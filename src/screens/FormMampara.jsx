@@ -1,24 +1,24 @@
 import { useState } from "react";
 import ScreenHeader from "../Component/ScreenHeader";
 
-const API = "http://localhost:3001";
+const API = "http://https://integral-backend-production.up.railway.app";
 const VIDRIOS = ["Incoloro", "Esmerilado"];
 
 export default function FormMampara({ modelo, onBack }) {
   const [form, setForm] = useState({
-    nombre:    "",
-    cantidad:  "1",
-    ancho:     "",
-    alto:      "",
-    vidrio:    "Incoloro",
-    colocacion:"",
+    nombre: "",
+    cantidad: "1",
+    ancho: "",
+    alto: "",
+    vidrio: "Incoloro",
+    colocacion: "",
   });
 
-  const [resultado, setResultado]   = useState(null); // { vidrio, heraje, total }
+  const [resultado, setResultado] = useState(null); // { vidrio, heraje, total }
   const [calculando, setCalculando] = useState(false);
-  const [guardando, setGuardando]   = useState(false);
-  const [error, setError]           = useState("");
-  const [exito, setExito]           = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+  const [exito, setExito] = useState("");
 
   const set = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -42,9 +42,9 @@ export default function FormMampara({ modelo, onBack }) {
         body: JSON.stringify({
           codformv: modelo?.codformv,
           variables: {
-            ancho:      parseFloat(form.ancho),
-            alto:       parseFloat(form.alto),
-            cantidad:   parseInt(form.cantidad),
+            ancho: parseFloat(form.ancho),
+            alto: parseFloat(form.alto),
+            cantidad: parseInt(form.cantidad),
             colocacion: parseFloat(form.colocacion) || 0,
           },
         }),
@@ -61,24 +61,30 @@ export default function FormMampara({ modelo, onBack }) {
 
   // ── Guardar ───────────────────────────────────────────────
   const guardar = async () => {
-    if (!resultado)          { setError("Primero calculá el valor."); return; }
-    if (!form.nombre.trim()) { setError("El nombre es obligatorio."); return; }
+    if (!resultado) {
+      setError("Primero calculá el valor.");
+      return;
+    }
+    if (!form.nombre.trim()) {
+      setError("El nombre es obligatorio.");
+      return;
+    }
     setGuardando(true);
     setError("");
     try {
       const today = new Date().toISOString().split("T")[0];
       const body = {
-        NOMBRE:        form.nombre,
-        FECHA:         today,
-        CANTIDAD:      parseInt(form.cantidad),
-        MODELO:        modelo?.label ?? "",
-        ANCHO:         parseFloat(form.ancho),
-        ALTO:          parseFloat(form.alto),
-        VIDRIO:        form.vidrio,
-        COLOCACION:    parseFloat(form.colocacion) || 0,
-        VALOR_VIDRIO:  resultado.vidrio,
-        VALOR_HERAJE:  resultado.heraje,
-        TOTAL:         resultado.total,
+        NOMBRE: form.nombre,
+        FECHA: today,
+        CANTIDAD: parseInt(form.cantidad),
+        MODELO: modelo?.label ?? "",
+        ANCHO: parseFloat(form.ancho),
+        ALTO: parseFloat(form.alto),
+        VIDRIO: form.vidrio,
+        COLOCACION: parseFloat(form.colocacion) || 0,
+        VALOR_VIDRIO: resultado.vidrio,
+        VALOR_HERAJE: resultado.heraje,
+        TOTAL: resultado.total,
       };
       const res = await fetch(`${API}/presupuestos-mamparas`, {
         method: "POST",
@@ -106,35 +112,56 @@ export default function FormMampara({ modelo, onBack }) {
       />
 
       <div className="formmampara-wrap">
-        <button className="ver-tablas-back" onClick={onBack}>← Volver</button>
+        <button className="ver-tablas-back" onClick={onBack}>
+          ← Volver
+        </button>
 
         <div className="formmampara-body">
-
           {/* Nombre */}
           <div className="form-group">
             <label className="form-label">Nombre / Cliente *</label>
-            <input className="form-input" placeholder="Ej: Juan Pérez"
-              value={form.nombre} onChange={(e) => set("nombre", e.target.value)} />
+            <input
+              className="form-input"
+              placeholder="Ej: Juan Pérez"
+              value={form.nombre}
+              onChange={(e) => set("nombre", e.target.value)}
+            />
           </div>
 
           {/* Cantidad */}
           <div className="form-group">
             <label className="form-label">Cantidad</label>
-            <input className="form-input" type="number" min="1" placeholder="1"
-              value={form.cantidad} onChange={(e) => set("cantidad", e.target.value)} />
+            <input
+              className="form-input"
+              type="number"
+              min="1"
+              placeholder="1"
+              value={form.cantidad}
+              onChange={(e) => set("cantidad", e.target.value)}
+            />
           </div>
 
           {/* Ancho / Alto */}
           <div className="formmampara-row">
             <div className="form-group">
               <label className="form-label">Ancho (cm)</label>
-              <input className="form-input" type="number" placeholder="Ej: 80"
-                value={form.ancho} onChange={(e) => set("ancho", e.target.value)} />
+              <input
+                className="form-input"
+                type="number"
+                placeholder="Ej: 80"
+                value={form.ancho}
+                onChange={(e) => set("ancho", e.target.value)}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">Alto (cm)</label>
-              <input className="form-input" type="number" placeholder="Ej: 200"
-                value={form.alto} onChange={(e) => set("alto", e.target.value)} />
+              <input
+                className="form-input"
+                type="number"
+                placeholder="Ej: 200"
+                value={form.alto}
+                onChange={(e) => set("alto", e.target.value)}
+              />
             </div>
           </div>
 
@@ -143,7 +170,9 @@ export default function FormMampara({ modelo, onBack }) {
             <label className="form-label">Vidrio</label>
             <div className="formmampara-vidrio">
               {VIDRIOS.map((v) => (
-                <button key={v} type="button"
+                <button
+                  key={v}
+                  type="button"
                   className={`formmampara-vidrio-btn${form.vidrio === v ? " selected" : ""}`}
                   onClick={() => set("vidrio", v)}
                 >
@@ -156,8 +185,13 @@ export default function FormMampara({ modelo, onBack }) {
           {/* Colocación */}
           <div className="form-group">
             <label className="form-label">Colocación ($)</label>
-            <input className="form-input" type="number" placeholder="Ej: 5000"
-              value={form.colocacion} onChange={(e) => set("colocacion", e.target.value)} />
+            <input
+              className="form-input"
+              type="number"
+              placeholder="Ej: 5000"
+              value={form.colocacion}
+              onChange={(e) => set("colocacion", e.target.value)}
+            />
           </div>
 
           {/* Errores / Éxito */}
@@ -184,8 +218,14 @@ export default function FormMampara({ modelo, onBack }) {
 
           {/* Acciones */}
           <div className="form-actions">
-            <button className="btn-cancel" onClick={onBack}>Cancelar</button>
-            <button className="btn-save" onClick={calcular} disabled={calculando}>
+            <button className="btn-cancel" onClick={onBack}>
+              Cancelar
+            </button>
+            <button
+              className="btn-save"
+              onClick={calcular}
+              disabled={calculando}
+            >
               {calculando ? "Calculando..." : "🧮 Calcular"}
             </button>
             {resultado && (
@@ -199,7 +239,6 @@ export default function FormMampara({ modelo, onBack }) {
               </button>
             )}
           </div>
-
         </div>
       </div>
     </>

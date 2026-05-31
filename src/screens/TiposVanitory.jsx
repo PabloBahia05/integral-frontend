@@ -5,7 +5,7 @@ import ActionBar from "../Component/ActionBar";
 import ScreenHeader from "../Component/ScreenHeader";
 import ConfirmDelete from "../Component/ConfirmDelete";
 
-const API = "http://localhost:3001";
+const API = "http://https://integral-backend-production.up.railway.app";
 
 const COLUMNS = [
   { key: "id", label: "ID" },
@@ -88,11 +88,11 @@ export default function TiposVanitory({
   const fileRef = useRef(null);
 
   // Buscador de artículos
-  const [artQuery, setArtQuery]               = useState("");
-  const [artResultados, setArtResultados]     = useState([]);
-  const [artBuscando, setArtBuscando]         = useState(false);
+  const [artQuery, setArtQuery] = useState("");
+  const [artResultados, setArtResultados] = useState([]);
+  const [artBuscando, setArtBuscando] = useState(false);
   const [artSeleccionado, setArtSeleccionado] = useState(null);
-  const artTimer                              = useRef(null);
+  const artTimer = useRef(null);
 
   const cargarRubros = () => {
     fetch(`${API}/articulos/rubros`)
@@ -110,7 +110,10 @@ export default function TiposVanitory({
   const buscarArticulos = (q) => {
     setArtQuery(q);
     clearTimeout(artTimer.current);
-    if (!q.trim()) { setArtResultados([]); return; }
+    if (!q.trim()) {
+      setArtResultados([]);
+      return;
+    }
     artTimer.current = setTimeout(() => {
       setArtBuscando(true);
       fetch(`${API}/vanitory-tipos/buscar-articulo?q=${encodeURIComponent(q)}`)
@@ -127,10 +130,10 @@ export default function TiposVanitory({
     setArtResultados([]);
     setForm((f) => ({
       ...f,
-      nombre:    art.articulo  ?? f.nombre,
+      nombre: art.articulo ?? f.nombre,
       codtipvan: art.codartint ?? f.codtipvan,
-      rubro:     art.rubro     ?? f.rubro,
-      foto:      art.artfoto   ?? f.foto,
+      rubro: art.rubro ?? f.rubro,
+      foto: art.artfoto ?? f.foto,
     }));
   };
 
@@ -205,8 +208,14 @@ export default function TiposVanitory({
   };
 
   const handleSubmit = () => {
-    if (!form.nombre.trim())    { setError("Seleccioná un artículo de la lista."); return; }
-    if (!form.codtipvan.trim()) { setError("El código es obligatorio."); return; }
+    if (!form.nombre.trim()) {
+      setError("Seleccioná un artículo de la lista.");
+      return;
+    }
+    if (!form.codtipvan.trim()) {
+      setError("El código es obligatorio.");
+      return;
+    }
     onSave(modal === "nuevo" ? form : { ...form, id: selected.id });
     onCloseModal();
     setForm(EMPTY);
@@ -226,42 +235,131 @@ export default function TiposVanitory({
         {onVolver && (
           <button
             onClick={onVolver}
-            style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#2563eb",
+              cursor: "pointer",
+              fontSize: 13,
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
           >
             ← Volver a muebles
           </button>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 6,
+          }}
+        >
           <span style={{ fontSize: 28 }}>🛁</span>
           <div>
-            <div style={{ fontFamily: "Syne, sans-serif", fontSize: 26, fontWeight: 800, color: "#0a3a5c", textTransform: "uppercase" }}>Vanitory</div>
-            <div style={{ fontSize: 12, color: "#6699bb", letterSpacing: 2 }}>Elegí un modelo o armá uno personalizado</div>
+            <div
+              style={{
+                fontFamily: "Syne, sans-serif",
+                fontSize: 26,
+                fontWeight: 800,
+                color: "#0a3a5c",
+                textTransform: "uppercase",
+              }}
+            >
+              Vanitory
+            </div>
+            <div style={{ fontSize: 12, color: "#6699bb", letterSpacing: 2 }}>
+              Elegí un modelo o armá uno personalizado
+            </div>
           </div>
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginTop: 24 }}>
+        <div
+          style={{ display: "flex", flexWrap: "wrap", gap: 20, marginTop: 24 }}
+        >
           {(tiposVanitory ?? []).map((tipo) => (
             <div
               key={tipo.id}
               onClick={() => onArmar?.(tipo)}
               style={{
-                width: 240, borderRadius: 12, overflow: "hidden",
-                border: "1.5px solid #d0dde8", background: "#fff",
-                cursor: "pointer", transition: "all 0.15s", boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                width: 240,
+                borderRadius: 12,
+                overflow: "hidden",
+                border: "1.5px solid #d0dde8",
+                background: "#fff",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
               }}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.13)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; e.currentTarget.style.transform = "none"; }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.13)";
+                e.currentTarget.style.transform = "translateY(-2px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
+                e.currentTarget.style.transform = "none";
+              }}
             >
-              {tipo.foto
-                ? <img src={tipo.foto} alt={tipo.nombre} style={{ width: "100%", height: 160, objectFit: "cover" }} />
-                : <div style={{ width: "100%", height: 160, background: "#e8f0f7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40 }}>🛁</div>
-              }
+              {tipo.foto ? (
+                <img
+                  src={tipo.foto}
+                  alt={tipo.nombre}
+                  style={{ width: "100%", height: 160, objectFit: "cover" }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "100%",
+                    height: 160,
+                    background: "#e8f0f7",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 40,
+                  }}
+                >
+                  🛁
+                </div>
+              )}
               <div style={{ padding: "14px 16px" }}>
-                <div style={{ fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: 15, color: "#0a3a5c", textTransform: "uppercase" }}>{tipo.nombre}</div>
-                {tipo.descripcion && <div style={{ fontSize: 12, color: "#6699bb", marginTop: 2 }}>{tipo.descripcion}</div>}
+                <div
+                  style={{
+                    fontFamily: "Rajdhani, sans-serif",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    color: "#0a3a5c",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {tipo.nombre}
+                </div>
+                {tipo.descripcion && (
+                  <div style={{ fontSize: 12, color: "#6699bb", marginTop: 2 }}>
+                    {tipo.descripcion}
+                  </div>
+                )}
                 {tipo.codtipvan && (
-                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                    }}
+                  >
                     <span style={{ color: "#e63946", fontSize: 13 }}>🔨</span>
-                    <span style={{ fontFamily: "Space Mono, monospace", fontSize: 12, color: "#e63946", fontWeight: 600 }}>{tipo.codtipvan}</span>
+                    <span
+                      style={{
+                        fontFamily: "Space Mono, monospace",
+                        fontSize: 12,
+                        color: "#e63946",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {tipo.codtipvan}
+                    </span>
                   </div>
                 )}
               </div>
@@ -271,17 +369,44 @@ export default function TiposVanitory({
           <div
             onClick={() => onArmar?.(null)}
             style={{
-              width: 240, height: 220, borderRadius: 12,
-              background: "#0f2944", cursor: "pointer",
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              gap: 12, transition: "all 0.15s", boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              width: 240,
+              height: 220,
+              borderRadius: 12,
+              background: "#0f2944",
+              cursor: "pointer",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+              transition: "all 0.15s",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
             }}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.2)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; e.currentTarget.style.transform = "none"; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.2)";
+              e.currentTarget.style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
+              e.currentTarget.style.transform = "none";
+            }}
           >
             <span style={{ fontSize: 36, color: "#fff" }}>🔧</span>
-            <div style={{ fontFamily: "Rajdhani, sans-serif", fontWeight: 800, fontSize: 18, color: "#fff", textTransform: "uppercase", letterSpacing: 2 }}>Armar</div>
-            <div style={{ fontSize: 12, color: "#7aaac8" }}>Modelo personalizado</div>
+            <div
+              style={{
+                fontFamily: "Rajdhani, sans-serif",
+                fontWeight: 800,
+                fontSize: 18,
+                color: "#fff",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+              }}
+            >
+              Armar
+            </div>
+            <div style={{ fontSize: 12, color: "#7aaac8" }}>
+              Modelo personalizado
+            </div>
           </div>
         </div>
       </div>
@@ -394,34 +519,99 @@ export default function TiposVanitory({
                 autoComplete="off"
               />
               {artBuscando && (
-                <div style={{ fontSize: 11, color: "#6699bb", marginTop: 3 }}>Buscando…</div>
+                <div style={{ fontSize: 11, color: "#6699bb", marginTop: 3 }}>
+                  Buscando…
+                </div>
               )}
               {artResultados.length > 0 && (
-                <div style={{
-                  position: "absolute", top: "100%", left: 0, right: 0, zIndex: 999,
-                  background: "#fff", border: "1.5px solid #d0dde8", borderRadius: 8,
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.12)", maxHeight: 220, overflowY: "auto",
-                }}>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    zIndex: 999,
+                    background: "#fff",
+                    border: "1.5px solid #d0dde8",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                    maxHeight: 220,
+                    overflowY: "auto",
+                  }}
+                >
                   {artResultados.map((art) => (
                     <div
                       key={art.id}
                       onClick={() => seleccionarArticulo(art)}
                       style={{
-                        padding: "8px 14px", cursor: "pointer", borderBottom: "1px solid #f0f4f8",
-                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "8px 14px",
+                        cursor: "pointer",
+                        borderBottom: "1px solid #f0f4f8",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = "#eff4ff"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#eff4ff";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "";
+                      }}
                     >
-                      {art.artfoto
-                        ? <img src={art.artfoto} alt="" style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4, border: "1px solid #d0dde8" }} />
-                        : <div style={{ width: 32, height: 32, background: "#e8f0f7", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🛁</div>
-                      }
+                      {art.artfoto ? (
+                        <img
+                          src={art.artfoto}
+                          alt=""
+                          style={{
+                            width: 32,
+                            height: 32,
+                            objectFit: "cover",
+                            borderRadius: 4,
+                            border: "1px solid #d0dde8",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            background: "#e8f0f7",
+                            borderRadius: 4,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 16,
+                          }}
+                        >
+                          🛁
+                        </div>
+                      )}
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#0a3a5c" }}>{art.articulo}</div>
-                        {art.rubro && <div style={{ fontSize: 11, color: "#6699bb" }}>{art.rubro}</div>}
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "#0a3a5c",
+                          }}
+                        >
+                          {art.articulo}
+                        </div>
+                        {art.rubro && (
+                          <div style={{ fontSize: 11, color: "#6699bb" }}>
+                            {art.rubro}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ marginLeft: "auto", fontFamily: "Space Mono, monospace", fontSize: 10, color: "#e63946" }}>{art.codartint}</div>
+                      <div
+                        style={{
+                          marginLeft: "auto",
+                          fontFamily: "Space Mono, monospace",
+                          fontSize: 10,
+                          color: "#e63946",
+                        }}
+                      >
+                        {art.codartint}
+                      </div>
                     </div>
                   ))}
                 </div>

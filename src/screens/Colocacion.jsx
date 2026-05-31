@@ -18,34 +18,41 @@ import ConfirmDelete from "../Component/ConfirmDelete";
      GET    /articulos/rubro-de?codart= → { rubro }
 ───────────────────────────────────────────── */
 
-const API = "http://localhost:3001";
+const API = "http://https://integral-backend-production.up.railway.app";
 
-const EMPTY_FORM = { id: null, rubro: "", codart: "", articulo: "", precio: "", porcentaje: "" };
+const EMPTY_FORM = {
+  id: null,
+  rubro: "",
+  codart: "",
+  articulo: "",
+  precio: "",
+  porcentaje: "",
+};
 
 const DISPLAY_COLUMNS = [
-  { key: "articulo",          label: "Artículo"     },
-  { key: "codart",            label: "Cód. art."    },
-  { key: "precioDisplay",     label: "Precio ($)"   },
+  { key: "articulo", label: "Artículo" },
+  { key: "codart", label: "Cód. art." },
+  { key: "precioDisplay", label: "Precio ($)" },
   { key: "porcentajeDisplay", label: "Porcentaje %" },
 ];
 
 export default function Colocacion() {
-  const [selected, setSelected]         = useState(null);
-  const [modal, setModal]               = useState(null);
-  const onSelect     = (row) => setSelected(row?.id === selected?.id ? null : row);
-  const onOpenModal  = (m)   => setModal(m);
-  const onCloseModal = ()    => setModal(null);
+  const [selected, setSelected] = useState(null);
+  const [modal, setModal] = useState(null);
+  const onSelect = (row) => setSelected(row?.id === selected?.id ? null : row);
+  const onOpenModal = (m) => setModal(m);
+  const onCloseModal = () => setModal(null);
 
   const [colocaciones, setColocaciones] = useState([]);
-  const [form, setForm]                 = useState(EMPTY_FORM);
-  const [error, setError]               = useState("");
-  const [search, setSearch]             = useState("");
-  const [saving, setSaving]             = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
   const pendingCodart = useRef("");
 
-  const [rubros, setRubros]                     = useState([]);
-  const [artsPorRubro, setArtsPorRubro]         = useState([]);
-  const [loadingRubros, setLoadingRubros]       = useState(false);
+  const [rubros, setRubros] = useState([]);
+  const [artsPorRubro, setArtsPorRubro] = useState([]);
+  const [loadingRubros, setLoadingRubros] = useState(false);
   const [loadingArticulos, setLoadingArticulos] = useState(false);
 
   /* ── cargar colocaciones al montar ── */
@@ -68,7 +75,10 @@ export default function Colocacion() {
 
   /* ── cargar artículos cuando cambia el rubro ── */
   useEffect(() => {
-    if (!form.rubro) { setArtsPorRubro([]); return; }
+    if (!form.rubro) {
+      setArtsPorRubro([]);
+      return;
+    }
     setLoadingArticulos(true);
     fetch(`${API}/articulos/por-rubro?rubro=${encodeURIComponent(form.rubro)}`)
       .then((r) => r.json())
@@ -81,7 +91,7 @@ export default function Colocacion() {
           if (art) {
             setForm((prev) => ({
               ...prev,
-              codart:   art.codart,
+              codart: art.codart,
               articulo: art.articulo,
             }));
           }
@@ -95,15 +105,21 @@ export default function Colocacion() {
   /* ── filas para la tabla principal ── */
   const rows = colocaciones.map((c) => ({
     ...c,
-    precioDisplay:     c.precio     != null && c.precio     !== "" ? Number(c.precio).toLocaleString("es-AR", { minimumFractionDigits: 2 }) : "—",
-    porcentajeDisplay: c.porcentaje != null && c.porcentaje !== "" ? `${Number(c.porcentaje).toLocaleString("es-AR")}%` : "—",
+    precioDisplay:
+      c.precio != null && c.precio !== ""
+        ? Number(c.precio).toLocaleString("es-AR", { minimumFractionDigits: 2 })
+        : "—",
+    porcentajeDisplay:
+      c.porcentaje != null && c.porcentaje !== ""
+        ? `${Number(c.porcentaje).toLocaleString("es-AR")}%`
+        : "—",
   }));
 
   const filtered = rows.filter((r) => {
     const q = search.toLowerCase();
     return (
       (r.articulo ?? "").toLowerCase().includes(q) ||
-      (r.codart   ?? "").toLowerCase().includes(q)
+      (r.codart ?? "").toLowerCase().includes(q)
     );
   });
 
@@ -119,12 +135,12 @@ export default function Colocacion() {
     if (!selected) return;
     pendingCodart.current = "";
     setForm({
-      id:          selected.id,
-      rubro:       "",
-      codart:      selected.codart      ?? "",
-      articulo:    selected.articulo    ?? "",
-      precio:      selected.precio      ?? "",
-      porcentaje:  selected.porcentaje  ?? "",
+      id: selected.id,
+      rubro: "",
+      codart: selected.codart ?? "",
+      articulo: selected.articulo ?? "",
+      precio: selected.precio ?? "",
+      porcentaje: selected.porcentaje ?? "",
     });
     setError("");
     onOpenModal("editar");
@@ -135,8 +151,8 @@ export default function Colocacion() {
     pendingCodart.current = "";
     setForm((prev) => ({
       ...prev,
-      rubro:    e.target.value,
-      codart:   "",
+      rubro: e.target.value,
+      codart: "",
       articulo: "",
     }));
   };
@@ -146,21 +162,30 @@ export default function Colocacion() {
     const art = artsPorRubro.find((a) => a.codart === e.target.value);
     setForm((prev) => ({
       ...prev,
-      codart:   art?.codart   ?? "",
+      codart: art?.codart ?? "",
       articulo: art?.articulo ?? "",
     }));
   };
 
   /* ── guardar: POST o PUT directo al servidor ── */
   const handleSubmit = async () => {
-    if (modal === "nuevo" && !form.rubro)                    { setError("Seleccioná un rubro."); return; }
-    if (!form.codart)                                         { setError("Seleccioná un artículo."); return; }
-    if (form.precio === "" && form.porcentaje === "")         { setError("Ingresá al menos precio o porcentaje."); return; }
+    if (modal === "nuevo" && !form.rubro) {
+      setError("Seleccioná un rubro.");
+      return;
+    }
+    if (!form.codart) {
+      setError("Seleccioná un artículo.");
+      return;
+    }
+    if (form.precio === "" && form.porcentaje === "") {
+      setError("Ingresá al menos precio o porcentaje.");
+      return;
+    }
 
     const payload = {
-      codart:     form.codart,
-      articulo:   form.articulo,
-      precio:     form.precio     !== "" ? form.precio     : null,
+      codart: form.codart,
+      articulo: form.articulo,
+      precio: form.precio !== "" ? form.precio : null,
       porcentaje: form.porcentaje !== "" ? form.porcentaje : null,
     };
 
@@ -171,9 +196,9 @@ export default function Colocacion() {
       if (modal === "nuevo") {
         /* ── POST ── */
         const res = await fetch(`${API}/colocacion`, {
-          method:  "POST",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(payload),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error("Error al guardar");
         const nueva = await res.json();
@@ -181,14 +206,14 @@ export default function Colocacion() {
       } else {
         /* ── PUT ── */
         const res = await fetch(`${API}/colocacion/${form.id}`, {
-          method:  "PUT",
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(payload),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error("Error al actualizar");
         const actualizada = await res.json();
         setColocaciones((prev) =>
-          prev.map((c) => (c.id === actualizada.id ? actualizada : c))
+          prev.map((c) => (c.id === actualizada.id ? actualizada : c)),
         );
       }
 
@@ -218,7 +243,11 @@ export default function Colocacion() {
   /* ── render ── */
   return (
     <>
-      <ScreenHeader icon="📐" title="Colocación" subtitle="Gestión de valores de colocación por artículo" />
+      <ScreenHeader
+        icon="📐"
+        title="Colocación"
+        subtitle="Gestión de valores de colocación por artículo"
+      />
 
       <ActionBar
         selected={selected}
@@ -257,10 +286,14 @@ export default function Colocacion() {
                   disabled={loadingRubros}
                 >
                   <option value="">
-                    {loadingRubros ? "Cargando rubros..." : "— seleccionar rubro —"}
+                    {loadingRubros
+                      ? "Cargando rubros..."
+                      : "— seleccionar rubro —"}
                   </option>
                   {rubros.map((r) => (
-                    <option key={r} value={r}>{r}</option>
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -273,14 +306,18 @@ export default function Colocacion() {
                   value={form.codart}
                   onChange={handleArticuloChange}
                   disabled={!form.rubro || loadingArticulos}
-                  style={!form.rubro ? { background: "#f0f6fb", cursor: "not-allowed" } : {}}
+                  style={
+                    !form.rubro
+                      ? { background: "#f0f6fb", cursor: "not-allowed" }
+                      : {}
+                  }
                 >
                   <option value="">
                     {!form.rubro
                       ? "Primero seleccioná un rubro"
                       : loadingArticulos
-                      ? "Cargando artículos..."
-                      : "— seleccionar artículo —"}
+                        ? "Cargando artículos..."
+                        : "— seleccionar artículo —"}
                   </option>
                   {artsPorRubro.map((a) => (
                     <option key={a.codart} value={a.codart}>
@@ -335,7 +372,9 @@ export default function Colocacion() {
               placeholder="0.00 — dejar vacío si no aplica"
               value={form.precio}
               autoFocus={modal === "editar"}
-              onChange={(e) => setForm((prev) => ({ ...prev, precio: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, precio: e.target.value }))
+              }
             />
           </div>
 
@@ -349,16 +388,30 @@ export default function Colocacion() {
               min="0"
               placeholder="0.00 — dejar vacío si no aplica"
               value={form.porcentaje}
-              onChange={(e) => setForm((prev) => ({ ...prev, porcentaje: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, porcentaje: e.target.value }))
+              }
             />
           </div>
 
           <div className="form-actions">
-            <button className="btn-cancel" onClick={onCloseModal} disabled={saving}>
+            <button
+              className="btn-cancel"
+              onClick={onCloseModal}
+              disabled={saving}
+            >
               Cancelar
             </button>
-            <button className="btn-save" onClick={handleSubmit} disabled={saving}>
-              {saving ? "Guardando..." : modal === "nuevo" ? "Guardar" : "Actualizar"}
+            <button
+              className="btn-save"
+              onClick={handleSubmit}
+              disabled={saving}
+            >
+              {saving
+                ? "Guardando..."
+                : modal === "nuevo"
+                  ? "Guardar"
+                  : "Actualizar"}
             </button>
           </div>
         </Modal>
@@ -366,7 +419,11 @@ export default function Colocacion() {
 
       {/* ── confirmación de borrado ── */}
       {modal === "eliminar" && (
-        <ConfirmDelete item={selected} onConfirm={handleDelete} onClose={onCloseModal} />
+        <ConfirmDelete
+          item={selected}
+          onConfirm={handleDelete}
+          onClose={onCloseModal}
+        />
       )}
     </>
   );

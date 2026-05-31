@@ -2,28 +2,28 @@ import { useState, useEffect } from "react";
 import ScreenHeader from "../Component/ScreenHeader";
 import PresupuestoVanitory from "./PresupuestoVanitory";
 
-const API = "http://localhost:3001";
+const API = "http://https://integral-backend-production.up.railway.app";
 
 const OTROS_ITEMS = [
-  { id: "cocina",     label: "Cocina",     icon: "🍳" },
-  { id: "placares",   label: "Placares",   icon: "🚪" },
+  { id: "cocina", label: "Cocina", icon: "🍳" },
+  { id: "placares", label: "Placares", icon: "🚪" },
   { id: "despensero", label: "Despensero", icon: "🗄️" },
   { id: "escritorio", label: "Escritorio", icon: "🖥️" },
 ];
 
 export default function PresupuestoMuebles({ onSelectItem }) {
-  const [subScreen, setSubScreen]     = useState(null); // null | "vanitory-modelos" | "vanitory-presup"
+  const [subScreen, setSubScreen] = useState(null); // null | "vanitory-modelos" | "vanitory-presup"
   const [tiposVanitory, setTiposVanitory] = useState([]);
   const [modeloSeleccionado, setModeloSeleccionado] = useState(null);
-  const [loading, setLoading]         = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Cargar tipos de vanitory al entrar a esa sección
   useEffect(() => {
     if (subScreen !== "vanitory-modelos") return;
     setLoading(true);
     fetch(`${API}/vanitory-tipos`)
-      .then(r => r.json())
-      .then(d => setTiposVanitory(Array.isArray(d) ? d : []))
+      .then((r) => r.json())
+      .then((d) => setTiposVanitory(Array.isArray(d) ? d : []))
       .catch(() => setTiposVanitory([]))
       .finally(() => setLoading(false));
   }, [subScreen]);
@@ -33,7 +33,10 @@ export default function PresupuestoMuebles({ onSelectItem }) {
     return (
       <PresupuestoVanitory
         modelo={modeloSeleccionado}
-        onVolver={() => { setSubScreen("vanitory-modelos"); setModeloSeleccionado(null); }}
+        onVolver={() => {
+          setSubScreen("vanitory-modelos");
+          setModeloSeleccionado(null);
+        }}
       />
     );
   }
@@ -85,10 +88,14 @@ export default function PresupuestoMuebles({ onSelectItem }) {
             ← Volver a muebles
           </button>
           <div className="van-title">🛁 Vanitory</div>
-          <div className="van-subtitle">Elegí un modelo o armá uno personalizado</div>
+          <div className="van-subtitle">
+            Elegí un modelo o armá uno personalizado
+          </div>
 
           {loading ? (
-            <div style={{ color: "#4a8ab5", fontStyle: "italic" }}>⏳ Cargando modelos...</div>
+            <div style={{ color: "#4a8ab5", fontStyle: "italic" }}>
+              ⏳ Cargando modelos...
+            </div>
           ) : (
             <div className="van-grid">
               {/* Modelos desde BD */}
@@ -96,17 +103,30 @@ export default function PresupuestoMuebles({ onSelectItem }) {
                 <div
                   key={tipo.id}
                   className="van-card"
-                  onClick={() => { setModeloSeleccionado(tipo); setSubScreen("vanitory-presup"); }}
+                  onClick={() => {
+                    setModeloSeleccionado(tipo);
+                    setSubScreen("vanitory-presup");
+                  }}
                 >
                   {tipo.foto && tipo.foto !== "null" ? (
-                    <img className="van-card-img" src={tipo.foto} alt={tipo.nombre} />
+                    <img
+                      className="van-card-img"
+                      src={tipo.foto}
+                      alt={tipo.nombre}
+                    />
                   ) : (
                     <div className="van-card-img-empty">🛁</div>
                   )}
                   <div className="van-card-body">
                     <div className="van-card-nombre">{tipo.nombre}</div>
-                    {tipo.descripcion && <div className="van-card-desc">{tipo.descripcion}</div>}
-                    {tipo.codtipvan   && <div className="van-card-material">🔖 {tipo.codtipvan}</div>}
+                    {tipo.descripcion && (
+                      <div className="van-card-desc">{tipo.descripcion}</div>
+                    )}
+                    {tipo.codtipvan && (
+                      <div className="van-card-material">
+                        🔖 {tipo.codtipvan}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -114,7 +134,14 @@ export default function PresupuestoMuebles({ onSelectItem }) {
               {/* Botón ARMAR personalizado */}
               <button
                 className="van-card-armar"
-                onClick={() => { setModeloSeleccionado({ id: null, NOMBRE: "Personalizado", custom: true }); setSubScreen("vanitory-presup"); }}
+                onClick={() => {
+                  setModeloSeleccionado({
+                    id: null,
+                    NOMBRE: "Personalizado",
+                    custom: true,
+                  });
+                  setSubScreen("vanitory-presup");
+                }}
               >
                 <span className="van-card-armar-icon">🔧</span>
                 <span className="van-card-armar-label">Armar</span>
@@ -143,18 +170,29 @@ export default function PresupuestoMuebles({ onSelectItem }) {
           color: #0f2944; letter-spacing: 0.08em; text-transform: uppercase; }
       `}</style>
 
-      <ScreenHeader icon="🪵" title="Presupuesto Muebles" subtitle="Seleccioná un tipo de mueble" />
+      <ScreenHeader
+        icon="🪵"
+        title="Presupuesto Muebles"
+        subtitle="Seleccioná un tipo de mueble"
+      />
 
       <div className="presup-grid">
         {/* Vanitory — abre selector de modelos */}
-        <button className="presup-card" onClick={() => setSubScreen("vanitory-modelos")}>
+        <button
+          className="presup-card"
+          onClick={() => setSubScreen("vanitory-modelos")}
+        >
           <span className="presup-icon">🛁</span>
           <span className="presup-label">Vanitory</span>
         </button>
 
         {/* Resto de items */}
         {OTROS_ITEMS.map((item) => (
-          <button key={item.id} className="presup-card" onClick={() => onSelectItem?.(item)}>
+          <button
+            key={item.id}
+            className="presup-card"
+            onClick={() => onSelectItem?.(item)}
+          >
             <span className="presup-icon">{item.icon}</span>
             <span className="presup-label">{item.label}</span>
           </button>

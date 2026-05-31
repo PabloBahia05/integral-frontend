@@ -6,7 +6,7 @@ import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
 
-const API = "http://localhost:3001";
+const API = "http://https://integral-backend-production.up.railway.app";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -19,11 +19,11 @@ const formatFecha = (f) => {
   if (!f) return "—";
   const d = new Date(f);
   if (isNaN(d)) return f;
-  const dd   = String(d.getDate()).padStart(2, "0");
-  const mm   = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
   const yyyy = d.getFullYear();
-  const hh   = String(d.getHours()).padStart(2, "0");
-  const min  = String(d.getMinutes()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
   return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
 };
 
@@ -39,41 +39,44 @@ const COLS_ENCABEZADO = [
     key: "revision",
     label: "Rev.",
     render: (v) => (
-      <span style={{
-        display: "inline-block",
-        background:   Number(v) === 0 ? "#eaf3fb" : "#fff3cd",
-        color:        Number(v) === 0 ? "#2d7fc1" : "#856404",
-        border:       `1px solid ${Number(v) === 0 ? "#b8d6ef" : "#ffc107"}`,
-        borderRadius: "4px",
-        padding:      "1px 8px",
-        fontSize:     "11px",
-        fontWeight:   700,
-        fontFamily:   "'Space Mono', monospace",
-      }}>
+      <span
+        style={{
+          display: "inline-block",
+          background: Number(v) === 0 ? "#eaf3fb" : "#fff3cd",
+          color: Number(v) === 0 ? "#2d7fc1" : "#856404",
+          border: `1px solid ${Number(v) === 0 ? "#b8d6ef" : "#ffc107"}`,
+          borderRadius: "4px",
+          padding: "1px 8px",
+          fontSize: "11px",
+          fontWeight: 700,
+          fontFamily: "'Space Mono', monospace",
+        }}
+      >
         Rev. {v ?? 0}
       </span>
     ),
   },
   { key: "nombre", label: "Cliente" },
-  { key: "fecha",  label: "Fecha",  render: (v) => formatFecha(v) },
-  { key: "linea1", label: "Lista"   },
-  { key: "total1", label: "Total",  render: (v) => formatPeso(v) },
+  { key: "fecha", label: "Fecha", render: (v) => formatFecha(v) },
+  { key: "linea1", label: "Lista" },
+  { key: "total1", label: "Total", render: (v) => formatPeso(v) },
 ];
 
 // ── Columnas ítems ────────────────────────────────────────────────────────────
 
 const COLS_ITEMS = [
-  { key: "tipo",      label: "Sección"     },
-  { key: "articulo",  label: "Artículo"    },
+  { key: "tipo", label: "Sección" },
+  { key: "articulo", label: "Artículo" },
   { key: "nombreart", label: "Descripción" },
-  { key: "cantidad",  label: "Cant.",      render: (v) => v ?? 1 },
-  { key: "ancho",     label: "Ancho",      render: (v) => v ? `${v} cm` : "—" },
-  { key: "alto",      label: "Alto",       render: (v) => v ? `${v} cm` : "—" },
-  { key: "valor1",    label: "Precio u.",  render: (v) => formatPeso(v) },
+  { key: "cantidad", label: "Cant.", render: (v) => v ?? 1 },
+  { key: "ancho", label: "Ancho", render: (v) => (v ? `${v} cm` : "—") },
+  { key: "alto", label: "Alto", render: (v) => (v ? `${v} cm` : "—") },
+  { key: "valor1", label: "Precio u.", render: (v) => formatPeso(v) },
   {
     key: "_subtotal",
     label: "Subtotal",
-    render: (_, row) => formatPeso(Number(row.valor1 ?? 0) * (Number(row.cantidad) || 1)),
+    render: (_, row) =>
+      formatPeso(Number(row.valor1 ?? 0) * (Number(row.cantidad) || 1)),
   },
 ];
 
@@ -84,15 +87,17 @@ const COLS_HISTORIAL = [
     key: "revision",
     label: "Rev.",
     render: (v) => (
-      <span className={`rev-badge ${Number(v) === 0 ? "rev-badge-0" : "rev-badge-n"}`}>
+      <span
+        className={`rev-badge ${Number(v) === 0 ? "rev-badge-0" : "rev-badge-n"}`}
+      >
         Rev. {String(v ?? 0).padStart(2, "0")}
       </span>
     ),
   },
-  { key: "fecha",  label: "Fecha",  render: (v) => formatFecha(v) },
+  { key: "fecha", label: "Fecha", render: (v) => formatFecha(v) },
   { key: "nombre", label: "Cliente" },
-  { key: "linea1", label: "Lista"   },
-  { key: "total1", label: "Total",  render: (v) => formatPeso(v) },
+  { key: "linea1", label: "Lista" },
+  { key: "total1", label: "Total", render: (v) => formatPeso(v) },
 ];
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -100,20 +105,20 @@ const COLS_HISTORIAL = [
 export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
   // Encabezados (un registro por numeropres, última revisión)
   const [encabezados, setEncabezados] = useState([]);
-  const [loadingEnc, setLoadingEnc]   = useState(true);
+  const [loadingEnc, setLoadingEnc] = useState(true);
 
   // Ítems del presupuesto seleccionado
   const [itemsDetalle, setItemsDetalle] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
 
   // Revisiones del numeropres seleccionado
-  const [revisiones, setRevisiones]       = useState([]);
-  const [loadingRev, setLoadingRev]       = useState(false);
+  const [revisiones, setRevisiones] = useState([]);
+  const [loadingRev, setLoadingRev] = useState(false);
   const [modalHistorial, setModalHistorial] = useState(false);
 
   const [selected, setSelected] = useState(null);
-  const [search, setSearch]     = useState("");
-  const [modal, setModal]       = useState(null);
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState(null);
 
   // ── Fetch encabezados ─────────────────────────────────────────────────────
 
@@ -121,22 +126,35 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
     setLoadingEnc(true);
     fetch(`${API}/tabla-presupuestos/encabezados`)
       .then((r) => r.json())
-      .then((data) => setEncabezados(Array.isArray(data) ? data.map((e, i) => ({
-        ...e,
-        id: `${e.numeropres}-${e.revision}`,   // id único para DataTable
-      })) : []))
+      .then((data) =>
+        setEncabezados(
+          Array.isArray(data)
+            ? data.map((e, i) => ({
+                ...e,
+                id: `${e.numeropres}-${e.revision}`, // id único para DataTable
+              }))
+            : [],
+        ),
+      )
       .catch(console.error)
       .finally(() => setLoadingEnc(false));
   };
 
-  useEffect(() => { fetchEncabezados(); }, []);
+  useEffect(() => {
+    fetchEncabezados();
+  }, []);
 
   // ── Fetch ítems al seleccionar ────────────────────────────────────────────
 
   useEffect(() => {
-    if (!selected) { setItemsDetalle([]); return; }
+    if (!selected) {
+      setItemsDetalle([]);
+      return;
+    }
     setLoadingItems(true);
-    fetch(`${API}/tabla-presupuestos?numeropres=${selected.numeropres}&revision=${selected.revision}`)
+    fetch(
+      `${API}/tabla-presupuestos?numeropres=${selected.numeropres}&revision=${selected.revision}`,
+    )
       .then((r) => r.json())
       .then((data) => setItemsDetalle(Array.isArray(data) ? data : []))
       .catch(console.error)
@@ -151,10 +169,16 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
     setModalHistorial(true);
     fetch(`${API}/tabla-presupuestos/revisiones/${selected.numeropres}`)
       .then((r) => r.json())
-      .then((data) => setRevisiones(Array.isArray(data) ? data.map((r) => ({
-        ...r,
-        id: `${r.numeropres}-${r.revision}`,
-      })) : []))
+      .then((data) =>
+        setRevisiones(
+          Array.isArray(data)
+            ? data.map((r) => ({
+                ...r,
+                id: `${r.numeropres}-${r.revision}`,
+              }))
+            : [],
+        ),
+      )
       .catch(console.error)
       .finally(() => setLoadingRev(false));
   };
@@ -168,14 +192,18 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
   // ── Filtro ────────────────────────────────────────────────────────────────
 
   const q = search.toLowerCase();
-  const filtered = encabezados.filter((e) =>
-    (e.nombre  ?? "").toLowerCase().includes(q) ||
-    String(e.numeropres ?? "").includes(q)      ||
-    (e.fecha   ?? "").includes(q)               ||
-    (e.linea1  ?? "").toLowerCase().includes(q)
+  const filtered = encabezados.filter(
+    (e) =>
+      (e.nombre ?? "").toLowerCase().includes(q) ||
+      String(e.numeropres ?? "").includes(q) ||
+      (e.fecha ?? "").includes(q) ||
+      (e.linea1 ?? "").toLowerCase().includes(q),
   );
 
-  const totalGeneral = encabezados.reduce((s, e) => s + Number(e.total1 ?? 0), 0);
+  const totalGeneral = encabezados.reduce(
+    (s, e) => s + Number(e.total1 ?? 0),
+    0,
+  );
 
   // ── DELETE: borra todos los ítems de la revisión seleccionada ─────────────
 
@@ -184,8 +212,8 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
     try {
       await Promise.all(
         itemsDetalle.map((it) =>
-          fetch(`${API}/tabla-presupuestos/${it.id}`, { method: "DELETE" })
-        )
+          fetch(`${API}/tabla-presupuestos/${it.id}`, { method: "DELETE" }),
+        ),
       );
       fetchEncabezados();
       setSelected(null);
@@ -258,11 +286,13 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
         subtitle="Registro de presupuestos"
       />
 
-      <StatCards stats={[
-        { label: "Total presupuestos", value: encabezados.length },
-        { label: "Filtrados",          value: filtered.length    },
-        { label: "Total general",      value: formatPeso(totalGeneral) },
-      ]} />
+      <StatCards
+        stats={[
+          { label: "Total presupuestos", value: encabezados.length },
+          { label: "Filtrados", value: filtered.length },
+          { label: "Total general", value: formatPeso(totalGeneral) },
+        ]}
+      />
 
       {/* ── Barra de acciones ─────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -296,7 +326,13 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
 
       {/* ── Tabla encabezados ─────────────────────────────────────────── */}
       {loadingEnc ? (
-        <p style={{ padding: "24px", color: "#4a8ab5", fontFamily: "'Space Mono',monospace" }}>
+        <p
+          style={{
+            padding: "24px",
+            color: "#4a8ab5",
+            fontFamily: "'Space Mono',monospace",
+          }}
+        >
           ⏳ Cargando presupuestos...
         </p>
       ) : (
@@ -313,7 +349,8 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
         <div className="items-panel">
           <div className="items-panel-header">
             <span>
-              📄 Ítems — N° {String(selected.numeropres).padStart(4, "0")} · {selected.nombre} · Rev. {selected.revision}
+              📄 Ítems — N° {String(selected.numeropres).padStart(4, "0")} ·{" "}
+              {selected.nombre} · Rev. {selected.revision}
             </span>
             <span className="items-panel-total">
               Total: {formatPeso(selected.total1)}
@@ -341,9 +378,15 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
           onClose={() => setModalHistorial(false)}
         >
           {loadingRev ? (
-            <p style={{ textAlign: "center", padding: "24px", color: "#4a8ab5" }}>⏳ Cargando...</p>
+            <p
+              style={{ textAlign: "center", padding: "24px", color: "#4a8ab5" }}
+            >
+              ⏳ Cargando...
+            </p>
           ) : revisiones.length === 0 ? (
-            <p style={{ textAlign: "center", padding: "24px", color: "#8aabb8" }}>
+            <p
+              style={{ textAlign: "center", padding: "24px", color: "#8aabb8" }}
+            >
               No hay revisiones registradas.
             </p>
           ) : (
@@ -351,21 +394,23 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
               columns={[
                 ...COLS_HISTORIAL,
                 ...(onAbrirPresupuesto
-                  ? [{
-                      key: "_abrir",
-                      label: "",
-                      render: (_, row) => (
-                        <button
-                          className="btn-abrir-sm"
-                          onClick={() => {
-                            setModalHistorial(false);
-                            onAbrirPresupuesto(row);
-                          }}
-                        >
-                          📝 Abrir
-                        </button>
-                      ),
-                    }]
+                  ? [
+                      {
+                        key: "_abrir",
+                        label: "",
+                        render: (_, row) => (
+                          <button
+                            className="btn-abrir-sm"
+                            onClick={() => {
+                              setModalHistorial(false);
+                              onAbrirPresupuesto(row);
+                            }}
+                          >
+                            📝 Abrir
+                          </button>
+                        ),
+                      },
+                    ]
                   : []),
               ]}
               rows={revisiones}
@@ -374,7 +419,12 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
             />
           )}
           <div className="form-actions" style={{ marginTop: "16px" }}>
-            <button className="btn-cancel" onClick={() => setModalHistorial(false)}>Cerrar</button>
+            <button
+              className="btn-cancel"
+              onClick={() => setModalHistorial(false)}
+            >
+              Cerrar
+            </button>
           </div>
         </Modal>
       )}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const API = "http://localhost:3001";
+const API = "http://https://integral-backend-production.up.railway.app";
 
 const STYLE = `
   .usr-wrap { padding: 24px; font-family: 'Space Mono', monospace; }
@@ -37,21 +37,26 @@ const emptyForm = { id: "", nombre: "", apellido: "", activo: 1 };
 
 export default function Usuarios({ onBack }) {
   const [usuarios, setUsuarios] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [modal, setModal]       = useState(false);
-  const [form, setForm]         = useState(emptyForm);
-  const [editId, setEditId]     = useState(null);
-  const [error, setError]       = useState("");
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [editId, setEditId] = useState(null);
+  const [error, setError] = useState("");
 
   const fetchUsuarios = () => {
     setLoading(true);
     fetch(`${API}/usuarios`)
       .then((r) => r.json())
-      .then((d) => { setUsuarios(Array.isArray(d) ? d : []); setLoading(false); })
+      .then((d) => {
+        setUsuarios(Array.isArray(d) ? d : []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { fetchUsuarios(); }, []);
+  useEffect(() => {
+    fetchUsuarios();
+  }, []);
 
   const openNew = () => {
     setForm(emptyForm);
@@ -61,7 +66,12 @@ export default function Usuarios({ onBack }) {
   };
 
   const openEdit = (u) => {
-    setForm({ id: u.id, nombre: u.nombre, apellido: u.apellido, activo: u.activo });
+    setForm({
+      id: u.id,
+      nombre: u.nombre,
+      apellido: u.apellido,
+      activo: u.activo,
+    });
     setEditId(u.id);
     setError("");
     setModal(true);
@@ -74,17 +84,24 @@ export default function Usuarios({ onBack }) {
       return;
     }
 
-    const url    = editId ? `${API}/usuarios/${editId}` : `${API}/usuarios`;
+    const url = editId ? `${API}/usuarios/${editId}` : `${API}/usuarios`;
     const method = editId ? "PUT" : "POST";
 
     fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, id: Number(form.id), activo: Number(form.activo) }),
+      body: JSON.stringify({
+        ...form,
+        id: Number(form.id),
+        activo: Number(form.activo),
+      }),
     })
       .then((r) => r.json())
       .then((d) => {
-        if (d.error) { setError(d.error); return; }
+        if (d.error) {
+          setError(d.error);
+          return;
+        }
         setModal(false);
         fetchUsuarios();
       })
@@ -93,8 +110,9 @@ export default function Usuarios({ onBack }) {
 
   const handleDelete = (u) => {
     if (!confirm(`¿Eliminar a ${u.apellido} ${u.nombre}?`)) return;
-    fetch(`${API}/usuarios/${u.id}`, { method: "DELETE" })
-      .then(() => fetchUsuarios());
+    fetch(`${API}/usuarios/${u.id}`, { method: "DELETE" }).then(() =>
+      fetchUsuarios(),
+    );
   };
 
   return (
@@ -102,9 +120,13 @@ export default function Usuarios({ onBack }) {
       <style>{STYLE}</style>
 
       <div className="usr-header">
-        <button className="usr-btn sec" onClick={onBack}>← Volver</button>
+        <button className="usr-btn sec" onClick={onBack}>
+          ← Volver
+        </button>
         <span className="usr-title">👥 Usuarios</span>
-        <button className="usr-btn" onClick={openNew}>+ Nuevo usuario</button>
+        <button className="usr-btn" onClick={openNew}>
+          + Nuevo usuario
+        </button>
       </div>
 
       <div className="usr-table-wrap">
@@ -126,7 +148,9 @@ export default function Usuarios({ onBack }) {
             <tbody>
               {usuarios.map((u) => (
                 <tr key={u.id}>
-                  <td><strong>{u.id}</strong></td>
+                  <td>
+                    <strong>{u.id}</strong>
+                  </td>
                   <td>{u.apellido}</td>
                   <td>{u.nombre}</td>
                   <td>
@@ -135,8 +159,15 @@ export default function Usuarios({ onBack }) {
                     </span>
                   </td>
                   <td style={{ display: "flex", gap: 8 }}>
-                    <button className="usr-btn sec" onClick={() => openEdit(u)}>Editar</button>
-                    <button className="usr-btn red" onClick={() => handleDelete(u)}>Eliminar</button>
+                    <button className="usr-btn sec" onClick={() => openEdit(u)}>
+                      Editar
+                    </button>
+                    <button
+                      className="usr-btn red"
+                      onClick={() => handleDelete(u)}
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -189,11 +220,19 @@ export default function Usuarios({ onBack }) {
               </select>
             </div>
 
-            {error && <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>{error}</p>}
+            {error && (
+              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
+                {error}
+              </p>
+            )}
 
             <div className="modal-actions">
-              <button className="usr-btn sec" onClick={() => setModal(false)}>Cancelar</button>
-              <button className="usr-btn" onClick={handleSave}>Guardar</button>
+              <button className="usr-btn sec" onClick={() => setModal(false)}>
+                Cancelar
+              </button>
+              <button className="usr-btn" onClick={handleSave}>
+                Guardar
+              </button>
             </div>
           </div>
         </div>

@@ -1,52 +1,52 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [
     react({
       babel: {
-        plugins: [['babel-plugin-react-compiler']],
+        plugins: [["babel-plugin-react-compiler"]],
       },
     }),
   ],
   server: {
     proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
+      "/api": {
+        target: "http://https://integral-backend-production.up.railway.app",
         changeOrigin: true,
       },
-      '/clientes': {
-        target: 'http://localhost:3001',
+      "/clientes": {
+        target: "http://https://integral-backend-production.up.railway.app",
         changeOrigin: true,
       },
-      '/proveedores': {
-        target: 'http://localhost:3001',
+      "/proveedores": {
+        target: "http://https://integral-backend-production.up.railway.app",
         changeOrigin: true,
       },
-      '/articulos': {
-        target: 'http://localhost:3001',
+      "/articulos": {
+        target: "http://https://integral-backend-production.up.railway.app",
         changeOrigin: true,
       },
-      '/facturas': {
-        target: 'http://localhost:3001',
+      "/facturas": {
+        target: "http://https://integral-backend-production.up.railway.app",
         changeOrigin: true,
       },
-      '/facturas-items': {
-        target: 'http://localhost:3001',
+      "/facturas-items": {
+        target: "http://https://integral-backend-production.up.railway.app",
         changeOrigin: true,
       },
-      '/fichadas': {
-        target: 'http://localhost:3001',
+      "/fichadas": {
+        target: "http://https://integral-backend-production.up.railway.app",
         changeOrigin: true,
       },
-      '/usuarios': {
-        target: 'http://localhost:3001',
+      "/usuarios": {
+        target: "http://https://integral-backend-production.up.railway.app",
         changeOrigin: true,
       },
-      '/anviz': {
-        target: 'http://localhost:3001',
+      "/anviz": {
+        target: "http://https://integral-backend-production.up.railway.app",
         changeOrigin: true,
       },
     },
   },
-})
+});

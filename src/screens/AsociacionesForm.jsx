@@ -1,15 +1,43 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
-const API = "http://localhost:3001";
+const API = "http://https://integral-backend-production.up.railway.app";
 const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 const EMPTY = () => ({
-  codart: "", articulo: "", rubro: "", familia: "",
-  codf1: "", form1: "", titulo1: "", codf2: "", form2: "", titulo2: "",
-  codf3: "", form3: "", titulo3: "", codf4: "", form4: "", titulo4: "",
-  codf5: "", form5: "", titulo5: "", codf6: "", form6: "", titulo6: "",
-  codf7: "", form7: "", titulo7: "", codf8: "", form8: "", titulo8: "",
-  codf9: "", form9: "", titulo9: "", codf10: "", form10: "", titulo10: "",
+  codart: "",
+  articulo: "",
+  rubro: "",
+  familia: "",
+  codf1: "",
+  form1: "",
+  titulo1: "",
+  codf2: "",
+  form2: "",
+  titulo2: "",
+  codf3: "",
+  form3: "",
+  titulo3: "",
+  codf4: "",
+  form4: "",
+  titulo4: "",
+  codf5: "",
+  form5: "",
+  titulo5: "",
+  codf6: "",
+  form6: "",
+  titulo6: "",
+  codf7: "",
+  form7: "",
+  titulo7: "",
+  codf8: "",
+  form8: "",
+  titulo8: "",
+  codf9: "",
+  form9: "",
+  titulo9: "",
+  codf10: "",
+  form10: "",
+  titulo10: "",
 });
 
 const styles = `
@@ -311,26 +339,32 @@ export default function AsociacionesForm({
   onOpenModal,
   onCloseModal,
 }) {
-  const [search, setSearch]       = useState("");
-  const [form, setForm]           = useState(EMPTY());
-  const [editId, setEditId]       = useState(null);
+  const [search, setSearch] = useState("");
+  const [form, setForm] = useState(EMPTY());
+  const [editId, setEditId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const [rubros, setRubros]       = useState([]);
-  const [familias, setFamilias]   = useState([]);
-  const [formulas, setFormulas]   = useState([]);
+  const [rubros, setRubros] = useState([]);
+  const [familias, setFamilias] = useState([]);
+  const [formulas, setFormulas] = useState([]);
 
-  const [rubroPadre, setRubroPadre]     = useState("");
+  const [rubroPadre, setRubroPadre] = useState("");
   const [familiaPadre, setFamiliaPadre] = useState("");
-  const [artsPadre, setArtsPadre]       = useState([]);
+  const [artsPadre, setArtsPadre] = useState([]);
 
   const [rubroSlots, setRubroSlots] = useState(() =>
-    Object.fromEntries(SLOTS.map(n => [n, ""]))
+    Object.fromEntries(SLOTS.map((n) => [n, ""])),
   );
 
   // Drag state for modal
   const [modalPos, setModalPos] = useState({ x: null, y: null });
-  const dragRef = useRef({ dragging: false, startX: 0, startY: 0, origX: 0, origY: 0 });
+  const dragRef = useRef({
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    origX: 0,
+    origY: 0,
+  });
 
   const onDragStart = useCallback((e) => {
     const box = e.currentTarget.closest(".aform-modal-box");
@@ -347,7 +381,10 @@ export default function AsociacionesForm({
       if (!dragRef.current.dragging) return;
       const dx = ev.clientX - dragRef.current.startX;
       const dy = ev.clientY - dragRef.current.startY;
-      setModalPos({ x: dragRef.current.origX + dx, y: dragRef.current.origY + dy });
+      setModalPos({
+        x: dragRef.current.origX + dx,
+        y: dragRef.current.origY + dy,
+      });
     };
     const onUp = () => {
       dragRef.current.dragging = false;
@@ -362,59 +399,81 @@ export default function AsociacionesForm({
   // const formulaRef = useRef(null);
 
   useEffect(() => {
-    fetch(`${API}/articulos/rubros`).then(r => r.json()).then(setRubros).catch(() => {});
-    fetch(`${API}/articulos/familias-todas`).then(r => r.json()).then(setFamilias).catch(() => {});
-    fetch(`${API}/formulas`).then(r => r.json()).then(setFormulas).catch(() => {});
+    fetch(`${API}/articulos/rubros`)
+      .then((r) => r.json())
+      .then(setRubros)
+      .catch(() => {});
+    fetch(`${API}/articulos/familias-todas`)
+      .then((r) => r.json())
+      .then(setFamilias)
+      .catch(() => {});
+    fetch(`${API}/formulas`)
+      .then((r) => r.json())
+      .then(setFormulas)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (!rubroPadre && !familiaPadre) { setArtsPadre([]); return; }
+    if (!rubroPadre && !familiaPadre) {
+      setArtsPadre([]);
+      return;
+    }
     let url = `${API}/articulos/por-rubro?`;
-    if (rubroPadre)   url += `rubro=${encodeURIComponent(rubroPadre)}`;
-    if (familiaPadre) url += `${rubroPadre ? "&" : ""}familia=${encodeURIComponent(familiaPadre)}`;
+    if (rubroPadre) url += `rubro=${encodeURIComponent(rubroPadre)}`;
+    if (familiaPadre)
+      url += `${rubroPadre ? "&" : ""}familia=${encodeURIComponent(familiaPadre)}`;
     fetch(url)
-      .then(r => r.json())
-      .then(data => setArtsPadre(Array.isArray(data) ? data : []))
+      .then((r) => r.json())
+      .then((data) => setArtsPadre(Array.isArray(data) ? data : []))
       .catch(() => setArtsPadre([]));
   }, [rubroPadre, familiaPadre]);
 
   useEffect(() => {
     if (!artsPadre.length || !form.articulo) return;
-    const found = artsPadre.find(a => a.articulo === form.articulo);
+    const found = artsPadre.find((a) => a.articulo === form.articulo);
     if (found && found.codart && !form.codart) {
-      setForm(f => ({ ...f, codart: found.codart }));
+      setForm((f) => ({ ...f, codart: found.codart }));
     }
   }, [artsPadre]);
 
   const openAdd = () => {
-    setForm(EMPTY()); setEditId(null);
-    setRubroPadre(""); setFamiliaPadre("");
-    setRubroSlots(Object.fromEntries(SLOTS.map(n => [n, ""])));
+    setForm(EMPTY());
+    setEditId(null);
+    setRubroPadre("");
+    setFamiliaPadre("");
+    setRubroSlots(Object.fromEntries(SLOTS.map((n) => [n, ""])));
     setModalPos({ x: null, y: null });
-    setModalOpen(true); onOpenModal?.("form");
+    setModalOpen(true);
+    onOpenModal?.("form");
   };
 
   const openEdit = (row) => {
-    setForm({ ...row });   // row ya tiene codart y articulo correctos
+    setForm({ ...row }); // row ya tiene codart y articulo correctos
     setEditId(row.id);
     setRubroPadre(row.rubro ?? "");
     setFamiliaPadre(row.familia ?? "");
-    setRubroSlots(Object.fromEntries(SLOTS.map(n => [n, ""])));
+    setRubroSlots(Object.fromEntries(SLOTS.map((n) => [n, ""])));
     setModalPos({ x: null, y: null });
-    setModalOpen(true); onOpenModal?.("form");
+    setModalOpen(true);
+    onOpenModal?.("form");
   };
 
   const openDuplicate = (row) => {
     const { id, ...rest } = row;
     setForm({ ...rest, codart: "", articulo: "" });
     setEditId(null);
-    setRubroPadre(""); setFamiliaPadre("");
-    setRubroSlots(Object.fromEntries(SLOTS.map(n => [n, ""])));
+    setRubroPadre("");
+    setFamiliaPadre("");
+    setRubroSlots(Object.fromEntries(SLOTS.map((n) => [n, ""])));
     setModalPos({ x: null, y: null });
-    setModalOpen(true); onOpenModal?.("form");
+    setModalOpen(true);
+    onOpenModal?.("form");
   };
 
-  const closeModal = () => { setModalOpen(false); onCloseModal?.(); };
+  const closeModal = () => {
+    setModalOpen(false);
+    onCloseModal?.();
+  };
 
   // Guardar asociación
   const handleSave = async () => {
@@ -422,25 +481,28 @@ export default function AsociacionesForm({
 
     // Incluir todos los campos del form en el payload (articulo, rubro y familia
     // son columnas reales de la tabla asociaciones_form y deben enviarse al PUT)
-    const payload = editId !== null
-      ? { id: editId, ...form }   // makeCRUD detecta edición por !!item.id
-      : { ...form };              // creación: sin id → MySQL lo autogenera
+    const payload =
+      editId !== null
+        ? { id: editId, ...form } // makeCRUD detecta edición por !!item.id
+        : { ...form }; // creación: sin id → MySQL lo autogenera
     onSave?.(payload);
     closeModal();
   };
 
   const handlePadreChange = (value) => {
-    const found = artsPadre.find(a => a.articulo === value || a.codart === value);
-    setForm(f => ({
+    const found = artsPadre.find(
+      (a) => a.articulo === value || a.codart === value,
+    );
+    setForm((f) => ({
       ...f,
       articulo: found ? found.articulo : value,
-      codart:   found ? found.codart   : "",
+      codart: found ? found.codart : "",
     }));
   };
 
   const handleSlotForm = (slot, codform) => {
-    const found = formulas.find(f => f.codform === codform);
-    setForm(f => ({
+    const found = formulas.find((f) => f.codform === codform);
+    setForm((f) => ({
       ...f,
       [`codf${slot}`]: codform,
       [`form${slot}`]: found ? (found.formula ?? "") : "",
@@ -455,14 +517,16 @@ export default function AsociacionesForm({
     // Sin textarea de fórmula principal, esta función queda como placeholder
   };
 
-  const filtered = useMemo(() =>
-    asociacionesForm.filter(a =>
-      !search ||
-      (a.articulo ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (a.codart   ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (a.codf     ?? "").toLowerCase().includes(search.toLowerCase())
-    ),
-    [asociacionesForm, search]
+  const filtered = useMemo(
+    () =>
+      asociacionesForm.filter(
+        (a) =>
+          !search ||
+          (a.articulo ?? "").toLowerCase().includes(search.toLowerCase()) ||
+          (a.codart ?? "").toLowerCase().includes(search.toLowerCase()) ||
+          (a.codf ?? "").toLowerCase().includes(search.toLowerCase()),
+      ),
+    [asociacionesForm, search],
   );
 
   const showModal = modal === "form" || modalOpen;
@@ -471,7 +535,6 @@ export default function AsociacionesForm({
     <>
       <style>{styles}</style>
       <div className="aform-root">
-
         <div className="aform-header">
           <div className="aform-header-left">
             <span className="aform-eyebrow">Gestión de fórmulas</span>
@@ -489,7 +552,7 @@ export default function AsociacionesForm({
               className="aform-search"
               placeholder="Buscar por artículo, código o fórmula…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <button className="aform-btn-add" onClick={openAdd}>
@@ -509,7 +572,9 @@ export default function AsociacionesForm({
                   <th>Cód. Art.</th>
                   <th>Artículo</th>
                   <th>Rubro</th>
-                  {SLOTS.map(n => <th key={n}>Form {n}</th>)}
+                  {SLOTS.map((n) => (
+                    <th key={n}>Form {n}</th>
+                  ))}
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -519,50 +584,99 @@ export default function AsociacionesForm({
                     <td colSpan={4 + SLOTS.length + 1}>
                       <div className="aform-empty">
                         <div className="aform-empty-icon">🧮</div>
-                        <div className="aform-empty-text">Sin registros de fórmulas asociadas</div>
+                        <div className="aform-empty-text">
+                          Sin registros de fórmulas asociadas
+                        </div>
                       </div>
                     </td>
                   </tr>
-                ) : filtered.map(row => (
-                  <tr
-                    key={row.id}
-                    className={selected?.id === row.id ? "row-selected" : ""}
-                    onClick={() => onSelect?.(row)}
-                  >
-                    <td><span className="aform-id-badge">{row.id}</span></td>
-                    <td><span className="aform-cod-badge">{row.codart}</span></td>
-                    <td><span className="aform-padre-name">{row.articulo}</span></td>
-                    <td><span style={{ fontSize: 12, color: "#64748b" }}>{row.rubro || "—"}</span></td>
-                    {SLOTS.map(n => (
-                      <td key={n}>
-                        {row[`codf${n}`]
-                          ? <div className="aform-slot-cell">
-                              <span className="aform-slot-form">{row[`codf${n}`]}</span>
+                ) : (
+                  filtered.map((row) => (
+                    <tr
+                      key={row.id}
+                      className={selected?.id === row.id ? "row-selected" : ""}
+                      onClick={() => onSelect?.(row)}
+                    >
+                      <td>
+                        <span className="aform-id-badge">{row.id}</span>
+                      </td>
+                      <td>
+                        <span className="aform-cod-badge">{row.codart}</span>
+                      </td>
+                      <td>
+                        <span className="aform-padre-name">{row.articulo}</span>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: 12, color: "#64748b" }}>
+                          {row.rubro || "—"}
+                        </span>
+                      </td>
+                      {SLOTS.map((n) => (
+                        <td key={n}>
+                          {row[`codf${n}`] ? (
+                            <div className="aform-slot-cell">
+                              <span className="aform-slot-form">
+                                {row[`codf${n}`]}
+                              </span>
                               {row[`titulo${n}`] && (
-                                <span style={{ fontSize: 11, color: "#64748b", marginTop: 1 }}>
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    color: "#64748b",
+                                    marginTop: 1,
+                                  }}
+                                >
                                   {row[`titulo${n}`]}
                                 </span>
                               )}
                             </div>
-                          : <span className="aform-slot-empty">—</span>
-                        }
+                          ) : (
+                            <span className="aform-slot-empty">—</span>
+                          )}
+                        </td>
+                      ))}
+                      <td>
+                        <div className="aform-actions">
+                          <button
+                            className="aform-btn-icon aform-btn-edit"
+                            title="Editar"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEdit(row);
+                            }}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="aform-btn-icon aform-btn-dup"
+                            title="Duplicar"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDuplicate(row);
+                            }}
+                          >
+                            📋
+                          </button>
+                          <button
+                            className="aform-btn-icon aform-btn-del"
+                            title="Eliminar"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (
+                                window.confirm(
+                                  "¿Eliminar esta asociación de fórmula?",
+                                )
+                              )
+                                onDelete?.(row);
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </td>
-                    ))}
-                    <td>
-                      <div className="aform-actions">
-                        <button className="aform-btn-icon aform-btn-edit" title="Editar"
-                          onClick={e => { e.stopPropagation(); openEdit(row); }}>✏️</button>
-                        <button className="aform-btn-icon aform-btn-dup" title="Duplicar"
-                          onClick={e => { e.stopPropagation(); openDuplicate(row); }}>📋</button>
-                        <button className="aform-btn-icon aform-btn-del" title="Eliminar"
-                          onClick={e => {
-                            e.stopPropagation();
-                            if (window.confirm("¿Eliminar esta asociación de fórmula?")) onDelete?.(row);
-                          }}>🗑️</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -571,20 +685,44 @@ export default function AsociacionesForm({
         {/* ── Modal ── */}
         {showModal && (
           <>
-            <div className="aform-modal-overlay" onClick={closeModal} style={{ pointerEvents: "all" }} />
+            <div
+              className="aform-modal-overlay"
+              onClick={closeModal}
+              style={{ pointerEvents: "all" }}
+            />
             <div
               className="aform-modal-box"
-              style={modalPos.x !== null ? { left: modalPos.x, top: modalPos.y, transform: "none" } : {
-                left: "50%", top: "50%", transform: "translate(-50%, -50%)"
-              }}
-              onClick={e => e.stopPropagation()}
+              style={
+                modalPos.x !== null
+                  ? { left: modalPos.x, top: modalPos.y, transform: "none" }
+                  : {
+                      left: "50%",
+                      top: "50%",
+                      transform: "translate(-50%, -50%)",
+                    }
+              }
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="aform-modal-header" onMouseDown={onDragStart}>
                 <div className="aform-modal-title">
-                  🧮 {editId !== null ? "Editar Asociación de Fórmula" : "Nueva Asociación de Fórmula"}
-                  <span style={{fontSize:11, fontWeight:400, color:"#94a3b8", marginLeft:6}}>⠿ arrastrar</span>
+                  🧮{" "}
+                  {editId !== null
+                    ? "Editar Asociación de Fórmula"
+                    : "Nueva Asociación de Fórmula"}
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 400,
+                      color: "#94a3b8",
+                      marginLeft: 6,
+                    }}
+                  >
+                    ⠿ arrastrar
+                  </span>
                 </div>
-                <button className="aform-modal-close" onClick={closeModal}>✕</button>
+                <button className="aform-modal-close" onClick={closeModal}>
+                  ✕
+                </button>
               </div>
 
               {/* ── Artículo Padre ── */}
@@ -592,41 +730,76 @@ export default function AsociacionesForm({
               <div className="aform-padre-row">
                 <div className="aform-field-group">
                   <label className="aform-field-label">Rubro</label>
-                  <select className="aform-field-select" value={rubroPadre}
-                    onChange={e => { setRubroPadre(e.target.value); setForm(f => ({ ...f, rubro: e.target.value })); }}>
+                  <select
+                    className="aform-field-select"
+                    value={rubroPadre}
+                    onChange={(e) => {
+                      setRubroPadre(e.target.value);
+                      setForm((f) => ({ ...f, rubro: e.target.value }));
+                    }}
+                  >
                     <option value="">— Todos —</option>
-                    {rubros.map(r => <option key={r} value={r}>{r}</option>)}
+                    {rubros.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="aform-field-group">
                   <label className="aform-field-label">Familia</label>
-                  <select className="aform-field-select" value={familiaPadre}
-                    onChange={e => { setFamiliaPadre(e.target.value); setForm(f => ({ ...f, familia: e.target.value })); }}>
+                  <select
+                    className="aform-field-select"
+                    value={familiaPadre}
+                    onChange={(e) => {
+                      setFamiliaPadre(e.target.value);
+                      setForm((f) => ({ ...f, familia: e.target.value }));
+                    }}
+                  >
                     <option value="">— Todas —</option>
-                    {familias.map(f => <option key={f} value={f}>{f}</option>)}
+                    {familias.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="aform-field-group">
                   <label className="aform-field-label">Artículo</label>
-                  <select className="aform-field-select" value={form.articulo}
-                    onChange={e => handlePadreChange(e.target.value)}>
+                  <select
+                    className="aform-field-select"
+                    value={form.articulo}
+                    onChange={(e) => handlePadreChange(e.target.value)}
+                  >
                     <option value="">— Elegir artículo —</option>
-                    {form.articulo && !artsPadre.find(a => a.articulo === form.articulo) && (
-                      <option value={form.articulo}>{form.articulo}</option>
-                    )}
-                    {artsPadre.map(a => <option key={a.codart} value={a.articulo}>{a.articulo}</option>)}
+                    {form.articulo &&
+                      !artsPadre.find((a) => a.articulo === form.articulo) && (
+                        <option value={form.articulo}>{form.articulo}</option>
+                      )}
+                    {artsPadre.map((a) => (
+                      <option key={a.codart} value={a.articulo}>
+                        {a.articulo}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="aform-field-group">
                   <label className="aform-field-label">Código</label>
-                  <input className="aform-field-input readonly" value={form.codart} readOnly placeholder="(auto)" />
+                  <input
+                    className="aform-field-input readonly"
+                    value={form.codart}
+                    readOnly
+                    placeholder="(auto)"
+                  />
                 </div>
               </div>
 
               {/* ── Slots ── */}
-              <div className="aform-section-label">Fórmulas asociadas (hasta 10)</div>
+              <div className="aform-section-label">
+                Fórmulas asociadas (hasta 10)
+              </div>
               <div className="aform-slots-grid">
-                {SLOTS.map(n => {
+                {SLOTS.map((n) => {
                   const codformSlot = form[`codf${n}`];
                   return (
                     <div key={n} className="aform-slot-card">
@@ -634,31 +807,54 @@ export default function AsociacionesForm({
                         <div className="aform-slot-number">Form {n}</div>
                       </div>
                       {/* Filtro rubro (solo organización visual) */}
-                      <select className="aform-slot-select" value={rubroSlots[n]}
-                        onChange={e => setRubroSlots(prev => ({ ...prev, [n]: e.target.value }))}>
+                      <select
+                        className="aform-slot-select"
+                        value={rubroSlots[n]}
+                        onChange={(e) =>
+                          setRubroSlots((prev) => ({
+                            ...prev,
+                            [n]: e.target.value,
+                          }))
+                        }
+                      >
                         <option value="">— Filtrar por rubro —</option>
-                        {rubros.map(r => <option key={r} value={r}>{r}</option>)}
+                        {rubros.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
                       </select>
                       {/* Selector fórmula */}
                       <select
                         className="aform-slot-select"
                         value={codformSlot}
                         data-filled={!!codformSlot}
-                        onChange={e => handleSlotForm(n, e.target.value)}
+                        onChange={(e) => handleSlotForm(n, e.target.value)}
                       >
                         <option value="">— Ninguna —</option>
-                        {formulas.map(f => (
-                          <option key={f.id} value={f.codform}>{f.codform}</option>
+                        {formulas.map((f) => (
+                          <option key={f.id} value={f.codform}>
+                            {f.codform}
+                          </option>
                         ))}
                       </select>
                       {/* Título de la fórmula */}
                       <input
                         className="aform-slot-titulo"
                         value={form[`titulo${n}`] ?? ""}
-                        onChange={e => setForm(f => ({ ...f, [`titulo${n}`]: e.target.value }))}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            [`titulo${n}`]: e.target.value,
+                          }))
+                        }
                         placeholder="Título (ej: Peso neto, Rendimiento…)"
                         disabled={!codformSlot}
-                        style={!codformSlot ? { opacity: 0.4, cursor: "not-allowed" } : {}}
+                        style={
+                          !codformSlot
+                            ? { opacity: 0.4, cursor: "not-allowed" }
+                            : {}
+                        }
                       />
                       {/* Preview expresión */}
                       <input
@@ -673,16 +869,16 @@ export default function AsociacionesForm({
               </div>
 
               <div className="aform-modal-actions">
-                <button className="aform-btn-cancel" onClick={closeModal}>Cancelar</button>
+                <button className="aform-btn-cancel" onClick={closeModal}>
+                  Cancelar
+                </button>
                 <button className="aform-btn-save" onClick={handleSave}>
                   {editId !== null ? "Guardar cambios" : "Agregar"}
                 </button>
               </div>
-
             </div>
           </>
         )}
-
       </div>
     </>
   );

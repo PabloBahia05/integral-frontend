@@ -41,33 +41,55 @@ const TIPO_COLORS = {
 
 function Initials({ name }) {
   const words = (name || "?").trim().split(" ");
-  const initials = words.length >= 2
-    ? words[0][0] + words[1][0]
-    : words[0].slice(0, 2);
+  const initials =
+    words.length >= 2 ? words[0][0] + words[1][0] : words[0].slice(0, 2);
   const colors = ["#2563eb", "#7c3aed", "#0891b2", "#059669", "#d97706"];
   const color = colors[name?.charCodeAt(0) % colors.length] || colors[0];
   return (
-    <div style={{
-      width: 36, height: 36, borderRadius: "50%",
-      background: color + "22", border: `1.5px solid ${color}55`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: "0.7rem", fontWeight: 700, color, flexShrink: 0,
-      letterSpacing: "0.05em", textTransform: "uppercase",
-    }}>
+    <div
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: "50%",
+        background: color + "22",
+        border: `1.5px solid ${color}55`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "0.7rem",
+        fontWeight: 700,
+        color,
+        flexShrink: 0,
+        letterSpacing: "0.05em",
+        textTransform: "uppercase",
+      }}
+    >
       {initials.toUpperCase()}
     </div>
   );
 }
 
 function TipoBadge({ tipo }) {
-  if (!tipo) return <span style={{ color: "#475569", fontSize: "0.75rem" }}>—</span>;
-  const s = TIPO_COLORS[tipo] || { bg: "#1e293b", color: "#94a3b8", border: "#334155" };
+  if (!tipo)
+    return <span style={{ color: "#475569", fontSize: "0.75rem" }}>—</span>;
+  const s = TIPO_COLORS[tipo] || {
+    bg: "#1e293b",
+    color: "#94a3b8",
+    border: "#334155",
+  };
   return (
-    <span style={{
-      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
-      borderRadius: 6, padding: "2px 10px", fontSize: "0.75rem", fontWeight: 700,
-      letterSpacing: "0.08em",
-    }}>
+    <span
+      style={{
+        background: s.bg,
+        color: s.color,
+        border: `1px solid ${s.border}`,
+        borderRadius: 6,
+        padding: "2px 10px",
+        fontSize: "0.75rem",
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+      }}
+    >
       {tipo}
     </span>
   );
@@ -87,8 +109,17 @@ const inputStyle = {
 };
 
 const FIELDS = [
-  { label: "Nombre *", name: "provnombre", placeholder: "Razón social", col: "1 / -1" },
-  { label: "Nombre Fantasía", name: "fantasia", placeholder: "Nombre comercial" },
+  {
+    label: "Nombre *",
+    name: "provnombre",
+    placeholder: "Razón social",
+    col: "1 / -1",
+  },
+  {
+    label: "Nombre Fantasía",
+    name: "fantasia",
+    placeholder: "Nombre comercial",
+  },
   { label: "Localidad", name: "localidad", placeholder: "" },
   { label: "Domicilio", name: "domicilio", placeholder: "" },
   { label: "Dom. Remito", name: "domrem", placeholder: "Domicilio de remito" },
@@ -97,17 +128,25 @@ const FIELDS = [
   { label: "Teléfono", name: "telefono", placeholder: "" },
   { label: "Teléfono 2", name: "telefono1", placeholder: "" },
   { label: "WhatsApp", name: "wapp", placeholder: "" },
-  { label: "Ubicación", name: "ubicacion", placeholder: "URL o descripción", col: "1 / -1" },
+  {
+    label: "Ubicación",
+    name: "ubicacion",
+    placeholder: "URL o descripción",
+    col: "1 / -1",
+  },
   { label: "Descuento (%)", name: "descuento", placeholder: "0.00" },
 ];
 
 async function uploadImagenProveedor(file) {
   const formData = new FormData();
   formData.append("imagen", file);
-  const res = await fetch("http://localhost:3001/api/upload-imagen-proveedor", {
-    method: "POST",
-    body: formData,
-  });
+  const res = await fetch(
+    "http://https://integral-backend-production.up.railway.app/api/upload-imagen-proveedor",
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
   if (!res.ok) throw new Error("Error al subir imagen");
   return (await res.json()).url;
 }
@@ -115,84 +154,174 @@ async function uploadImagenProveedor(file) {
 async function uploadFactmodImagen(file) {
   const formData = new FormData();
   formData.append("imagen", file);
-  const res = await fetch("http://localhost:3001/api/upload-imagen", {
-    method: "POST",
-    body: formData,
-  });
+  const res = await fetch(
+    "http://https://integral-backend-production.up.railway.app/api/upload-imagen",
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
   if (!res.ok) throw new Error("Error al subir imagen modelo");
   return (await res.json()).url;
 }
 
 function FotoUpload({ value, onChange }) {
   const [dragging, setDragging] = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const inputRef = useRef(null);
   const processFile = async (file) => {
     if (!file || !file.type.startsWith("image/")) return;
-    setLoading(true); setError("");
-    try { onChange(await uploadImagenProveedor(file)); }
-    catch { setError("No se pudo subir la imagen."); }
-    finally { setLoading(false); }
+    setLoading(true);
+    setError("");
+    try {
+      onChange(await uploadImagenProveedor(file));
+    } catch {
+      setError("No se pudo subir la imagen.");
+    } finally {
+      setLoading(false);
+    }
   };
   return (
     <div className="form-field">
       <label className="form-label">Foto del proveedor</label>
       <div
         className={`foto-dropzone${dragging ? " foto-dropzone--active" : ""}`}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); processFile(e.dataTransfer.files[0]); }}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          processFile(e.dataTransfer.files[0]);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
         onDragLeave={() => setDragging(false)}
         onClick={() => !loading && inputRef.current.click()}
       >
-        {loading
-          ? <div className="foto-placeholder"><span className="foto-hint">⏳ Subiendo...</span></div>
-          : value
-            ? <img src={value} alt="Factura modelo" className="foto-preview" />
-            : <div className="foto-placeholder">
-                <span className="foto-icon">🧾</span>
-                <span className="foto-hint">{dragging ? "Soltá aquí" : "Arrastrá o hacé clic"}</span>
-              </div>}
-        <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }}
-          onChange={(e) => processFile(e.target.files[0])} />
+        {loading ? (
+          <div className="foto-placeholder">
+            <span className="foto-hint">⏳ Subiendo...</span>
+          </div>
+        ) : value ? (
+          <img src={value} alt="Factura modelo" className="foto-preview" />
+        ) : (
+          <div className="foto-placeholder">
+            <span className="foto-icon">🧾</span>
+            <span className="foto-hint">
+              {dragging ? "Soltá aquí" : "Arrastrá o hacé clic"}
+            </span>
+          </div>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => processFile(e.target.files[0])}
+        />
       </div>
-      {error && <p style={{ color: "red", fontSize: "0.8rem", marginTop: 4 }}>{error}</p>}
-      <input type="text" className="form-input" style={{ marginTop: "6px" }}
+      {error && (
+        <p style={{ color: "red", fontSize: "0.8rem", marginTop: 4 }}>
+          {error}
+        </p>
+      )}
+      <input
+        type="text"
+        className="form-input"
+        style={{ marginTop: "6px" }}
         placeholder="O pegá una URL: https://..."
-        value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+      />
       {value && (
-        <button type="button" className="btn-cancel"
+        <button
+          type="button"
+          className="btn-cancel"
           style={{ marginTop: "6px", fontSize: "0.8rem", padding: "4px 10px" }}
-          onClick={() => onChange("")}>Quitar imagen</button>
+          onClick={() => onChange("")}
+        >
+          Quitar imagen
+        </button>
       )}
     </div>
   );
 }
 
 const ANCLA_FIELDS = [
-  { label: "Número de factura", name: "ancla_numero",     placeholder: 'Ej: "N°", "Factura N°", "Comprobante"',        icon: "🔢" },
-  { label: "Fecha",             name: "ancla_fecha",      placeholder: 'Ej: "Fecha:", "Fecha de emisión"',              icon: "📅" },
-  { label: "Proveedor / Emisor",name: "ancla_proveedor",  placeholder: 'Ej: razón social tal como aparece en factura',  icon: "🏭" },
-  { label: "Total",             name: "ancla_total",      placeholder: 'Ej: "Total:", "TOTAL A PAGAR"',                 icon: "💰" },
-  { label: "IVA",               name: "ancla_iva",        placeholder: 'Ej: "I.V.A. 21%", "IVA"',                      icon: "%" },
-  { label: "Ítems / Descripción",name: "ancla_items",     placeholder: 'Ej: "Descripción", "Concepto", "Detalle"',      icon: "📋" },
-  { label: "Código de artículo", name: "ancla_codigo",    placeholder: 'Ej: "Código", "Cód.", "SKU", "Art."',           icon: "🏷️" },
-  { label: "Cantidad",           name: "ancla_cantidad",  placeholder: 'Ej: "Cant.", "Cantidad", "Unid."',              icon: "🔢" },
-  { label: "Precio unitario",    name: "ancla_precio_unit",placeholder: 'Ej: "Precio unit.", "P. Unit", "Valor"',       icon: "💲" },
+  {
+    label: "Número de factura",
+    name: "ancla_numero",
+    placeholder: 'Ej: "N°", "Factura N°", "Comprobante"',
+    icon: "🔢",
+  },
+  {
+    label: "Fecha",
+    name: "ancla_fecha",
+    placeholder: 'Ej: "Fecha:", "Fecha de emisión"',
+    icon: "📅",
+  },
+  {
+    label: "Proveedor / Emisor",
+    name: "ancla_proveedor",
+    placeholder: "Ej: razón social tal como aparece en factura",
+    icon: "🏭",
+  },
+  {
+    label: "Total",
+    name: "ancla_total",
+    placeholder: 'Ej: "Total:", "TOTAL A PAGAR"',
+    icon: "💰",
+  },
+  {
+    label: "IVA",
+    name: "ancla_iva",
+    placeholder: 'Ej: "I.V.A. 21%", "IVA"',
+    icon: "%",
+  },
+  {
+    label: "Ítems / Descripción",
+    name: "ancla_items",
+    placeholder: 'Ej: "Descripción", "Concepto", "Detalle"',
+    icon: "📋",
+  },
+  {
+    label: "Código de artículo",
+    name: "ancla_codigo",
+    placeholder: 'Ej: "Código", "Cód.", "SKU", "Art."',
+    icon: "🏷️",
+  },
+  {
+    label: "Cantidad",
+    name: "ancla_cantidad",
+    placeholder: 'Ej: "Cant.", "Cantidad", "Unid."',
+    icon: "🔢",
+  },
+  {
+    label: "Precio unitario",
+    name: "ancla_precio_unit",
+    placeholder: 'Ej: "Precio unit.", "P. Unit", "Valor"',
+    icon: "💲",
+  },
 ];
 
 function FactmodUpload({ value, onChange }) {
   const [dragging, setDragging] = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const inputRef = useRef(null);
 
   const processFile = async (file) => {
     if (!file || !file.type.startsWith("image/")) return;
-    setLoading(true); setError("");
-    try { onChange(await uploadFactmodImagen(file)); }
-    catch { setError("No se pudo subir la imagen modelo."); }
-    finally { setLoading(false); }
+    setLoading(true);
+    setError("");
+    try {
+      onChange(await uploadFactmodImagen(file));
+    } catch {
+      setError("No se pudo subir la imagen modelo.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -200,30 +329,62 @@ function FactmodUpload({ value, onChange }) {
       <label className="form-label">Imagen modelo</label>
       <div
         className={`foto-dropzone${dragging ? " foto-dropzone--active" : ""}`}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); processFile(e.dataTransfer.files[0]); }}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          processFile(e.dataTransfer.files[0]);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
         onDragLeave={() => setDragging(false)}
         onClick={() => !loading && inputRef.current.click()}
       >
-        {loading
-          ? <div className="foto-placeholder"><span className="foto-hint">⏳ Subiendo...</span></div>
-          : value
-            ? <img src={value} alt="Factura modelo" className="foto-preview" />
-            : <div className="foto-placeholder">
-                <span className="foto-icon">🧾</span>
-                <span className="foto-hint">{dragging ? "Soltá aquí" : "Arrastrá o hacé clic"}</span>
-              </div>}
-        <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }}
-          onChange={(e) => processFile(e.target.files[0])} />
+        {loading ? (
+          <div className="foto-placeholder">
+            <span className="foto-hint">⏳ Subiendo...</span>
+          </div>
+        ) : value ? (
+          <img src={value} alt="Factura modelo" className="foto-preview" />
+        ) : (
+          <div className="foto-placeholder">
+            <span className="foto-icon">🧾</span>
+            <span className="foto-hint">
+              {dragging ? "Soltá aquí" : "Arrastrá o hacé clic"}
+            </span>
+          </div>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => processFile(e.target.files[0])}
+        />
       </div>
-      {error && <p style={{ color: "red", fontSize: "0.8rem", marginTop: 4 }}>{error}</p>}
-      <input type="text" className="form-input" style={{ marginTop: "6px" }}
+      {error && (
+        <p style={{ color: "red", fontSize: "0.8rem", marginTop: 4 }}>
+          {error}
+        </p>
+      )}
+      <input
+        type="text"
+        className="form-input"
+        style={{ marginTop: "6px" }}
         placeholder="O pegá una URL: https://..."
-        value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+      />
       {value && (
-        <button type="button" className="btn-cancel"
+        <button
+          type="button"
+          className="btn-cancel"
           style={{ marginTop: "6px", fontSize: "0.8rem", padding: "4px 10px" }}
-          onClick={() => onChange("")}>Quitar imagen</button>
+          onClick={() => onChange("")}
+        >
+          Quitar imagen
+        </button>
       )}
     </div>
   );
@@ -247,18 +408,32 @@ export default function Proveedores({
   const [rubroEsNuevo, setRubroEsNuevo] = useState(false);
   const [nuevoRubro, setNuevoRubro] = useState("");
 
-  const API = "http://localhost:3001";
+  const API = "http://https://integral-backend-production.up.railway.app";
 
   useEffect(() => {
     fetch(`${API}/proveedores/rubros`)
-      .then(r => r.json())
-      .then(data => setRubros(Array.isArray(data) ? data : []))
+      .then((r) => r.json())
+      .then((data) => setRubros(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
-  const abrirCrear = () => { setForm(EMPTY); setRubroEsNuevo(false); setNuevoRubro(""); onOpenModal("crear"); };
-  const abrirEditar = (prov) => { setForm({ ...prov }); setRubroEsNuevo(false); setNuevoRubro(""); onSelect(prov); onOpenModal("editar"); };
-  const abrirEliminar = (prov) => { onSelect(prov); onOpenModal("eliminar"); };
+  const abrirCrear = () => {
+    setForm(EMPTY);
+    setRubroEsNuevo(false);
+    setNuevoRubro("");
+    onOpenModal("crear");
+  };
+  const abrirEditar = (prov) => {
+    setForm({ ...prov });
+    setRubroEsNuevo(false);
+    setNuevoRubro("");
+    onSelect(prov);
+    onOpenModal("editar");
+  };
+  const abrirEliminar = (prov) => {
+    onSelect(prov);
+    onOpenModal("eliminar");
+  };
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -266,14 +441,15 @@ export default function Proveedores({
   const handleAgregarRubro = () => {
     const r = nuevoRubro.trim().toUpperCase();
     if (!r) return;
-    if (!rubros.includes(r)) setRubros(prev => [...prev, r].sort());
-    setForm(f => ({ ...f, rubro: r }));
+    if (!rubros.includes(r)) setRubros((prev) => [...prev, r].sort());
+    setForm((f) => ({ ...f, rubro: r }));
     setNuevoRubro("");
     setRubroEsNuevo(false);
   };
 
   const handleGuardar = () => {
-    if (!form.provnombre?.trim()) return alert("El nombre del proveedor es obligatorio.");
+    if (!form.provnombre?.trim())
+      return alert("El nombre del proveedor es obligatorio.");
     const payload = {
       ...form,
       cuit: form.cuit || null,
@@ -289,7 +465,10 @@ export default function Proveedores({
     else onEdit({ ...selected, ...payload });
     onCloseModal();
   };
-  const handleEliminar = () => { onDelete(selected); onCloseModal(); };
+  const handleEliminar = () => {
+    onDelete(selected);
+    onCloseModal();
+  };
 
   const filtrados = proveedores.filter((p) => {
     const q = search.toLowerCase();
@@ -303,15 +482,35 @@ export default function Proveedores({
 
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-      <ScreenHeader icon="🏭" title="Proveedores" subtitle="Gestión de proveedores" />
+      <ScreenHeader
+        icon="🏭"
+        title="Proveedores"
+        subtitle="Gestión de proveedores"
+      />
 
       {/* Toolbar */}
-      <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", margin: "1.5rem 0 1rem" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "0.75rem",
+          alignItems: "center",
+          margin: "1.5rem 0 1rem",
+        }}
+      >
         <div style={{ position: "relative", flex: 1, maxWidth: 420 }}>
-          <span style={{
-            position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
-            color: "#475569", fontSize: "1rem", pointerEvents: "none",
-          }}>🔍</span>
+          <span
+            style={{
+              position: "absolute",
+              left: 12,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "#475569",
+              fontSize: "1rem",
+              pointerEvents: "none",
+            }}
+          >
+            🔍
+          </span>
           <input
             style={{
               ...inputStyle,
@@ -325,7 +524,9 @@ export default function Proveedores({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div style={{ color: "#475569", fontSize: "0.8rem", whiteSpace: "nowrap" }}>
+        <div
+          style={{ color: "#475569", fontSize: "0.8rem", whiteSpace: "nowrap" }}
+        >
           {filtrados.length} proveedor{filtrados.length !== 1 ? "es" : ""}
         </div>
         <button
@@ -339,36 +540,59 @@ export default function Proveedores({
             fontSize: "0.875rem",
             fontWeight: 600,
             cursor: "pointer",
-            display: "flex", alignItems: "center", gap: "0.4rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.4rem",
             boxShadow: "0 4px 15px rgba(37,99,235,0.35)",
             whiteSpace: "nowrap",
           }}
         >
-          <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>＋</span> Nuevo proveedor
+          <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>＋</span> Nuevo
+          proveedor
         </button>
       </div>
 
       {/* Tabla */}
-      <div style={{
-        background: "#0a1628",
-        border: "1px solid #1e3a5f",
-        borderRadius: 14,
-        overflow: "hidden",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
-      }}>
+      <div
+        style={{
+          background: "#0a1628",
+          border: "1px solid #1e3a5f",
+          borderRadius: 14,
+          overflow: "hidden",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
+        }}
+      >
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
-            <tr style={{ background: "#0d1f3c", borderBottom: "1px solid #1e3a5f" }}>
-              {["Proveedor", "Localidad", "Rubro", "Contacto", "CUIT", "Tipo Fact.", "Descuento", "Flete", "Acciones"].map((h) => (
-                <th key={h} style={{
-                  padding: "0.85rem 1rem",
-                  textAlign: "left",
-                  fontSize: "0.7rem",
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: "#475569",
-                }}>
+            <tr
+              style={{
+                background: "#0d1f3c",
+                borderBottom: "1px solid #1e3a5f",
+              }}
+            >
+              {[
+                "Proveedor",
+                "Localidad",
+                "Rubro",
+                "Contacto",
+                "CUIT",
+                "Tipo Fact.",
+                "Descuento",
+                "Flete",
+                "Acciones",
+              ].map((h) => (
+                <th
+                  key={h}
+                  style={{
+                    padding: "0.85rem 1rem",
+                    textAlign: "left",
+                    fontSize: "0.7rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: "#475569",
+                  }}
+                >
                   {h}
                 </th>
               ))}
@@ -377,91 +601,224 @@ export default function Proveedores({
           <tbody>
             {filtrados.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: "center", padding: "3rem", color: "#334155" }}>
-                  <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🏭</div>
-                  <div style={{ fontSize: "0.9rem" }}>No hay proveedores registrados</div>
+                <td
+                  colSpan={9}
+                  style={{
+                    textAlign: "center",
+                    padding: "3rem",
+                    color: "#334155",
+                  }}
+                >
+                  <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>
+                    🏭
+                  </div>
+                  <div style={{ fontSize: "0.9rem" }}>
+                    No hay proveedores registrados
+                  </div>
                 </td>
               </tr>
             ) : (
               filtrados.map((prov, i) => (
                 <tr
                   key={prov.id}
-                  onClick={() => onSelect(prov?.id === selected?.id ? null : prov)}
+                  onClick={() =>
+                    onSelect(prov?.id === selected?.id ? null : prov)
+                  }
                   style={{
                     borderBottom: "1px solid #0f2240",
-                    background: selected?.id === prov.id ? "#0f2a4a" : "transparent",
+                    background:
+                      selected?.id === prov.id ? "#0f2a4a" : "transparent",
                     cursor: "pointer",
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={e => { if (selected?.id !== prov.id) e.currentTarget.style.background = "#0d1f3a"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = selected?.id === prov.id ? "#0f2a4a" : "transparent"; }}
+                  onMouseEnter={(e) => {
+                    if (selected?.id !== prov.id)
+                      e.currentTarget.style.background = "#0d1f3a";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background =
+                      selected?.id === prov.id ? "#0f2a4a" : "transparent";
+                  }}
                 >
                   <td style={{ padding: "0.85rem 1rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.65rem",
+                      }}
+                    >
                       <Initials name={prov.provnombre} />
                       <div>
-                        <div style={{ color: "#e2e8f0", fontWeight: 600, fontSize: "0.875rem" }}>{prov.provnombre}</div>
-                        {prov.fantasia && <div style={{ color: "#475569", fontSize: "0.75rem", marginTop: 1 }}>{prov.fantasia}</div>}
+                        <div
+                          style={{
+                            color: "#e2e8f0",
+                            fontWeight: 600,
+                            fontSize: "0.875rem",
+                          }}
+                        >
+                          {prov.provnombre}
+                        </div>
+                        {prov.fantasia && (
+                          <div
+                            style={{
+                              color: "#475569",
+                              fontSize: "0.75rem",
+                              marginTop: 1,
+                            }}
+                          >
+                            {prov.fantasia}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: "0.85rem 1rem", color: "#94a3b8", fontSize: "0.85rem" }}>
-                    {prov.localidad || <span style={{ color: "#334155" }}>—</span>}
+                  <td
+                    style={{
+                      padding: "0.85rem 1rem",
+                      color: "#94a3b8",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    {prov.localidad || (
+                      <span style={{ color: "#334155" }}>—</span>
+                    )}
                   </td>
-                  <td style={{ padding: "0.85rem 1rem", color: "#94a3b8", fontSize: "0.85rem" }}>
+                  <td
+                    style={{
+                      padding: "0.85rem 1rem",
+                      color: "#94a3b8",
+                      fontSize: "0.85rem",
+                    }}
+                  >
                     {prov.rubro || <span style={{ color: "#334155" }}>—</span>}
                   </td>
                   <td style={{ padding: "0.85rem 1rem" }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      {prov.telefono && <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>📞 {prov.telefono}</span>}
-                      {prov.wapp && <span style={{ color: "#4ade80", fontSize: "0.8rem" }}>💬 {prov.wapp}</span>}
-                      {!prov.telefono && !prov.wapp && <span style={{ color: "#334155", fontSize: "0.8rem" }}>—</span>}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                      }}
+                    >
+                      {prov.telefono && (
+                        <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>
+                          📞 {prov.telefono}
+                        </span>
+                      )}
+                      {prov.wapp && (
+                        <span style={{ color: "#4ade80", fontSize: "0.8rem" }}>
+                          💬 {prov.wapp}
+                        </span>
+                      )}
+                      {!prov.telefono && !prov.wapp && (
+                        <span style={{ color: "#334155", fontSize: "0.8rem" }}>
+                          —
+                        </span>
+                      )}
                     </div>
                   </td>
-                  <td style={{ padding: "0.85rem 1rem", color: "#64748b", fontSize: "0.82rem", fontFamily: "monospace" }}>
+                  <td
+                    style={{
+                      padding: "0.85rem 1rem",
+                      color: "#64748b",
+                      fontSize: "0.82rem",
+                      fontFamily: "monospace",
+                    }}
+                  >
                     {prov.cuit || <span style={{ color: "#334155" }}>—</span>}
                   </td>
                   <td style={{ padding: "0.85rem 1rem" }}>
                     <TipoBadge tipo={prov.tipo_fact} />
                   </td>
-                  <td style={{ padding: "0.85rem 1rem", color: "#94a3b8", fontSize: "0.85rem" }}>
-                    {prov.descuento != null && prov.descuento !== ""
-                      ? <span style={{ color: "#4ade80", fontWeight: 600 }}>{prov.descuento}%</span>
-                      : <span style={{ color: "#334155" }}>—</span>}
+                  <td
+                    style={{
+                      padding: "0.85rem 1rem",
+                      color: "#94a3b8",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    {prov.descuento != null && prov.descuento !== "" ? (
+                      <span style={{ color: "#4ade80", fontWeight: 600 }}>
+                        {prov.descuento}%
+                      </span>
+                    ) : (
+                      <span style={{ color: "#334155" }}>—</span>
+                    )}
                   </td>
                   <td style={{ padding: "0.85rem 1rem", textAlign: "center" }}>
-                    {prov.flete
-                      ? <span style={{ color: "#4ade80", fontSize: "1rem" }}>✓</span>
-                      : <span style={{ color: "#334155" }}>—</span>}
+                    {prov.flete ? (
+                      <span style={{ color: "#4ade80", fontSize: "1rem" }}>
+                        ✓
+                      </span>
+                    ) : (
+                      <span style={{ color: "#334155" }}>—</span>
+                    )}
                   </td>
                   <td style={{ padding: "0.85rem 1rem" }}>
                     <div style={{ display: "flex", gap: "0.4rem" }}>
                       <button
                         title="Editar"
-                        onClick={(e) => { e.stopPropagation(); abrirEditar(prov); }}
-                        style={{
-                          background: "#1e3a5f", border: "1px solid #2563eb33",
-                          color: "#60a5fa", borderRadius: 8,
-                          width: 32, height: 32, cursor: "pointer",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: "0.85rem", transition: "all 0.15s",
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          abrirEditar(prov);
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = "#2563eb"; e.currentTarget.style.color = "#fff"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = "#1e3a5f"; e.currentTarget.style.color = "#60a5fa"; }}
-                      >✏️</button>
+                        style={{
+                          background: "#1e3a5f",
+                          border: "1px solid #2563eb33",
+                          color: "#60a5fa",
+                          borderRadius: 8,
+                          width: 32,
+                          height: 32,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "0.85rem",
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "#2563eb";
+                          e.currentTarget.style.color = "#fff";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "#1e3a5f";
+                          e.currentTarget.style.color = "#60a5fa";
+                        }}
+                      >
+                        ✏️
+                      </button>
                       <button
                         title="Eliminar"
-                        onClick={(e) => { e.stopPropagation(); abrirEliminar(prov); }}
-                        style={{
-                          background: "#3a1a1a", border: "1px solid #7f1d1d44",
-                          color: "#f87171", borderRadius: 8,
-                          width: 32, height: 32, cursor: "pointer",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: "0.85rem", transition: "all 0.15s",
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          abrirEliminar(prov);
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = "#dc2626"; e.currentTarget.style.color = "#fff"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = "#3a1a1a"; e.currentTarget.style.color = "#f87171"; }}
-                      >🗑️</button>
+                        style={{
+                          background: "#3a1a1a",
+                          border: "1px solid #7f1d1d44",
+                          color: "#f87171",
+                          borderRadius: 8,
+                          width: 32,
+                          height: 32,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "0.85rem",
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "#dc2626";
+                          e.currentTarget.style.color = "#fff";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "#3a1a1a";
+                          e.currentTarget.style.color = "#f87171";
+                        }}
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -476,10 +833,13 @@ export default function Proveedores({
         <div
           onClick={onCloseModal}
           style={{
-            position: "fixed", inset: 0,
+            position: "fixed",
+            inset: 0,
             background: "rgba(0,10,25,0.75)",
             backdropFilter: "blur(4px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             zIndex: 1000,
           }}
         >
@@ -496,17 +856,56 @@ export default function Proveedores({
               boxShadow: "0 25px 80px rgba(0,0,0,0.6)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem", paddingBottom: "1rem", borderBottom: "1px solid #1e3a5f" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                marginBottom: "1.5rem",
+                paddingBottom: "1rem",
+                borderBottom: "1px solid #1e3a5f",
+              }}
+            >
               <div style={{ fontSize: "1.5rem" }}>🏭</div>
-              <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#e2e8f0" }}>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: "1.1rem",
+                  fontWeight: 700,
+                  color: "#e2e8f0",
+                }}
+              >
                 {modal === "crear" ? "Nuevo Proveedor" : "Editar Proveedor"}
               </h2>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "1rem",
+              }}
+            >
               {FIELDS.map(({ label, name, placeholder, col }) => (
-                <label key={name} style={{ display: "flex", flexDirection: "column", gap: "0.35rem", gridColumn: col }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: focusedField === name ? "#60a5fa" : "#475569", letterSpacing: "0.05em", textTransform: "uppercase", transition: "color 0.2s" }}>
+                <label
+                  key={name}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.35rem",
+                    gridColumn: col,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: focusedField === name ? "#60a5fa" : "#475569",
+                      letterSpacing: "0.05em",
+                      textTransform: "uppercase",
+                      transition: "color 0.2s",
+                    }}
+                  >
                     {label}
                   </span>
                   <input
@@ -518,31 +917,62 @@ export default function Proveedores({
                     onBlur={() => setFocusedField(null)}
                     style={{
                       ...inputStyle,
-                      borderColor: focusedField === name ? "#2563eb" : "#1e3a5f",
-                      boxShadow: focusedField === name ? "0 0 0 3px rgba(37,99,235,0.15)" : "none",
+                      borderColor:
+                        focusedField === name ? "#2563eb" : "#1e3a5f",
+                      boxShadow:
+                        focusedField === name
+                          ? "0 0 0 3px rgba(37,99,235,0.15)"
+                          : "none",
                     }}
                   />
                 </label>
               ))}
               {/* Rubro — desplegable con opción agregar nuevo */}
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: focusedField === "rubro" ? "#60a5fa" : "#475569", letterSpacing: "0.05em", textTransform: "uppercase", transition: "color 0.2s" }}>
+              <label
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.35rem",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    color: focusedField === "rubro" ? "#60a5fa" : "#475569",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    transition: "color 0.2s",
+                  }}
+                >
                   Rubro
                 </span>
                 {!rubroEsNuevo ? (
                   <select
                     name="rubro"
                     value={form.rubro ?? ""}
-                    onChange={e => {
-                      if (e.target.value === "__nuevo__") { setRubroEsNuevo(true); return; }
-                      setForm(f => ({ ...f, rubro: e.target.value }));
+                    onChange={(e) => {
+                      if (e.target.value === "__nuevo__") {
+                        setRubroEsNuevo(true);
+                        return;
+                      }
+                      setForm((f) => ({ ...f, rubro: e.target.value }));
                     }}
                     onFocus={() => setFocusedField("rubro")}
                     onBlur={() => setFocusedField(null)}
-                    style={{ ...inputStyle, borderColor: focusedField === "rubro" ? "#2563eb" : "#1e3a5f", cursor: "pointer" }}
+                    style={{
+                      ...inputStyle,
+                      borderColor:
+                        focusedField === "rubro" ? "#2563eb" : "#1e3a5f",
+                      cursor: "pointer",
+                    }}
                   >
                     <option value="">— Sin rubro —</option>
-                    {rubros.map(r => <option key={r} value={r}>{r}</option>)}
+                    {rubros.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
                     <option value="__nuevo__">＋ Agregar nuevo...</option>
                   </select>
                 ) : (
@@ -550,25 +980,70 @@ export default function Proveedores({
                     <input
                       autoFocus
                       value={nuevoRubro}
-                      onChange={e => setNuevoRubro(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") handleAgregarRubro(); if (e.key === "Escape") { setRubroEsNuevo(false); setNuevoRubro(""); }}}
+                      onChange={(e) => setNuevoRubro(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAgregarRubro();
+                        if (e.key === "Escape") {
+                          setRubroEsNuevo(false);
+                          setNuevoRubro("");
+                        }
+                      }}
                       placeholder="Nombre del rubro"
                       style={{ ...inputStyle, borderColor: "#2563eb", flex: 1 }}
                     />
                     <button
                       onClick={handleAgregarRubro}
-                      style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "0 14px", cursor: "pointer", fontWeight: 700, fontSize: "1rem" }}
-                    >✓</button>
+                      style={{
+                        background: "#2563eb",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "0 14px",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        fontSize: "1rem",
+                      }}
+                    >
+                      ✓
+                    </button>
                     <button
-                      onClick={() => { setRubroEsNuevo(false); setNuevoRubro(""); }}
-                      style={{ background: "#1e3a5f", color: "#94a3b8", border: "none", borderRadius: 8, padding: "0 12px", cursor: "pointer", fontSize: "0.85rem" }}
-                    >✕</button>
+                      onClick={() => {
+                        setRubroEsNuevo(false);
+                        setNuevoRubro("");
+                      }}
+                      style={{
+                        background: "#1e3a5f",
+                        color: "#94a3b8",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "0 12px",
+                        cursor: "pointer",
+                        fontSize: "0.85rem",
+                      }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 )}
               </label>
 
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: focusedField === "tipo_fact" ? "#60a5fa" : "#475569", letterSpacing: "0.05em", textTransform: "uppercase", transition: "color 0.2s" }}>
+              <label
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.35rem",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    color: focusedField === "tipo_fact" ? "#60a5fa" : "#475569",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    transition: "color 0.2s",
+                  }}
+                >
                   Tipo Facturación
                 </span>
                 <select
@@ -579,7 +1054,8 @@ export default function Proveedores({
                   onBlur={() => setFocusedField(null)}
                   style={{
                     ...inputStyle,
-                    borderColor: focusedField === "tipo_fact" ? "#2563eb" : "#1e3a5f",
+                    borderColor:
+                      focusedField === "tipo_fact" ? "#2563eb" : "#1e3a5f",
                     cursor: "pointer",
                   }}
                 >
@@ -594,51 +1070,123 @@ export default function Proveedores({
               <div style={{ gridColumn: "1 / -1" }}>
                 <FotoUpload
                   value={form.foto ?? ""}
-                  onChange={(url) => setForm((prev) => ({ ...prev, foto: url }))}
+                  onChange={(url) =>
+                    setForm((prev) => ({ ...prev, foto: url }))
+                  }
                 />
               </div>
 
               {/* Flete — tinyint(1) */}
-              <label style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: "pointer", gridColumn: "1 / -1", marginTop: "0.25rem" }}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.6rem",
+                  cursor: "pointer",
+                  gridColumn: "1 / -1",
+                  marginTop: "0.25rem",
+                }}
+              >
                 <input
                   type="checkbox"
                   name="flete"
                   checked={!!form.flete}
-                  onChange={e => setForm(prev => ({ ...prev, flete: e.target.checked ? 1 : 0 }))}
-                  style={{ width: 18, height: 18, accentColor: "#2563eb", cursor: "pointer" }}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      flete: e.target.checked ? 1 : 0,
+                    }))
+                  }
+                  style={{
+                    width: 18,
+                    height: 18,
+                    accentColor: "#2563eb",
+                    cursor: "pointer",
+                  }}
                 />
-                <span style={{ fontSize: "0.875rem", color: "#94a3b8", fontWeight: 500 }}>Tiene flete</span>
+                <span
+                  style={{
+                    fontSize: "0.875rem",
+                    color: "#94a3b8",
+                    fontWeight: 500,
+                  }}
+                >
+                  Tiene flete
+                </span>
               </label>
             </div>
 
             {/* ── Sección: Modelo de Factura ── */}
-            <div style={{
-              marginTop: "1.75rem",
-              borderTop: "1px solid #1e3a5f",
-              paddingTop: "1.5rem",
-            }}>
+            <div
+              style={{
+                marginTop: "1.75rem",
+                borderTop: "1px solid #1e3a5f",
+                paddingTop: "1.5rem",
+              }}
+            >
               {/* Encabezado de sección */}
-              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 8,
-                  background: "#1c1204", border: "1px solid #92400e55",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "1rem",
-                }}>🧾</div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.6rem",
+                  marginBottom: "1.25rem",
+                }}
+              >
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: "#1c1204",
+                    border: "1px solid #92400e55",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "1rem",
+                  }}
+                >
+                  🧾
+                </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#d97706" }}>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: "0.95rem",
+                      fontWeight: 700,
+                      color: "#d97706",
+                    }}
+                  >
                     Modelo de Factura
                   </h3>
-                  <p style={{ margin: 0, fontSize: "0.75rem", color: "#78350f" }}>
-                    Subí una factura de ejemplo y completá las palabras clave que el OCR va a buscar
+                  <p
+                    style={{ margin: 0, fontSize: "0.75rem", color: "#78350f" }}
+                  >
+                    Subí una factura de ejemplo y completá las palabras clave
+                    que el OCR va a buscar
                   </p>
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "1.5rem",
+                }}
+              >
                 {/* Columna izquierda: imagen modelo */}
                 <div>
-                  <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "#92400e", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+                  <div
+                    style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 600,
+                      color: "#92400e",
+                      letterSpacing: "0.05em",
+                      textTransform: "uppercase",
+                      marginBottom: "0.4rem",
+                    }}
+                  >
                     Imagen modelo
                   </div>
                   <FactmodUpload
@@ -648,19 +1196,49 @@ export default function Proveedores({
                 </div>
 
                 {/* Columna derecha: anclas */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                  <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "#92400e", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "0.1rem" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.75rem",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 600,
+                      color: "#92400e",
+                      letterSpacing: "0.05em",
+                      textTransform: "uppercase",
+                      marginBottom: "0.1rem",
+                    }}
+                  >
                     Palabras ancla para OCR
                   </div>
                   {ANCLA_FIELDS.map(({ label, name, placeholder, icon }) => (
-                    <label key={name} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                      <span style={{
-                        fontSize: "0.72rem", fontWeight: 600,
-                        color: focusedField === name ? "#f59e0b" : "#78350f",
-                        letterSpacing: "0.04em", textTransform: "uppercase", transition: "color 0.2s",
-                        display: "flex", alignItems: "center", gap: "0.3rem",
-                      }}>
-                        <span>{icon}</span>{label}
+                    <label
+                      key={name}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.25rem",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          color: focusedField === name ? "#f59e0b" : "#78350f",
+                          letterSpacing: "0.04em",
+                          textTransform: "uppercase",
+                          transition: "color 0.2s",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.3rem",
+                        }}
+                      >
+                        <span>{icon}</span>
+                        {label}
                       </span>
                       <input
                         name={name}
@@ -672,8 +1250,12 @@ export default function Proveedores({
                         style={{
                           ...inputStyle,
                           background: "#0d0a02",
-                          borderColor: focusedField === name ? "#f59e0b" : "#92400e55",
-                          boxShadow: focusedField === name ? "0 0 0 3px rgba(245,158,11,0.12)" : "none",
+                          borderColor:
+                            focusedField === name ? "#f59e0b" : "#92400e55",
+                          boxShadow:
+                            focusedField === name
+                              ? "0 0 0 3px rgba(245,158,11,0.12)"
+                              : "none",
                           fontSize: "0.8rem",
                         }}
                       />
@@ -683,36 +1265,68 @@ export default function Proveedores({
               </div>
 
               {/* Tip informativo */}
-              <div style={{
-                marginTop: "1rem",
-                padding: "0.6rem 0.85rem",
-                background: "#0d0a02",
-                border: "1px solid #92400e33",
-                borderRadius: 8,
-                fontSize: "0.75rem",
-                color: "#92400e",
-                display: "flex",
-                gap: "0.5rem",
-                alignItems: "flex-start",
-              }}>
+              <div
+                style={{
+                  marginTop: "1rem",
+                  padding: "0.6rem 0.85rem",
+                  background: "#0d0a02",
+                  border: "1px solid #92400e33",
+                  borderRadius: 8,
+                  fontSize: "0.75rem",
+                  color: "#92400e",
+                  display: "flex",
+                  gap: "0.5rem",
+                  alignItems: "flex-start",
+                }}
+              >
                 <span style={{ flexShrink: 0 }}>💡</span>
                 <span>
-                  Las anclas son los textos que aparecen <em>cerca</em> del valor en la factura real.
-                  Cuanto más exactas, mejor extrae el OCR. Si una factura no tiene IVA separado, podés dejarlo vacío.
+                  Las anclas son los textos que aparecen <em>cerca</em> del
+                  valor en la factura real. Cuanto más exactas, mejor extrae el
+                  OCR. Si una factura no tiene IVA separado, podés dejarlo
+                  vacío.
                 </span>
               </div>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.75rem", paddingTop: "1rem", borderTop: "1px solid #1e3a5f" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.75rem",
+                marginTop: "1.75rem",
+                paddingTop: "1rem",
+                borderTop: "1px solid #1e3a5f",
+              }}
+            >
               <button
                 onClick={onCloseModal}
-                style={{ background: "transparent", border: "1px solid #1e3a5f", color: "#64748b", borderRadius: 10, padding: "0.6rem 1.2rem", fontSize: "0.875rem", cursor: "pointer", fontWeight: 500 }}
+                style={{
+                  background: "transparent",
+                  border: "1px solid #1e3a5f",
+                  color: "#64748b",
+                  borderRadius: 10,
+                  padding: "0.6rem 1.2rem",
+                  fontSize: "0.875rem",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                }}
               >
                 Cancelar
               </button>
               <button
                 onClick={handleGuardar}
-                style={{ background: "linear-gradient(135deg, #2563eb, #1d4ed8)", color: "#fff", border: "none", borderRadius: 10, padding: "0.6rem 1.5rem", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 15px rgba(37,99,235,0.4)" }}
+                style={{
+                  background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "0.6rem 1.5rem",
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  boxShadow: "0 4px 15px rgba(37,99,235,0.4)",
+                }}
               >
                 {modal === "crear" ? "Crear proveedor" : "Guardar cambios"}
               </button>
@@ -726,10 +1340,13 @@ export default function Proveedores({
         <div
           onClick={onCloseModal}
           style={{
-            position: "fixed", inset: 0,
+            position: "fixed",
+            inset: 0,
             background: "rgba(0,10,25,0.75)",
             backdropFilter: "blur(4px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             zIndex: 1000,
           }}
         >
@@ -745,24 +1362,60 @@ export default function Proveedores({
             }}
           >
             <div style={{ textAlign: "center", marginBottom: "1.25rem" }}>
-              <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>⚠️</div>
-              <h2 style={{ margin: "0 0 0.5rem", fontSize: "1.1rem", color: "#f87171", fontWeight: 700 }}>Eliminar proveedor</h2>
+              <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>
+                ⚠️
+              </div>
+              <h2
+                style={{
+                  margin: "0 0 0.5rem",
+                  fontSize: "1.1rem",
+                  color: "#f87171",
+                  fontWeight: 700,
+                }}
+              >
+                Eliminar proveedor
+              </h2>
               <p style={{ color: "#64748b", fontSize: "0.875rem", margin: 0 }}>
                 ¿Estás seguro que querés eliminar a{" "}
-                <strong style={{ color: "#e2e8f0" }}>{selected.provnombre}</strong>?
-                <br />Esta acción no se puede deshacer.
+                <strong style={{ color: "#e2e8f0" }}>
+                  {selected.provnombre}
+                </strong>
+                ?
+                <br />
+                Esta acción no se puede deshacer.
               </p>
             </div>
             <div style={{ display: "flex", gap: "0.75rem" }}>
               <button
                 onClick={onCloseModal}
-                style={{ flex: 1, background: "transparent", border: "1px solid #1e3a5f", color: "#64748b", borderRadius: 10, padding: "0.65rem", fontSize: "0.875rem", cursor: "pointer", fontWeight: 500 }}
+                style={{
+                  flex: 1,
+                  background: "transparent",
+                  border: "1px solid #1e3a5f",
+                  color: "#64748b",
+                  borderRadius: 10,
+                  padding: "0.65rem",
+                  fontSize: "0.875rem",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                }}
               >
                 Cancelar
               </button>
               <button
                 onClick={handleEliminar}
-                style={{ flex: 1, background: "linear-gradient(135deg, #dc2626, #b91c1c)", color: "#fff", border: "none", borderRadius: 10, padding: "0.65rem", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 15px rgba(220,38,38,0.4)" }}
+                style={{
+                  flex: 1,
+                  background: "linear-gradient(135deg, #dc2626, #b91c1c)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "0.65rem",
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  boxShadow: "0 4px 15px rgba(220,38,38,0.4)",
+                }}
               >
                 Eliminar
               </button>

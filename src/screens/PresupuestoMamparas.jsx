@@ -1,44 +1,51 @@
 import { useState, useEffect, useRef } from "react";
 
-export default function PresupuestoMamparas({ presupuestoACargar = null, onCargado, onGuardado, clienteInicial = "", codclienteInicial = null, numeroPres = null }) {
+export default function PresupuestoMamparas({
+  presupuestoACargar = null,
+  onCargado,
+  onGuardado,
+  clienteInicial = "",
+  codclienteInicial = null,
+  numeroPres = null,
+}) {
   const [presupuestoId, setPresupuestoId] = useState(null); // número entero, null = sin asignar
-  const [revision, setRevision]           = useState(0);
+  const [revision, setRevision] = useState(0);
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
-  const [articulos, setArticulos]         = useState([]);
-  const [familias, setFamilias]           = useState([]);
-  const [busqueda, setBusqueda]           = useState("");
-  const [showDropdown, setShowDropdown]   = useState(false);
-  const [modelo, setModelo]               = useState("");
+  const [articulos, setArticulos] = useState([]);
+  const [familias, setFamilias] = useState([]);
+  const [busqueda, setBusqueda] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [modelo, setModelo] = useState("");
   const searchRef = useRef(null);
 
   // ── Artículos asociados ─────────────────────────────────────────────────────
   // Cada slot: { slot, art, cod, precio, codform, resultado, parciales, error }
-  const [asociados, setAsociados]               = useState([]);
+  const [asociados, setAsociados] = useState([]);
   const [cargandoAsociados, setCargandoAsociados] = useState(false);
 
   // ── Cálculo ─────────────────────────────────────────────────────────────────
-  const [calculando, setCalculando]   = useState(false);
-  const [errorCalc, setErrorCalc]     = useState("");
-  const [calculated, setCalculated]   = useState(false);
+  const [calculando, setCalculando] = useState(false);
+  const [errorCalc, setErrorCalc] = useState("");
+  const [calculated, setCalculated] = useState(false);
   const [parcialesExpandidos, setParcialesExpandidos] = useState({});
 
   // ── Colocación ──────────────────────────────────────────────────────────────
   const [colocacionBD, setColocacionBD] = useState(null);
 
   // ── Guardado ────────────────────────────────────────────────────────────────
-  const [guardando, setGuardando]           = useState(false);
-  const [guardadoOk, setGuardadoOk]         = useState(false);
-  const [modoEdicion, setModoEdicion]       = useState(false);   // true = editando presupuesto existente
+  const [guardando, setGuardando] = useState(false);
+  const [guardadoOk, setGuardadoOk] = useState(false);
+  const [modoEdicion, setModoEdicion] = useState(false); // true = editando presupuesto existente
   const [presupuestoDbId, setPresupuestoDbId] = useState(null); // id de la fila en BD (para revisiones)
 
   // ── Form ────────────────────────────────────────────────────────────────────
   const [form, setForm] = useState({
-    cliente:   clienteInicial,
+    cliente: clienteInicial,
     codcliente: codclienteInicial,
-    cantidad:  1,
-    ancho:     80,
-    alto:      200,
-    vidrio:    "esmerilado",
+    cantidad: 1,
+    ancho: 80,
+    alto: 200,
+    vidrio: "esmerilado",
     colocacion: 0,
   });
 
@@ -52,7 +59,7 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
   useEffect(() => {
     if (!articulos.length || !modeloARestaurarRef.current) return;
     const modeloGuardado = modeloARestaurarRef.current;
-    const art = articulos.find(a => a.articulo === modeloGuardado);
+    const art = articulos.find((a) => a.articulo === modeloGuardado);
     if (art?.familia) setBusqueda(art.familia);
     if (art) setArticuloSeleccionado(art);
     setModelo(modeloGuardado);
@@ -60,13 +67,16 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
   }, [articulos]);
 
   useEffect(() => {
-    if (!presupuestoACargar) { cargadoRef.current = false; return; }
+    if (!presupuestoACargar) {
+      cargadoRef.current = false;
+      return;
+    }
     if (cargadoRef.current) return;
     cargadoRef.current = true;
 
     // Normalizar claves a mayúscula para unificar datos de BD (minúscula) y del estado (mayúscula)
     const p = Object.fromEntries(
-      Object.entries(presupuestoACargar).map(([k, v]) => [k.toUpperCase(), v])
+      Object.entries(presupuestoACargar).map(([k, v]) => [k.toUpperCase(), v]),
     );
 
     // Número de presupuesto y revisión
@@ -77,18 +87,18 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
 
     // Datos del form
     setForm({
-      cliente:    p.NOMBRE   ?? "",
+      cliente: p.NOMBRE ?? "",
       codcliente: p.CODCLIENTE ?? null,
-      cantidad:   Number(p.CANTIDAD  ?? 1),
-      ancho:      Number(p.ANCHO     ?? 80),
-      alto:       Number(p.ALTO      ?? 200),
-      vidrio:     p.VIDRIO   ?? "esmerilado",
+      cantidad: Number(p.CANTIDAD ?? 1),
+      ancho: Number(p.ANCHO ?? 80),
+      alto: Number(p.ALTO ?? 200),
+      vidrio: p.VIDRIO ?? "esmerilado",
       colocacion: Number(p.COLOCACION ?? 0),
     });
 
     // Modelo / tipo — se setea ahora, y también se re-aplica cuando articulos cargue
     setModelo(p.MODELO ?? "");
-    setBusqueda("");   // el tipo se inferirá al seleccionar el artículo
+    setBusqueda(""); // el tipo se inferirá al seleccionar el artículo
 
     // Guardar modelo en ref para re-aplicar cuando articulos cargue
     modeloARestaurarRef.current = p.MODELO ?? null;
@@ -96,42 +106,47 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
     // Reconstituir artículos asociados desde art1..art10 y valor1..valor10
     const slotsGuardados = [];
     for (let n = 1; n <= 10; n++) {
-      const art   = p[`ART${n}`];
+      const art = p[`ART${n}`];
       const valor = p[`VALOR${n}`];
       if (!art) continue;
       slotsGuardados.push({
-        slot:          n,
+        slot: n,
         art,
-        cod:           "",        // se enriquece después si hace falta
-        precio:        0,
-        codform:       null,
-        margen:        1,
-        margenBD:      1,
+        cod: "", // se enriquece después si hace falta
+        precio: 0,
+        codform: null,
+        margen: 1,
+        margenBD: 1,
         resultadoBase: Number(valor ?? 0),
-        resultado:     Number(valor ?? 0),
-        parciales:     {},
-        error:         "",
+        resultado: Number(valor ?? 0),
+        parciales: {},
+        error: "",
       });
     }
     setAsociados(slotsGuardados);
     setCalculated(true);
     onCargado?.();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presupuestoACargar]);
 
   // ── Cargar catálogo de mamparas ─────────────────────────────────────────────
   useEffect(() => {
-    fetch("http://localhost:3001/productos/mamparas")
-      .then(r => r.json())
-      .then(data => {
+    fetch(
+      "http://https://integral-backend-production.up.railway.app/productos/mamparas",
+    )
+      .then((r) => r.json())
+      .then((data) => {
         if (!Array.isArray(data)) return;
-        const normalized = data.map(a => ({
+        const normalized = data.map((a) => ({
           ...a,
           codart: a.codart ?? a.codartint ?? "",
-          familia: (a.familia && a.familia.trim()) ? a.familia.trim() : (a.rubro ?? ""),
+          familia:
+            a.familia && a.familia.trim() ? a.familia.trim() : (a.rubro ?? ""),
         }));
         setArticulos(normalized);
-        const fams = [...new Set(normalized.map(a => a.familia).filter(Boolean))].sort();
+        const fams = [
+          ...new Set(normalized.map((a) => a.familia).filter(Boolean)),
+        ].sort();
         setFamilias(fams);
       })
       .catch(() => {});
@@ -142,9 +157,11 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
   // Se usa una ref para evitar que el fetch asíncrono pise el número
   // que ya seteó el useEffect de "cargar presupuesto existente".
   const fetchProximoNumero = () => {
-    fetch("http://localhost:3001/presupuestos-mamparas/proximo-numero")
-      .then(r => r.json())
-      .then(data => {
+    fetch(
+      "http://https://integral-backend-production.up.railway.app/presupuestos-mamparas/proximo-numero",
+    )
+      .then((r) => r.json())
+      .then((data) => {
         const n = data?.proximo ?? null;
         setPresupuestoId(n != null ? Number(n) : 1);
       })
@@ -171,16 +188,18 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
   // ── Colocación desde BD al cambiar artículo ─────────────────────────────────
   useEffect(() => {
     if (!articuloSeleccionado?.codart) return;
-    fetch(`http://localhost:3001/colocacion/buscar?codart=${encodeURIComponent(articuloSeleccionado.codart)}`)
-      .then(r => r.json())
-      .then(data => {
+    fetch(
+      `http://https://integral-backend-production.up.railway.app/colocacion/buscar?codart=${encodeURIComponent(articuloSeleccionado.codart)}`,
+    )
+      .then((r) => r.json())
+      .then((data) => {
         const precio = data?.precio != null ? parseFloat(data.precio) : null;
         if (precio !== null && !isNaN(precio)) {
           setColocacionBD(precio);
-          setForm(prev => ({ ...prev, colocacion: precio }));
+          setForm((prev) => ({ ...prev, colocacion: precio }));
         } else {
           setColocacionBD(null);
-          setForm(prev => ({ ...prev, colocacion: 0 }));
+          setForm((prev) => ({ ...prev, colocacion: 0 }));
         }
       })
       .catch(() => setColocacionBD(null));
@@ -204,8 +223,14 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
 
     // Traer asociaciones y tabla MARGEN en paralelo
     Promise.all([
-      fetch("http://localhost:3001/asociaciones").then(r => r.json()).catch(() => []),
-      fetch("http://localhost:3001/margen").then(r => r.json()).catch(() => []),
+      fetch(
+        "http://https://integral-backend-production.up.railway.app/asociaciones",
+      )
+        .then((r) => r.json())
+        .catch(() => []),
+      fetch("http://https://integral-backend-production.up.railway.app/margen")
+        .then((r) => r.json())
+        .catch(() => []),
     ])
       .then(([dataAsoc, dataMargen]) => {
         if (!Array.isArray(dataAsoc)) return;
@@ -213,58 +238,75 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
         // Mapa codart → margen desde tabla MARGEN (fuente de verdad)
         const margenPorCodart = {};
         if (Array.isArray(dataMargen)) {
-          dataMargen.forEach(m => {
+          dataMargen.forEach((m) => {
             const key = (m.CODART ?? m.codart ?? "").toLowerCase().trim();
-            if (key) margenPorCodart[key] = parseFloat(String(m.MARGEN ?? m.margen ?? "").replace(",", ".")) || 1;
+            if (key)
+              margenPorCodart[key] =
+                parseFloat(
+                  String(m.MARGEN ?? m.margen ?? "").replace(",", "."),
+                ) || 1;
           });
         }
 
         const codartLower = articuloSeleccionado.codart.toLowerCase().trim();
-        const artLower    = (articuloSeleccionado.articulo ?? "").toLowerCase().trim();
+        const artLower = (articuloSeleccionado.articulo ?? "")
+          .toLowerCase()
+          .trim();
 
-        const fila = dataAsoc.find(a =>
-          (a.codart   ?? "").toLowerCase().trim() === codartLower ||
-          (a.articulo ?? "").toLowerCase().trim() === artLower
+        const fila = dataAsoc.find(
+          (a) =>
+            (a.codart ?? "").toLowerCase().trim() === codartLower ||
+            (a.articulo ?? "").toLowerCase().trim() === artLower,
         );
 
-        if (!fila) { setCargandoAsociados(false); return; }
+        if (!fila) {
+          setCargandoAsociados(false);
+          return;
+        }
 
         const slots = [];
         for (let n = 1; n <= 10; n++) {
-          const art    = fila[`art${n}`];
-          const cod    = fila[`cod${n}`];
-          const codform = fila[`form${n}`] ?? null;   // ← fórmula directa de asociaciones
+          const art = fila[`art${n}`];
+          const cod = fila[`cod${n}`];
+          const codform = fila[`form${n}`] ?? null; // ← fórmula directa de asociaciones
           if (!art && !cod) continue;
 
           const codLower2 = (cod ?? "").toLowerCase().trim();
           const artLower2 = (art ?? "").toLowerCase().trim();
 
           // Precio del artículo asociado desde el catálogo
-          const productoAsoc = articulos.find(p =>
-            (p.codart   ?? "").toLowerCase().trim() === codLower2 ||
-            (p.articulo ?? "").toLowerCase().trim() === artLower2
+          const productoAsoc = articulos.find(
+            (p) =>
+              (p.codart ?? "").toLowerCase().trim() === codLower2 ||
+              (p.articulo ?? "").toLowerCase().trim() === artLower2,
           );
-          const precioAsoc = productoAsoc?.precio ? parseFloat(productoAsoc.precio) : 0;
+          const precioAsoc = productoAsoc?.precio
+            ? parseFloat(productoAsoc.precio)
+            : 0;
           const codartAsoc = productoAsoc?.codart ?? cod ?? "";
 
           // Margen: primero buscar en tabla MARGEN por codart del artículo asociado,
           // si no está ahí usar el campo margenN de asociaciones como fallback.
-          const margenTabla    = margenPorCodart[codLower2] ?? margenPorCodart[codartAsoc.toLowerCase().trim()];
-          const margenAsoc     = parseFloat(String(fila[`margen${n}`] ?? "").replace(",", ".")) || null;
-          const margen         = margenTabla ?? margenAsoc ?? 1;
+          const margenTabla =
+            margenPorCodart[codLower2] ??
+            margenPorCodart[codartAsoc.toLowerCase().trim()];
+          const margenAsoc =
+            parseFloat(String(fila[`margen${n}`] ?? "").replace(",", ".")) ||
+            null;
+          const margen = margenTabla ?? margenAsoc ?? 1;
 
           slots.push({
-            slot:       n,
-            art:        art ?? codartAsoc,
-            cod:        codartAsoc,
-            precio:     precioAsoc,
-            codform:    codform || null,
-            margen:     margen,       // editable en el front
-            margenBD:   margen,       // valor original de BD para restaurar
-            resultadoBase: 0,         // resultado puro de la fórmula (sin margen)
-            resultado:     0,         // resultado final = base * margen
-            parciales:     {},
-            error:      codform ? "" : "Sin fórmula",
+            slot: n,
+            art: art ?? codartAsoc,
+            cod: codartAsoc,
+            precio: precioAsoc,
+            codform: codform || null,
+            margen: margen, // editable en el front
+            margenBD: margen, // valor original de BD para restaurar
+            resultadoBase: 0, // resultado puro de la fórmula (sin margen)
+            resultado: 0, // resultado final = base * margen
+            parciales: {},
+            error: codform ? "" : "Sin fórmula",
           });
         }
         setAsociados(slots);
@@ -272,7 +314,7 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
       .catch(() => {})
       .finally(() => setCargandoAsociados(false));
 
-  // Re-ejecutar cuando cambia el artículo o el catálogo
+    // Re-ejecutar cuando cambia el artículo o el catálogo
   }, [articuloSeleccionado?.id, articuloSeleccionado?.codart, articulos]);
 
   // ── Calcular bases: llama al backend por cada artículo asociado ─────────────
@@ -281,7 +323,7 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
   const calcular = async (slotsActuales) => {
     const slots = slotsActuales ?? asociados;
     if (!articuloSeleccionado?.codart) return;
-    const slotsConFormula = slots.filter(a => a.codform);
+    const slotsConFormula = slots.filter((a) => a.codform);
     if (slotsConFormula.length === 0) return;
 
     setErrorCalc("");
@@ -289,58 +331,94 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
 
     try {
       // Obtener textos de fórmulas para resolver dependencias FORM_XXX
-      const resFormulas = await fetch("http://localhost:3001/formulas").then(r => r.json()).catch(() => []);
+      const resFormulas = await fetch(
+        "http://https://integral-backend-production.up.railway.app/formulas",
+      )
+        .then((r) => r.json())
+        .catch(() => []);
       const formulasTexto = {};
       if (Array.isArray(resFormulas))
-        resFormulas.forEach(f => { formulasTexto[f.codform] = f.formula ?? ""; });
+        resFormulas.forEach((f) => {
+          formulasTexto[f.codform] = f.formula ?? "";
+        });
 
       const getDeps = (cf) =>
-        (formulasTexto[cf] ?? "").match(/FORM_([A-Z0-9]+)/g)?.map(m => m.replace("FORM_", "")) ?? [];
+        (formulasTexto[cf] ?? "")
+          .match(/FORM_([A-Z0-9]+)/g)
+          ?.map((m) => m.replace("FORM_", "")) ?? [];
 
       // Sort topológico
-      const codformsList = [...new Set(slotsConFormula.map(a => a.codform))];
+      const codformsList = [...new Set(slotsConFormula.map((a) => a.codform))];
       const ordenados = [];
       const visitados = new Set();
       const visitar = (cf) => {
         if (visitados.has(cf)) return;
         visitados.add(cf);
-        getDeps(cf).forEach(dep => { if (codformsList.includes(dep)) visitar(dep); });
+        getDeps(cf).forEach((dep) => {
+          if (codformsList.includes(dep)) visitar(dep);
+        });
         ordenados.push(cf);
       };
-      codformsList.forEach(cf => visitar(cf));
+      codformsList.forEach((cf) => visitar(cf));
 
       // Calcular secuencialmente; acumular FORM_XXX para anidadas
       const resultadosMap = {};
-      const nuevos = slots.map(a => ({ ...a }));
+      const nuevos = slots.map((a) => ({ ...a }));
 
       for (const codform of ordenados) {
-        const idxs = nuevos.reduce((acc, a, i) => { if (a.codform === codform) acc.push(i); return acc; }, []);
+        const idxs = nuevos.reduce((acc, a, i) => {
+          if (a.codform === codform) acc.push(i);
+          return acc;
+        }, []);
 
         for (const idx of idxs) {
           const asoc = nuevos[idx];
           const variables = {
-            ancho:      Number(form.ancho),
-            alto:       Number(form.alto),
-            cantidad:   Number(form.cantidad),
+            ancho: Number(form.ancho),
+            alto: Number(form.alto),
+            cantidad: Number(form.cantidad),
             colocacion: Number(form.colocacion),
-            precio:     asoc.precio,
-            ...Object.fromEntries(Object.entries(resultadosMap).map(([cf, v]) => [`FORM_${cf}`, v])),
+            precio: asoc.precio,
+            ...Object.fromEntries(
+              Object.entries(resultadosMap).map(([cf, v]) => [`FORM_${cf}`, v]),
+            ),
           };
 
-          const res = await fetch("http://localhost:3001/formulas/calcular", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ codform, codart_modelo: asoc.cod, variables }),
-          }).then(r => r.json()).catch(err => ({ error: err.message }));
+          const res = await fetch(
+            "http://https://integral-backend-production.up.railway.app/formulas/calcular",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                codform,
+                codart_modelo: asoc.cod,
+                variables,
+              }),
+            },
+          )
+            .then((r) => r.json())
+            .catch((err) => ({ error: err.message }));
 
           if (res.error) {
-            nuevos[idx] = { ...asoc, resultadoBase: 0, resultado: 0, parciales: {}, error: res.error };
+            nuevos[idx] = {
+              ...asoc,
+              resultadoBase: 0,
+              resultado: 0,
+              parciales: {},
+              error: res.error,
+            };
           } else {
-            const base  = res.resultado ?? 0;
-            const mg    = parseFloat(String(asoc.margen).replace(",", ".")) || 1;
+            const base = res.resultado ?? 0;
+            const mg = parseFloat(String(asoc.margen).replace(",", ".")) || 1;
             const final = Math.round(base * mg);
             resultadosMap[codform] = base;
-            nuevos[idx] = { ...asoc, resultadoBase: base, resultado: final, parciales: res.parciales ?? {}, error: "" };
+            nuevos[idx] = {
+              ...asoc,
+              resultadoBase: base,
+              resultado: final,
+              parciales: res.parciales ?? {},
+              error: "",
+            };
           }
         }
       }
@@ -359,7 +437,7 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
   // (cambios de margen se aplican reactivamente sin fetch — ver abajo)
   useEffect(() => {
     if (!articuloSeleccionado?.codart || asociados.length === 0) return;
-    if (!asociados.some(a => a.codform)) return;
+    if (!asociados.some((a) => a.codform)) return;
     calcular();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -369,7 +447,7 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
     form.cantidad,
     form.colocacion,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    JSON.stringify(asociados.map(a => a.codform)),
+    JSON.stringify(asociados.map((a) => a.codform)),
   ]);
 
   // ── Aplicar margen reactivamente (sin fetch) ─────────────────────────────────
@@ -377,25 +455,35 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
   // resultado = resultadoBase * margen de forma instantánea.
   useEffect(() => {
     if (asociados.length === 0) return;
-    setAsociados(prev => prev.map(a => {
-      if (!a.resultadoBase) return a;
-      const mg    = parseFloat(String(a.margen).replace(",", ".")) || 1;
-      const final = Math.round(a.resultadoBase * mg);
-      return final !== a.resultado ? { ...a, resultado: final } : a;
-    }));
+    setAsociados((prev) =>
+      prev.map((a) => {
+        if (!a.resultadoBase) return a;
+        const mg = parseFloat(String(a.margen).replace(",", ".")) || 1;
+        const final = Math.round(a.resultadoBase * mg);
+        return final !== a.resultado ? { ...a, resultado: final } : a;
+      }),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(asociados.map(a => a.margen))]);
+  }, [JSON.stringify(asociados.map((a) => a.margen))]);
 
   // ── Totales ─────────────────────────────────────────────────────────────────
-  const subtotalArticulos = asociados.reduce((acc, a) => acc + (a.resultado ?? 0), 0);
-  const total             = subtotalArticulos + Number(form.colocacion);
+  const subtotalArticulos = asociados.reduce(
+    (acc, a) => acc + (a.resultado ?? 0),
+    0,
+  );
+  const total = subtotalArticulos + Number(form.colocacion);
 
   const formatPeso = (n) =>
-    "$" + Number(n).toLocaleString("es-AR", { minimumFractionDigits: 0 }).replace(/,/g, ".");
+    "$" +
+    Number(n)
+      .toLocaleString("es-AR", { minimumFractionDigits: 0 })
+      .replace(/,/g, ".");
 
   // ── Artículos filtrados para los selects ─────────────────────────────────────
   const articulosFiltradosPorTipo = busqueda
-    ? articulos.filter(a => (a.familia ?? "").toLowerCase() === busqueda.toLowerCase())
+    ? articulos.filter(
+        (a) => (a.familia ?? "").toLowerCase() === busqueda.toLowerCase(),
+      )
     : [];
 
   const seleccionarArticulo = (art) => {
@@ -409,7 +497,10 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
   // - Reabierto/editado  → POST /presupuestos-mamparas (mismo número, REVISION + 1)
   //   El backend debe insertar una nueva fila (nueva revisión), no actualizar la existente.
   const handleGuardar = async () => {
-    if (!modelo) { setErrorCalc("Seleccioná un modelo de mampara primero."); return; }
+    if (!modelo) {
+      setErrorCalc("Seleccioná un modelo de mampara primero.");
+      return;
+    }
     setGuardando(true);
     setErrorCalc("");
     setGuardadoOk(false);
@@ -418,14 +509,14 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
     const artValores = {};
     asociados.forEach((a, i) => {
       const n = i + 1;
-      artValores[`art${n}`]    = a.art ?? "";
-      artValores[`valor${n}`]  = a.resultado > 0 ? String(a.resultado) : "";
+      artValores[`art${n}`] = a.art ?? "";
+      artValores[`valor${n}`] = a.resultado > 0 ? String(a.resultado) : "";
       artValores[`margen${n}`] = a.margen != null ? String(a.margen) : "";
     });
     // Limpiar slots vacíos (hasta 10)
     for (let n = asociados.length + 1; n <= 10; n++) {
-      artValores[`art${n}`]    = "";
-      artValores[`valor${n}`]  = "";
+      artValores[`art${n}`] = "";
+      artValores[`valor${n}`] = "";
       artValores[`margen${n}`] = "";
     }
 
@@ -433,15 +524,15 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
 
     const payload = {
       CODCLIENTE: form.codcliente ?? null,
-      FECHA:      new Date().toISOString().slice(0, 10),
-      CANTIDAD:   Number(form.cantidad),
-      MODELO:     modelo,
-      ANCHO:      Number(form.ancho),
-      ALTO:       Number(form.alto),
-      VIDRIO:     form.vidrio,
+      FECHA: new Date().toISOString().slice(0, 10),
+      CANTIDAD: Number(form.cantidad),
+      MODELO: modelo,
+      ANCHO: Number(form.ancho),
+      ALTO: Number(form.alto),
+      VIDRIO: form.vidrio,
       COLOCACION: Number(form.colocacion),
-      PRECIO:     Number(total),
-      REVISION:   nuevaRevision,
+      PRECIO: Number(total),
+      REVISION: nuevaRevision,
       // Vinculación con el presupuesto principal de tabla_presupuestos
       NUMEROPRES: numeroPres ?? null,
       // Si es revisión, mandar PRESM para mantener el mismo número de mampara
@@ -450,11 +541,14 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
     };
 
     try {
-      const res  = await fetch("http://localhost:3001/presupuestos-mamparas", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(payload),
-      });
+      const res = await fetch(
+        "http://https://integral-backend-production.up.railway.app/presupuestos-mamparas",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error al guardar");
 
@@ -479,12 +573,12 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
       // Los datos del presupuesto se enviarán a tabla_presupuestos al guardar el presupuesto principal.
       onGuardado?.({
         ...data,
-        MODELO:     modelo,
-        PRECIO:     Number(total),
-        CANTIDAD:   Number(form.cantidad),
-        ANCHO:      Number(form.ancho),
-        ALTO:       Number(form.alto),
-        VIDRIO:     form.vidrio,
+        MODELO: modelo,
+        PRECIO: Number(total),
+        CANTIDAD: Number(form.cantidad),
+        ANCHO: Number(form.ancho),
+        ALTO: Number(form.alto),
+        VIDRIO: form.vidrio,
         COLOCACION: Number(form.colocacion),
       });
 
@@ -505,7 +599,14 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
     setAsociados([]);
     setBusqueda("");
     setModelo("");
-    setForm({ cliente: clienteInicial, cantidad: 1, ancho: 80, alto: 200, vidrio: "esmerilado", colocacion: 0 });
+    setForm({
+      cliente: clienteInicial,
+      cantidad: 1,
+      ancho: 80,
+      alto: 200,
+      vidrio: "esmerilado",
+      colocacion: 0,
+    });
     setColocacionBD(null);
     setErrorCalc("");
     fetchProximoNumero(); // trae el próximo número actualizado desde la BD
@@ -514,18 +615,25 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
   const handlePrint = () => window.print();
 
   const handlePDF = () => {
-    const fecha  = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
-    const nro    = presupuestoId != null ? String(presupuestoId).padStart(5, "0") : "----";
+    const fecha = new Date().toLocaleDateString("es-AR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+    const nro =
+      presupuestoId != null ? String(presupuestoId).padStart(5, "0") : "----";
 
     const filasArticulos = asociados
-      .filter(a => a.resultado > 0)
-      .map((a, i) => `
+      .filter((a) => a.resultado > 0)
+      .map(
+        (a, i) => `
         <tr>
           <td>${i + 1}</td>
           <td><strong>${a.art}</strong></td>
           <td>${a.cod ?? ""}</td>
           <td>${formatPeso(a.resultado)}</td>
-        </tr>`)
+        </tr>`,
+      )
       .join("");
 
     const html = `<!DOCTYPE html>
@@ -619,13 +727,17 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
       </thead>
       <tbody>
         ${filasArticulos}
-        ${Number(form.colocacion) > 0 ? `
+        ${
+          Number(form.colocacion) > 0
+            ? `
         <tr>
           <td>—</td>
           <td><strong>Colocación</strong></td>
           <td>—</td>
           <td>${formatPeso(form.colocacion)}</td>
-        </tr>` : ""}
+        </tr>`
+            : ""
+        }
       </tbody>
     </table>
     <div class="totals-wrap">
@@ -651,7 +763,10 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
 </html>`;
 
     const win = window.open("", "_blank");
-    if (!win) { alert("Habilitá las ventanas emergentes para generar el PDF."); return; }
+    if (!win) {
+      alert("Habilitá las ventanas emergentes para generar el PDF.");
+      return;
+    }
     win.document.write(html);
     win.document.close();
     win.focus();
@@ -731,22 +846,42 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
           <div className="presup-layout">
             <div className="presup-form-col">
               <div className="card">
-
                 {/* Header: título + número */}
                 <div className="presup-badge">
-                  <span className="presup-badge-title">🪟 Presupuesto Mamparas</span>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
-                    <span className={`presup-badge-num${presupuestoId == null ? " empty" : ""}`}>
-                      {presupuestoId != null ? `N° ${String(presupuestoId).padStart(5, "0")}` : "N° —"}
+                  <span className="presup-badge-title">
+                    🪟 Presupuesto Mamparas
+                  </span>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
+                      gap: "4px",
+                    }}
+                  >
+                    <span
+                      className={`presup-badge-num${presupuestoId == null ? " empty" : ""}`}
+                    >
+                      {presupuestoId != null
+                        ? `N° ${String(presupuestoId).padStart(5, "0")}`
+                        : "N° —"}
                     </span>
-                    <span style={{
-                      fontSize: "11px", fontFamily: "'Source Sans 3', sans-serif", fontWeight: 600,
-                      background: modoEdicion ? "#fff3cd" : "#eaf3fb",
-                      color:      modoEdicion ? "#856404" : "#2d7fc1",
-                      border:     `1px solid ${modoEdicion ? "#ffc107" : "#b8d6ef"}`,
-                      borderRadius: "4px", padding: "1px 8px", letterSpacing: "0.04em",
-                    }}>
-                      {modoEdicion ? `✏️ Rev. ${revision} — editando` : "Rev. 0 — nuevo"}
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontFamily: "'Source Sans 3', sans-serif",
+                        fontWeight: 600,
+                        background: modoEdicion ? "#fff3cd" : "#eaf3fb",
+                        color: modoEdicion ? "#856404" : "#2d7fc1",
+                        border: `1px solid ${modoEdicion ? "#ffc107" : "#b8d6ef"}`,
+                        borderRadius: "4px",
+                        padding: "1px 8px",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {modoEdicion
+                        ? `✏️ Rev. ${revision} — editando`
+                        : "Rev. 0 — nuevo"}
                     </span>
                   </div>
                 </div>
@@ -757,7 +892,9 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                   <input
                     className="input"
                     value={form.cliente}
-                    onChange={(e) => setForm({ ...form, cliente: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, cliente: e.target.value })
+                    }
                     placeholder="Nombre del cliente"
                   />
                 </div>
@@ -778,7 +915,9 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                   >
                     <option value="">— Seleccioná un tipo —</option>
                     {familias.map((fam) => (
-                      <option key={fam} value={fam}>{fam}</option>
+                      <option key={fam} value={fam}>
+                        {fam}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -793,7 +932,9 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                       const val = e.target.value;
                       setModelo(val);
                       if (val) {
-                        const art = articulosFiltradosPorTipo.find(a => a.articulo === val);
+                        const art = articulosFiltradosPorTipo.find(
+                          (a) => a.articulo === val,
+                        );
                         if (art) setArticuloSeleccionado(art);
                       }
                     }}
@@ -801,10 +942,14 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                     disabled={!busqueda}
                   >
                     <option value="">
-                      {busqueda ? `— Seleccioná un modelo de ${busqueda} —` : "— Primero seleccioná un tipo —"}
+                      {busqueda
+                        ? `— Seleccioná un modelo de ${busqueda} —`
+                        : "— Primero seleccioná un tipo —"}
                     </option>
                     {articulosFiltradosPorTipo.map((art) => (
-                      <option key={art.id} value={art.articulo}>{art.articulo}</option>
+                      <option key={art.id} value={art.articulo}>
+                        {art.articulo}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -813,34 +958,80 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                 {articuloSeleccionado && (
                   <div className="asociados-section">
                     <div className="asociados-header">
-                      <span className="asociados-header-title">🔗 Artículos asociados</span>
-                      {cargandoAsociados && <span style={{ fontSize:"10px", color:"#7ab2d4", fontStyle:"italic" }}>⏳ cargando...</span>}
-                      {calculando && !cargandoAsociados && <span style={{ fontSize:"10px", color:"#7ab2d4", fontStyle:"italic" }}>⏳ calculando...</span>}
+                      <span className="asociados-header-title">
+                        🔗 Artículos asociados
+                      </span>
+                      {cargandoAsociados && (
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            color: "#7ab2d4",
+                            fontStyle: "italic",
+                          }}
+                        >
+                          ⏳ cargando...
+                        </span>
+                      )}
+                      {calculando && !cargandoAsociados && (
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            color: "#7ab2d4",
+                            fontStyle: "italic",
+                          }}
+                        >
+                          ⏳ calculando...
+                        </span>
+                      )}
                     </div>
 
                     {!cargandoAsociados && asociados.length === 0 && (
-                      <div className="asociado-empty">Sin artículos asociados para este modelo</div>
+                      <div className="asociado-empty">
+                        Sin artículos asociados para este modelo
+                      </div>
                     )}
 
                     {asociados.map((a, i) => {
-                      const tieneParciales = a.parciales && Object.keys(a.parciales).length > 0;
-                      const expandido      = parcialesExpandidos[`${a.slot}`];
-                      const mg             = parseFloat(a.margen) || 1;
-                      const montoMargen    = a.resultadoBase > 0 ? Math.round(a.resultadoBase * mg) - a.resultadoBase : 0;
+                      const tieneParciales =
+                        a.parciales && Object.keys(a.parciales).length > 0;
+                      const expandido = parcialesExpandidos[`${a.slot}`];
+                      const mg = parseFloat(a.margen) || 1;
+                      const montoMargen =
+                        a.resultadoBase > 0
+                          ? Math.round(a.resultadoBase * mg) - a.resultadoBase
+                          : 0;
                       return (
                         <div key={i}>
                           {/* Fila principal */}
-                          <div className="asociado-row" style={{ gridTemplateColumns: "1fr 110px auto", gap: 8 }}>
+                          <div
+                            className="asociado-row"
+                            style={{
+                              gridTemplateColumns: "1fr 110px auto",
+                              gap: 8,
+                            }}
+                          >
                             {/* Nombre + info */}
                             <div
-                              style={{ cursor: tieneParciales ? "pointer" : "default" }}
-                              onClick={() => tieneParciales && setParcialesExpandidos(prev => ({
-                                ...prev, [`${a.slot}`]: !prev[`${a.slot}`]
-                              }))}
+                              style={{
+                                cursor: tieneParciales ? "pointer" : "default",
+                              }}
+                              onClick={() =>
+                                tieneParciales &&
+                                setParcialesExpandidos((prev) => ({
+                                  ...prev,
+                                  [`${a.slot}`]: !prev[`${a.slot}`],
+                                }))
+                              }
                             >
                               <div className="asociado-nombre">
                                 {tieneParciales && (
-                                  <span style={{ marginRight:5, color:"#2d7fc1", fontSize:11 }}>
+                                  <span
+                                    style={{
+                                      marginRight: 5,
+                                      color: "#2d7fc1",
+                                      fontSize: 11,
+                                    }}
+                                  >
                                     {expandido ? "▾" : "▸"}
                                   </span>
                                 )}
@@ -848,81 +1039,220 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                               </div>
                               <div className="asociado-cod">
                                 {a.cod}
-                                {a.codform
-                                  ? <span style={{ marginLeft:6, background:"#fef3c7", color:"#92400e", borderRadius:3, padding:"1px 5px", fontSize:10, fontWeight:700 }}>{a.codform}</span>
-                                  : <span style={{ marginLeft:6, background:"#fdf0f0", color:"#c0392b", borderRadius:3, padding:"1px 5px", fontSize:10 }}>sin fórmula</span>
-                                }
+                                {a.codform ? (
+                                  <span
+                                    style={{
+                                      marginLeft: 6,
+                                      background: "#fef3c7",
+                                      color: "#92400e",
+                                      borderRadius: 3,
+                                      padding: "1px 5px",
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {a.codform}
+                                  </span>
+                                ) : (
+                                  <span
+                                    style={{
+                                      marginLeft: 6,
+                                      background: "#fdf0f0",
+                                      color: "#c0392b",
+                                      borderRadius: 3,
+                                      padding: "1px 5px",
+                                      fontSize: 10,
+                                    }}
+                                  >
+                                    sin fórmula
+                                  </span>
+                                )}
                               </div>
                               {a.precio > 0 && (
-                                <div style={{ fontSize:"10px", color:"#6a8aa0", marginTop:2 }}>
+                                <div
+                                  style={{
+                                    fontSize: "10px",
+                                    color: "#6a8aa0",
+                                    marginTop: 2,
+                                  }}
+                                >
                                   Precio BD: {formatPeso(a.precio)}
                                 </div>
                               )}
                               {/* Base de fórmula sin margen */}
                               {a.resultadoBase > 0 && mg !== 1 && (
-                                <div style={{ fontSize:"10px", color:"#6a8aa0", marginTop:1, fontFamily:"monospace" }}>
-                                  Base: {formatPeso(a.resultadoBase)} × {mg} = <strong style={{ color:"#2d7fc1" }}>{formatPeso(a.resultado)}</strong>
+                                <div
+                                  style={{
+                                    fontSize: "10px",
+                                    color: "#6a8aa0",
+                                    marginTop: 1,
+                                    fontFamily: "monospace",
+                                  }}
+                                >
+                                  Base: {formatPeso(a.resultadoBase)} × {mg} ={" "}
+                                  <strong style={{ color: "#2d7fc1" }}>
+                                    {formatPeso(a.resultado)}
+                                  </strong>
                                 </div>
                               )}
                               {a.error && a.error !== "Sin fórmula" && (
-                                <div className="asociado-error">⚠️ {a.error}</div>
+                                <div className="asociado-error">
+                                  ⚠️ {a.error}
+                                </div>
                               )}
                             </div>
 
                             {/* Margen editable */}
-                            <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
-                              <span style={{ fontSize:"9px", fontWeight:700, color:"#6a8aa0", textTransform:"uppercase", letterSpacing:".06em" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 2,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "9px",
+                                  fontWeight: 700,
+                                  color: "#6a8aa0",
+                                  textTransform: "uppercase",
+                                  letterSpacing: ".06em",
+                                }}
+                              >
                                 Margen %
                               </span>
-                              <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
                                 <input
-                                  type="number" min="0" max="999" step="0.1"
+                                  type="number"
+                                  min="0"
+                                  max="999"
+                                  step="0.1"
                                   value={a.margen}
-                                  onChange={e => setAsociados(prev => prev.map((x, j) =>
-                                    j === i ? { ...x, margen: e.target.value } : x
-                                  ))}
+                                  onChange={(e) =>
+                                    setAsociados((prev) =>
+                                      prev.map((x, j) =>
+                                        j === i
+                                          ? { ...x, margen: e.target.value }
+                                          : x,
+                                      ),
+                                    )
+                                  }
                                   style={{
-                                    width:"60px", padding:"4px 6px", border:"1.5px solid #d0dde8",
-                                    borderRadius:5, fontFamily:"monospace", fontSize:12,
-                                    color:"#059669", fontWeight:700, outline:"none",
-                                    background: String(a.margen) !== String(a.margenBD) ? "#fffbea" : "#fff",
-                                    borderColor: String(a.margen) !== String(a.margenBD) ? "#f59e0b" : "#d0dde8",
+                                    width: "60px",
+                                    padding: "4px 6px",
+                                    border: "1.5px solid #d0dde8",
+                                    borderRadius: 5,
+                                    fontFamily: "monospace",
+                                    fontSize: 12,
+                                    color: "#059669",
+                                    fontWeight: 700,
+                                    outline: "none",
+                                    background:
+                                      String(a.margen) !== String(a.margenBD)
+                                        ? "#fffbea"
+                                        : "#fff",
+                                    borderColor:
+                                      String(a.margen) !== String(a.margenBD)
+                                        ? "#f59e0b"
+                                        : "#d0dde8",
                                   }}
                                 />
                                 {String(a.margen) !== String(a.margenBD) && (
                                   <span
                                     title={`Restaurar BD: ${a.margenBD}%`}
-                                    onClick={() => setAsociados(prev => prev.map((x, j) =>
-                                      j === i ? { ...x, margen: x.margenBD } : x
-                                    ))}
-                                    style={{ fontSize:10, cursor:"pointer", color:"#856404", background:"#fff3cd", border:"1px solid #ffc107", borderRadius:3, padding:"1px 5px" }}
-                                  >↩ BD</span>
+                                    onClick={() =>
+                                      setAsociados((prev) =>
+                                        prev.map((x, j) =>
+                                          j === i
+                                            ? { ...x, margen: x.margenBD }
+                                            : x,
+                                        ),
+                                      )
+                                    }
+                                    style={{
+                                      fontSize: 10,
+                                      cursor: "pointer",
+                                      color: "#856404",
+                                      background: "#fff3cd",
+                                      border: "1px solid #ffc107",
+                                      borderRadius: 3,
+                                      padding: "1px 5px",
+                                    }}
+                                  >
+                                    ↩ BD
+                                  </span>
                                 )}
                               </div>
                             </div>
 
                             {/* Resultado final */}
-                            <div className="asociado-resultado" style={{ alignSelf:"center" }}>
-                              {a.resultado > 0
-                                ? formatPeso(a.resultado)
-                                : a.error
-                                  ? <span style={{ color:"#c0392b", fontSize:11 }}>—</span>
-                                  : "—"
-                              }
+                            <div
+                              className="asociado-resultado"
+                              style={{ alignSelf: "center" }}
+                            >
+                              {a.resultado > 0 ? (
+                                formatPeso(a.resultado)
+                              ) : a.error ? (
+                                <span
+                                  style={{ color: "#c0392b", fontSize: 11 }}
+                                >
+                                  —
+                                </span>
+                              ) : (
+                                "—"
+                              )}
                             </div>
                           </div>
 
                           {/* Parciales expandidos */}
                           {tieneParciales && expandido && (
-                            <div style={{ background:"#eaf3fb", borderTop:"1px solid #d8ecf7", padding:"6px 14px 8px 24px" }}>
-                              {Object.entries(a.parciales).map(([nombre, valor]) => (
-                                <div key={nombre} style={{ display:"flex", justifyContent:"space-between", padding:"3px 0", borderBottom:"1px solid #d8ecf7", fontSize:11, color:"#2a4a60" }}>
-                                  <span style={{ fontFamily:"monospace", color:"#4a8ab5" }}>{nombre}</span>
-                                  <span style={{ fontFamily:"monospace", fontWeight:600 }}>
-                                    {typeof valor === "number" ? formatPeso(Math.round(valor)) : String(valor)}
-                                  </span>
-                                </div>
-                              ))}
+                            <div
+                              style={{
+                                background: "#eaf3fb",
+                                borderTop: "1px solid #d8ecf7",
+                                padding: "6px 14px 8px 24px",
+                              }}
+                            >
+                              {Object.entries(a.parciales).map(
+                                ([nombre, valor]) => (
+                                  <div
+                                    key={nombre}
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      padding: "3px 0",
+                                      borderBottom: "1px solid #d8ecf7",
+                                      fontSize: 11,
+                                      color: "#2a4a60",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontFamily: "monospace",
+                                        color: "#4a8ab5",
+                                      }}
+                                    >
+                                      {nombre}
+                                    </span>
+                                    <span
+                                      style={{
+                                        fontFamily: "monospace",
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      {typeof valor === "number"
+                                        ? formatPeso(Math.round(valor))
+                                        : String(valor)}
+                                    </span>
+                                  </div>
+                                ),
+                              )}
                             </div>
                           )}
                         </div>
@@ -939,7 +1269,9 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                     type="number"
                     min="1"
                     value={form.cantidad}
-                    onChange={(e) => setForm({ ...form, cantidad: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({ ...form, cantidad: Number(e.target.value) })
+                    }
                   />
                 </div>
 
@@ -951,7 +1283,9 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                       className="input"
                       type="number"
                       value={form.ancho}
-                      onChange={(e) => setForm({ ...form, ancho: Number(e.target.value) })}
+                      onChange={(e) =>
+                        setForm({ ...form, ancho: Number(e.target.value) })
+                      }
                     />
                   </div>
                   <div className="field">
@@ -960,27 +1294,59 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                       className="input"
                       type="number"
                       value={form.alto}
-                      onChange={(e) => setForm({ ...form, alto: Number(e.target.value) })}
+                      onChange={(e) =>
+                        setForm({ ...form, alto: Number(e.target.value) })
+                      }
                     />
                   </div>
                 </div>
 
                 {/* Colocación */}
                 <div className="field">
-                  <span className="label-text" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span
+                    className="label-text"
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
                     <span>COLOCACIÓN ($)</span>
                     {colocacionBD !== null && (
                       <span
                         style={{
-                          fontSize: "10px", fontFamily: "'Source Sans 3', sans-serif", fontWeight: 600,
-                          background: Number(form.colocacion) !== colocacionBD ? "#fff3cd" : "#eaf3fb",
-                          color: Number(form.colocacion) !== colocacionBD ? "#856404" : "#2d7fc1",
+                          fontSize: "10px",
+                          fontFamily: "'Source Sans 3', sans-serif",
+                          fontWeight: 600,
+                          background:
+                            Number(form.colocacion) !== colocacionBD
+                              ? "#fff3cd"
+                              : "#eaf3fb",
+                          color:
+                            Number(form.colocacion) !== colocacionBD
+                              ? "#856404"
+                              : "#2d7fc1",
                           border: `1px solid ${Number(form.colocacion) !== colocacionBD ? "#ffc107" : "#b8d6ef"}`,
-                          borderRadius: "4px", padding: "1px 7px", letterSpacing: "0.04em",
-                          cursor: Number(form.colocacion) !== colocacionBD ? "pointer" : "default",
+                          borderRadius: "4px",
+                          padding: "1px 7px",
+                          letterSpacing: "0.04em",
+                          cursor:
+                            Number(form.colocacion) !== colocacionBD
+                              ? "pointer"
+                              : "default",
                         }}
-                        title={Number(form.colocacion) !== colocacionBD ? `Click para restaurar al valor de BD ($${colocacionBD})` : "Valor de BD"}
-                        onClick={() => Number(form.colocacion) !== colocacionBD && setForm(prev => ({ ...prev, colocacion: colocacionBD }))}
+                        title={
+                          Number(form.colocacion) !== colocacionBD
+                            ? `Click para restaurar al valor de BD ($${colocacionBD})`
+                            : "Valor de BD"
+                        }
+                        onClick={() =>
+                          Number(form.colocacion) !== colocacionBD &&
+                          setForm((prev) => ({
+                            ...prev,
+                            colocacion: colocacionBD,
+                          }))
+                        }
                       >
                         {Number(form.colocacion) !== colocacionBD
                           ? `⚠️ BD: $${colocacionBD} — restaurar`
@@ -993,69 +1359,132 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                     type="number"
                     min="0"
                     value={form.colocacion}
-                    onChange={(e) => setForm({ ...form, colocacion: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({ ...form, colocacion: Number(e.target.value) })
+                    }
                   />
                 </div>
 
                 {/* Breakdown */}
                 <div className="breakdown">
                   {calculando && (
-                    <div style={{ padding: "8px 16px", fontSize: "12px", color: "#4a8ab5", fontStyle: "italic", borderBottom: "1px solid #e0eaf2" }}>
+                    <div
+                      style={{
+                        padding: "8px 16px",
+                        fontSize: "12px",
+                        color: "#4a8ab5",
+                        fontStyle: "italic",
+                        borderBottom: "1px solid #e0eaf2",
+                      }}
+                    >
                       ⏳ Recalculando...
                     </div>
                   )}
 
                   {/* Una fila por cada artículo asociado con resultado */}
-                  {asociados.filter(a => a.resultado > 0).map(a => {
-                    const tieneParciales = a.parciales && Object.keys(a.parciales).length > 0;
-                    const expandido      = parcialesExpandidos[`bd_${a.slot}`];
-                    return (
-                      <div key={a.slot}>
-                        <div
-                          className="breakdown-row"
-                          style={{ cursor: tieneParciales ? "pointer" : "default" }}
-                          onClick={() => tieneParciales && setParcialesExpandidos(prev => ({
-                            ...prev, [`bd_${a.slot}`]: !prev[`bd_${a.slot}`]
-                          }))}
-                        >
-                          <span>
-                            {tieneParciales && (
-                              <span style={{ marginRight: 5, color: "#2d7fc1", fontSize: 11 }}>
-                                {expandido ? "▾" : "▸"}
-                              </span>
-                            )}
-                            🔩 {a.art}
-                            {a.codform && (
-                              <span style={{ marginLeft: 6, fontSize: 11, color: "#92400e", fontFamily: "monospace" }}>
-                                ({a.codform})
-                              </span>
-                            )}
-                          </span>
-                          <span>{formatPeso(a.resultado)}</span>
-                        </div>
-                        {tieneParciales && expandido && Object.entries(a.parciales).map(([nombre, valor]) => (
-                          <div key={nombre} style={{
-                            display: "flex", justifyContent: "space-between",
-                            padding: "5px 16px 5px 28px", fontSize: 12,
-                            background: "#eaf3fb", borderBottom: "1px solid #d8ecf7", color: "#2a4a60"
-                          }}>
-                            <span style={{ fontFamily: "monospace", color: "#4a8ab5" }}>{nombre}</span>
-                            <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
-                              {typeof valor === "number" ? formatPeso(Math.round(valor)) : String(valor)}
+                  {asociados
+                    .filter((a) => a.resultado > 0)
+                    .map((a) => {
+                      const tieneParciales =
+                        a.parciales && Object.keys(a.parciales).length > 0;
+                      const expandido = parcialesExpandidos[`bd_${a.slot}`];
+                      return (
+                        <div key={a.slot}>
+                          <div
+                            className="breakdown-row"
+                            style={{
+                              cursor: tieneParciales ? "pointer" : "default",
+                            }}
+                            onClick={() =>
+                              tieneParciales &&
+                              setParcialesExpandidos((prev) => ({
+                                ...prev,
+                                [`bd_${a.slot}`]: !prev[`bd_${a.slot}`],
+                              }))
+                            }
+                          >
+                            <span>
+                              {tieneParciales && (
+                                <span
+                                  style={{
+                                    marginRight: 5,
+                                    color: "#2d7fc1",
+                                    fontSize: 11,
+                                  }}
+                                >
+                                  {expandido ? "▾" : "▸"}
+                                </span>
+                              )}
+                              🔩 {a.art}
+                              {a.codform && (
+                                <span
+                                  style={{
+                                    marginLeft: 6,
+                                    fontSize: 11,
+                                    color: "#92400e",
+                                    fontFamily: "monospace",
+                                  }}
+                                >
+                                  ({a.codform})
+                                </span>
+                              )}
                             </span>
+                            <span>{formatPeso(a.resultado)}</span>
                           </div>
-                        ))}
-                      </div>
-                    );
-                  })}
+                          {tieneParciales &&
+                            expandido &&
+                            Object.entries(a.parciales).map(
+                              ([nombre, valor]) => (
+                                <div
+                                  key={nombre}
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    padding: "5px 16px 5px 28px",
+                                    fontSize: 12,
+                                    background: "#eaf3fb",
+                                    borderBottom: "1px solid #d8ecf7",
+                                    color: "#2a4a60",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontFamily: "monospace",
+                                      color: "#4a8ab5",
+                                    }}
+                                  >
+                                    {nombre}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontFamily: "monospace",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {typeof valor === "number"
+                                      ? formatPeso(Math.round(valor))
+                                      : String(valor)}
+                                  </span>
+                                </div>
+                              ),
+                            )}
+                        </div>
+                      );
+                    })}
 
                   {/* Errores de artículos */}
-                  {asociados.filter(a => a.error && a.error !== "Sin fórmula").map(a => (
-                    <div key={`err_${a.slot}`} className="breakdown-row" style={{ color: "#c0392b" }}>
-                      <span>⚠️ {a.art}</span>
-                      <span style={{ fontSize: 11 }}>{a.error}</span>
-                    </div>
-                  ))}
+                  {asociados
+                    .filter((a) => a.error && a.error !== "Sin fórmula")
+                    .map((a) => (
+                      <div
+                        key={`err_${a.slot}`}
+                        className="breakdown-row"
+                        style={{ color: "#c0392b" }}
+                      >
+                        <span>⚠️ {a.art}</span>
+                        <span style={{ fontSize: 11 }}>{a.error}</span>
+                      </div>
+                    ))}
 
                   {/* Colocación */}
                   {Number(form.colocacion) > 0 && (
@@ -1074,18 +1503,43 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
 
                 {/* Acciones */}
                 <div className="actions">
-                  <button className="btn btn-cancel" onClick={handleNuevo}>+ Nuevo</button>
+                  <button className="btn btn-cancel" onClick={handleNuevo}>
+                    + Nuevo
+                  </button>
                   {errorCalc && (
-                    <p style={{ color: "#dc2626", fontSize: "12px", width: "100%", textAlign: "right", marginBottom: 4 }}>
+                    <p
+                      style={{
+                        color: "#dc2626",
+                        fontSize: "12px",
+                        width: "100%",
+                        textAlign: "right",
+                        marginBottom: 4,
+                      }}
+                    >
                       ⚠️ {errorCalc}
                     </p>
                   )}
                   {guardadoOk && (
-                    <p style={{ color: "#16a34a", fontSize: "12px", width: "100%", textAlign: "right", marginBottom: 4 }}>
-                      ✅ {modoEdicion ? `Guardado como Rev. ${revision}` : "Presupuesto guardado correctamente"}
+                    <p
+                      style={{
+                        color: "#16a34a",
+                        fontSize: "12px",
+                        width: "100%",
+                        textAlign: "right",
+                        marginBottom: 4,
+                      }}
+                    >
+                      ✅{" "}
+                      {modoEdicion
+                        ? `Guardado como Rev. ${revision}`
+                        : "Presupuesto guardado correctamente"}
                     </p>
                   )}
-                  <button className="btn btn-save" onClick={handleGuardar} disabled={guardando}>
+                  <button
+                    className="btn btn-save"
+                    onClick={handleGuardar}
+                    disabled={guardando}
+                  >
                     {guardando ? "⏳ Guardando..." : "💾 Guardar"}
                   </button>
                   <button className="btn btn-pdf" onClick={handlePDF}>
@@ -1095,14 +1549,16 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                     🖨️ Imprimir
                   </button>
                 </div>
-
-              </div>{/* /card */}
-            </div>{/* /presup-form-col */}
+              </div>
+              {/* /card */}
+            </div>
+            {/* /presup-form-col */}
 
             {/* Panel foto — derecha en desktop */}
             <div className="foto-panel">
               <div className="foto-panel-title">🪟 Tipo de mampara</div>
-              {articuloSeleccionado?.artfoto && articuloSeleccionado.artfoto !== "null" ? (
+              {articuloSeleccionado?.artfoto &&
+              articuloSeleccionado.artfoto !== "null" ? (
                 <img
                   src={articuloSeleccionado.artfoto}
                   alt={articuloSeleccionado.articulo}
@@ -1111,14 +1567,18 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
               ) : (
                 <div className="foto-panel-empty">
                   <span>🪟</span>
-                  <small>{articuloSeleccionado ? "Sin imagen" : "Seleccioná un tipo"}</small>
+                  <small>
+                    {articuloSeleccionado ? "Sin imagen" : "Seleccioná un tipo"}
+                  </small>
                 </div>
               )}
               {articuloSeleccionado && (
                 <div className="foto-panel-info">
                   <div className="foto-info-row">
                     <span className="foto-info-label">Código</span>
-                    <span className="foto-info-value">{articuloSeleccionado.codart}</span>
+                    <span className="foto-info-value">
+                      {articuloSeleccionado.codart}
+                    </span>
                   </div>
                   <div className="foto-info-row">
                     <span className="foto-info-label">Tipo</span>
@@ -1133,43 +1593,78 @@ export default function PresupuestoMamparas({ presupuestoACargar = null, onCarga
                   {articuloSeleccionado?.precio && (
                     <div className="foto-info-row">
                       <span className="foto-info-label">Precio ref.</span>
-                      <span className="foto-info-value" style={{ color: "#2d7fc1" }}>
-                        ${Number(articuloSeleccionado.precio).toLocaleString("es-AR")}
+                      <span
+                        className="foto-info-value"
+                        style={{ color: "#2d7fc1" }}
+                      >
+                        $
+                        {Number(articuloSeleccionado.precio).toLocaleString(
+                          "es-AR",
+                        )}
                       </span>
                     </div>
                   )}
                   {articuloSeleccionado.color && (
                     <div className="foto-info-row">
                       <span className="foto-info-label">Color</span>
-                      <span className="foto-info-value">{articuloSeleccionado.color}</span>
+                      <span className="foto-info-value">
+                        {articuloSeleccionado.color}
+                      </span>
                     </div>
                   )}
                 </div>
               )}
             </div>
-
-          </div>{/* /presup-layout */}
+          </div>
+          {/* /presup-layout */}
 
           {/* Contenido oculto para impresión */}
           <div id="presupuesto-print">
-            <h2>Presupuesto Mamparas {presupuestoId != null ? `N° ${String(presupuestoId).padStart(5, "0")}` : ""}</h2>
-            <p><strong>Cliente:</strong> {form.cliente}</p>
-            {busqueda && <p><strong>Tipo:</strong> {busqueda}</p>}
-            {modelo && <p><strong>Modelo:</strong> {modelo}</p>}
-            <p><strong>Cantidad:</strong> {form.cantidad}</p>
-            <p><strong>Dimensiones:</strong> {form.ancho} cm × {form.alto} cm</p>
+            <h2>
+              Presupuesto Mamparas{" "}
+              {presupuestoId != null
+                ? `N° ${String(presupuestoId).padStart(5, "0")}`
+                : ""}
+            </h2>
+            <p>
+              <strong>Cliente:</strong> {form.cliente}
+            </p>
+            {busqueda && (
+              <p>
+                <strong>Tipo:</strong> {busqueda}
+              </p>
+            )}
+            {modelo && (
+              <p>
+                <strong>Modelo:</strong> {modelo}
+              </p>
+            )}
+            <p>
+              <strong>Cantidad:</strong> {form.cantidad}
+            </p>
+            <p>
+              <strong>Dimensiones:</strong> {form.ancho} cm × {form.alto} cm
+            </p>
             <table>
               <tbody>
-                {asociados.filter(a => a.resultado > 0).map(a => (
-                  <tr key={a.slot}>
-                    <td>{a.art}</td>
-                    <td>{formatPeso(a.resultado)}</td>
-                  </tr>
-                ))}
+                {asociados
+                  .filter((a) => a.resultado > 0)
+                  .map((a) => (
+                    <tr key={a.slot}>
+                      <td>{a.art}</td>
+                      <td>{formatPeso(a.resultado)}</td>
+                    </tr>
+                  ))}
                 {Number(form.colocacion) > 0 && (
-                  <tr><td>Colocación</td><td>{formatPeso(form.colocacion)}</td></tr>
+                  <tr>
+                    <td>Colocación</td>
+                    <td>{formatPeso(form.colocacion)}</td>
+                  </tr>
                 )}
-                <tr className="total-row"><td>TOTAL</td><td>{formatPeso(total)}</td></tr>
+                <tr className="total-row">
+                  <td>TOTAL</td>
+                  <td>{formatPeso(total)}</td>
+                </tr>
               </tbody>
             </table>
           </div>

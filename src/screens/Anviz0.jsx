@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-const API = "http://localhost:3001";
-const WS  = "ws://localhost:3001";
+const API = "http://https://integral-backend-production.up.railway.app";
+const WS = "ws://https://integral-backend-production.up.railway.app";
 
 const STYLE = `
   .anviz-wrap { padding: 24px; font-family: 'Space Mono', monospace; }
@@ -45,25 +45,33 @@ const STYLE = `
 `;
 
 export default function Anviz({ onBack }) {
-  const [fichadas, setFichadas]       = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [status, setStatus]           = useState({ connected: false, lastSync: null, lastError: null, pendingQueue: 0 });
+  const [fichadas, setFichadas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState({
+    connected: false,
+    lastSync: null,
+    lastError: null,
+    pendingQueue: 0,
+  });
   const [filtroFecha, setFiltroFecha] = useState("");
-  const [filtroUser, setFiltroUser]   = useState("");
-  const [nuevasIds, setNuevasIds]     = useState(new Set());
-  const [syncing, setSyncing]         = useState(false);
-  const [syncMsg, setSyncMsg]         = useState("");
+  const [filtroUser, setFiltroUser] = useState("");
+  const [nuevasIds, setNuevasIds] = useState(new Set());
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
   const wsRef = useRef(null);
 
   // ── Cargar fichadas ────────────────────────────────────────────────────────
   const fetchFichadas = (fecha, userId) => {
     setLoading(true);
     let url = `${API}/fichadas?limit=200`;
-    if (fecha)  url += `&fecha=${fecha}`;
+    if (fecha) url += `&fecha=${fecha}`;
     if (userId) url += `&user_id=${userId}`;
     fetch(url)
       .then((r) => r.json())
-      .then((d) => { setFichadas(Array.isArray(d) ? d : []); setLoading(false); })
+      .then((d) => {
+        setFichadas(Array.isArray(d) ? d : []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   };
 
@@ -94,7 +102,15 @@ export default function Anviz({ onBack }) {
         const f = msg.data;
         setFichadas((prev) => [f, ...prev]);
         setNuevasIds((prev) => new Set([...prev, f.id]));
-        setTimeout(() => setNuevasIds((prev) => { const s = new Set(prev); s.delete(f.id); return s; }), 2000);
+        setTimeout(
+          () =>
+            setNuevasIds((prev) => {
+              const s = new Set(prev);
+              s.delete(f.id);
+              return s;
+            }),
+          2000,
+        );
       }
     };
     ws.onerror = () => {};
@@ -109,7 +125,8 @@ export default function Anviz({ onBack }) {
       .then((r) => r.json())
       .then((d) => {
         setSyncMsg(d.ok ? "✅ Sincronización iniciada" : `⚠️ ${d.error}`);
-        if (d.ok) setTimeout(() => fetchFichadas(filtroFecha, filtroUser), 5000);
+        if (d.ok)
+          setTimeout(() => fetchFichadas(filtroFecha, filtroUser), 5000);
       })
       .catch(() => setSyncMsg("⚠️ Error de conexión"))
       .finally(() => setSyncing(false));
@@ -117,19 +134,25 @@ export default function Anviz({ onBack }) {
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const entradas = fichadas.filter((f) => f.direccion === "entrada").length;
-  const salidas  = fichadas.filter((f) => f.direccion === "salida").length;
+  const salidas = fichadas.filter((f) => f.direccion === "salida").length;
   const usuarios = new Set(fichadas.map((f) => f.user_id)).size;
 
   const fmtTs = (ts) => {
     if (!ts) return "—";
-    const d   = new Date(ts + "Z");
+    const d = new Date(ts + "Z");
     const pad = (n) => n.toString().padStart(2, "0");
-    return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)}/${d.getUTCFullYear()} ` +
-           `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+    return (
+      `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ` +
+      `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
+    );
   };
 
-  const badgeClass = status.connected ? "on" : status.lastError?.includes("red local") ? "warn" : "off";
-  const badgeText  = status.connected
+  const badgeClass = status.connected
+    ? "on"
+    : status.lastError?.includes("red local")
+      ? "warn"
+      : "off";
+  const badgeText = status.connected
     ? "● CONECTADO"
     : status.lastError?.includes("red local")
       ? "⚠ FUERA DE RED LOCAL"
@@ -141,10 +164,16 @@ export default function Anviz({ onBack }) {
 
       {/* Header */}
       <div className="anviz-header">
-        <button className="anviz-btn sec" onClick={onBack}>← Volver</button>
+        <button className="anviz-btn sec" onClick={onBack}>
+          ← Volver
+        </button>
         <span className="anviz-title">🕐 Control de Accesos</span>
         <span className={`anviz-badge ${badgeClass}`}>{badgeText}</span>
-        <button className="anviz-btn grn" onClick={handleSync} disabled={syncing || !status.connected}>
+        <button
+          className="anviz-btn grn"
+          onClick={handleSync}
+          disabled={syncing || !status.connected}
+        >
           {syncing ? "Sincronizando..." : "🔄 Sincronizar"}
         </button>
         {syncMsg && <span className="sync-msg">{syncMsg}</span>}
@@ -153,8 +182,10 @@ export default function Anviz({ onBack }) {
       {/* Aviso si no está en red local */}
       {status.lastError && (
         <div className="anviz-notice">
-          ⚠️ {status.lastError}. Los datos mostrados son los últimos sincronizados.
-          {status.pendingQueue > 0 && ` Hay ${status.pendingQueue} eventos pendientes de subir.`}
+          ⚠️ {status.lastError}. Los datos mostrados son los últimos
+          sincronizados.
+          {status.pendingQueue > 0 &&
+            ` Hay ${status.pendingQueue} eventos pendientes de subir.`}
         </div>
       )}
 
@@ -165,15 +196,21 @@ export default function Anviz({ onBack }) {
           <div className="lbl">Total</div>
         </div>
         <div className="anviz-stat">
-          <div className="num" style={{ color: "#0a7a3c" }}>{entradas}</div>
+          <div className="num" style={{ color: "#0a7a3c" }}>
+            {entradas}
+          </div>
           <div className="lbl">Entradas</div>
         </div>
         <div className="anviz-stat">
-          <div className="num" style={{ color: "#c0392b" }}>{salidas}</div>
+          <div className="num" style={{ color: "#c0392b" }}>
+            {salidas}
+          </div>
           <div className="lbl">Salidas</div>
         </div>
         <div className="anviz-stat">
-          <div className="num" style={{ color: "#4361ee" }}>{usuarios}</div>
+          <div className="num" style={{ color: "#4361ee" }}>
+            {usuarios}
+          </div>
           <div className="lbl">Usuarios</div>
         </div>
         {status.lastSync && (
@@ -188,16 +225,35 @@ export default function Anviz({ onBack }) {
 
       {/* Filtros */}
       <div className="anviz-filters">
-        <input type="date" value={filtroFecha} onChange={(e) => setFiltroFecha(e.target.value)} />
         <input
-          type="number" placeholder="User ID" value={filtroUser}
-          onChange={(e) => setFiltroUser(e.target.value)} style={{ width: 100 }}
+          type="date"
+          value={filtroFecha}
+          onChange={(e) => setFiltroFecha(e.target.value)}
         />
-        <button className="anviz-btn" onClick={() => fetchFichadas(filtroFecha, filtroUser)}>Buscar</button>
-        <button className="anviz-btn sec" onClick={() => {
-          const hoy = new Date().toISOString().split("T")[0];
-          setFiltroFecha(hoy); setFiltroUser(""); fetchFichadas(hoy, "");
-        }}>Hoy</button>
+        <input
+          type="number"
+          placeholder="User ID"
+          value={filtroUser}
+          onChange={(e) => setFiltroUser(e.target.value)}
+          style={{ width: 100 }}
+        />
+        <button
+          className="anviz-btn"
+          onClick={() => fetchFichadas(filtroFecha, filtroUser)}
+        >
+          Buscar
+        </button>
+        <button
+          className="anviz-btn sec"
+          onClick={() => {
+            const hoy = new Date().toISOString().split("T")[0];
+            setFiltroFecha(hoy);
+            setFiltroUser("");
+            fetchFichadas(hoy, "");
+          }}
+        >
+          Hoy
+        </button>
       </div>
 
       {/* Tabla */}
@@ -220,7 +276,11 @@ export default function Anviz({ onBack }) {
               {fichadas.map((f) => (
                 <tr key={f.id} className={nuevasIds.has(f.id) ? "nueva" : ""}>
                   <td style={{ color: "#99bbcc" }}>{f.user_id}</td>
-                  <td><strong>{f.nombre_completo?.trim() || `Usuario ${f.user_id}`}</strong></td>
+                  <td>
+                    <strong>
+                      {f.nombre_completo?.trim() || `Usuario ${f.user_id}`}
+                    </strong>
+                  </td>
                   <td>
                     <span className={`tag ${f.direccion}`}>
                       {f.direccion === "entrada" ? "🟢 ENTRADA" : "🔴 SALIDA"}

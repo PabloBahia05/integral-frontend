@@ -1,20 +1,51 @@
 import { useState, useEffect, useMemo } from "react";
 
-const API   = "http://localhost:3001";
+const API = "http://https://integral-backend-production.up.railway.app";
 const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 const EMPTY = () => ({
-  codart: "", articulo: "",
-  cod1:  "", art1:  "", margen1:  "", form1:  "",
-  cod2:  "", art2:  "", margen2:  "", form2:  "",
-  cod3:  "", art3:  "", margen3:  "", form3:  "",
-  cod4:  "", art4:  "", margen4:  "", form4:  "",
-  cod5:  "", art5:  "", margen5:  "", form5:  "",
-  cod6:  "", art6:  "", margen6:  "", form6:  "",
-  cod7:  "", art7:  "", margen7:  "", form7:  "",
-  cod8:  "", art8:  "", margen8:  "", form8:  "",
-  cod9:  "", art9:  "", margen9:  "", form9:  "",
-  cod10: "", art10: "", margen10: "", form10: "",
+  codart: "",
+  articulo: "",
+  cod1: "",
+  art1: "",
+  margen1: "",
+  form1: "",
+  cod2: "",
+  art2: "",
+  margen2: "",
+  form2: "",
+  cod3: "",
+  art3: "",
+  margen3: "",
+  form3: "",
+  cod4: "",
+  art4: "",
+  margen4: "",
+  form4: "",
+  cod5: "",
+  art5: "",
+  margen5: "",
+  form5: "",
+  cod6: "",
+  art6: "",
+  margen6: "",
+  form6: "",
+  cod7: "",
+  art7: "",
+  margen7: "",
+  form7: "",
+  cod8: "",
+  art8: "",
+  margen8: "",
+  form8: "",
+  cod9: "",
+  art9: "",
+  margen9: "",
+  form9: "",
+  cod10: "",
+  art10: "",
+  margen10: "",
+  form10: "",
 });
 
 const CSS = `
@@ -118,25 +149,40 @@ const CSS = `
 `;
 
 // ── Slot en modo edición ──────────────────────────────────────────────────────
-function SlotEdit({ n, form, setForm, listaSlot, rubroSlots, setRubroSlots, rubros, formulasList }) {
+function SlotEdit({
+  n,
+  form,
+  setForm,
+  listaSlot,
+  rubroSlots,
+  setRubroSlots,
+  rubros,
+  formulasList,
+}) {
   const [busqueda, setBusqueda] = useState("");
-  const [abierto,  setAbierto]  = useState(false);
+  const [abierto, setAbierto] = useState(false);
 
   const lista = listaSlot[n] ?? [];
   const artActual = form[`art${n}`] ?? "";
 
   const filtrados = busqueda.trim()
-    ? lista.filter(a => a.articulo.toLowerCase().includes(busqueda.toLowerCase()))
+    ? lista.filter((a) =>
+        a.articulo.toLowerCase().includes(busqueda.toLowerCase()),
+      )
     : lista;
 
   const seleccionar = (a) => {
-    setForm(f => ({ ...f, [`art${n}`]: a.articulo, [`cod${n}`]: a.codartint ?? a.codart ?? "" }));
+    setForm((f) => ({
+      ...f,
+      [`art${n}`]: a.articulo,
+      [`cod${n}`]: a.codartint ?? a.codart ?? "",
+    }));
     setBusqueda("");
     setAbierto(false);
   };
 
   const limpiar = () => {
-    setForm(f => ({ ...f, [`art${n}`]: "", [`cod${n}`]: "" }));
+    setForm((f) => ({ ...f, [`art${n}`]: "", [`cod${n}`]: "" }));
     setBusqueda("");
     setAbierto(false);
   };
@@ -144,14 +190,21 @@ function SlotEdit({ n, form, setForm, listaSlot, rubroSlots, setRubroSlots, rubr
   return (
     <div className="sc">
       <div className="sc-num">Art {n}</div>
-      <select className="sc-sel" value={rubroSlots[n] ?? ""}
-        onChange={e => {
-          setRubroSlots(p => ({ ...p, [n]: e.target.value }));
-          setForm(f => ({ ...f, [`art${n}`]: "", [`cod${n}`]: "" }));
+      <select
+        className="sc-sel"
+        value={rubroSlots[n] ?? ""}
+        onChange={(e) => {
+          setRubroSlots((p) => ({ ...p, [n]: e.target.value }));
+          setForm((f) => ({ ...f, [`art${n}`]: "", [`cod${n}`]: "" }));
           setBusqueda("");
-        }}>
+        }}
+      >
         <option value="">— Rubro —</option>
-        {rubros.map(r => <option key={r} value={r}>{r}</option>)}
+        {rubros.map((r) => (
+          <option key={r} value={r}>
+            {r}
+          </option>
+        ))}
       </select>
 
       {/* Buscador filtrable de material */}
@@ -161,38 +214,78 @@ function SlotEdit({ n, form, setForm, listaSlot, rubroSlots, setRubroSlots, rubr
           style={{ paddingRight: artActual ? 22 : 8 }}
           placeholder={artActual || "Buscar material..."}
           value={busqueda}
-          onChange={e => { setBusqueda(e.target.value); setAbierto(true); }}
+          onChange={(e) => {
+            setBusqueda(e.target.value);
+            setAbierto(true);
+          }}
           onFocus={() => setAbierto(true)}
           onBlur={() => setTimeout(() => setAbierto(false), 180)}
         />
         {artActual && (
           <span
             onClick={limpiar}
-            style={{ position: "absolute", right: 5, top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "#94a3b8", fontSize: 11, lineHeight: 1 }}
+            style={{
+              position: "absolute",
+              right: 5,
+              top: "50%",
+              transform: "translateY(-50%)",
+              cursor: "pointer",
+              color: "#94a3b8",
+              fontSize: 11,
+              lineHeight: 1,
+            }}
             title="Limpiar"
-          >✕</span>
+          >
+            ✕
+          </span>
         )}
         {abierto && filtrados.length > 0 && (
-          <div style={{
-            position: "absolute", zIndex: 999, top: "100%", left: 0, right: 0,
-            background: "#fff", border: "1.5px solid #bfdbfe", borderRadius: 8,
-            boxShadow: "0 8px 24px rgba(15,31,53,.13)", maxHeight: 200, overflowY: "auto",
-          }}>
-            {filtrados.map(a => (
+          <div
+            style={{
+              position: "absolute",
+              zIndex: 999,
+              top: "100%",
+              left: 0,
+              right: 0,
+              background: "#fff",
+              border: "1.5px solid #bfdbfe",
+              borderRadius: 8,
+              boxShadow: "0 8px 24px rgba(15,31,53,.13)",
+              maxHeight: 200,
+              overflowY: "auto",
+            }}
+          >
+            {filtrados.map((a) => (
               <div
                 key={a.id}
                 onMouseDown={() => seleccionar(a)}
                 style={{
-                  padding: "6px 10px", cursor: "pointer", fontSize: 11,
-                  borderBottom: "1px solid #f0f4f8", color: "#1a2332",
+                  padding: "6px 10px",
+                  cursor: "pointer",
+                  fontSize: 11,
+                  borderBottom: "1px solid #f0f4f8",
+                  color: "#1a2332",
                   background: artActual === a.articulo ? "#eff4ff" : undefined,
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = "#f0f6ff"}
-                onMouseLeave={e => e.currentTarget.style.background = artActual === a.articulo ? "#eff4ff" : "#fff"}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#f0f6ff")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background =
+                    artActual === a.articulo ? "#eff4ff" : "#fff")
+                }
               >
                 <div style={{ fontWeight: 500 }}>{a.articulo}</div>
                 {(a.codartint || a.codart) && (
-                  <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "monospace" }}>{a.codartint ?? a.codart}</div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "#94a3b8",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {a.codartint ?? a.codart}
+                  </div>
                 )}
               </div>
             ))}
@@ -200,18 +293,40 @@ function SlotEdit({ n, form, setForm, listaSlot, rubroSlots, setRubroSlots, rubr
         )}
       </div>
 
-      <input className="sc-inp ro" value={artActual} readOnly placeholder="Artículo seleccionado" style={{ fontSize: 10 }} />
-      <input className="sc-inp ro" value={form[`cod${n}`] ?? ""} readOnly placeholder="Código" />
-      <input className="sc-mg" value={form[`margen${n}`] ?? ""}
-        onChange={e => setForm(f => ({ ...f, [`margen${n}`]: e.target.value }))}
-        placeholder="Margen %" />
+      <input
+        className="sc-inp ro"
+        value={artActual}
+        readOnly
+        placeholder="Artículo seleccionado"
+        style={{ fontSize: 10 }}
+      />
+      <input
+        className="sc-inp ro"
+        value={form[`cod${n}`] ?? ""}
+        readOnly
+        placeholder="Código"
+      />
+      <input
+        className="sc-mg"
+        value={form[`margen${n}`] ?? ""}
+        onChange={(e) =>
+          setForm((f) => ({ ...f, [`margen${n}`]: e.target.value }))
+        }
+        placeholder="Margen %"
+      />
       <div className="sc-fl">🧮 Fórmula</div>
-      <select className="sc-fs" value={form[`form${n}`] ?? ""}
-        onChange={e => setForm(f => ({ ...f, [`form${n}`]: e.target.value }))}>
+      <select
+        className="sc-fs"
+        value={form[`form${n}`] ?? ""}
+        onChange={(e) =>
+          setForm((f) => ({ ...f, [`form${n}`]: e.target.value }))
+        }
+      >
         <option value="">— Sin fórmula —</option>
-        {formulasList.map(f => (
+        {formulasList.map((f) => (
           <option key={f.codform} value={f.codform}>
-            {f.codform}{f.codart ? ` (${f.codart})` : ""}
+            {f.codform}
+            {f.codart ? ` (${f.codart})` : ""}
           </option>
         ))}
       </select>
@@ -221,17 +336,17 @@ function SlotEdit({ n, form, setForm, listaSlot, rubroSlots, setRubroSlots, rubr
 
 // ── Slot en modo vista ────────────────────────────────────────────────────────
 function SlotView({ row, n }) {
-  const art    = row[`art${n}`];
-  const cod    = row[`cod${n}`];
+  const art = row[`art${n}`];
+  const cod = row[`cod${n}`];
   const margen = row[`margen${n}`];
-  const form   = row[`form${n}`];
+  const form = row[`form${n}`];
   if (!art) return <span className="sv-mt">—</span>;
   return (
     <div className="sv">
       <span className="sv-art">{art}</span>
-      {cod    && <span className="sv-sub">{cod}</span>}
+      {cod && <span className="sv-sub">{cod}</span>}
       {margen && <span className="b-mg">↑ {margen}%</span>}
-      {form   && <span className="b-form">🧮 {form}</span>}
+      {form && <span className="b-form">🧮 {form}</span>}
     </div>
   );
 }
@@ -247,103 +362,158 @@ export default function Asociaciones({
   onOpenModal,
   onCloseModal,
 }) {
-  const [search,        setSearch]        = useState("");
+  const [search, setSearch] = useState("");
   const [articulosList, setArticulosList] = useState([]);
-  const [formulasList,  setFormulasList]  = useState([]);
-  const [rubros,        setRubros]        = useState([]);
+  const [formulasList, setFormulasList] = useState([]);
+  const [rubros, setRubros] = useState([]);
 
   // edición inline
-  const [editId,         setEditId]         = useState(null);
-  const [editForm,       setEditForm]       = useState(null);
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
   const [editRubroPadre, setEditRubroPadre] = useState("");
-  const [editRubroSlots, setEditRubroSlots] = useState(() => Object.fromEntries(SLOTS.map(n => [n, ""])));
+  const [editRubroSlots, setEditRubroSlots] = useState(() =>
+    Object.fromEntries(SLOTS.map((n) => [n, ""])),
+  );
 
   // modal nuevo
-  const [modalOpen,     setModalOpen]     = useState(false);
-  const [newForm,       setNewForm]       = useState(EMPTY());
+  const [modalOpen, setModalOpen] = useState(false);
+  const [newForm, setNewForm] = useState(EMPTY());
   const [newRubroPadre, setNewRubroPadre] = useState("");
-  const [newRubroSlots, setNewRubroSlots] = useState(() => Object.fromEntries(SLOTS.map(n => [n, ""])));
+  const [newRubroSlots, setNewRubroSlots] = useState(() =>
+    Object.fromEntries(SLOTS.map((n) => [n, ""])),
+  );
 
   useEffect(() => {
     fetch(`${API}/productos?limit=99999`)
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         if (!Array.isArray(data)) return;
         setArticulosList(data);
-        setRubros([...new Set(data.map(a => a.rubro).filter(Boolean))].sort());
-      }).catch(() => {});
+        setRubros(
+          [...new Set(data.map((a) => a.rubro).filter(Boolean))].sort(),
+        );
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     fetch(`${API}/formulas`)
-      .then(r => r.json())
-      .then(data => setFormulasList(Array.isArray(data) ? data : []))
+      .then((r) => r.json())
+      .then((data) => setFormulasList(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
-  const listaPadreEdit = useMemo(() =>
-    editRubroPadre ? articulosList.filter(a => a.rubro === editRubroPadre) : articulosList,
-    [articulosList, editRubroPadre]);
+  const listaPadreEdit = useMemo(
+    () =>
+      editRubroPadre
+        ? articulosList.filter((a) => a.rubro === editRubroPadre)
+        : articulosList,
+    [articulosList, editRubroPadre],
+  );
 
-  const listaPadreNew = useMemo(() =>
-    newRubroPadre ? articulosList.filter(a => a.rubro === newRubroPadre) : articulosList,
-    [articulosList, newRubroPadre]);
+  const listaPadreNew = useMemo(
+    () =>
+      newRubroPadre
+        ? articulosList.filter((a) => a.rubro === newRubroPadre)
+        : articulosList,
+    [articulosList, newRubroPadre],
+  );
 
   const PROV_EXCLUIDO = "DANIEL ROQUE SRL";
 
   const filtrarSlot = (lista, rubroSlot, rubroPadre) => {
-    let result = rubroSlot ? lista.filter(a => a.rubro === rubroSlot) : lista;
+    let result = rubroSlot ? lista.filter((a) => a.rubro === rubroSlot) : lista;
     // Si el artículo padre es MUEBLES y el slot también es MUEBLES (o sin rubro), excluir Daniel Roque SRL
-    if (rubroPadre?.toUpperCase() === "MUEBLES" && (!rubroSlot || rubroSlot.toUpperCase() === "MUEBLES")) {
-      result = result.filter(a => (a.proveedor ?? "").toUpperCase() !== PROV_EXCLUIDO);
+    if (
+      rubroPadre?.toUpperCase() === "MUEBLES" &&
+      (!rubroSlot || rubroSlot.toUpperCase() === "MUEBLES")
+    ) {
+      result = result.filter(
+        (a) => (a.proveedor ?? "").toUpperCase() !== PROV_EXCLUIDO,
+      );
     }
     return result;
   };
 
-  const listaSlotEdit = useMemo(() =>
-    Object.fromEntries(SLOTS.map(n => [n,
-      filtrarSlot(articulosList, editRubroSlots[n], editRubroPadre)
-    ])), [articulosList, editRubroSlots, editRubroPadre]);
+  const listaSlotEdit = useMemo(
+    () =>
+      Object.fromEntries(
+        SLOTS.map((n) => [
+          n,
+          filtrarSlot(articulosList, editRubroSlots[n], editRubroPadre),
+        ]),
+      ),
+    [articulosList, editRubroSlots, editRubroPadre],
+  );
 
-  const listaSlotNew = useMemo(() =>
-    Object.fromEntries(SLOTS.map(n => [n,
-      filtrarSlot(articulosList, newRubroSlots[n], newRubroPadre)
-    ])), [articulosList, newRubroSlots, newRubroPadre]);
+  const listaSlotNew = useMemo(
+    () =>
+      Object.fromEntries(
+        SLOTS.map((n) => [
+          n,
+          filtrarSlot(articulosList, newRubroSlots[n], newRubroPadre),
+        ]),
+      ),
+    [articulosList, newRubroSlots, newRubroPadre],
+  );
 
   // iniciar edición inline
   const startEdit = (row) => {
     setEditId(row.id);
     setEditForm({ ...EMPTY(), ...row });
-    const pf = articulosList.find(a => a.articulo === row.articulo);
+    const pf = articulosList.find((a) => a.articulo === row.articulo);
     setEditRubroPadre(pf?.rubro ?? "");
-    setEditRubroSlots(Object.fromEntries(
-      SLOTS.map(n => {
-        const f = articulosList.find(a => a.articulo === row[`art${n}`]);
-        return [n, f?.rubro ?? ""];
-      })
-    ));
+    setEditRubroSlots(
+      Object.fromEntries(
+        SLOTS.map((n) => {
+          const f = articulosList.find((a) => a.articulo === row[`art${n}`]);
+          return [n, f?.rubro ?? ""];
+        }),
+      ),
+    );
   };
-  const cancelEdit = () => { setEditId(null); setEditForm(null); };
-  const saveEdit   = () => { if (!editForm) return; onSave?.({ id: editId, ...editForm }); cancelEdit(); };
+  const cancelEdit = () => {
+    setEditId(null);
+    setEditForm(null);
+  };
+  const saveEdit = () => {
+    if (!editForm) return;
+    onSave?.({ id: editId, ...editForm });
+    cancelEdit();
+  };
 
   // modal nuevo
-  const openNew  = () => { setNewForm(EMPTY()); setNewRubroPadre(""); setNewRubroSlots(Object.fromEntries(SLOTS.map(n=>[n,""]))); setModalOpen(true); onOpenModal?.("form"); };
-  const closeNew = () => { setModalOpen(false); onCloseModal?.(); };
-  const saveNew  = () => { if (!newForm.codart && !newForm.articulo) return; onSave?.({ ...newForm }); closeNew(); };
+  const openNew = () => {
+    setNewForm(EMPTY());
+    setNewRubroPadre("");
+    setNewRubroSlots(Object.fromEntries(SLOTS.map((n) => [n, ""])));
+    setModalOpen(true);
+    onOpenModal?.("form");
+  };
+  const closeNew = () => {
+    setModalOpen(false);
+    onCloseModal?.();
+  };
+  const saveNew = () => {
+    if (!newForm.codart && !newForm.articulo) return;
+    onSave?.({ ...newForm });
+    closeNew();
+  };
 
-  const filtered = asociaciones.filter(a =>
-    !search ||
-    (a.articulo ?? "").toLowerCase().includes(search.toLowerCase()) ||
-    (a.codart   ?? "").toLowerCase().includes(search.toLowerCase())
+  const filtered = asociaciones.filter(
+    (a) =>
+      !search ||
+      (a.articulo ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (a.codart ?? "").toLowerCase().includes(search.toLowerCase()),
   );
 
   const sharedSlotProps = (isEdit) => ({
     rubros,
     formulasList,
-    form:          isEdit ? editForm       : newForm,
-    setForm:       isEdit ? setEditForm    : setNewForm,
-    listaSlot:     isEdit ? listaSlotEdit  : listaSlotNew,
-    rubroSlots:    isEdit ? editRubroSlots : newRubroSlots,
+    form: isEdit ? editForm : newForm,
+    setForm: isEdit ? setEditForm : setNewForm,
+    listaSlot: isEdit ? listaSlotEdit : listaSlotNew,
+    rubroSlots: isEdit ? editRubroSlots : newRubroSlots,
     setRubroSlots: isEdit ? setEditRubroSlots : setNewRubroSlots,
   });
 
@@ -351,21 +521,31 @@ export default function Asociaciones({
     <>
       <style>{CSS}</style>
       <div className="ar">
-
         <div className="ar-hdr">
           <div>
             <div className="ar-eyebrow">Gestión de productos</div>
-            <div className="ar-title"><div className="ar-icon">🔗</div>Asociaciones</div>
+            <div className="ar-title">
+              <div className="ar-icon">🔗</div>Asociaciones
+            </div>
           </div>
         </div>
 
         <div className="ar-bar">
           <div className="ar-sw">
             <span className="ar-si">🔍</span>
-            <input className="ar-s" placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)} />
+            <input
+              className="ar-s"
+              placeholder="Buscar…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-          <button className="btn-add" onClick={openNew}><span>＋</span> Agregar</button>
-          <span className="ar-count">{filtered.length} {filtered.length === 1 ? "registro" : "registros"}</span>
+          <button className="btn-add" onClick={openNew}>
+            <span>＋</span> Agregar
+          </button>
+          <span className="ar-count">
+            {filtered.length} {filtered.length === 1 ? "registro" : "registros"}
+          </span>
         </div>
 
         <div className="ar-card">
@@ -376,107 +556,219 @@ export default function Asociaciones({
                   <th>ID</th>
                   <th>Código</th>
                   <th>Artículo Padre</th>
-                  {SLOTS.map(n => <th key={n}>Art {n}</th>)}
+                  {SLOTS.map((n) => (
+                    <th key={n}>Art {n}</th>
+                  ))}
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={3 + SLOTS.length + 1}>
-                    <div className="ar-empty"><div style={{fontSize:36,opacity:.4}}>🔗</div><div>Sin registros</div></div>
-                  </td></tr>
-                ) : filtered.flatMap(row => {
-                  const isEditing = editId === row.id;
-                  const rows = [];
+                  <tr>
+                    <td colSpan={3 + SLOTS.length + 1}>
+                      <div className="ar-empty">
+                        <div style={{ fontSize: 36, opacity: 0.4 }}>🔗</div>
+                        <div>Sin registros</div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.flatMap((row) => {
+                    const isEditing = editId === row.id;
+                    const rows = [];
 
-                  // fila de datos
-                  rows.push(
-                    <tr key={`r-${row.id}`}
-                      className={isEditing ? "row-edit-hdr" : (selected?.id === row.id ? "row-sel" : "row-normal")}
-                      onClick={() => !isEditing && onSelect?.(row)}
-                    >
-                      <td><span className="b-id">{row.id}</span></td>
-                      <td><span className="b-cod">{row.codart}</span></td>
-                      <td style={{fontWeight:500}}>{row.articulo}</td>
-                      {SLOTS.map(n => (
-                        <td key={n}>
-                          {isEditing
-                            ? <span style={{fontSize:10,color:"#2563eb",fontStyle:"italic"}}>↓ editando</span>
-                            : <SlotView row={row} n={n} />
-                          }
-                        </td>
-                      ))}
-                      <td>
-                        <div className="ar-acts">
-                          {isEditing ? (
-                            <>
-                              <button className="bic bic-ok" title="Guardar" onClick={e=>{e.stopPropagation();saveEdit();}}>💾</button>
-                              <button className="bic bic-cx" title="Cancelar" onClick={e=>{e.stopPropagation();cancelEdit();}}>✕</button>
-                            </>
-                          ) : (
-                            <>
-                              <button className="bic bic-ed" title="Editar" onClick={e=>{e.stopPropagation();startEdit(row);}}>✏️</button>
-                              <button className="bic bic-dl" title="Eliminar" onClick={e=>{e.stopPropagation();if(window.confirm("¿Eliminar?"))onDelete?.(row);}}>🗑️</button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-
-                  // fila de edición expandida
-                  if (isEditing && editForm) {
+                    // fila de datos
                     rows.push(
-                      <tr key={`e-${row.id}`} className="row-edit-body">
-                        <td colSpan={3 + SLOTS.length + 1} style={{padding:0}}>
-                          <div className="ep">
-
-                            {/* padre */}
-                            <div className="ep-sec">Artículo Padre</div>
-                            <div className="ep-padre">
-                              <div>
-                                <div className="ep-lbl">Rubro</div>
-                                <select className="ep-sel" value={editRubroPadre}
-                                  onChange={e => { setEditRubroPadre(e.target.value); setEditForm(f=>({...f,articulo:"",codart:""})); }}>
-                                  <option value="">— Todos —</option>
-                                  {rubros.map(r=><option key={r} value={r}>{r}</option>)}
-                                </select>
-                              </div>
-                              <div>
-                                <div className="ep-lbl">Artículo</div>
-                                <select className="ep-sel" value={editForm.articulo}
-                                  onChange={e => {
-                                    const found = listaPadreEdit.find(a=>a.articulo===e.target.value);
-                                    setEditForm(f=>({...f,articulo:e.target.value,codart:found?.codartint??""}));
-                                  }}>
-                                  <option value="">— Elegir —</option>
-                                  {listaPadreEdit.map(a=><option key={a.id} value={a.articulo}>{a.articulo}</option>)}
-                                </select>
-                              </div>
-                              <div>
-                                <div className="ep-lbl">Código</div>
-                                <input className="ep-inp ro" value={editForm.codart} readOnly />
-                              </div>
-                            </div>
-
-                            {/* slots */}
-                            <div className="ep-sec">Artículos Asociados</div>
-                            <div className="slots-wrap">
-                              {SLOTS.map(n => <SlotEdit key={n} n={n} {...sharedSlotProps(true)} />)}
-                            </div>
-
-                            <div className="ep-acts">
-                              <button className="ep-cancel" onClick={cancelEdit}>Cancelar</button>
-                              <button className="ep-save"   onClick={saveEdit}>💾 Guardar cambios</button>
-                            </div>
+                      <tr
+                        key={`r-${row.id}`}
+                        className={
+                          isEditing
+                            ? "row-edit-hdr"
+                            : selected?.id === row.id
+                              ? "row-sel"
+                              : "row-normal"
+                        }
+                        onClick={() => !isEditing && onSelect?.(row)}
+                      >
+                        <td>
+                          <span className="b-id">{row.id}</span>
+                        </td>
+                        <td>
+                          <span className="b-cod">{row.codart}</span>
+                        </td>
+                        <td style={{ fontWeight: 500 }}>{row.articulo}</td>
+                        {SLOTS.map((n) => (
+                          <td key={n}>
+                            {isEditing ? (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: "#2563eb",
+                                  fontStyle: "italic",
+                                }}
+                              >
+                                ↓ editando
+                              </span>
+                            ) : (
+                              <SlotView row={row} n={n} />
+                            )}
+                          </td>
+                        ))}
+                        <td>
+                          <div className="ar-acts">
+                            {isEditing ? (
+                              <>
+                                <button
+                                  className="bic bic-ok"
+                                  title="Guardar"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    saveEdit();
+                                  }}
+                                >
+                                  💾
+                                </button>
+                                <button
+                                  className="bic bic-cx"
+                                  title="Cancelar"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    cancelEdit();
+                                  }}
+                                >
+                                  ✕
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  className="bic bic-ed"
+                                  title="Editar"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    startEdit(row);
+                                  }}
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  className="bic bic-dl"
+                                  title="Eliminar"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm("¿Eliminar?"))
+                                      onDelete?.(row);
+                                  }}
+                                >
+                                  🗑️
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
-                      </tr>
+                      </tr>,
                     );
-                  }
 
-                  return rows;
-                })}
+                    // fila de edición expandida
+                    if (isEditing && editForm) {
+                      rows.push(
+                        <tr key={`e-${row.id}`} className="row-edit-body">
+                          <td
+                            colSpan={3 + SLOTS.length + 1}
+                            style={{ padding: 0 }}
+                          >
+                            <div className="ep">
+                              {/* padre */}
+                              <div className="ep-sec">Artículo Padre</div>
+                              <div className="ep-padre">
+                                <div>
+                                  <div className="ep-lbl">Rubro</div>
+                                  <select
+                                    className="ep-sel"
+                                    value={editRubroPadre}
+                                    onChange={(e) => {
+                                      setEditRubroPadre(e.target.value);
+                                      setEditForm((f) => ({
+                                        ...f,
+                                        articulo: "",
+                                        codart: "",
+                                      }));
+                                    }}
+                                  >
+                                    <option value="">— Todos —</option>
+                                    {rubros.map((r) => (
+                                      <option key={r} value={r}>
+                                        {r}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <div className="ep-lbl">Artículo</div>
+                                  <select
+                                    className="ep-sel"
+                                    value={editForm.articulo}
+                                    onChange={(e) => {
+                                      const found = listaPadreEdit.find(
+                                        (a) => a.articulo === e.target.value,
+                                      );
+                                      setEditForm((f) => ({
+                                        ...f,
+                                        articulo: e.target.value,
+                                        codart: found?.codartint ?? "",
+                                      }));
+                                    }}
+                                  >
+                                    <option value="">— Elegir —</option>
+                                    {listaPadreEdit.map((a) => (
+                                      <option key={a.id} value={a.articulo}>
+                                        {a.articulo}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <div className="ep-lbl">Código</div>
+                                  <input
+                                    className="ep-inp ro"
+                                    value={editForm.codart}
+                                    readOnly
+                                  />
+                                </div>
+                              </div>
+
+                              {/* slots */}
+                              <div className="ep-sec">Artículos Asociados</div>
+                              <div className="slots-wrap">
+                                {SLOTS.map((n) => (
+                                  <SlotEdit
+                                    key={n}
+                                    n={n}
+                                    {...sharedSlotProps(true)}
+                                  />
+                                ))}
+                              </div>
+
+                              <div className="ep-acts">
+                                <button
+                                  className="ep-cancel"
+                                  onClick={cancelEdit}
+                                >
+                                  Cancelar
+                                </button>
+                                <button className="ep-save" onClick={saveEdit}>
+                                  💾 Guardar cambios
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>,
+                      );
+                    }
+
+                    return rows;
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -485,52 +777,86 @@ export default function Asociaciones({
         {/* Modal Nuevo */}
         {(modal === "form" || modalOpen) && (
           <div className="mo" onClick={closeNew}>
-            <div className="mo-box" onClick={e=>e.stopPropagation()}>
+            <div className="mo-box" onClick={(e) => e.stopPropagation()}>
               <div className="mo-hdr">
                 <div className="mo-title">🔗 Nueva Asociación</div>
-                <button className="mo-close" onClick={closeNew}>✕</button>
+                <button className="mo-close" onClick={closeNew}>
+                  ✕
+                </button>
               </div>
 
               <div className="ep-sec">Artículo Padre</div>
               <div className="ep-padre">
                 <div>
                   <div className="ep-lbl">Rubro</div>
-                  <select className="ep-sel" value={newRubroPadre}
-                    onChange={e=>{setNewRubroPadre(e.target.value);setNewForm(f=>({...f,articulo:"",codart:""}));}}>
+                  <select
+                    className="ep-sel"
+                    value={newRubroPadre}
+                    onChange={(e) => {
+                      setNewRubroPadre(e.target.value);
+                      setNewForm((f) => ({ ...f, articulo: "", codart: "" }));
+                    }}
+                  >
                     <option value="">— Todos —</option>
-                    {rubros.map(r=><option key={r} value={r}>{r}</option>)}
+                    {rubros.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <div className="ep-lbl">Artículo</div>
-                  <select className="ep-sel" value={newForm.articulo}
-                    onChange={e=>{
-                      const found=listaPadreNew.find(a=>a.articulo===e.target.value);
-                      setNewForm(f=>({...f,articulo:e.target.value,codart:found?.codartint??""}));
-                    }}>
+                  <select
+                    className="ep-sel"
+                    value={newForm.articulo}
+                    onChange={(e) => {
+                      const found = listaPadreNew.find(
+                        (a) => a.articulo === e.target.value,
+                      );
+                      setNewForm((f) => ({
+                        ...f,
+                        articulo: e.target.value,
+                        codart: found?.codartint ?? "",
+                      }));
+                    }}
+                  >
                     <option value="">— Elegir —</option>
-                    {listaPadreNew.map(a=><option key={a.id} value={a.articulo}>{a.articulo}</option>)}
+                    {listaPadreNew.map((a) => (
+                      <option key={a.id} value={a.articulo}>
+                        {a.articulo}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <div className="ep-lbl">Código</div>
-                  <input className="ep-inp ro" value={newForm.codart} readOnly />
+                  <input
+                    className="ep-inp ro"
+                    value={newForm.codart}
+                    readOnly
+                  />
                 </div>
               </div>
 
               <div className="ep-sec">Artículos Asociados</div>
               <div className="slots-wrap">
-                {SLOTS.map(n => <SlotEdit key={n} n={n} {...sharedSlotProps(false)} />)}
+                {SLOTS.map((n) => (
+                  <SlotEdit key={n} n={n} {...sharedSlotProps(false)} />
+                ))}
               </div>
 
               <div className="mo-acts">
-                <button className="mo-cancel" onClick={closeNew}>Cancelar</button>
-                <button className="mo-save"   onClick={saveNew}>Agregar</button>
+                <button className="mo-cancel" onClick={closeNew}>
+                  Cancelar
+                </button>
+                <button className="mo-save" onClick={saveNew}>
+                  Agregar
+                </button>
               </div>
             </div>
           </div>
         )}
-
       </div>
     </>
   );

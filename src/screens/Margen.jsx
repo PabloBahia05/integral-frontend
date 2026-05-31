@@ -5,34 +5,42 @@ import ActionBar from "../Component/ActionBar";
 import ScreenHeader from "../Component/ScreenHeader";
 import ConfirmDelete from "../Component/ConfirmDelete";
 
-const API = "http://localhost:3001";
+const API = "http://https://integral-backend-production.up.railway.app";
 
 const COLUMNS = [
-  { key: "CODART",   label: "Código" },
+  { key: "CODART", label: "Código" },
   { key: "ARTICULO", label: "Artículo" },
-  { key: "AREA",     label: "Área" },
-  { key: "FAMILIA",  label: "Familia" },
-  { key: "MARGEN",   label: "Margen" },
+  { key: "AREA", label: "Área" },
+  { key: "FAMILIA", label: "Familia" },
+  { key: "MARGEN", label: "Margen" },
 ];
 
 const EMPTY = { CODART: "", ARTICULO: "", AREA: "", FAMILIA: "", MARGEN: "" };
 
 function BuscadorArticulo({ onSelect }) {
-  const [buscar, setBuscar]         = useState("");
+  const [buscar, setBuscar] = useState("");
   const [resultados, setResultados] = useState([]);
-  const [buscando, setBuscando]     = useState(false);
+  const [buscando, setBuscando] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
     const t = setTimeout(async () => {
-      if (buscar.length < 2) { setResultados([]); return; }
+      if (buscar.length < 2) {
+        setResultados([]);
+        return;
+      }
       setBuscando(true);
       try {
-        const r = await fetch(`${API}/productos?search=${encodeURIComponent(buscar)}&limit=15`);
+        const r = await fetch(
+          `${API}/productos?search=${encodeURIComponent(buscar)}&limit=15`,
+        );
         const d = await r.json();
         setResultados(Array.isArray(d) ? d : []);
-      } catch { setResultados([]); }
-      finally { setBuscando(false); }
+      } catch {
+        setResultados([]);
+      } finally {
+        setBuscando(false);
+      }
     }, 300);
     return () => clearTimeout(t);
   }, [buscar]);
@@ -50,26 +58,60 @@ function BuscadorArticulo({ onSelect }) {
         className="form-input"
         placeholder="Escribí nombre o código del artículo..."
         value={buscar}
-        onChange={e => { setBuscar(e.target.value); }}
+        onChange={(e) => {
+          setBuscar(e.target.value);
+        }}
       />
       {(resultados.length > 0 || buscando) && (
-        <div style={{
-          position: "absolute", top: "100%", left: 0, right: 0, zIndex: 300,
-          background: "#fff", border: "1.5px solid #2277bb", borderRadius: 4,
-          maxHeight: 200, overflowY: "auto", boxShadow: "0 4px 16px rgba(0,0,0,0.12)"
-        }}>
-          {buscando && <div style={{ padding: "10px 14px", color: "#88aacc", fontSize: 13 }}>Buscando...</div>}
-          {resultados.map(a => (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            right: 0,
+            zIndex: 300,
+            background: "#fff",
+            border: "1.5px solid #2277bb",
+            borderRadius: 4,
+            maxHeight: 200,
+            overflowY: "auto",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+          }}
+        >
+          {buscando && (
+            <div
+              style={{ padding: "10px 14px", color: "#88aacc", fontSize: 13 }}
+            >
+              Buscando...
+            </div>
+          )}
+          {resultados.map((a) => (
             <div
               key={a.id ?? a.codart}
-              style={{ padding: "9px 14px", cursor: "pointer", borderBottom: "1px solid #eef2f7", fontSize: 13 }}
-              onMouseEnter={e => e.currentTarget.style.background = "#eaf3fb"}
-              onMouseLeave={e => e.currentTarget.style.background = ""}
-              onMouseDown={e => { e.preventDefault(); elegir(a); }}
+              style={{
+                padding: "9px 14px",
+                cursor: "pointer",
+                borderBottom: "1px solid #eef2f7",
+                fontSize: 13,
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#eaf3fb")
+              }
+              onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                elegir(a);
+              }}
             >
               <strong style={{ color: "#0a3a5c" }}>{a.articulo}</strong>
-              <span style={{ color: "#6699bb", marginLeft: 8, fontSize: 11 }}>{a.codart}</span>
-              {a.familia && <span style={{ color: "#aaa", marginLeft: 8, fontSize: 11 }}>{a.familia}</span>}
+              <span style={{ color: "#6699bb", marginLeft: 8, fontSize: 11 }}>
+                {a.codart}
+              </span>
+              {a.familia && (
+                <span style={{ color: "#aaa", marginLeft: 8, fontSize: 11 }}>
+                  {a.familia}
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -78,48 +120,67 @@ function BuscadorArticulo({ onSelect }) {
   );
 }
 
-export default function Margen({ margen, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal }) {
-  const [form, setForm]     = useState(EMPTY);
-  const [error, setError]   = useState("");
+export default function Margen({
+  margen,
+  onSave,
+  onDelete,
+  selected,
+  onSelect,
+  modal,
+  onOpenModal,
+  onCloseModal,
+}) {
+  const [form, setForm] = useState(EMPTY);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
   const filtered = (margen ?? []).filter((m) => {
     const q = search.toLowerCase();
     return (
-      (m.CODART   ?? "").toLowerCase().includes(q) ||
+      (m.CODART ?? "").toLowerCase().includes(q) ||
       (m.ARTICULO ?? "").toLowerCase().includes(q) ||
-      (m.FAMILIA  ?? "").toLowerCase().includes(q)
+      (m.FAMILIA ?? "").toLowerCase().includes(q)
     );
   });
 
-  const openNew = () => { setForm(EMPTY); setError(""); onOpenModal("nuevo"); };
+  const openNew = () => {
+    setForm(EMPTY);
+    setError("");
+    onOpenModal("nuevo");
+  };
 
   const openEdit = () => {
     if (!selected) return;
     setForm({
-      CODART:   selected.CODART   ?? "",
+      CODART: selected.CODART ?? "",
       ARTICULO: selected.ARTICULO ?? "",
-      AREA:     selected.AREA     ?? "",
-      FAMILIA:  selected.FAMILIA  ?? "",
-      MARGEN:   selected.MARGEN   ?? "",
+      AREA: selected.AREA ?? "",
+      FAMILIA: selected.FAMILIA ?? "",
+      MARGEN: selected.MARGEN ?? "",
     });
     setError("");
     onOpenModal("editar");
   };
 
   const handleSelect = (art) => {
-    setForm(p => ({
+    setForm((p) => ({
       ...p,
-      CODART:   art.codartint ?? art.CODARTINT ?? art.codart ?? art.CODART ?? "",
-      ARTICULO: art.articulo  ?? art.ARTICULO  ?? "",
-      AREA:     art.area      ?? art.AREA      ?? "",
-      FAMILIA:  art.familia   ?? art.FAMILIA   ?? "",
+      CODART: art.codartint ?? art.CODARTINT ?? art.codart ?? art.CODART ?? "",
+      ARTICULO: art.articulo ?? art.ARTICULO ?? "",
+      AREA: art.area ?? art.AREA ?? "",
+      FAMILIA: art.familia ?? art.FAMILIA ?? "",
     }));
   };
 
   const handleSubmit = () => {
-    if (!form.CODART.trim())  { setError("Seleccioná un artículo."); return; }
-    if (!form.MARGEN.trim())  { setError("El margen es obligatorio."); return; }
+    if (!form.CODART.trim()) {
+      setError("Seleccioná un artículo.");
+      return;
+    }
+    if (!form.MARGEN.trim()) {
+      setError("El margen es obligatorio.");
+      return;
+    }
     const payload = modal === "nuevo" ? form : { ...form, id: selected.id };
     onSave(payload);
     onCloseModal();
@@ -128,15 +189,27 @@ export default function Margen({ margen, onSave, onDelete, selected, onSelect, m
 
   return (
     <>
-      <ScreenHeader icon="📊" title="Márgenes" subtitle="Gestión de márgenes por artículo" />
-
-      <ActionBar
-        selected={selected} onNew={openNew} onEdit={openEdit}
-        onDelete={() => selected && onOpenModal("eliminar")}
-        search={search} onSearch={setSearch}
+      <ScreenHeader
+        icon="📊"
+        title="Márgenes"
+        subtitle="Gestión de márgenes por artículo"
       />
 
-      <DataTable columns={COLUMNS} rows={filtered} selectedId={selected?.id} onSelect={onSelect} />
+      <ActionBar
+        selected={selected}
+        onNew={openNew}
+        onEdit={openEdit}
+        onDelete={() => selected && onOpenModal("eliminar")}
+        search={search}
+        onSearch={setSearch}
+      />
+
+      <DataTable
+        columns={COLUMNS}
+        rows={filtered}
+        selectedId={selected?.id}
+        onSelect={onSelect}
+      />
 
       {(modal === "nuevo" || modal === "editar") && (
         <Modal
@@ -155,25 +228,41 @@ export default function Margen({ margen, onSave, onDelete, selected, onSelect, m
             <div>
               <div className="form-group">
                 <label className="form-label">Código (CODART)</label>
-                <input className="form-input" value={form.CODART} readOnly
-                  style={{ background: "#f0f6fb", cursor: "default" }} />
+                <input
+                  className="form-input"
+                  value={form.CODART}
+                  readOnly
+                  style={{ background: "#f0f6fb", cursor: "default" }}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Artículo</label>
-                <input className="form-input" value={form.ARTICULO} readOnly
-                  style={{ background: "#f0f6fb", cursor: "default" }} />
+                <input
+                  className="form-input"
+                  value={form.ARTICULO}
+                  readOnly
+                  style={{ background: "#f0f6fb", cursor: "default" }}
+                />
               </div>
             </div>
             <div>
               <div className="form-group">
                 <label className="form-label">Área</label>
-                <input className="form-input" value={form.AREA} readOnly
-                  style={{ background: "#f0f6fb", cursor: "default" }} />
+                <input
+                  className="form-input"
+                  value={form.AREA}
+                  readOnly
+                  style={{ background: "#f0f6fb", cursor: "default" }}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Familia</label>
-                <input className="form-input" value={form.FAMILIA} readOnly
-                  style={{ background: "#f0f6fb", cursor: "default" }} />
+                <input
+                  className="form-input"
+                  value={form.FAMILIA}
+                  readOnly
+                  style={{ background: "#f0f6fb", cursor: "default" }}
+                />
               </div>
             </div>
           </div>
@@ -185,12 +274,16 @@ export default function Margen({ margen, onSave, onDelete, selected, onSelect, m
               className="form-input"
               placeholder="Ej: 30% o 1.30"
               value={form.MARGEN}
-              onChange={e => setForm(p => ({ ...p, MARGEN: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, MARGEN: e.target.value }))
+              }
             />
           </div>
 
           <div className="form-actions">
-            <button className="btn-cancel" onClick={onCloseModal}>Cancelar</button>
+            <button className="btn-cancel" onClick={onCloseModal}>
+              Cancelar
+            </button>
             <button className="btn-save" onClick={handleSubmit}>
               {modal === "nuevo" ? "Guardar" : "Actualizar"}
             </button>
@@ -199,7 +292,11 @@ export default function Margen({ margen, onSave, onDelete, selected, onSelect, m
       )}
 
       {modal === "eliminar" && (
-        <ConfirmDelete item={selected} onConfirm={onDelete} onClose={onCloseModal} />
+        <ConfirmDelete
+          item={selected}
+          onConfirm={onDelete}
+          onClose={onCloseModal}
+        />
       )}
     </>
   );

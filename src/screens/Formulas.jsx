@@ -6,32 +6,41 @@ import ScreenHeader from "../Component/ScreenHeader";
 import ConfirmDelete from "../Component/ConfirmDelete";
 
 const COLUMNS = [
-  { key: "id",          label: "ID" },
-  { key: "codform",     label: "Código fórmula" },
-  { key: "codart",      label: "Artículo vinculado" },
-  { key: "rubro",       label: "Rubro" },
-  { key: "familia",     label: "Familia" },
+  { key: "id", label: "ID" },
+  { key: "codform", label: "Código fórmula" },
+  { key: "codart", label: "Artículo vinculado" },
+  { key: "rubro", label: "Rubro" },
+  { key: "familia", label: "Familia" },
   { key: "descripcion", label: "Descripción" },
-  { key: "formula",     label: "Fórmula" },
+  { key: "formula", label: "Fórmula" },
 ];
 
-const EMPTY = { codform: "", codart: "", descripcion: "", formula: "", rubro: "", familia: "" };
+const EMPTY = {
+  codform: "",
+  codart: "",
+  descripcion: "",
+  formula: "",
+  rubro: "",
+  familia: "",
+};
 
 const CAMPOS_ARTICULO = [
-  { key: "precio",   label: "Precio" },
-  { key: "margen",   label: "Margen (tabla Márgenes)" },
-  { key: "ancho",    label: "Ancho" },
-  { key: "alto",     label: "Alto" },
+  { key: "precio", label: "Precio" },
+  { key: "margen", label: "Margen (tabla Márgenes)" },
+  { key: "ancho", label: "Ancho" },
+  { key: "alto", label: "Alto" },
   { key: "cantidad", label: "Cantidad" },
 ];
 
 // ── Selector de artículo + campo para insertar variable en la fórmula ──
 function InsertarVariable({ formulaRef, setForm, rubro, artsDeFamilia }) {
-  const [artElegido, setArtElegido]     = useState(null);
+  const [artElegido, setArtElegido] = useState(null);
   const [campoElegido, setCampoElegido] = useState("precio");
 
   // Reset when rubro changes
-  useEffect(() => { setArtElegido(null); }, [rubro]);
+  useEffect(() => {
+    setArtElegido(null);
+  }, [rubro]);
 
   const insertar = () => {
     if (!artElegido) return;
@@ -39,34 +48,54 @@ function InsertarVariable({ formulaRef, setForm, rubro, artsDeFamilia }) {
     const el = formulaRef.current;
     if (el) {
       const start = el.selectionStart ?? el.value.length;
-      const end   = el.selectionEnd   ?? el.value.length;
-      setForm(p => ({
+      const end = el.selectionEnd ?? el.value.length;
+      setForm((p) => ({
         ...p,
-        formula: p.formula.slice(0, start) + variable + p.formula.slice(end)
+        formula: p.formula.slice(0, start) + variable + p.formula.slice(end),
       }));
       setTimeout(() => {
         el.focus();
         el.setSelectionRange(start + variable.length, start + variable.length);
       }, 10);
     } else {
-      setForm(p => ({ ...p, formula: p.formula + variable }));
+      setForm((p) => ({ ...p, formula: p.formula + variable }));
     }
     setArtElegido(null);
     setCampoElegido("precio");
   };
 
   return (
-    <div style={{
-      background: "#f0f6fb", border: "1px solid #a0cce8", borderRadius: 6,
-      padding: "12px 14px", marginBottom: 10
-    }}>
-      <div style={{ fontSize: 11, color: "#4a8ab5", letterSpacing: "1px",
-        textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>
+    <div
+      style={{
+        background: "#f0f6fb",
+        border: "1px solid #a0cce8",
+        borderRadius: 6,
+        padding: "12px 14px",
+        marginBottom: 10,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          color: "#4a8ab5",
+          letterSpacing: "1px",
+          textTransform: "uppercase",
+          fontWeight: 700,
+          marginBottom: 8,
+        }}
+      >
         ➕ Insertar dato de artículo en fórmula
       </div>
 
       {!rubro && (
-        <p style={{ fontSize: 12, color: "#b0c0d0", fontStyle: "italic", marginBottom: 0 }}>
+        <p
+          style={{
+            fontSize: 12,
+            color: "#b0c0d0",
+            fontStyle: "italic",
+            marginBottom: 0,
+          }}
+        >
           Seleccioná un rubro arriba para elegir el artículo.
         </p>
       )}
@@ -75,24 +104,36 @@ function InsertarVariable({ formulaRef, setForm, rubro, artsDeFamilia }) {
         <>
           {/* Paso 1: elegir artículo de el rubro */}
           <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 10, color: "#6699bb", letterSpacing: "1px",
-              textTransform: "uppercase", display: "block", marginBottom: 4 }}>
+            <label
+              style={{
+                fontSize: 10,
+                color: "#6699bb",
+                letterSpacing: "1px",
+                textTransform: "uppercase",
+                display: "block",
+                marginBottom: 4,
+              }}
+            >
               1. Elegí el artículo
             </label>
             <select
               className="form-input"
               value={artElegido?.codartint ?? ""}
               onChange={(e) => {
-                const art = artsDeFamilia.find(a => a.codartint === e.target.value);
+                const art = artsDeFamilia.find(
+                  (a) => a.codartint === e.target.value,
+                );
                 setArtElegido(art ?? null);
               }}
               style={{ cursor: "pointer", marginBottom: 0 }}
             >
               <option value="">— Seleccioná un artículo —</option>
-              {artsDeFamilia.map(a => (
+              {artsDeFamilia.map((a) => (
                 <option key={a.codartint} value={a.codartint}>
                   {a.codartint} — {a.articulo}
-                  {a.precio ? ` ($${Number(a.precio).toLocaleString("es-AR")})` : ""}
+                  {a.precio
+                    ? ` ($${Number(a.precio).toLocaleString("es-AR")})`
+                    : ""}
                 </option>
               ))}
             </select>
@@ -101,8 +142,16 @@ function InsertarVariable({ formulaRef, setForm, rubro, artsDeFamilia }) {
           {/* Paso 2: elegir campo + botón insertar */}
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 10, color: "#6699bb", letterSpacing: "1px",
-                textTransform: "uppercase", display: "block", marginBottom: 4 }}>
+              <label
+                style={{
+                  fontSize: 10,
+                  color: "#6699bb",
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                  display: "block",
+                  marginBottom: 4,
+                }}
+              >
                 2. Qué dato querés usar
               </label>
               <select
@@ -112,8 +161,10 @@ function InsertarVariable({ formulaRef, setForm, rubro, artsDeFamilia }) {
                 style={{ cursor: "pointer", marginBottom: 0 }}
                 disabled={!artElegido}
               >
-                {CAMPOS_ARTICULO.map(c => (
-                  <option key={c.key} value={c.key}>{c.label}</option>
+                {CAMPOS_ARTICULO.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -122,14 +173,23 @@ function InsertarVariable({ formulaRef, setForm, rubro, artsDeFamilia }) {
               onClick={insertar}
               disabled={!artElegido}
               style={{
-                padding: "10px 16px", borderRadius: 4, border: "none",
+                padding: "10px 16px",
+                borderRadius: 4,
+                border: "none",
                 background: artElegido ? "#2277bb" : "#ccc",
-                color: "#fff", cursor: artElegido ? "pointer" : "not-allowed",
-                fontFamily: "monospace", fontSize: 13, fontWeight: 700,
-                whiteSpace: "nowrap", height: 42
+                color: "#fff",
+                cursor: artElegido ? "pointer" : "not-allowed",
+                fontFamily: "monospace",
+                fontSize: 13,
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+                height: 42,
               }}
             >
-              Insertar → {artElegido ? `${campoElegido}_${artElegido.codartint}` : "variable"}
+              Insertar →{" "}
+              {artElegido
+                ? `${campoElegido}_${artElegido.codartint}`
+                : "variable"}
             </button>
           </div>
         </>
@@ -148,49 +208,74 @@ function InsertarFormula({ formulaRef, setForm, formulas, codformActual }) {
     const el = formulaRef.current;
     if (el) {
       const start = el.selectionStart ?? el.value.length;
-      const end   = el.selectionEnd   ?? el.value.length;
-      setForm(p => ({
+      const end = el.selectionEnd ?? el.value.length;
+      setForm((p) => ({
         ...p,
-        formula: p.formula.slice(0, start) + variable + p.formula.slice(end)
+        formula: p.formula.slice(0, start) + variable + p.formula.slice(end),
       }));
       setTimeout(() => {
         el.focus();
         el.setSelectionRange(start + variable.length, start + variable.length);
       }, 10);
     } else {
-      setForm(p => ({ ...p, formula: p.formula + variable }));
+      setForm((p) => ({ ...p, formula: p.formula + variable }));
     }
     setElegida("");
   };
 
   // Excluir la fórmula actual para evitar referencia circular directa
-  const disponibles = formulas.filter(f => f.codform !== codformActual);
+  const disponibles = formulas.filter((f) => f.codform !== codformActual);
 
   return (
-    <div style={{
-      background: "#f0fbf4", border: "1px solid #7ecba1", borderRadius: 6,
-      padding: "12px 14px", marginBottom: 10
-    }}>
-      <div style={{ fontSize: 11, color: "#1a7a44", letterSpacing: "1px",
-        textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>
+    <div
+      style={{
+        background: "#f0fbf4",
+        border: "1px solid #7ecba1",
+        borderRadius: 6,
+        padding: "12px 14px",
+        marginBottom: 10,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          color: "#1a7a44",
+          letterSpacing: "1px",
+          textTransform: "uppercase",
+          fontWeight: 700,
+          marginBottom: 8,
+        }}
+      >
         🔗 Anidar otra fórmula
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
         <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 10, color: "#2d8a55", letterSpacing: "1px",
-            textTransform: "uppercase", display: "block", marginBottom: 4 }}>
+          <label
+            style={{
+              fontSize: 10,
+              color: "#2d8a55",
+              letterSpacing: "1px",
+              textTransform: "uppercase",
+              display: "block",
+              marginBottom: 4,
+            }}
+          >
             Elegí la fórmula a incluir
           </label>
           <select
             className="form-input"
             value={elegida}
-            onChange={e => setElegida(e.target.value)}
+            onChange={(e) => setElegida(e.target.value)}
             style={{ cursor: "pointer", marginBottom: 0 }}
           >
             <option value="">— Seleccioná una fórmula —</option>
-            {disponibles.map(f => (
+            {disponibles.map((f) => (
               <option key={f.codform} value={f.codform}>
-                {f.codform}{f.codart ? ` (${f.codart})` : ""} — {f.formula.length > 40 ? f.formula.slice(0, 40) + "…" : f.formula}
+                {f.codform}
+                {f.codart ? ` (${f.codart})` : ""} —{" "}
+                {f.formula.length > 40
+                  ? f.formula.slice(0, 40) + "…"
+                  : f.formula}
               </option>
             ))}
           </select>
@@ -200,19 +285,42 @@ function InsertarFormula({ formulaRef, setForm, formulas, codformActual }) {
           onClick={insertar}
           disabled={!elegida}
           style={{
-            padding: "10px 16px", borderRadius: 4, border: "none",
+            padding: "10px 16px",
+            borderRadius: 4,
+            border: "none",
             background: elegida ? "#1a7a44" : "#ccc",
-            color: "#fff", cursor: elegida ? "pointer" : "not-allowed",
-            fontFamily: "monospace", fontSize: 13, fontWeight: 700,
-            whiteSpace: "nowrap", height: 42
+            color: "#fff",
+            cursor: elegida ? "pointer" : "not-allowed",
+            fontFamily: "monospace",
+            fontSize: 13,
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+            height: 42,
           }}
         >
           Insertar → {elegida ? `FORM_${elegida}` : "fórmula"}
         </button>
       </div>
       {elegida && (
-        <div style={{ marginTop: 8, fontSize: 11, color: "#2d8a55", fontStyle: "italic" }}>
-          Se insertará <code style={{ background: "#d4f0e0", padding: "1px 5px", borderRadius: 3 }}>FORM_{elegida}</code> — el backend la resolverá al calcular.
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 11,
+            color: "#2d8a55",
+            fontStyle: "italic",
+          }}
+        >
+          Se insertará{" "}
+          <code
+            style={{
+              background: "#d4f0e0",
+              padding: "1px 5px",
+              borderRadius: 3,
+            }}
+          >
+            FORM_{elegida}
+          </code>{" "}
+          — el backend la resolverá al calcular.
         </div>
       )}
     </div>
@@ -222,16 +330,23 @@ function InsertarFormula({ formulaRef, setForm, formulas, codformActual }) {
 // ── Insertar margen del artículo vinculado (codart del form) ─────────────────
 function InsertarMargen({ formulaRef, setForm, codart }) {
   const [margenInfo, setMargenInfo] = useState(null);
-  const [cargando, setCargando]     = useState(false);
+  const [cargando, setCargando] = useState(false);
 
   useEffect(() => {
-    if (!codart) { setMargenInfo(null); return; }
+    if (!codart) {
+      setMargenInfo(null);
+      return;
+    }
     setCargando(true);
-    fetch(`http://localhost:3001/margen/buscar?q=${encodeURIComponent(codart)}`)
-      .then(r => r.json())
-      .then(data => {
+    fetch(
+      `http://https://integral-backend-production.up.railway.app/margen/buscar?q=${encodeURIComponent(codart)}`,
+    )
+      .then((r) => r.json())
+      .then((data) => {
         // Buscar coincidencia exacta de CODART
-        const exacto = Array.isArray(data) ? data.find(d => d.CODART === codart) : null;
+        const exacto = Array.isArray(data)
+          ? data.find((d) => d.CODART === codart)
+          : null;
         setMargenInfo(exacto ?? null);
       })
       .catch(() => setMargenInfo(null))
@@ -244,27 +359,40 @@ function InsertarMargen({ formulaRef, setForm, codart }) {
     const el = formulaRef.current;
     if (el) {
       const start = el.selectionStart ?? el.value.length;
-      const end   = el.selectionEnd   ?? el.value.length;
-      setForm(p => ({
+      const end = el.selectionEnd ?? el.value.length;
+      setForm((p) => ({
         ...p,
-        formula: p.formula.slice(0, start) + variable + p.formula.slice(end)
+        formula: p.formula.slice(0, start) + variable + p.formula.slice(end),
       }));
       setTimeout(() => {
         el.focus();
         el.setSelectionRange(start + variable.length, start + variable.length);
       }, 10);
     } else {
-      setForm(p => ({ ...p, formula: p.formula + variable }));
+      setForm((p) => ({ ...p, formula: p.formula + variable }));
     }
   };
 
   return (
-    <div style={{
-      background: "#f5f0fb", border: "1px solid #c0a8e8", borderRadius: 6,
-      padding: "12px 14px", marginBottom: 10
-    }}>
-      <div style={{ fontSize: 11, color: "#7a4ab5", letterSpacing: "1px",
-        textTransform: "uppercase", fontWeight: 700, marginBottom: 10 }}>
+    <div
+      style={{
+        background: "#f5f0fb",
+        border: "1px solid #c0a8e8",
+        borderRadius: 6,
+        padding: "12px 14px",
+        marginBottom: 10,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          color: "#7a4ab5",
+          letterSpacing: "1px",
+          textTransform: "uppercase",
+          fontWeight: 700,
+          marginBottom: 10,
+        }}
+      >
         📊 Insertar margen de artículo en fórmula
       </div>
 
@@ -278,12 +406,21 @@ function InsertarMargen({ formulaRef, setForm, codart }) {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ flex: 1, fontSize: 13, color: "#3a0a5c" }}>
             <strong>{margenInfo.ARTICULO}</strong>
-            <span style={{ color: "#9966cc", marginLeft: 8, fontSize: 11 }}>{margenInfo.CODART}</span>
-            <span style={{
-              marginLeft: 10, background: "#ede8f8", border: "1px solid #c0a8e8",
-              borderRadius: 3, padding: "2px 8px", color: "#7a4ab5",
-              fontFamily: "monospace", fontSize: 12
-            }}>
+            <span style={{ color: "#9966cc", marginLeft: 8, fontSize: 11 }}>
+              {margenInfo.CODART}
+            </span>
+            <span
+              style={{
+                marginLeft: 10,
+                background: "#ede8f8",
+                border: "1px solid #c0a8e8",
+                borderRadius: 3,
+                padding: "2px 8px",
+                color: "#7a4ab5",
+                fontFamily: "monospace",
+                fontSize: 12,
+              }}
+            >
               Margen: {margenInfo.MARGEN}
             </span>
           </div>
@@ -291,10 +428,16 @@ function InsertarMargen({ formulaRef, setForm, codart }) {
             type="button"
             onClick={insertar}
             style={{
-              padding: "9px 14px", borderRadius: 4, border: "none",
-              background: "#7a4ab5", color: "#fff", cursor: "pointer",
-              fontFamily: "monospace", fontSize: 12, fontWeight: 700,
-              whiteSpace: "nowrap"
+              padding: "9px 14px",
+              borderRadius: 4,
+              border: "none",
+              background: "#7a4ab5",
+              color: "#fff",
+              cursor: "pointer",
+              fontFamily: "monospace",
+              fontSize: 12,
+              fontWeight: 700,
+              whiteSpace: "nowrap",
             }}
           >
             Insertar → margen_{codart}
@@ -302,17 +445,31 @@ function InsertarMargen({ formulaRef, setForm, codart }) {
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <p style={{ fontSize: 12, color: "#b0a0cc", fontStyle: "italic", flex: 1 }}>
-            El artículo <strong>{codart}</strong> no tiene margen en la tabla Márgenes.
+          <p
+            style={{
+              fontSize: 12,
+              color: "#b0a0cc",
+              fontStyle: "italic",
+              flex: 1,
+            }}
+          >
+            El artículo <strong>{codart}</strong> no tiene margen en la tabla
+            Márgenes.
           </p>
           <button
             type="button"
             onClick={insertar}
             style={{
-              padding: "9px 14px", borderRadius: 4, border: "none",
-              background: "#9966cc", color: "#fff", cursor: "pointer",
-              fontFamily: "monospace", fontSize: 12, fontWeight: 700,
-              whiteSpace: "nowrap"
+              padding: "9px 14px",
+              borderRadius: 4,
+              border: "none",
+              background: "#9966cc",
+              color: "#fff",
+              cursor: "pointer",
+              fontFamily: "monospace",
+              fontSize: 12,
+              fontWeight: 700,
+              whiteSpace: "nowrap",
             }}
           >
             Insertar → margen_{codart}
@@ -324,13 +481,22 @@ function InsertarMargen({ formulaRef, setForm, codart }) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export default function Formulas({ formulas, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal }) {
-  const [form, setForm]                 = useState(EMPTY);
-  const [error, setError]               = useState("");
-  const [search, setSearch]             = useState("");
-  const [rubroFiltro, setRubroFiltro]   = useState("");
-  const [familias, setFamilias]         = useState([]);
-  const [rubros, setRubros]             = useState([]);
+export default function Formulas({
+  formulas,
+  onSave,
+  onDelete,
+  selected,
+  onSelect,
+  modal,
+  onOpenModal,
+  onCloseModal,
+}) {
+  const [form, setForm] = useState(EMPTY);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [rubroFiltro, setRubroFiltro] = useState("");
+  const [familias, setFamilias] = useState([]);
+  const [rubros, setRubros] = useState([]);
   const [artsPorRubro, setArtsPorRubro] = useState([]);
   const [familiaElegida, setFamiliaElegida] = useState("");
   const [rubroElegido, setRubroElegido] = useState("");
@@ -347,32 +513,53 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
     const variables = { ancho: 100, alto: 200, cantidad: 1, colocacion: 5000 };
     const codart_modelo = form.codartint || null;
     try {
-      const res = await fetch("http://localhost:3001/formulas/verificar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formula: form.formula, variables, codart_modelo }),
-      });
+      const res = await fetch(
+        "http://https://integral-backend-production.up.railway.app/formulas/verificar",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            formula: form.formula,
+            variables,
+            codart_modelo,
+          }),
+        },
+      );
       const data = await res.json();
       if (!res.ok) {
-        setVerifResult({ ok: false, error: data.error ?? "Error desconocido." });
+        setVerifResult({
+          ok: false,
+          error: data.error ?? "Error desconocido.",
+        });
       } else {
-        setVerifResult({ ok: true, resultado: data.resultado, preciosUsados: data.variables });
+        setVerifResult({
+          ok: true,
+          resultado: data.resultado,
+          preciosUsados: data.variables,
+        });
       }
     } catch {
-      setVerifResult({ ok: false, error: "No se pudo conectar con el servidor." });
+      setVerifResult({
+        ok: false,
+        error: "No se pudo conectar con el servidor.",
+      });
     }
   };
 
   // Cargar familias y rubros al abrir modal
   useEffect(() => {
     if (modal === "nuevo" || modal === "editar") {
-      fetch("http://localhost:3001/articulos/familias-todas")
-        .then(r => r.json())
-        .then(data => setFamilias(Array.isArray(data) ? data : []))
+      fetch(
+        "http://https://integral-backend-production.up.railway.app/articulos/familias-todas",
+      )
+        .then((r) => r.json())
+        .then((data) => setFamilias(Array.isArray(data) ? data : []))
         .catch(() => {});
-      fetch("http://localhost:3001/articulos/rubros")
-        .then(r => r.json())
-        .then(data => setRubros(Array.isArray(data) ? data : []))
+      fetch(
+        "http://https://integral-backend-production.up.railway.app/articulos/rubros",
+      )
+        .then((r) => r.json())
+        .then((data) => setRubros(Array.isArray(data) ? data : []))
         .catch(() => {});
       if (modal === "nuevo") {
         setFamiliaElegida("");
@@ -386,69 +573,89 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
     setRubroElegido(rubro);
     setFamiliaElegida("");
     setArtsPorRubro([]);
-    setForm(p => ({ ...p, codartint: "" }));
+    setForm((p) => ({ ...p, codartint: "" }));
     if (rubro) {
       // Cargar familias de ese rubro
-      fetch(`http://localhost:3001/articulos/familias-por-rubro?rubro=${encodeURIComponent(rubro)}`)
-        .then(r => r.json())
-        .then(data => setFamilias(Array.isArray(data) ? data : []))
+      fetch(
+        `http://https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(rubro)}`,
+      )
+        .then((r) => r.json())
+        .then((data) => setFamilias(Array.isArray(data) ? data : []))
         .catch(() => {});
       // Cargar artículos del rubro + GENERAL
       (async () => {
         try {
-          const arts = await fetch(`http://localhost:3001/articulos/por-rubro?rubro=${encodeURIComponent(rubro)}`).then(r => r.json());
+          const arts = await fetch(
+            `http://https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(rubro)}`,
+          ).then((r) => r.json());
           let todos = Array.isArray(arts) ? arts : [];
           if (rubro.toUpperCase() !== "GENERAL") {
             try {
-              const g = await fetch("http://localhost:3001/articulos/por-rubro?rubro=GENERAL").then(r => r.json());
-              const codsSeen = new Set(todos.map(a => a.codartint));
-              (Array.isArray(g) ? g : []).forEach(a => { if (!codsSeen.has(a.codartint)) todos.push(a); });
+              const g = await fetch(
+                "http://https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=GENERAL",
+              ).then((r) => r.json());
+              const codsSeen = new Set(todos.map((a) => a.codartint));
+              (Array.isArray(g) ? g : []).forEach((a) => {
+                if (!codsSeen.has(a.codartint)) todos.push(a);
+              });
             } catch {}
           }
           setArtsPorRubro(todos);
-        } catch { setArtsPorRubro([]); }
+        } catch {
+          setArtsPorRubro([]);
+        }
       })();
     } else {
       // Sin rubro → recargar todas las familias
-      fetch("http://localhost:3001/articulos/familias-todas")
-        .then(r => r.json())
-        .then(data => setFamilias(Array.isArray(data) ? data : []))
+      fetch(
+        "http://https://integral-backend-production.up.railway.app/articulos/familias-todas",
+      )
+        .then((r) => r.json())
+        .then((data) => setFamilias(Array.isArray(data) ? data : []))
         .catch(() => {});
     }
   };
 
   const elegirFamilia = (familia) => {
     setFamiliaElegida(familia);
-    setForm(p => ({ ...p, codartint: "" }));
-    const rubroParam = rubroElegido ? `&rubro=${encodeURIComponent(rubroElegido)}` : "";
+    setForm((p) => ({ ...p, codartint: "" }));
+    const rubroParam = rubroElegido
+      ? `&rubro=${encodeURIComponent(rubroElegido)}`
+      : "";
     if (familia) {
-      fetch(`http://localhost:3001/articulos/por-rubro?familia=${encodeURIComponent(familia)}${rubroParam}`)
-        .then(r => r.json())
-        .then(data => setArtsPorRubro(Array.isArray(data) ? data : []))
+      fetch(
+        `http://https://integral-backend-production.up.railway.app/articulos/por-rubro?familia=${encodeURIComponent(familia)}${rubroParam}`,
+      )
+        .then((r) => r.json())
+        .then((data) => setArtsPorRubro(Array.isArray(data) ? data : []))
         .catch(() => {});
     } else if (rubroElegido) {
       // Sin familia pero con rubro → recargar artículos del rubro
-      fetch(`http://localhost:3001/articulos/por-rubro?rubro=${encodeURIComponent(rubroElegido)}`)
-        .then(r => r.json())
-        .then(data => setArtsPorRubro(Array.isArray(data) ? data : []))
+      fetch(
+        `http://https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(rubroElegido)}`,
+      )
+        .then((r) => r.json())
+        .then((data) => setArtsPorRubro(Array.isArray(data) ? data : []))
         .catch(() => {});
     } else {
       setArtsPorRubro([]);
     }
   };
 
-  const rubrosUnicos = [...new Set(formulas.map(f => f.rubro).filter(Boolean))].sort();
+  const rubrosUnicos = [
+    ...new Set(formulas.map((f) => f.rubro).filter(Boolean)),
+  ].sort();
 
   const filtered = formulas.filter((f) => {
     const q = search.toLowerCase();
-    const matchSearch = (
-      (f.codform     ?? "").toLowerCase().includes(q) ||
-      (f.codart      ?? "").toLowerCase().includes(q) ||
+    const matchSearch =
+      (f.codform ?? "").toLowerCase().includes(q) ||
+      (f.codart ?? "").toLowerCase().includes(q) ||
       (f.descripcion ?? "").toLowerCase().includes(q) ||
-      (f.formula     ?? "").toLowerCase().includes(q)
-    );
+      (f.formula ?? "").toLowerCase().includes(q);
     const matchRubro = rubroFiltro
-      ? (f.rubro ?? "") === rubroFiltro || (f.rubro ?? "").toUpperCase() === "GENERAL"
+      ? (f.rubro ?? "") === rubroFiltro ||
+        (f.rubro ?? "").toUpperCase() === "GENERAL"
       : true;
     return matchSearch && matchRubro;
   });
@@ -465,12 +672,12 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
   const openEdit = async () => {
     if (!selected) return;
     setForm({
-      codform:     selected.codform     ?? "",
-      codartint:   selected.codart      ?? "",
+      codform: selected.codform ?? "",
+      codartint: selected.codart ?? "",
       descripcion: selected.descripcion ?? "",
-      formula:     selected.formula     ?? "",
-      rubro:       selected.rubro       ?? "",
-      familia:     selected.familia     ?? "",
+      formula: selected.formula ?? "",
+      rubro: selected.rubro ?? "",
+      familia: selected.familia ?? "",
     });
     setError("");
     setFamiliaElegida("");
@@ -482,36 +689,54 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
     const codVinculado = selected.codart ?? "";
     if (codVinculado) {
       try {
-        const res = await fetch(`http://localhost:3001/articulos/rubro-de?codart=${encodeURIComponent(codVinculado)}`);
+        const res = await fetch(
+          `http://https://integral-backend-production.up.railway.app/articulos/rubro-de?codart=${encodeURIComponent(codVinculado)}`,
+        );
         const data = await res.json();
         if (data.rubro) {
           setRubroElegido(data.rubro);
           // Cargar familias de ese rubro
-          const resFam = await fetch(`http://localhost:3001/articulos/familias-por-rubro?rubro=${encodeURIComponent(data.rubro)}`);
+          const resFam = await fetch(
+            `http://https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(data.rubro)}`,
+          );
           const fams = await resFam.json();
           if (Array.isArray(fams) && fams.length > 0) setFamilias(fams);
           // Cargar TODOS los artículos del rubro (sin filtrar familia)
-          const resArts = await fetch(`http://localhost:3001/articulos/por-rubro?rubro=${encodeURIComponent(data.rubro)}`);
+          const resArts = await fetch(
+            `http://https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(data.rubro)}`,
+          );
           const arts = await resArts.json();
           setArtsPorRubro(Array.isArray(arts) ? arts : []);
         }
         if (data.familia) {
           setFamiliaElegida(data.familia);
         }
-      } catch { /* silencioso */ }
+      } catch {
+        /* silencioso */
+      }
     } else if (selected.rubro) {
       // Sin artículo vinculado pero con rubro en la fórmula → cargar familias del rubro
       try {
-        const resFam = await fetch(`http://localhost:3001/articulos/familias-por-rubro?rubro=${encodeURIComponent(selected.rubro)}`);
+        const resFam = await fetch(
+          `http://https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(selected.rubro)}`,
+        );
         const fams = await resFam.json();
         if (Array.isArray(fams) && fams.length > 0) setFamilias(fams);
-      } catch { /* silencioso */ }
+      } catch {
+        /* silencioso */
+      }
     }
   };
 
   const handleSubmit = async () => {
-    if (!form.codform.trim()) { setError("El código es obligatorio."); return; }
-    if (!form.formula.trim()) { setError("La fórmula es obligatoria."); return; }
+    if (!form.codform.trim()) {
+      setError("El código es obligatorio.");
+      return;
+    }
+    if (!form.formula.trim()) {
+      setError("La fórmula es obligatoria.");
+      return;
+    }
 
     // La tabla FORMULAS sigue usando la columna "codart" — mapeamos antes de enviar
     const { codartint, ...rest } = form;
@@ -519,18 +744,29 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
 
     if (modal === "nuevo") {
       try {
-        const res = await fetch("http://localhost:3001/formulas", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        const res = await fetch(
+          "http://https://integral-backend-production.up.railway.app/formulas",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        );
         const data = await res.json();
-        if (res.status === 409) { setError(data.error); return; }
-        if (!res.ok) { setError(data.error ?? "Error al guardar."); return; }
+        if (res.status === 409) {
+          setError(data.error);
+          return;
+        }
+        if (!res.ok) {
+          setError(data.error ?? "Error al guardar.");
+          return;
+        }
         onSave({ ...payload, id: data.id, _skipPost: true });
         onCloseModal();
         setForm(EMPTY);
-      } catch { setError("Error de conexión con el servidor."); }
+      } catch {
+        setError("Error de conexión con el servidor.");
+      }
     } else {
       onSave({ ...payload, id: selected.id });
       onCloseModal();
@@ -541,35 +777,78 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
 
   return (
     <>
-      <ScreenHeader icon="🧮" title="Fórmulas" subtitle="Gestión de fórmulas de cálculo" />
-
-      <ActionBar
-        selected={selected} onNew={openNew} onEdit={openEdit}
-        onDelete={() => selected && onOpenModal("eliminar")}
-        search={search} onSearch={setSearch}
+      <ScreenHeader
+        icon="🧮"
+        title="Fórmulas"
+        subtitle="Gestión de fórmulas de cálculo"
       />
 
-      <div style={{ display: "flex", gap: 10, margin: "8px 0", alignItems: "center" }}>
+      <ActionBar
+        selected={selected}
+        onNew={openNew}
+        onEdit={openEdit}
+        onDelete={() => selected && onOpenModal("eliminar")}
+        search={search}
+        onSearch={setSearch}
+      />
+
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          margin: "8px 0",
+          alignItems: "center",
+        }}
+      >
         <select
-          style={{ padding: "7px 12px", borderRadius: 6, border: "1.5px solid #b8cfe0", fontSize: 13, fontFamily: "inherit", color: "#0a3a5c", cursor: "pointer", background: "#fff" }}
+          style={{
+            padding: "7px 12px",
+            borderRadius: 6,
+            border: "1.5px solid #b8cfe0",
+            fontSize: 13,
+            fontFamily: "inherit",
+            color: "#0a3a5c",
+            cursor: "pointer",
+            background: "#fff",
+          }}
           value={rubroFiltro}
-          onChange={e => setRubroFiltro(e.target.value)}
+          onChange={(e) => setRubroFiltro(e.target.value)}
         >
           <option value="">— Todos los rubros —</option>
-          {rubrosUnicos.map(r => <option key={r} value={r}>{r}</option>)}
+          {rubrosUnicos.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
         </select>
         {rubroFiltro && (
           <button
             onClick={() => setRubroFiltro("")}
-            style={{ padding: "6px 12px", borderRadius: 6, border: "1.5px solid #b8cfe0", background: "#fff", color: "#6699bb", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 6,
+              border: "1.5px solid #b8cfe0",
+              background: "#fff",
+              color: "#6699bb",
+              fontSize: 12,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
           >
             ✕ Limpiar filtro
           </button>
         )}
-        <span style={{ fontSize: 12, color: "#94a3b8" }}>{filtered.length} fórmula{filtered.length !== 1 ? "s" : ""}</span>
+        <span style={{ fontSize: 12, color: "#94a3b8" }}>
+          {filtered.length} fórmula{filtered.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
-      <DataTable columns={COLUMNS} rows={filtered} selectedId={selected?.id} onSelect={onSelect} />
+      <DataTable
+        columns={COLUMNS}
+        rows={filtered}
+        selectedId={selected?.id}
+        onSelect={onSelect}
+      />
 
       {(modal === "nuevo" || modal === "editar") && (
         <Modal
@@ -585,7 +864,9 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
               className="form-input"
               placeholder="Ej: FPF, FCORR, FBOX"
               value={form.codform}
-              onChange={(e) => setForm(p => ({ ...p, codform: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, codform: e.target.value }))
+              }
             />
           </div>
 
@@ -598,10 +879,14 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
                 list="rubros-list"
                 placeholder="Escribí o elegí un rubro..."
                 value={form.rubro ?? ""}
-                onChange={(e) => setForm(p => ({ ...p, rubro: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, rubro: e.target.value }))
+                }
               />
               <datalist id="rubros-list">
-                {rubros.map(r => <option key={r} value={r} />)}
+                {rubros.map((r) => (
+                  <option key={r} value={r} />
+                ))}
               </datalist>
             </div>
             <div className="form-group" style={{ position: "relative" }}>
@@ -611,10 +896,14 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
                 list="familias-list"
                 placeholder="Escribí o elegí una familia..."
                 value={form.familia ?? ""}
-                onChange={(e) => setForm(p => ({ ...p, familia: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, familia: e.target.value }))
+                }
               />
               <datalist id="familias-list">
-                {familias.map(f => <option key={f} value={f} />)}
+                {familias.map((f) => (
+                  <option key={f} value={f} />
+                ))}
               </datalist>
             </div>
           </div>
@@ -626,7 +915,9 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
               className="form-input"
               placeholder="Ej: Costo de paneles laterales, Herraje corredera simple..."
               value={form.descripcion}
-              onChange={(e) => setForm(p => ({ ...p, descripcion: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, descripcion: e.target.value }))
+              }
             />
           </div>
 
@@ -641,7 +932,11 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
                 style={{ cursor: "pointer" }}
               >
                 <option value="">— Seleccioná un rubro —</option>
-                {rubros.map(r => <option key={r} value={r}>{r}</option>)}
+                {rubros.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="form-group">
@@ -652,26 +947,36 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
                 onChange={(e) => elegirFamilia(e.target.value)}
                 style={{ cursor: "pointer" }}
               >
-                <option value="">— Todas las familias (genérico al rubro) —</option>
-                {familias.map(f => <option key={f} value={f}>{f}</option>)}
+                <option value="">
+                  — Todas las familias (genérico al rubro) —
+                </option>
+                {familias.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Artículo vinculado (código interno)</label>
+            <label className="form-label">
+              Artículo vinculado (código interno)
+            </label>
             {rubroElegido ? (
               <select
                 className="form-input"
                 value={form.codartint}
-                onChange={(e) => setForm(p => ({ ...p, codartint: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, codartint: e.target.value }))
+                }
                 style={{ cursor: "pointer" }}
               >
                 <option value="">— Seleccioná un artículo —</option>
                 <option value={`RUBRO:${rubroElegido}`}>
                   🔹 Genérico — todo el rubro {rubroElegido}
                 </option>
-                {artsPorRubro.map(a => (
+                {artsPorRubro.map((a) => (
                   <option key={a.codartint} value={a.codartint}>
                     {a.codartint} — {a.articulo}
                   </option>
@@ -682,16 +987,28 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
                 className="form-input"
                 placeholder="Seleccioná un rubro arriba o ingresá el código manualmente"
                 value={form.codartint}
-                onChange={(e) => setForm(p => ({ ...p, codartint: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, codartint: e.target.value }))
+                }
               />
             )}
             {form.codartint?.startsWith("RUBRO:") && (
-              <div style={{
-                marginTop: 6, padding: "6px 10px", borderRadius: 4,
-                background: "#e8f4fd", border: "1px solid #90caf9",
-                fontSize: 11, color: "#1565c0"
-              }}>
-                ℹ️ Esta fórmula aplica a <strong>todos los artículos del rubro {form.codartint.slice(6)}</strong> que no tengan una fórmula específica.
+              <div
+                style={{
+                  marginTop: 6,
+                  padding: "6px 10px",
+                  borderRadius: 4,
+                  background: "#e8f4fd",
+                  border: "1px solid #90caf9",
+                  fontSize: 11,
+                  color: "#1565c0",
+                }}
+              >
+                ℹ️ Esta fórmula aplica a{" "}
+                <strong>
+                  todos los artículos del rubro {form.codartint.slice(6)}
+                </strong>{" "}
+                que no tengan una fórmula específica.
               </div>
             )}
           </div>
@@ -705,7 +1022,11 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
               rubro={rubroElegido}
               artsDeFamilia={artsPorRubro}
             />
-            <InsertarMargen formulaRef={formulaRef} setForm={setForm} codart={form.codartint} />
+            <InsertarMargen
+              formulaRef={formulaRef}
+              setForm={setForm}
+              codart={form.codartint}
+            />
             <InsertarFormula
               formulaRef={formulaRef}
               setForm={setForm}
@@ -718,17 +1039,26 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
                 className="form-input"
                 placeholder="Ej: ancho * alto * precio_KITMP000"
                 value={form.formula}
-                onChange={(e) => { setForm(p => ({ ...p, formula: e.target.value })); setVerifResult(null); }}
+                onChange={(e) => {
+                  setForm((p) => ({ ...p, formula: e.target.value }));
+                  setVerifResult(null);
+                }}
                 style={{ flex: 1, marginBottom: 0 }}
               />
               <button
                 type="button"
                 onClick={verificarFormula}
                 style={{
-                  padding: "10px 16px", borderRadius: 4, border: "1.5px solid #2277bb",
-                  background: "#fff", color: "#2277bb", cursor: "pointer",
-                  fontFamily: "monospace", fontSize: 13, fontWeight: 700,
-                  whiteSpace: "nowrap"
+                  padding: "10px 16px",
+                  borderRadius: 4,
+                  border: "1.5px solid #2277bb",
+                  background: "#fff",
+                  color: "#2277bb",
+                  cursor: "pointer",
+                  fontFamily: "monospace",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
                 }}
               >
                 ✓ Verificar
@@ -737,62 +1067,205 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
 
             {/* Resultado de verificación */}
             {verifResult && (
-              <div style={{
-                marginTop: 8, padding: "10px 14px", borderRadius: 5, fontSize: 12,
-                background: verifResult.ok ? "#e8f8f0" : "#fdf0f0",
-                border: `1px solid ${verifResult.ok ? "#6dcc99" : "#f0a0a0"}`,
-                color: verifResult.ok ? "#1a7a44" : "#c0392b",
-              }}>
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: "10px 14px",
+                  borderRadius: 5,
+                  fontSize: 12,
+                  background: verifResult.ok ? "#e8f8f0" : "#fdf0f0",
+                  border: `1px solid ${verifResult.ok ? "#6dcc99" : "#f0a0a0"}`,
+                  color: verifResult.ok ? "#1a7a44" : "#c0392b",
+                }}
+              >
                 {verifResult.ok ? (
                   <>
-                    <strong>✅ Fórmula válida</strong><br/>
-                    Resultado con valores de prueba
-                    (ancho=100, alto=200, cantidad=1, colocacion=5000):<br/>
-                    <strong style={{ fontSize: 15 }}>= {verifResult.resultado}</strong>
-                    {verifResult.preciosUsados && Object.keys(verifResult.preciosUsados).length > 0 && (
-                      <div style={{ marginTop: 6, fontSize: 11, color: "#2d7a50" }}>
-                        Precios usados de BD: {Object.entries(verifResult.preciosUsados)
-                          .filter(([k]) => k.startsWith("precio_") && k !== "precio_vidrio" && k !== "precio")
-                          .map(([k, v]) => `${k} = $${Number(v).toLocaleString("es-AR")}`)
-                          .join(" · ")}
-                      </div>
-                    )}
+                    <strong>✅ Fórmula válida</strong>
+                    <br />
+                    Resultado con valores de prueba (ancho=100, alto=200,
+                    cantidad=1, colocacion=5000):
+                    <br />
+                    <strong style={{ fontSize: 15 }}>
+                      = {verifResult.resultado}
+                    </strong>
+                    {verifResult.preciosUsados &&
+                      Object.keys(verifResult.preciosUsados).length > 0 && (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            fontSize: 11,
+                            color: "#2d7a50",
+                          }}
+                        >
+                          Precios usados de BD:{" "}
+                          {Object.entries(verifResult.preciosUsados)
+                            .filter(
+                              ([k]) =>
+                                k.startsWith("precio_") &&
+                                k !== "precio_vidrio" &&
+                                k !== "precio",
+                            )
+                            .map(
+                              ([k, v]) =>
+                                `${k} = $${Number(v).toLocaleString("es-AR")}`,
+                            )
+                            .join(" · ")}
+                        </div>
+                      )}
                   </>
                 ) : (
                   <>
-                    <strong>❌ Error en la fórmula</strong><br/>
+                    <strong>❌ Error en la fórmula</strong>
+                    <br />
                     {verifResult.error}
                   </>
                 )}
               </div>
             )}
-            <div style={{ marginTop: 8, padding: "10px 12px", background: "#f0f6fb",
-              border: "1px solid #c0d8ee", borderRadius: 5, fontSize: 11, lineHeight: 1.8, color: "#4a6a80" }}>
-              <strong style={{ color: "#0a3a5c" }}>Variables del usuario</strong> (valores ingresados en el presupuesto):<br/>
-              <code style={{ background: "#e0eef8", padding: "1px 5px", borderRadius: 3, marginRight: 4 }}>ancho</code>
-              <code style={{ background: "#e0eef8", padding: "1px 5px", borderRadius: 3, marginRight: 4 }}>alto</code>
-              <code style={{ background: "#e0eef8", padding: "1px 5px", borderRadius: 3, marginRight: 4 }}>cantidad</code>
-              <code style={{ background: "#e0eef8", padding: "1px 5px", borderRadius: 3 }}>colocacion</code>
-              <br/>
-              <strong style={{ color: "#0a3a5c" }}>Variables de artículo</strong> (datos traídos de la BD):<br/>
-              <code style={{ background: "#e0eef8", padding: "1px 5px", borderRadius: 3, marginRight: 4 }}>precio_CODART</code>
-              <code style={{ background: "#e0eef8", padding: "1px 5px", borderRadius: 3, marginRight: 4 }}>ancho_CODART</code>
-              <code style={{ background: "#e0eef8", padding: "1px 5px", borderRadius: 3 }}>alto_CODART</code>
-              <br/>
-              <strong style={{ color: "#1a7a44" }}>Fórmulas anidadas</strong> (referencias a otras fórmulas):<br/>
-              <code style={{ background: "#d4f0e0", padding: "1px 5px", borderRadius: 3, marginRight: 4 }}>FORM_CODFORMULA</code>
-              <span style={{ fontSize: 10, color: "#2d8a55" }}>el resultado de esa fórmula se reemplaza aquí</span>
-              <br/>
-              <strong style={{ color: "#c0392b" }}>⚠️ Importante:</strong> usá minúsculas y <code style={{ background: "#e0eef8", padding: "1px 4px", borderRadius: 3 }}>*</code> para multiplicar.<br/>
-              <strong style={{ color: "#2d7fc1" }}>Ejemplo anidado:</strong>{" "}
-              <code style={{ background: "#dff0fb", padding: "2px 7px", borderRadius: 3, color: "#0a3a5c" }}>
+            <div
+              style={{
+                marginTop: 8,
+                padding: "10px 12px",
+                background: "#f0f6fb",
+                border: "1px solid #c0d8ee",
+                borderRadius: 5,
+                fontSize: 11,
+                lineHeight: 1.8,
+                color: "#4a6a80",
+              }}
+            >
+              <strong style={{ color: "#0a3a5c" }}>
+                Variables del usuario
+              </strong>{" "}
+              (valores ingresados en el presupuesto):
+              <br />
+              <code
+                style={{
+                  background: "#e0eef8",
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                  marginRight: 4,
+                }}
+              >
+                ancho
+              </code>
+              <code
+                style={{
+                  background: "#e0eef8",
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                  marginRight: 4,
+                }}
+              >
+                alto
+              </code>
+              <code
+                style={{
+                  background: "#e0eef8",
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                  marginRight: 4,
+                }}
+              >
+                cantidad
+              </code>
+              <code
+                style={{
+                  background: "#e0eef8",
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                }}
+              >
+                colocacion
+              </code>
+              <br />
+              <strong style={{ color: "#0a3a5c" }}>
+                Variables de artículo
+              </strong>{" "}
+              (datos traídos de la BD):
+              <br />
+              <code
+                style={{
+                  background: "#e0eef8",
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                  marginRight: 4,
+                }}
+              >
+                precio_CODART
+              </code>
+              <code
+                style={{
+                  background: "#e0eef8",
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                  marginRight: 4,
+                }}
+              >
+                ancho_CODART
+              </code>
+              <code
+                style={{
+                  background: "#e0eef8",
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                }}
+              >
+                alto_CODART
+              </code>
+              <br />
+              <strong style={{ color: "#1a7a44" }}>
+                Fórmulas anidadas
+              </strong>{" "}
+              (referencias a otras fórmulas):
+              <br />
+              <code
+                style={{
+                  background: "#d4f0e0",
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                  marginRight: 4,
+                }}
+              >
+                FORM_CODFORMULA
+              </code>
+              <span style={{ fontSize: 10, color: "#2d8a55" }}>
+                el resultado de esa fórmula se reemplaza aquí
+              </span>
+              <br />
+              <strong style={{ color: "#c0392b" }}>⚠️ Importante:</strong> usá
+              minúsculas y{" "}
+              <code
+                style={{
+                  background: "#e0eef8",
+                  padding: "1px 4px",
+                  borderRadius: 3,
+                }}
+              >
+                *
+              </code>{" "}
+              para multiplicar.
+              <br />
+              <strong style={{ color: "#2d7fc1" }}>
+                Ejemplo anidado:
+              </strong>{" "}
+              <code
+                style={{
+                  background: "#dff0fb",
+                  padding: "2px 7px",
+                  borderRadius: 3,
+                  color: "#0a3a5c",
+                }}
+              >
                 FORM_FBASE + FORM_FMATERIAL * cantidad
               </code>
             </div>
           </div>
 
           <div className="form-actions">
-            <button className="btn-cancel" onClick={onCloseModal}>Cancelar</button>
+            <button className="btn-cancel" onClick={onCloseModal}>
+              Cancelar
+            </button>
             <button className="btn-save" onClick={handleSubmit}>
               {modal === "nuevo" ? "Guardar" : "Actualizar"}
             </button>
@@ -801,7 +1274,11 @@ export default function Formulas({ formulas, onSave, onDelete, selected, onSelec
       )}
 
       {modal === "eliminar" && (
-        <ConfirmDelete item={selected} onConfirm={onDelete} onClose={onCloseModal} />
+        <ConfirmDelete
+          item={selected}
+          onConfirm={onDelete}
+          onClose={onCloseModal}
+        />
       )}
     </>
   );

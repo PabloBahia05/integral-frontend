@@ -5,19 +5,31 @@ import ActionBar from "../Component/ActionBar";
 import ScreenHeader from "../Component/ScreenHeader";
 import ConfirmDelete from "../Component/ConfirmDelete";
 
-const API = "http://localhost:3001";
+const API = "http://https://integral-backend-production.up.railway.app";
 
 const COLUMNS = [
-  { key: "id",          label: "ID" },
-  { key: "codtipdes",   label: "Código" },
-  { key: "nombre",      label: "Nombre" },
+  { key: "id", label: "ID" },
+  { key: "codtipdes", label: "Código" },
+  { key: "nombre", label: "Nombre" },
   { key: "descripcion", label: "Descripción" },
   {
     key: "rubro",
     label: "Rubro",
     render: (v) =>
       v ? (
-        <span style={{ display: "inline-block", padding: "2px 10px", background: "#eff4ff", color: "#2563eb", borderRadius: 5, fontSize: 12, fontWeight: 600 }}>{v}</span>
+        <span
+          style={{
+            display: "inline-block",
+            padding: "2px 10px",
+            background: "#eff4ff",
+            color: "#2563eb",
+            borderRadius: 5,
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          {v}
+        </span>
       ) : (
         <span style={{ color: "#b0c8d8", fontSize: 11 }}>—</span>
       ),
@@ -27,14 +39,30 @@ const COLUMNS = [
     label: "Foto",
     render: (v) =>
       v ? (
-        <img src={v} alt="foto" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6, border: "1px solid #d0dde8" }} />
+        <img
+          src={v}
+          alt="foto"
+          style={{
+            width: 48,
+            height: 48,
+            objectFit: "cover",
+            borderRadius: 6,
+            border: "1px solid #d0dde8",
+          }}
+        />
       ) : (
         <span style={{ color: "#b0c8d8", fontSize: 11 }}>Sin foto</span>
       ),
   },
 ];
 
-const EMPTY = { nombre: "", codtipdes: "", descripcion: "", rubro: "", foto: "" };
+const EMPTY = {
+  nombre: "",
+  codtipdes: "",
+  descripcion: "",
+  rubro: "",
+  foto: "",
+};
 
 export default function TiposDespensero({
   tiposDespensero,
@@ -49,39 +77,48 @@ export default function TiposDespensero({
   onVolver,
   modoSelector = false,
 }) {
-  const [form, setForm]             = useState(EMPTY);
-  const [error, setError]           = useState("");
-  const [search, setSearch]         = useState("");
-  const [uploading, setUploading]   = useState(false);
-  const [rubros, setRubros]         = useState([]);
+  const [form, setForm] = useState(EMPTY);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [rubros, setRubros] = useState([]);
   const [nuevoRubro, setNuevoRubro] = useState("");
   const [agregandoRubro, setAgregandoRubro] = useState(false);
   const fileRef = useRef(null);
 
   // Buscador de artículos para vincular al tipo de despensero
-  const [artQuery, setArtQuery]               = useState("");
-  const [artResultados, setArtResultados]     = useState([]);
-  const [artBuscando, setArtBuscando]         = useState(false);
+  const [artQuery, setArtQuery] = useState("");
+  const [artResultados, setArtResultados] = useState([]);
+  const [artBuscando, setArtBuscando] = useState(false);
   const [artSeleccionado, setArtSeleccionado] = useState(null);
-  const artTimer                              = useRef(null);
+  const artTimer = useRef(null);
 
   const cargarRubros = () => {
     fetch(`${API}/articulos/rubros`)
       .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data)) setRubros(data); })
+      .then((data) => {
+        if (Array.isArray(data)) setRubros(data);
+      })
       .catch(() => {});
   };
 
-  useEffect(() => { cargarRubros(); }, []);
+  useEffect(() => {
+    cargarRubros();
+  }, []);
 
   // Busca artículos por nombre con debounce de 280ms
   const buscarArticulos = (q) => {
     setArtQuery(q);
     clearTimeout(artTimer.current);
-    if (!q.trim()) { setArtResultados([]); return; }
+    if (!q.trim()) {
+      setArtResultados([]);
+      return;
+    }
     artTimer.current = setTimeout(() => {
       setArtBuscando(true);
-      fetch(`${API}/despensero-tipos/buscar-articulo?q=${encodeURIComponent(q)}`)
+      fetch(
+        `${API}/despensero-tipos/buscar-articulo?q=${encodeURIComponent(q)}`,
+      )
         .then((r) => r.json())
         .then((data) => setArtResultados(Array.isArray(data) ? data : []))
         .catch(() => setArtResultados([]))
@@ -95,10 +132,10 @@ export default function TiposDespensero({
     setArtResultados([]);
     setForm((f) => ({
       ...f,
-      nombre:    art.articulo  ?? f.nombre,
+      nombre: art.articulo ?? f.nombre,
       codtipdes: art.codartint ?? f.codtipdes,
-      rubro:     art.rubro     ?? f.rubro,
-      foto:      art.artfoto   ?? f.foto,
+      rubro: art.rubro ?? f.rubro,
+      foto: art.artfoto ?? f.foto,
     }));
   };
 
@@ -106,10 +143,10 @@ export default function TiposDespensero({
     ? tiposDespensero.filter((t) => {
         const q = search.toLowerCase();
         return (
-          (t.nombre      ?? "").toLowerCase().includes(q) ||
-          (t.codtipdes   ?? "").toLowerCase().includes(q) ||
+          (t.nombre ?? "").toLowerCase().includes(q) ||
+          (t.codtipdes ?? "").toLowerCase().includes(q) ||
           (t.descripcion ?? "").toLowerCase().includes(q) ||
-          (t.rubro       ?? "").toLowerCase().includes(q)
+          (t.rubro ?? "").toLowerCase().includes(q)
         );
       })
     : [];
@@ -128,11 +165,11 @@ export default function TiposDespensero({
   const openEdit = () => {
     if (!selected) return;
     setForm({
-      nombre:      selected.nombre      ?? "",
-      codtipdes:   selected.codtipdes   ?? "",
+      nombre: selected.nombre ?? "",
+      codtipdes: selected.codtipdes ?? "",
       descripcion: selected.descripcion ?? "",
-      rubro:       selected.rubro       ?? "",
-      foto:        selected.foto        ?? "",
+      rubro: selected.rubro ?? "",
+      foto: selected.foto ?? "",
     });
     setError("");
     setAgregandoRubro(false);
@@ -160,7 +197,10 @@ export default function TiposDespensero({
     try {
       const fd = new FormData();
       fd.append("imagen", file);
-      const res = await fetch(`${API}/api/upload-imagen`, { method: "POST", body: fd });
+      const res = await fetch(`${API}/api/upload-imagen`, {
+        method: "POST",
+        body: fd,
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error al subir");
       setForm((p) => ({ ...p, foto: data.url }));
@@ -173,8 +213,14 @@ export default function TiposDespensero({
   };
 
   const handleSubmit = () => {
-    if (!form.nombre.trim())    { setError("Seleccioná un artículo de la lista."); return; }
-    if (!form.codtipdes.trim()) { setError("El código es obligatorio."); return; }
+    if (!form.nombre.trim()) {
+      setError("Seleccioná un artículo de la lista.");
+      return;
+    }
+    if (!form.codtipdes.trim()) {
+      setError("El código es obligatorio.");
+      return;
+    }
     onSave(modal === "nuevo" ? form : { ...form, id: selected.id });
     onCloseModal();
     setForm(EMPTY);
@@ -194,38 +240,131 @@ export default function TiposDespensero({
         {onVolver && (
           <button
             onClick={onVolver}
-            style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#2563eb",
+              cursor: "pointer",
+              fontSize: 13,
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
           >
             ← Volver a muebles
           </button>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 6,
+          }}
+        >
           <span style={{ fontSize: 28 }}>🗄️</span>
           <div>
-            <div style={{ fontFamily: "Syne, sans-serif", fontSize: 26, fontWeight: 800, color: "#0a3a5c", textTransform: "uppercase" }}>Despensero</div>
-            <div style={{ fontSize: 12, color: "#6699bb", letterSpacing: 2 }}>Elegí un modelo o armá uno personalizado</div>
+            <div
+              style={{
+                fontFamily: "Syne, sans-serif",
+                fontSize: 26,
+                fontWeight: 800,
+                color: "#0a3a5c",
+                textTransform: "uppercase",
+              }}
+            >
+              Despensero
+            </div>
+            <div style={{ fontSize: 12, color: "#6699bb", letterSpacing: 2 }}>
+              Elegí un modelo o armá uno personalizado
+            </div>
           </div>
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginTop: 24 }}>
+        <div
+          style={{ display: "flex", flexWrap: "wrap", gap: 20, marginTop: 24 }}
+        >
           {(tiposDespensero ?? []).map((tipo) => (
             <div
               key={tipo.id}
               onClick={() => onArmar?.(tipo)}
-              style={{ width: 240, borderRadius: 12, overflow: "hidden", border: "1.5px solid #d0dde8", background: "#fff", cursor: "pointer", transition: "all 0.15s", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
-              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.13)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; e.currentTarget.style.transform = "none"; }}
+              style={{
+                width: 240,
+                borderRadius: 12,
+                overflow: "hidden",
+                border: "1.5px solid #d0dde8",
+                background: "#fff",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.13)";
+                e.currentTarget.style.transform = "translateY(-2px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
+                e.currentTarget.style.transform = "none";
+              }}
             >
-              {tipo.foto
-                ? <img src={tipo.foto} alt={tipo.nombre} style={{ width: "100%", height: 160, objectFit: "cover" }} />
-                : <div style={{ width: "100%", height: 160, background: "#e8f0f7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40 }}>🗄️</div>
-              }
+              {tipo.foto ? (
+                <img
+                  src={tipo.foto}
+                  alt={tipo.nombre}
+                  style={{ width: "100%", height: 160, objectFit: "cover" }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "100%",
+                    height: 160,
+                    background: "#e8f0f7",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 40,
+                  }}
+                >
+                  🗄️
+                </div>
+              )}
               <div style={{ padding: "14px 16px" }}>
-                <div style={{ fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: 15, color: "#0a3a5c", textTransform: "uppercase" }}>{tipo.nombre}</div>
-                {tipo.descripcion && <div style={{ fontSize: 12, color: "#6699bb", marginTop: 2 }}>{tipo.descripcion}</div>}
+                <div
+                  style={{
+                    fontFamily: "Rajdhani, sans-serif",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    color: "#0a3a5c",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {tipo.nombre}
+                </div>
+                {tipo.descripcion && (
+                  <div style={{ fontSize: 12, color: "#6699bb", marginTop: 2 }}>
+                    {tipo.descripcion}
+                  </div>
+                )}
                 {tipo.codtipdes && (
-                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                    }}
+                  >
                     <span style={{ color: "#2ec4b6", fontSize: 13 }}>🔨</span>
-                    <span style={{ fontFamily: "Space Mono, monospace", fontSize: 12, color: "#2ec4b6", fontWeight: 600 }}>{tipo.codtipdes}</span>
+                    <span
+                      style={{
+                        fontFamily: "Space Mono, monospace",
+                        fontSize: 12,
+                        color: "#2ec4b6",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {tipo.codtipdes}
+                    </span>
                   </div>
                 )}
               </div>
@@ -233,13 +372,43 @@ export default function TiposDespensero({
           ))}
           <div
             onClick={() => onArmar?.(null)}
-            style={{ width: 240, height: 220, borderRadius: 12, background: "#0f2944", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, transition: "all 0.15s", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
-            onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.2)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; e.currentTarget.style.transform = "none"; }}
+            style={{
+              width: 240,
+              height: 220,
+              borderRadius: 12,
+              background: "#0f2944",
+              cursor: "pointer",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+              transition: "all 0.15s",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.2)";
+              e.currentTarget.style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
+              e.currentTarget.style.transform = "none";
+            }}
           >
             <span style={{ fontSize: 36 }}>✏️</span>
-            <div style={{ color: "#fff", fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: "0.08em", textAlign: "center" }}>
-              ARMAR<br />PERSONALIZADO
+            <div
+              style={{
+                color: "#fff",
+                fontFamily: "Rajdhani, sans-serif",
+                fontWeight: 700,
+                fontSize: 15,
+                letterSpacing: "0.08em",
+                textAlign: "center",
+              }}
+            >
+              ARMAR
+              <br />
+              PERSONALIZADO
             </div>
           </div>
         </div>
@@ -250,19 +419,35 @@ export default function TiposDespensero({
   // ── Modo tabla normal (desde VerTablas) ─────────────────
   return (
     <>
-      <ScreenHeader icon="🗄️" title="Tipos de Despensero" subtitle="Gestión de tipos de despensero" />
-
-      <ActionBar
-        selected={selected} onNew={openNew} onEdit={openEdit}
-        onDelete={() => selected && onOpenModal("eliminar")}
-        search={search} onSearch={setSearch}
+      <ScreenHeader
+        icon="🗄️"
+        title="Tipos de Despensero"
+        subtitle="Gestión de tipos de despensero"
       />
 
-      <DataTable columns={COLUMNS} rows={filtered} selectedId={selected?.id} onSelect={onSelect} />
+      <ActionBar
+        selected={selected}
+        onNew={openNew}
+        onEdit={openEdit}
+        onDelete={() => selected && onOpenModal("eliminar")}
+        search={search}
+        onSearch={setSearch}
+      />
+
+      <DataTable
+        columns={COLUMNS}
+        rows={filtered}
+        selectedId={selected?.id}
+        onSelect={onSelect}
+      />
 
       {(modal === "nuevo" || modal === "editar") && (
         <Modal
-          title={modal === "nuevo" ? "Nuevo tipo de despensero" : "Editar tipo de despensero"}
+          title={
+            modal === "nuevo"
+              ? "Nuevo tipo de despensero"
+              : "Editar tipo de despensero"
+          }
           onClose={onCloseModal}
         >
           {error && <p className="form-error">{error}</p>}
@@ -279,34 +464,99 @@ export default function TiposDespensero({
                 autoComplete="off"
               />
               {artBuscando && (
-                <div style={{ fontSize: 11, color: "#6699bb", marginTop: 3 }}>Buscando…</div>
+                <div style={{ fontSize: 11, color: "#6699bb", marginTop: 3 }}>
+                  Buscando…
+                </div>
               )}
               {artResultados.length > 0 && (
-                <div style={{
-                  position: "absolute", top: "100%", left: 0, right: 0, zIndex: 999,
-                  background: "#fff", border: "1.5px solid #d0dde8", borderRadius: 8,
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.12)", maxHeight: 220, overflowY: "auto",
-                }}>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    zIndex: 999,
+                    background: "#fff",
+                    border: "1.5px solid #d0dde8",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                    maxHeight: 220,
+                    overflowY: "auto",
+                  }}
+                >
                   {artResultados.map((art) => (
                     <div
                       key={art.id}
                       onClick={() => seleccionarArticulo(art)}
                       style={{
-                        padding: "8px 14px", cursor: "pointer", borderBottom: "1px solid #f0f4f8",
-                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "8px 14px",
+                        cursor: "pointer",
+                        borderBottom: "1px solid #f0f4f8",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = "#eff4ff"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#eff4ff";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "";
+                      }}
                     >
-                      {art.artfoto
-                        ? <img src={art.artfoto} alt="" style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4, border: "1px solid #d0dde8" }} />
-                        : <div style={{ width: 32, height: 32, background: "#e8f0f7", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🗄️</div>
-                      }
+                      {art.artfoto ? (
+                        <img
+                          src={art.artfoto}
+                          alt=""
+                          style={{
+                            width: 32,
+                            height: 32,
+                            objectFit: "cover",
+                            borderRadius: 4,
+                            border: "1px solid #d0dde8",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            background: "#e8f0f7",
+                            borderRadius: 4,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 16,
+                          }}
+                        >
+                          🗄️
+                        </div>
+                      )}
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#0a3a5c" }}>{art.articulo}</div>
-                        {art.rubro && <div style={{ fontSize: 11, color: "#6699bb" }}>{art.rubro}</div>}
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "#0a3a5c",
+                          }}
+                        >
+                          {art.articulo}
+                        </div>
+                        {art.rubro && (
+                          <div style={{ fontSize: 11, color: "#6699bb" }}>
+                            {art.rubro}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ marginLeft: "auto", fontFamily: "Space Mono, monospace", fontSize: 10, color: "#2ec4b6" }}>{art.codartint}</div>
+                      <div
+                        style={{
+                          marginLeft: "auto",
+                          fontFamily: "Space Mono, monospace",
+                          fontSize: 10,
+                          color: "#2ec4b6",
+                        }}
+                      >
+                        {art.codartint}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -319,44 +569,93 @@ export default function TiposDespensero({
             </div>
             <div className="form-group">
               <label className="form-label">Código *</label>
-              <input className="form-input" placeholder="Ej: DES01"
-                value={form.codtipdes} onChange={(e) => set("codtipdes", e.target.value)} />
+              <input
+                className="form-input"
+                placeholder="Ej: DES01"
+                value={form.codtipdes}
+                onChange={(e) => set("codtipdes", e.target.value)}
+              />
             </div>
           </div>
 
           <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Descripción</label>
-              <input className="form-input" placeholder="Ej: Mueble con puertas batientes"
-                value={form.descripcion} onChange={(e) => set("descripcion", e.target.value)} />
+              <input
+                className="form-input"
+                placeholder="Ej: Mueble con puertas batientes"
+                value={form.descripcion}
+                onChange={(e) => set("descripcion", e.target.value)}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">Rubro</label>
               {!agregandoRubro ? (
                 <div style={{ display: "flex", gap: 8 }}>
-                  <select className="form-input" style={{ flex: 1 }} value={form.rubro}
-                    onChange={(e) => set("rubro", e.target.value)}>
+                  <select
+                    className="form-input"
+                    style={{ flex: 1 }}
+                    value={form.rubro}
+                    onChange={(e) => set("rubro", e.target.value)}
+                  >
                     <option value="">— Sin rubro —</option>
-                    {rubros.map((r) => <option key={r} value={r}>{r}</option>)}
+                    {rubros.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
                   </select>
-                  <button type="button" className="btn-save"
+                  <button
+                    type="button"
+                    className="btn-save"
                     style={{ padding: "0 14px", fontSize: 18, flexShrink: 0 }}
                     title="Agregar nuevo rubro"
-                    onClick={() => setAgregandoRubro(true)}>＋</button>
+                    onClick={() => setAgregandoRubro(true)}
+                  >
+                    ＋
+                  </button>
                 </div>
               ) : (
                 <div style={{ display: "flex", gap: 8 }}>
-                  <input className="form-input" style={{ flex: 1 }} placeholder="Nuevo rubro..."
-                    value={nuevoRubro} onChange={(e) => setNuevoRubro(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAgregarRubro()} autoFocus />
-                  <button type="button" className="btn-save" style={{ padding: "0 14px", flexShrink: 0 }}
-                    onClick={handleAgregarRubro}>✓</button>
-                  <button type="button" className="btn-cancel" style={{ padding: "0 14px", flexShrink: 0 }}
-                    onClick={() => { setAgregandoRubro(false); setNuevoRubro(""); }}>✕</button>
+                  <input
+                    className="form-input"
+                    style={{ flex: 1 }}
+                    placeholder="Nuevo rubro..."
+                    value={nuevoRubro}
+                    onChange={(e) => setNuevoRubro(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAgregarRubro()}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    className="btn-save"
+                    style={{ padding: "0 14px", flexShrink: 0 }}
+                    onClick={handleAgregarRubro}
+                  >
+                    ✓
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-cancel"
+                    style={{ padding: "0 14px", flexShrink: 0 }}
+                    onClick={() => {
+                      setAgregandoRubro(false);
+                      setNuevoRubro("");
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
               )}
               {form.rubro && (
-                <span style={{ fontSize: 11, color: "#2563eb", marginTop: 4, display: "block" }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: "#2563eb",
+                    marginTop: 4,
+                    display: "block",
+                  }}
+                >
                   Rubro seleccionado: <strong>{form.rubro}</strong>
                 </span>
               )}
@@ -368,25 +667,63 @@ export default function TiposDespensero({
             <label className="form-label">Foto del modelo</label>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               {form.foto ? (
-                <img src={form.foto} alt="preview"
-                  style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: "1.5px solid #d0dde8" }} />
+                <img
+                  src={form.foto}
+                  alt="preview"
+                  style={{
+                    width: 80,
+                    height: 80,
+                    objectFit: "cover",
+                    borderRadius: 8,
+                    border: "1.5px solid #d0dde8",
+                  }}
+                />
               ) : (
-                <div style={{ width: 80, height: 80, borderRadius: 8, border: "2px dashed #d0dde8",
-                  display: "flex", alignItems: "center", justifyContent: "center", color: "#b0c8d8", fontSize: 24 }}>
+                <div
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 8,
+                    border: "2px dashed #d0dde8",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#b0c8d8",
+                    fontSize: 24,
+                  }}
+                >
                   🗄️
                 </div>
               )}
               <div style={{ flex: 1 }}>
-                <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleUpload} />
-                <button type="button" className="btn-cancel"
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={handleUpload}
+                />
+                <button
+                  type="button"
+                  className="btn-cancel"
                   style={{ width: "100%", marginBottom: 6 }}
-                  onClick={() => fileRef.current?.click()} disabled={uploading}>
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                >
                   {uploading ? "⏳ Subiendo..." : "📷 Subir foto"}
                 </button>
                 {form.foto && (
-                  <button type="button" className="btn-cancel"
-                    style={{ width: "100%", fontSize: 11, color: "#dc2626", borderColor: "#fca5a5" }}
-                    onClick={() => set("foto", "")}>
+                  <button
+                    type="button"
+                    className="btn-cancel"
+                    style={{
+                      width: "100%",
+                      fontSize: 11,
+                      color: "#dc2626",
+                      borderColor: "#fca5a5",
+                    }}
+                    onClick={() => set("foto", "")}
+                  >
                     ✕ Quitar foto
                   </button>
                 )}
@@ -395,8 +732,14 @@ export default function TiposDespensero({
           </div>
 
           <div className="form-actions">
-            <button className="btn-cancel" onClick={onCloseModal}>Cancelar</button>
-            <button className="btn-save" onClick={handleSubmit} disabled={uploading}>
+            <button className="btn-cancel" onClick={onCloseModal}>
+              Cancelar
+            </button>
+            <button
+              className="btn-save"
+              onClick={handleSubmit}
+              disabled={uploading}
+            >
               {modal === "nuevo" ? "Guardar" : "Actualizar"}
             </button>
           </div>
@@ -404,7 +747,11 @@ export default function TiposDespensero({
       )}
 
       {modal === "eliminar" && (
-        <ConfirmDelete item={selected} onConfirm={onDelete} onClose={onCloseModal} />
+        <ConfirmDelete
+          item={selected}
+          onConfirm={onDelete}
+          onClose={onCloseModal}
+        />
       )}
     </>
   );
