@@ -18,6 +18,7 @@ import PresupuestosNuevoTabla from "./screens/PresupuestosNuevoTabla";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
 import ActionButton from "./Component/ActionButton";
+import Login from "./screens/Login";
 import { useEffect, useState } from "react";
 
 const API = "https://integral-backend-production.up.railway.app";
@@ -151,6 +152,9 @@ export default function App() {
   const [selectedMargen, setSelectedMargen] = useState(null);
   const [selectedLista, setSelectedLista] = useState(null);
   const [modal, setModal] = useState(null);
+  const [usuario, setUsuario] = useState(null);
+
+  if (!usuario) return <Login onLogin={setUsuario} />;
 
   // ── Proveedores ──────────────────────────────────────────
   const [proveedores, setProveedores] = useState([]);
