@@ -20,7 +20,7 @@ import Facturas from "./screens/Facturas";
 import ActionButton from "./Component/ActionButton";
 import { useEffect, useState } from "react";
 
-const API = "http://localhost:3001";
+const API = "https://integral-backend-production.up.railway.app";
 
 const SCREENS = {
   clientes: { label: "CLIENTES", icon: "👥" },
