@@ -154,8 +154,6 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [usuario, setUsuario] = useState(null);
 
-  if (!usuario) return <Login onLogin={setUsuario} />;
-
   // ── Proveedores ──────────────────────────────────────────
   const [proveedores, setProveedores] = useState([]);
   const [selectedProveedor, setSelectedProveedor] = useState(null);
@@ -170,6 +168,8 @@ export default function App() {
   const [tablaInicialVerTablas, setTablaInicialVerTablas] = useState(null);
 
   const addLog = (msg) => setLog((prev) => [msg, ...prev.slice(0, 4)]);
+
+  if (!usuario) return <Login onLogin={setUsuario} />;
 
   // ── Cargar datos ─────────────────────────────────────────
   const fetchClientes = () =>
