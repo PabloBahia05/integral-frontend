@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-const API = "https://integral-backend-production.up.railway.app";
-const WS  = "wss://integral-backend-production.up.railway.app";
+const API = "http://localhost:3001";
+const WS  = "ws://localhost:3001";
 
 const STYLE = `
   .anviz-wrap { padding: 24px; font-family: 'Space Mono', monospace; }
