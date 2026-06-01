@@ -114,7 +114,13 @@ const buttons = [
   },
 ];
 
-export default function App() {
+export default function Root() {
+  const [usuario, setUsuario] = useState(null);
+  if (!usuario) return <Login onLogin={setUsuario} />;
+  return <App usuario={usuario} />;
+}
+
+function App({ usuario }) {
   const [screen, setScreen] = useState(null);
   const [active, setActive] = useState(null);
   const [log, setLog] = useState([]);
@@ -152,7 +158,6 @@ export default function App() {
   const [selectedMargen, setSelectedMargen] = useState(null);
   const [selectedLista, setSelectedLista] = useState(null);
   const [modal, setModal] = useState(null);
-  const [usuario, setUsuario] = useState(null);
 
   // ── Proveedores ──────────────────────────────────────────
   const [proveedores, setProveedores] = useState([]);
@@ -169,9 +174,6 @@ export default function App() {
 
   const addLog = (msg) => setLog((prev) => [msg, ...prev.slice(0, 4)]);
 
-  if (!usuario) return <Login onLogin={setUsuario} />;
-
-  // ── Cargar datos ─────────────────────────────────────────
   const fetchClientes = () =>
     fetch(`${API}/clientes`)
       .then((r) => r.json())
