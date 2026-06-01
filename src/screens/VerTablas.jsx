@@ -14,6 +14,7 @@ import Asociaciones from "./Asociaciones";
 import AsociacionesForm from "./AsociacionesForm";
 import Lista from "./Lista";
 import Proveedores from "./Proveedores"; // ← nuevo
+import UsuariosApp from "./UsuariosApp"; // ← usuarios app
 
 const TABLAS = [
   { id: "clientes", label: "Clientes", icon: "👥", color: "#eb56d7" },
@@ -59,7 +60,8 @@ const TABLAS = [
     color: "#e63946",
   },
   { id: "lista", label: "Lista Margen", icon: "📊", color: "#20b2aa" },
-  { id: "proveedores", label: "Proveedores", icon: "🏭", color: "#7b5ea7" }, // ← nuevo
+  { id: "proveedores",   label: "Proveedores",    icon: "🏭", color: "#7b5ea7" }, // ← nuevo
+  { id: "usuarios-app", label: "Usuarios App",   icon: "🔐", color: "#e63946" },
 ];
 
 export default function VerTablas({
@@ -315,6 +317,15 @@ export default function VerTablas({
           {...localCRUD(proveedoresCRUD ?? {})}
           onSelect={(row) => proveedoresCRUD?.onSelect?.(row)}
         />
+      </div>
+    );
+
+  // ── usuarios app ──
+  if (tablaActiva === "usuarios-app")
+    return (
+      <div>
+        {back}
+        <UsuariosApp />
       </div>
     );
 
