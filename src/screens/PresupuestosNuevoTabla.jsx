@@ -6,7 +6,7 @@ import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
