@@ -339,7 +339,7 @@ function InsertarMargen({ formulaRef, setForm, codart }) {
     }
     setCargando(true);
     fetch(
-      `http://https://integral-backend-production.up.railway.app/margen/buscar?q=${encodeURIComponent(codart)}`,
+      `https://integral-backend-production.up.railway.app/margen/buscar?q=${encodeURIComponent(codart)}`,
     )
       .then((r) => r.json())
       .then((data) => {
@@ -514,7 +514,7 @@ export default function Formulas({
     const codart_modelo = form.codartint || null;
     try {
       const res = await fetch(
-        "http://https://integral-backend-production.up.railway.app/formulas/verificar",
+        "https://integral-backend-production.up.railway.app/formulas/verificar",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -550,13 +550,13 @@ export default function Formulas({
   useEffect(() => {
     if (modal === "nuevo" || modal === "editar") {
       fetch(
-        "http://https://integral-backend-production.up.railway.app/articulos/familias-todas",
+        "https://integral-backend-production.up.railway.app/articulos/familias-todas",
       )
         .then((r) => r.json())
         .then((data) => setFamilias(Array.isArray(data) ? data : []))
         .catch(() => {});
       fetch(
-        "http://https://integral-backend-production.up.railway.app/articulos/rubros",
+        "https://integral-backend-production.up.railway.app/articulos/rubros",
       )
         .then((r) => r.json())
         .then((data) => setRubros(Array.isArray(data) ? data : []))
@@ -577,7 +577,7 @@ export default function Formulas({
     if (rubro) {
       // Cargar familias de ese rubro
       fetch(
-        `http://https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(rubro)}`,
+        `https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(rubro)}`,
       )
         .then((r) => r.json())
         .then((data) => setFamilias(Array.isArray(data) ? data : []))
@@ -586,13 +586,13 @@ export default function Formulas({
       (async () => {
         try {
           const arts = await fetch(
-            `http://https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(rubro)}`,
+            `https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(rubro)}`,
           ).then((r) => r.json());
           let todos = Array.isArray(arts) ? arts : [];
           if (rubro.toUpperCase() !== "GENERAL") {
             try {
               const g = await fetch(
-                "http://https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=GENERAL",
+                "https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=GENERAL",
               ).then((r) => r.json());
               const codsSeen = new Set(todos.map((a) => a.codartint));
               (Array.isArray(g) ? g : []).forEach((a) => {
@@ -608,7 +608,7 @@ export default function Formulas({
     } else {
       // Sin rubro → recargar todas las familias
       fetch(
-        "http://https://integral-backend-production.up.railway.app/articulos/familias-todas",
+        "https://integral-backend-production.up.railway.app/articulos/familias-todas",
       )
         .then((r) => r.json())
         .then((data) => setFamilias(Array.isArray(data) ? data : []))
@@ -624,7 +624,7 @@ export default function Formulas({
       : "";
     if (familia) {
       fetch(
-        `http://https://integral-backend-production.up.railway.app/articulos/por-rubro?familia=${encodeURIComponent(familia)}${rubroParam}`,
+        `https://integral-backend-production.up.railway.app/articulos/por-rubro?familia=${encodeURIComponent(familia)}${rubroParam}`,
       )
         .then((r) => r.json())
         .then((data) => setArtsPorRubro(Array.isArray(data) ? data : []))
@@ -632,7 +632,7 @@ export default function Formulas({
     } else if (rubroElegido) {
       // Sin familia pero con rubro → recargar artículos del rubro
       fetch(
-        `http://https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(rubroElegido)}`,
+        `https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(rubroElegido)}`,
       )
         .then((r) => r.json())
         .then((data) => setArtsPorRubro(Array.isArray(data) ? data : []))
@@ -690,20 +690,20 @@ export default function Formulas({
     if (codVinculado) {
       try {
         const res = await fetch(
-          `http://https://integral-backend-production.up.railway.app/articulos/rubro-de?codart=${encodeURIComponent(codVinculado)}`,
+          `https://integral-backend-production.up.railway.app/articulos/rubro-de?codart=${encodeURIComponent(codVinculado)}`,
         );
         const data = await res.json();
         if (data.rubro) {
           setRubroElegido(data.rubro);
           // Cargar familias de ese rubro
           const resFam = await fetch(
-            `http://https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(data.rubro)}`,
+            `https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(data.rubro)}`,
           );
           const fams = await resFam.json();
           if (Array.isArray(fams) && fams.length > 0) setFamilias(fams);
           // Cargar TODOS los artículos del rubro (sin filtrar familia)
           const resArts = await fetch(
-            `http://https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(data.rubro)}`,
+            `https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(data.rubro)}`,
           );
           const arts = await resArts.json();
           setArtsPorRubro(Array.isArray(arts) ? arts : []);
@@ -718,7 +718,7 @@ export default function Formulas({
       // Sin artículo vinculado pero con rubro en la fórmula → cargar familias del rubro
       try {
         const resFam = await fetch(
-          `http://https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(selected.rubro)}`,
+          `https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(selected.rubro)}`,
         );
         const fams = await resFam.json();
         if (Array.isArray(fams) && fams.length > 0) setFamilias(fams);
@@ -745,7 +745,7 @@ export default function Formulas({
     if (modal === "nuevo") {
       try {
         const res = await fetch(
-          "http://https://integral-backend-production.up.railway.app/formulas",
+          "https://integral-backend-production.up.railway.app/formulas",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
