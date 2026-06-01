@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import Usuarios from "./Usuarios";
 
 const API = "https://integral-backend-production.up.railway.app";
 const WS  = "wss://integral-backend-production.up.railway.app";
@@ -45,6 +46,7 @@ const STYLE = `
 `;
 
 export default function Anviz({ onBack }) {
+  const [vista, setVista]             = useState("fichadas"); // "fichadas" | "usuarios"
   const [fichadas, setFichadas]       = useState([]);
   const [loading, setLoading]         = useState(true);
   const [status, setStatus]           = useState({ connected: false, lastSync: null, lastError: null, pendingQueue: 0 });
@@ -139,11 +141,21 @@ export default function Anviz({ onBack }) {
     <div className="anviz-wrap">
       <style>{STYLE}</style>
 
+      {/* Si vista es usuarios, mostrar el componente Usuarios */}
+      {vista === "usuarios" && (
+        <Usuarios onBack={() => setVista("fichadas")} />
+      )}
+
+      {vista === "fichadas" && (<>
+
       {/* Header */}
       <div className="anviz-header">
         <button className="anviz-btn sec" onClick={onBack}>← Volver</button>
         <span className="anviz-title">🕐 Control de Accesos</span>
         <span className={`anviz-badge ${badgeClass}`}>{badgeText}</span>
+        <button className="anviz-btn" style={{ background: "#4361ee", borderColor: "#4361ee" }} onClick={() => setVista("usuarios")}>
+          👥 Usuarios
+        </button>
         <button className="anviz-btn grn" onClick={handleSync} disabled={syncing || !status.connected}>
           {syncing ? "Sincronizando..." : "🔄 Sincronizar"}
         </button>
@@ -233,6 +245,7 @@ export default function Anviz({ onBack }) {
           </table>
         )}
       </div>
+      </>)}
     </div>
   );
 }

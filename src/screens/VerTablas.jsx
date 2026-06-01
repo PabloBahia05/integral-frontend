@@ -65,7 +65,6 @@ const TABLAS = [
   { id: "proveedores",   label: "Proveedores",    icon: "🏭", color: "#7b5ea7" },
   { id: "usuarios-app", label: "Usuarios App",    icon: "🔐", color: "#e63946" },
   { id: "anviz",        label: "Accesos Anviz",   icon: "🕐", color: "#0a7a3c" },
-  { id: "panel",        label: "Panel Usuarios",  icon: "👥", color: "#4361ee" },
 ];
 
 export default function VerTablas({
@@ -338,14 +337,6 @@ export default function VerTablas({
     return (
       <div>
         <Anviz onBack={volver} />
-      </div>
-    );
-
-  // ── panel usuarios anviz ──
-  if (tablaActiva === "panel")
-    return (
-      <div>
-        <Usuarios onBack={volver} />
       </div>
     );
 
