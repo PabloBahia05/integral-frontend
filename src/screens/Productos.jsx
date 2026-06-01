@@ -192,7 +192,7 @@ async function uploadImageToCloud(file) {
   const formData = new FormData();
   formData.append("imagen", file);
   const res = await fetch(
-    "http://https://integral-backend-production.up.railway.app/api/upload-imagen",
+    "https://integral-backend-production.up.railway.app/api/upload-imagen",
     { method: "POST", body: formData },
   );
   if (!res.ok) throw new Error("Error al subir imagen");
@@ -415,7 +415,7 @@ function DetalleArticulo({ producto }) {
   );
 }
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 const PAGE = 80;
 
 export default function Productos({
