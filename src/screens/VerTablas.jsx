@@ -15,6 +15,8 @@ import AsociacionesForm from "./AsociacionesForm";
 import Lista from "./Lista";
 import Proveedores from "./Proveedores"; // ← nuevo
 import UsuariosApp from "./UsuariosApp"; // ← usuarios app
+import Anviz from "./Anviz";
+import Usuarios from "./Usuarios";
 
 const TABLAS = [
   { id: "clientes", label: "Clientes", icon: "👥", color: "#eb56d7" },
@@ -60,8 +62,10 @@ const TABLAS = [
     color: "#e63946",
   },
   { id: "lista", label: "Lista Margen", icon: "📊", color: "#20b2aa" },
-  { id: "proveedores",   label: "Proveedores",    icon: "🏭", color: "#7b5ea7" }, // ← nuevo
-  { id: "usuarios-app", label: "Usuarios App",   icon: "🔐", color: "#e63946" },
+  { id: "proveedores",   label: "Proveedores",    icon: "🏭", color: "#7b5ea7" },
+  { id: "usuarios-app", label: "Usuarios App",    icon: "🔐", color: "#e63946" },
+  { id: "anviz",        label: "Accesos Anviz",   icon: "🕐", color: "#0a7a3c" },
+  { id: "panel",        label: "Panel Usuarios",  icon: "👥", color: "#4361ee" },
 ];
 
 export default function VerTablas({
@@ -326,6 +330,22 @@ export default function VerTablas({
       <div>
         {back}
         <UsuariosApp />
+      </div>
+    );
+
+  // ── anviz ──
+  if (tablaActiva === "anviz")
+    return (
+      <div>
+        <Anviz onBack={volver} />
+      </div>
+    );
+
+  // ── panel usuarios anviz ──
+  if (tablaActiva === "panel")
+    return (
+      <div>
+        <Usuarios onBack={volver} />
       </div>
     );
 

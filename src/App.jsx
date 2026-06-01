@@ -104,8 +104,6 @@ const buttons = [
     color: "#27ae60",
     screen: "facturas",
   },
-  { id: 14, label: "ACCESOS", icon: "🕐", color: "#0a7a3c", screen: "anviz" },
-  { id: 15, label: "PANEL",   icon: "👥", color: "#4361ee", screen: "usuarios" },
 ];
 
 export default function Root() {
