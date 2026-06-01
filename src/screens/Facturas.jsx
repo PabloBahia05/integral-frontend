@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 
 const MONEDAS = ["ARS", "USD", "EUR"];
 const TIPOS_FACTURA = ["A", "B", "C", "M", "E"];
