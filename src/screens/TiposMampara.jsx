@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import ScreenHeader from "../Component/ScreenHeader";
 import FormMampara from "./FormMampara";
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 
 export default function TiposMampara({ onBack }) {
   const [tipos, setTipos] = useState([]);

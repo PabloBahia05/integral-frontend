@@ -31,6 +31,7 @@ const EMPTY = {
   ancla_codigo: "",
   ancla_cantidad: "",
   ancla_precio_unit: "",
+  ancla_iibb: "",
 };
 
 const TIPO_COLORS = {
@@ -305,6 +306,12 @@ const ANCLA_FIELDS = [
     placeholder: 'Ej: "Precio unit.", "P. Unit", "Valor"',
     icon: "💲",
   },
+  {
+    label: "Perc. IIBB",
+    name: "ancla_iibb",
+    placeholder: 'Ej: "Perc. IIBB", "Ing. Brutos", "I.B."',
+    icon: "📊",
+  },
 ];
 
 function FactmodUpload({ value, onChange }) {
@@ -462,6 +469,7 @@ export default function Proveedores({
       ancla_proveedor: form.ancla_proveedor || null,
       ancla_iva: form.ancla_iva || null,
       ancla_items: form.ancla_items || null,
+      ancla_iibb: form.ancla_iibb || null,
     };
     if (modal === "crear") onAdd(payload);
     else onEdit({ ...selected, ...payload });
