@@ -32,6 +32,7 @@ const EMPTY_FACTURA = {
   iva: "",
   total: "",
   moneda: "ARS",
+  pers_IIBB: "",
 };
 
 // ítem — campos alineados a tabla `facturas_items`
@@ -541,6 +542,7 @@ export default function Facturas({ proveedores = [] }) {
           iva: f.iva ?? "",
           total: f.total ?? "",
           moneda: f.moneda ?? "ARS",
+          pers_IIBB: f.pers_IIBB ?? "",
         }),
       );
 
@@ -1846,6 +1848,7 @@ export default function Facturas({ proveedores = [] }) {
                   "Subtotal",
                   "IVA $",
                   "Total",
+                  "Perc. IIBB",
                   "Moneda",
                   "",
                 ].map((h) => (
@@ -1889,6 +1892,9 @@ export default function Facturas({ proveedores = [] }) {
                   <td style={{ ...S.td, textAlign: "right" }}>{fmt(f.iva)}</td>
                   <td style={{ ...S.td, textAlign: "right", fontWeight: 700 }}>
                     {fmt(f.total)}
+                  </td>
+                  <td style={{ ...S.td, textAlign: "right" }}>
+                    {fmt(f.pers_IIBB)}
                   </td>
                   <td style={S.td}>
                     <span
@@ -2199,6 +2205,16 @@ export default function Facturas({ proveedores = [] }) {
               value={form.total}
               placeholder="0.00"
               onChange={(e) => setFormField("total", e.target.value)}
+            />
+          </div>
+          <div style={S.field}>
+            <label style={S.label}>Perc. IIBB $</label>
+            <input
+              type="number"
+              style={S.input}
+              value={form.pers_IIBB}
+              placeholder="0.00"
+              onChange={(e) => setFormField("pers_IIBB", e.target.value)}
             />
           </div>
         </div>

@@ -16,6 +16,7 @@ const EMPTY = {
   tipo_fact: "",
   cod_postal: "",
   descuento: "",
+  pers_IIBB: "",
   flete: false,
   foto: "",
   imagen_path: "",
@@ -135,13 +136,14 @@ const FIELDS = [
     col: "1 / -1",
   },
   { label: "Descuento (%)", name: "descuento", placeholder: "0.00" },
+  { label: "Perc. IIBB (%)", name: "pers_IIBB", placeholder: "0.00" },
 ];
 
 async function uploadImagenProveedor(file) {
   const formData = new FormData();
   formData.append("imagen", file);
   const res = await fetch(
-    "http://https://integral-backend-production.up.railway.app/api/upload-imagen-proveedor",
+    "https://integral-backend-production.up.railway.app/api/upload-imagen-proveedor",
     {
       method: "POST",
       body: formData,
@@ -155,7 +157,7 @@ async function uploadFactmodImagen(file) {
   const formData = new FormData();
   formData.append("imagen", file);
   const res = await fetch(
-    "http://https://integral-backend-production.up.railway.app/api/upload-imagen",
+    "https://integral-backend-production.up.railway.app/api/upload-imagen",
     {
       method: "POST",
       body: formData,
@@ -408,7 +410,7 @@ export default function Proveedores({
   const [rubroEsNuevo, setRubroEsNuevo] = useState(false);
   const [nuevoRubro, setNuevoRubro] = useState("");
 
-  const API = "http://https://integral-backend-production.up.railway.app";
+  const API = "https://integral-backend-production.up.railway.app";
 
   useEffect(() => {
     fetch(`${API}/proveedores/rubros`)
