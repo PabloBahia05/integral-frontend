@@ -415,6 +415,7 @@ export default function Facturas({ proveedores = [] }) {
   const [dragOver, setDragOver] = useState(false);
   const [imgPreview, setImgPreview] = useState(null);
   const [imgFile, setImgFile] = useState(null);
+  const [fileType, setFileType] = useState(null); // "image" | "pdf"
   const [filtro, setFiltro] = useState("");
   const [provId, setProvId] = useState("");
   // ── Sync articulos ─────────────────────────────────────────────────────────
@@ -500,20 +501,24 @@ export default function Facturas({ proveedores = [] }) {
   // ── OCR ────────────────────────────────────────────────────────────────────
   const handleFile = (file) => {
     if (!file) return;
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
     setImgFile(file);
-    setImgPreview(URL.createObjectURL(file));
+    setFileType(isPdf ? "pdf" : "image");
+    setImgPreview(isPdf ? null : URL.createObjectURL(file));
   };
 
   const lanzarOcr = async () => {
     if (!imgFile) return;
     setOcrProgress(10);
     const fd = new FormData();
-    fd.append("imagen", imgFile);
+    const isPdf = fileType === "pdf";
+    fd.append(isPdf ? "pdf" : "imagen", imgFile);
     if (provId) fd.append("proveedor_id", provId);
 
     try {
       setOcrProgress(40);
-      const res = await fetch(`${API}/facturas/ocr-preview`, {
+      const endpoint = isPdf ? `${API}/facturas/ocr-pdf-preview` : `${API}/facturas/ocr-preview`;
+      const res = await fetch(endpoint, {
         method: "POST",
         body: fd,
       });
@@ -1507,6 +1512,7 @@ export default function Facturas({ proveedores = [] }) {
     setOcrResult(null);
     setImgFile(null);
     setImgPreview(null);
+    setFileType(null);
     setProvId("");
     setOcrProgress(0);
   };
@@ -1983,7 +1989,17 @@ export default function Facturas({ proveedores = [] }) {
           }}
           onClick={() => fileRef.current.click()}
         >
-          {imgPreview ? (
+          {imgFile && fileType === "pdf" ? (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 40, marginBottom: 8 }}>📑</div>
+              <div style={{ fontSize: 13, color: "#0a3a5c", fontWeight: 700 }}>
+                {imgFile.name}
+              </div>
+              <div style={{ fontSize: 11, marginTop: 4, color: "#6699bb" }}>
+                {(imgFile.size / 1024).toFixed(0)} KB · PDF listo para procesar
+              </div>
+            </div>
+          ) : imgPreview ? (
             <img
               src={imgPreview}
               alt="preview"
@@ -1993,11 +2009,11 @@ export default function Facturas({ proveedores = [] }) {
             <>
               <div style={{ fontSize: 36, marginBottom: 10 }}>📄</div>
               <div>
-                Arrastrá la imagen de la factura aquí
+                Arrastrá la imagen o PDF de la factura aquí
                 <br />o hacé clic para seleccionar
               </div>
               <div style={{ fontSize: 11, marginTop: 8, color: "#99bbcc" }}>
-                JPG · PNG · TIFF · BMP
+                JPG · PNG · TIFF · BMP · PDF
               </div>
             </>
           )}
@@ -2005,7 +2021,7 @@ export default function Facturas({ proveedores = [] }) {
         <input
           ref={fileRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.pdf,application/pdf"
           style={{ display: "none" }}
           onChange={(e) => handleFile(e.target.files[0])}
         />
