@@ -494,6 +494,9 @@ export default function Facturas({ proveedores = [] }) {
     });
   };
 
+  // ── Validación OCR ─────────────────────────────────────────────────────────
+  const [ocrValidacion, setOcrValidacion] = useState(null); // {subtotal, iva, pers_IIBB, totalOcr, totalCalc}
+
   // ── OCR ────────────────────────────────────────────────────────────────────
   const handleFile = (file) => {
     if (!file) return;
@@ -530,8 +533,7 @@ export default function Facturas({ proveedores = [] }) {
         if ([10.5, 21, 27].includes(derived)) ivaPct = String(derived);
       }
 
-      setForm(
-        recalcTotales({
+      const formOcr = {
           proveedor_id: f.proveedor_id ?? provId ?? "",
           numero: f.numero ?? "",
           fecha: f.fecha ?? "",
@@ -543,8 +545,24 @@ export default function Facturas({ proveedores = [] }) {
           total: f.total ?? "",
           moneda: f.moneda ?? "ARS",
           pers_IIBB: f.pers_IIBB ?? "",
-        }),
-      );
+      };
+
+      // Validar: subtotal + iva + pers_IIBB debe coincidir con total
+      const sub = parseFloat(f.subtotal) || 0;
+      const iva = parseFloat(f.iva) || 0;
+      const pers = parseFloat(f.pers_IIBB) || 0;
+      const totalOcr = parseFloat(f.total) || 0;
+      const totalCalc = +(sub + iva + pers).toFixed(2);
+      const diferencia = Math.abs(totalCalc - totalOcr);
+
+      if (diferencia > 1) {
+        // No coincide — mostrar cartel para corregir
+        setOcrValidacion({ subtotal: sub, iva, pers_IIBB: pers, totalOcr, totalCalc });
+        setForm(formOcr);
+      } else {
+        // Coincide — usar total del OCR directamente
+        setForm(formOcr);
+      }
 
       const itemsEnriquecidos = await enriquecerItemsOcr(
         (data.items ?? []).map((it) => ({
@@ -2559,6 +2577,38 @@ export default function Facturas({ proveedores = [] }) {
       {(modal === "nueva" || modal === "editar") && renderModalForm()}
       {modal === "detalle" && renderModalDetalle()}
       {modalArticulo && renderModalArticulo()}
+      {ocrValidacion && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <div style={{ background:"#fff", borderRadius:12, padding:32, maxWidth:420, width:"90%", boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ margin:"0 0 8px", color:"#dc2626" }}>⚠️ Discrepancia en los totales</h3>
+            <p style={{ color:"#64748b", marginBottom:16, fontSize:14 }}>
+              La suma de los valores no coincide con el total leído del OCR. Revisá y corregí los valores.
+            </p>
+            <table style={{ width:"100%", borderCollapse:"collapse", marginBottom:16, fontSize:14 }}>
+              <tbody>
+                <tr><td style={{ padding:"4px 8px", color:"#64748b" }}>Subtotal</td><td style={{ padding:"4px 8px", textAlign:"right" }}>{ocrValidacion.subtotal.toLocaleString("es-AR", {minimumFractionDigits:2})}</td></tr>
+                <tr><td style={{ padding:"4px 8px", color:"#64748b" }}>IVA</td><td style={{ padding:"4px 8px", textAlign:"right" }}>{ocrValidacion.iva.toLocaleString("es-AR", {minimumFractionDigits:2})}</td></tr>
+                <tr><td style={{ padding:"4px 8px", color:"#64748b" }}>Perc. IIBB</td><td style={{ padding:"4px 8px", textAlign:"right" }}>{ocrValidacion.pers_IIBB.toLocaleString("es-AR", {minimumFractionDigits:2})}</td></tr>
+                <tr style={{ borderTop:"2px solid #e2e8f0" }}><td style={{ padding:"4px 8px", fontWeight:700 }}>Total calculado</td><td style={{ padding:"4px 8px", textAlign:"right", fontWeight:700, color:"#16a34a" }}>{ocrValidacion.totalCalc.toLocaleString("es-AR", {minimumFractionDigits:2})}</td></tr>
+                <tr><td style={{ padding:"4px 8px", color:"#64748b" }}>Total OCR leído</td><td style={{ padding:"4px 8px", textAlign:"right", color:"#dc2626" }}>{ocrValidacion.totalOcr.toLocaleString("es-AR", {minimumFractionDigits:2})}</td></tr>
+              </tbody>
+            </table>
+            <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+              <button
+                style={{ padding:"8px 16px", borderRadius:8, border:"1px solid #e2e8f0", background:"#f8fafc", cursor:"pointer" }}
+                onClick={() => {
+                  setForm(f => ({ ...f, total: ocrValidacion.totalCalc }));
+                  setOcrValidacion(null);
+                }}
+              >Usar total calculado</button>
+              <button
+                style={{ padding:"8px 16px", borderRadius:8, border:"none", background:"#1e40af", color:"#fff", cursor:"pointer" }}
+                onClick={() => setOcrValidacion(null)}
+              >Corregir manualmente</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
