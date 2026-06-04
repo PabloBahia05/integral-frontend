@@ -839,10 +839,6 @@ export default function Facturas({ proveedores = [] }) {
     if (noExisten.length > 0) {
       setArticulosCola(noExisten);
       setModalArticulo(noExisten[0]);
-      setNuevoArtForm((prev) => ({
-        ...prev,
-        proveedor: noExisten[0]?.proveedorNombre ?? "",
-      }));
     }
   };
 
@@ -906,19 +902,18 @@ export default function Facturas({ proveedores = [] }) {
     setModoModal("elegir");
     setBusqEditar("");
     setResEditar([]);
+    setNuevoArtForm({
+      codartint: "",
+      codartprov: "",
+      articulo: "",
+      proveedor: "",
+      rubro: "",
+      familia: "",
+      unidad: "",
+    });
     setArticulosCola((prev) => {
       const resto = prev.slice(1);
-      const siguiente = resto.length > 0 ? resto[0] : null;
-      setNuevoArtForm({
-        codartint: "",
-        codartprov: "",
-        articulo: "",
-        proveedor: siguiente?.proveedorNombre ?? "",
-        rubro: "",
-        familia: "",
-        unidad: "",
-      });
-      setModalArticulo(siguiente);
+      setModalArticulo(resto.length > 0 ? resto[0] : null);
       return resto;
     });
   };
@@ -1206,7 +1201,13 @@ export default function Facturas({ proveedores = [] }) {
                   justifyContent: "center",
                   background: "#0a7c4a",
                 }}
-                onClick={() => setModoModal("agregar")}
+                onClick={() => {
+                  setNuevoArtForm((p) => ({
+                    ...p,
+                    proveedor: p.proveedor || item.proveedorNombre || "",
+                  }));
+                  setModoModal("agregar");
+                }}
               >
                 ＋ Agregar como nuevo
               </button>
