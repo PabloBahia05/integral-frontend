@@ -132,7 +132,7 @@ export default function PresupuestoMamparas({
   // ── Cargar catálogo de mamparas ─────────────────────────────────────────────
   useEffect(() => {
     fetch(
-      "http://https://integral-backend-production.up.railway.app/productos/mamparas",
+      "https://integral-backend-production.up.railway.app/productos/mamparas",
     )
       .then((r) => r.json())
       .then((data) => {
@@ -158,7 +158,7 @@ export default function PresupuestoMamparas({
   // que ya seteó el useEffect de "cargar presupuesto existente".
   const fetchProximoNumero = () => {
     fetch(
-      "http://https://integral-backend-production.up.railway.app/presupuestos-mamparas/proximo-numero",
+      "https://integral-backend-production.up.railway.app/presupuestos-mamparas/proximo-numero",
     )
       .then((r) => r.json())
       .then((data) => {
@@ -189,7 +189,7 @@ export default function PresupuestoMamparas({
   useEffect(() => {
     if (!articuloSeleccionado?.codart) return;
     fetch(
-      `http://https://integral-backend-production.up.railway.app/colocacion/buscar?codart=${encodeURIComponent(articuloSeleccionado.codart)}`,
+      `https://integral-backend-production.up.railway.app/colocacion/buscar?codart=${encodeURIComponent(articuloSeleccionado.codart)}`,
     )
       .then((r) => r.json())
       .then((data) => {
@@ -224,11 +224,11 @@ export default function PresupuestoMamparas({
     // Traer asociaciones y tabla MARGEN en paralelo
     Promise.all([
       fetch(
-        "http://https://integral-backend-production.up.railway.app/asociaciones",
+        "https://integral-backend-production.up.railway.app/asociaciones",
       )
         .then((r) => r.json())
         .catch(() => []),
-      fetch("http://https://integral-backend-production.up.railway.app/margen")
+      fetch("https://integral-backend-production.up.railway.app/margen")
         .then((r) => r.json())
         .catch(() => []),
     ])
@@ -332,7 +332,7 @@ export default function PresupuestoMamparas({
     try {
       // Obtener textos de fórmulas para resolver dependencias FORM_XXX
       const resFormulas = await fetch(
-        "http://https://integral-backend-production.up.railway.app/formulas",
+        "https://integral-backend-production.up.railway.app/formulas",
       )
         .then((r) => r.json())
         .catch(() => []);
@@ -385,7 +385,7 @@ export default function PresupuestoMamparas({
           };
 
           const res = await fetch(
-            "http://https://integral-backend-production.up.railway.app/formulas/calcular",
+            "https://integral-backend-production.up.railway.app/formulas/calcular",
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -542,7 +542,7 @@ export default function PresupuestoMamparas({
 
     try {
       const res = await fetch(
-        "http://https://integral-backend-production.up.railway.app/presupuestos-mamparas",
+        "https://integral-backend-production.up.railway.app/presupuestos-mamparas",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
