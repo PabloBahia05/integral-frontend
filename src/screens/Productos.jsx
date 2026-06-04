@@ -439,6 +439,7 @@ export default function Productos({
   const [rubros, setRubros] = useState([]);
   const [filtroFamilia, setFiltroFamilia] = useState("");
   const [filtroRubro, setFiltroRubro] = useState("");
+  const [filtroProveedor, setFiltroProveedor] = useState("");
   const [rubrosDelFiltro, setRubrosDelFiltro] = useState([]);
   const [familiaEsNueva, setFamiliaEsNueva] = useState(false);
   const [rubroEsNuevo, setRubroEsNuevo] = useState(false);
@@ -530,10 +531,12 @@ export default function Productos({
       if (debouncedSearch) params.set("search", debouncedSearch);
       if (filtroFamilia) params.set("familia", filtroFamilia);
       if (filtroRubro) params.set("rubro", filtroRubro);
+      if (filtroProveedor) params.set("proveedor", filtroProveedor);
       const countParams = new URLSearchParams();
       if (debouncedSearch) countParams.set("search", debouncedSearch);
       if (filtroFamilia) countParams.set("familia", filtroFamilia);
       if (filtroRubro) countParams.set("rubro", filtroRubro);
+      if (filtroProveedor) countParams.set("proveedor", filtroProveedor);
       const countQ = countParams.toString() ? `?${countParams}` : "";
       const [dataRes, countRes] = await Promise.all([
         fetch(`${API}/productos?${params}`),
@@ -548,7 +551,7 @@ export default function Productos({
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, filtroFamilia, filtroRubro]);
+  }, [page, debouncedSearch, filtroFamilia, filtroRubro, filtroProveedor]);
 
   useEffect(() => {
     fetchRows();
@@ -565,6 +568,11 @@ export default function Productos({
     if (
       filtroRubro &&
       (r.rubro ?? "").toLowerCase() !== filtroRubro.toLowerCase()
+    )
+      return false;
+    if (
+      filtroProveedor &&
+      (r.proveedor ?? "").toLowerCase() !== filtroProveedor.toLowerCase()
     )
       return false;
     return true;
@@ -747,13 +755,33 @@ export default function Productos({
             </option>
           ))}
         </select>
-        {(filtroRubro || filtroFamilia) && (
+        <select
+          className="form-input"
+          style={{ maxWidth: 220, marginBottom: 0, cursor: "pointer" }}
+          value={filtroProveedor}
+          onChange={(e) => {
+            setFiltroProveedor(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">— Todos los proveedores —</option>
+          {proveedores.map((p) => {
+            const nombre = p.provnombre || p.nombre || p;
+            return (
+              <option key={nombre} value={nombre}>
+                {nombre}
+              </option>
+            );
+          })}
+        </select>
+        {(filtroRubro || filtroFamilia || filtroProveedor) && (
           <button
             className="btn-cancel"
             style={{ padding: "6px 14px", fontSize: 12, whiteSpace: "nowrap" }}
             onClick={() => {
               setFiltroRubro("");
               setFiltroFamilia("");
+              setFiltroProveedor("");
               setPage(1);
             }}
           >
