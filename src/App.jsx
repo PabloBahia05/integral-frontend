@@ -38,6 +38,8 @@ const SCREENS = {
   "presupuestos-nuevo-tabla": { label: "PRESUPUESTOS", icon: "📋" },
   "mueble-especial": { label: "MUEBLE ESPECIAL", icon: "🪚" },
   facturas: { label: "FACTURAS", icon: "🧾" },
+  anviz:    { label: "ASISTENCIA", icon: "🕐" },
+  usuarios: { label: "USUARIOS", icon: "👤" },
 };
 
 const buttons = [
@@ -103,6 +105,20 @@ const buttons = [
     icon: "🧾",
     color: "#27ae60",
     screen: "facturas",
+  },
+  {
+    id: 14,
+    label: "ASISTENCIA",
+    icon: "🕐",
+    color: "#6366f1",
+    screen: "anviz",
+  },
+  {
+    id: 15,
+    label: "USUARIOS",
+    icon: "👤",
+    color: "#0ea5e9",
+    screen: "usuarios",
   },
 ];
 
@@ -674,6 +690,8 @@ function App({ usuario }) {
               "lista-margenes",
               "mueble-especial",
               "facturas",
+              "anviz",
+              "usuarios",
             ].map((s) => (
               <button
                 key={s}
@@ -977,6 +995,8 @@ function App({ usuario }) {
           📊 Lista de Márgenes
         </p>
         <p onClick={() => setScreen("facturas")}>🧾 Facturas</p>
+        <p onClick={() => setScreen("anviz")}>🕐 Asistencia</p>
+        <p onClick={() => setScreen("usuarios")}>👤 Usuarios</p>
         <p>⚙️ Configuración</p>
         <p>📊 Reportes</p>
       </div>
