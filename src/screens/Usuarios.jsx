@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 
 const STYLE = `
   .usr-wrap { padding: 24px; font-family: 'Space Mono', monospace; }
@@ -45,7 +45,7 @@ export default function Usuarios({ onBack }) {
 
   const fetchUsuarios = () => {
     setLoading(true);
-    fetch(`${API}/usuarios`)
+    fetch(`${API}/empleados`)
       .then((r) => r.json())
       .then((d) => {
         setUsuarios(Array.isArray(d) ? d : []);
@@ -84,7 +84,7 @@ export default function Usuarios({ onBack }) {
       return;
     }
 
-    const url = editId ? `${API}/usuarios/${editId}` : `${API}/usuarios`;
+    const url = editId ? `${API}/empleados/${editId}` : `${API}/empleados`;
     const method = editId ? "PUT" : "POST";
 
     fetch(url, {
@@ -110,7 +110,7 @@ export default function Usuarios({ onBack }) {
 
   const handleDelete = (u) => {
     if (!confirm(`¿Eliminar a ${u.apellido} ${u.nombre}?`)) return;
-    fetch(`${API}/usuarios/${u.id}`, { method: "DELETE" }).then(() =>
+    fetch(`${API}/empleados/${u.id}`, { method: "DELETE" }).then(() =>
       fetchUsuarios(),
     );
   };
