@@ -1,109 +1,142 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Usuarios from "./Usuarios";
 
 const API = "https://integral-backend-production.up.railway.app";
-const WS  = "wss://integral-backend-production.up.railway.app";
 
-const STYLE = `
-  .anviz-wrap { padding: 24px; font-family: 'Space Mono', monospace; }
-  .anviz-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
-  .anviz-title { font-size: 22px; font-weight: 800; color: #0a3a5c; flex: 1; }
-  .anviz-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
-  .anviz-badge.on  { background: #d4f7e7; color: #0a7a3c; border: 1px solid #0a7a3c44; }
-  .anviz-badge.off { background: #fde8e8; color: #c0392b; border: 1px solid #c0392b44; }
-  .anviz-badge.warn { background: #fff8e1; color: #b7700a; border: 1px solid #b7700a44; }
-  .anviz-notice { background: #fff8e1; border: 1px solid #f0c040; border-radius: 6px; padding: 12px 16px;
-    font-size: 12px; color: #7a5500; margin-bottom: 20px; }
-  .anviz-stats { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
-  .anviz-stat { background: #fff; border: 1px solid #a0cce8; border-radius: 6px; padding: 14px 20px; min-width: 110px; }
-  .anviz-stat .num { font-size: 28px; font-weight: 800; color: #0a3a5c; }
-  .anviz-stat .lbl { font-size: 10px; color: #6699bb; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
-  .anviz-filters { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
-  .anviz-filters input, .anviz-filters select {
-    border: 1px solid #a0cce8; border-radius: 4px; padding: 7px 12px;
-    font-family: inherit; font-size: 13px; color: #0a3a5c; background: #fff; outline: none;
-  }
-  .anviz-filters input:focus { border-color: #4361ee; }
-  .anviz-btn { padding: 7px 16px; border: 1px solid #4361ee; border-radius: 4px; background: #4361ee;
-    color: #fff; font-family: inherit; font-size: 12px; cursor: pointer; transition: opacity 0.15s; }
-  .anviz-btn:hover { opacity: 0.85; }
-  .anviz-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .anviz-btn.sec { background: #fff; color: #4361ee; }
-  .anviz-btn.grn { background: #0a7a3c; border-color: #0a7a3c; }
-  .anviz-table-wrap { overflow-x: auto; }
-  table.anviz { width: 100%; border-collapse: collapse; font-size: 13px; }
-  table.anviz th { background: #0a3a5c; color: #fff; padding: 10px 14px; text-align: left;
-    font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
-  table.anviz td { padding: 10px 14px; border-bottom: 1px solid #e0eef8; color: #2a3a5c; }
-  table.anviz tr:hover td { background: #f0f8ff; }
-  table.anviz tr.nueva td { animation: flashRow 1.5s ease; }
-  .tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
-  .tag.entrada { background: #d4f7e7; color: #0a7a3c; }
-  .tag.salida  { background: #fde8e8; color: #c0392b; }
-  .empty { text-align: center; color: #99bbcc; padding: 40px; font-size: 13px; }
-  .sync-msg { font-size: 11px; color: #6699bb; margin-left: 8px; }
-  @keyframes flashRow { 0%,100% { background: transparent; } 30% { background: #fffbe6; } }
-`;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const pad = (n) => String(n).padStart(2, "0");
 
+function parseMysqlTs(ts) {
+  if (!ts) return null;
+  if (typeof ts === "number") return new Date(ts);
+  const str = String(ts).trim();
+  if (str.includes("T") && str.endsWith("Z")) return new Date(str);
+  const clean = str.replace(" ", "T");
+  const d = new Date(clean.includes("Z") ? clean : clean + "Z");
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function fmtFecha(ts) {
+  const d = parseMysqlTs(ts);
+  if (!d) return "—";
+  return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+}
+
+function fmtHora(ts) {
+  const d = parseMysqlTs(ts);
+  if (!d) return "—";
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+
+function hoy() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+async function apiFetch(path) {
+  const res = await fetch(`${API}${path}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} en ${path}`);
+  return res.json();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 export default function Anviz({ onBack }) {
-  const [vista, setVista]             = useState("fichadas"); // "fichadas" | "usuarios"
-  const [fichadas, setFichadas]       = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [status, setStatus]           = useState({ connected: false, lastSync: null, lastError: null, pendingQueue: 0 });
-  const [filtroFecha, setFiltroFecha] = useState("");
-  const [filtroUser, setFiltroUser]   = useState("");
-  const [nuevasIds, setNuevasIds]     = useState(new Set());
-  const [syncing, setSyncing]         = useState(false);
-  const [syncMsg, setSyncMsg]         = useState("");
+  const [vista, setVista]               = useState("fichadas"); // "fichadas" | "usuarios"
+  const [fichadas, setFichadas]         = useState([]);
+  const [usuarios, setUsuarios]         = useState([]);
+  const [agente, setAgente]             = useState({ connected: false, lastSync: null, lastError: null, pendingQueue: 0 });
+  const [cargando, setCargando]         = useState(true);
+  const [error, setError]               = useState(null);
+  const [ultimoSync, setUltimoSync]     = useState(null);
+  const [syncing, setSyncing]           = useState(false);
+  const [syncMsg, setSyncMsg]           = useState("");
+
+  // ── Filtros ────────────────────────────────────────────────────────────────
+  const [filtroDesde, setFiltroDesde]         = useState(hoy());
+  const [filtroHasta, setFiltroHasta]         = useState(hoy());
+  const [filtroUser, setFiltroUser]           = useState("");
+  const [filtroDireccion, setFiltroDireccion] = useState("todas");
+
+  // ── Paginación ─────────────────────────────────────────────────────────────
+  const [pagina, setPagina] = useState(1);
+  const POR_PAGINA = 25;
+
+  // ── Vista tabla/resumen ────────────────────────────────────────────────────
+  const [vistaTabla, setVistaTabla] = useState("tabla"); // "tabla" | "resumen"
+
   const wsRef = useRef(null);
 
-  // ── Cargar fichadas ────────────────────────────────────────────────────────
-  const fetchFichadas = (fecha, userId) => {
-    setLoading(true);
-    let url = `${API}/fichadas?limit=200`;
-    if (fecha)  url += `&fecha=${fecha}`;
-    if (userId) url += `&user_id=${userId}`;
-    fetch(url)
-      .then((r) => r.json())
-      .then((d) => { setFichadas(Array.isArray(d) ? d : []); setLoading(false); })
-      .catch(() => setLoading(false));
-  };
-
-  // ── Status del agente ──────────────────────────────────────────────────────
-  const fetchStatus = () => {
-    fetch(`${API}/anviz/status`)
-      .then((r) => r.json())
-      .then((d) => setStatus(d))
+  // ── Cargar empleados (una vez) ─────────────────────────────────────────────
+  useEffect(() => {
+    apiFetch("/empleados")
+      .then(setUsuarios)
       .catch(() => {});
-  };
+  }, []);
+
+  // ── Cargar fichadas ────────────────────────────────────────────────────────
+  const cargarFichadas = useCallback(async () => {
+    setCargando(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ limit: 500 });
+      if (filtroDesde) params.set("fecha_desde", filtroDesde);
+      if (filtroHasta) params.set("fecha_hasta", filtroHasta);
+      if (filtroUser)  params.set("user_id", filtroUser);
+      const data = await apiFetch(`/fichadas?${params}`);
+      setFichadas(Array.isArray(data) ? data : []);
+      setUltimoSync(new Date());
+      setPagina(1);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCargando(false);
+    }
+  }, [filtroDesde, filtroHasta, filtroUser]);
 
   useEffect(() => {
-    fetchStatus();
-    setInterval(fetchStatus, 10_000); // actualizar cada 10s
-    const hoy = new Date().toISOString().split("T")[0];
-    setFiltroFecha(hoy);
-    fetchFichadas(hoy, "");
+    cargarFichadas();
+  }, [cargarFichadas]);
+
+  // ── Polling estado agente cada 30s ─────────────────────────────────────────
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const data = await apiFetch("/anviz/status");
+        setAgente(data);
+      } catch {}
+    };
+    poll();
+    const iv = setInterval(poll, 30_000);
+    return () => clearInterval(iv);
   }, []);
 
   // ── WebSocket ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    const ws = new WebSocket(WS);
-    wsRef.current = ws;
-    ws.onmessage = (e) => {
-      const msg = JSON.parse(e.data);
-      if (msg.type === "anviz_status") setStatus((s) => ({ ...s, ...msg }));
-      if (msg.type === "fichada") {
-        const f = msg.data;
-        setFichadas((prev) => [f, ...prev]);
-        setNuevasIds((prev) => new Set([...prev, f.id]));
-        setTimeout(() => setNuevasIds((prev) => { const s = new Set(prev); s.delete(f.id); return s; }), 2000);
-      }
-    };
-    ws.onerror = () => {};
-    return () => ws.close();
-  }, []);
+    const wsUrl = API.replace(/^http/, "ws") + "/ws";
+    try {
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === "fichada") {
+            const nueva = msg.data;
+            const fechaNueva = nueva.timestamp?.slice(0, 10);
+            if (!filtroDesde || (fechaNueva >= filtroDesde && fechaNueva <= filtroHasta)) {
+              setFichadas((prev) => [nueva, ...prev]);
+            }
+          }
+          if (msg.type === "anviz_status") {
+            setAgente((s) => ({ ...s, connected: msg.connected, lastSync: msg.lastSync }));
+          }
+        } catch {}
+      };
+      ws.onerror = () => {};
+      return () => ws.close();
+    } catch {}
+  }, [filtroDesde, filtroHasta]);
 
-  // ── Sync manual ───────────────────────────────────────────────────────────
+  // ── Sync manual ────────────────────────────────────────────────────────────
   const handleSync = () => {
     setSyncing(true);
     setSyncMsg("");
@@ -111,141 +144,537 @@ export default function Anviz({ onBack }) {
       .then((r) => r.json())
       .then((d) => {
         setSyncMsg(d.ok ? "✅ Sincronización iniciada" : `⚠️ ${d.error}`);
-        if (d.ok) setTimeout(() => fetchFichadas(filtroFecha, filtroUser), 5000);
+        if (d.ok) setTimeout(cargarFichadas, 5000);
       })
       .catch(() => setSyncMsg("⚠️ Error de conexión"))
       .finally(() => setSyncing(false));
   };
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
-  const entradas = fichadas.filter((f) => f.direccion === "entrada").length;
-  const salidas  = fichadas.filter((f) => f.direccion === "salida").length;
-  const usuarios = new Set(fichadas.map((f) => f.user_id)).size;
+  // ── Derivados ──────────────────────────────────────────────────────────────
+  const fichadasFiltradas = fichadas.filter((f) => {
+    if (filtroDireccion !== "todas" && f.direccion !== filtroDireccion) return false;
+    return true;
+  });
 
-  const fmtTs = (ts) => {
-    if (!ts) return "—";
-    const d   = new Date(ts + "Z");
-    const pad = (n) => n.toString().padStart(2, "0");
-    return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)}/${d.getUTCFullYear()} ` +
-           `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
-  };
+  const total     = fichadasFiltradas.length;
+  const entradas  = fichadasFiltradas.filter((f) => f.direccion === "entrada").length;
+  const salidas   = fichadasFiltradas.filter((f) => f.direccion === "salida").length;
+  const empUnicos = [...new Set(fichadasFiltradas.map((f) => f.user_id))].length;
 
-  const badgeClass = status.connected ? "on" : status.lastError?.includes("red local") ? "warn" : "off";
-  const badgeText  = status.connected
-    ? "● CONECTADO"
-    : status.lastError?.includes("red local")
-      ? "⚠ FUERA DE RED LOCAL"
-      : "○ DESCONECTADO";
+  const paginas  = Math.max(1, Math.ceil(total / POR_PAGINA));
+  const inicio   = (pagina - 1) * POR_PAGINA;
+  const visibles = fichadasFiltradas.slice(inicio, inicio + POR_PAGINA);
 
+  // Resumen agrupado por empleado
+  const resumenEmpleados = Object.values(
+    fichadasFiltradas.reduce((acc, f) => {
+      const key = f.user_id;
+      if (!acc[key])
+        acc[key] = {
+          user_id: f.user_id,
+          nombre: f.nombre_completo?.trim() || `Usuario ${f.user_id}`,
+          entradas: 0,
+          salidas: 0,
+          primera: f.timestamp,
+          ultima: f.timestamp,
+        };
+      if (f.direccion === "entrada") acc[key].entradas++;
+      else acc[key].salidas++;
+      if (f.timestamp < acc[key].primera) acc[key].primera = f.timestamp;
+      if (f.timestamp > acc[key].ultima)  acc[key].ultima  = f.timestamp;
+      return acc;
+    }, {}),
+  ).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="anviz-wrap">
-      <style>{STYLE}</style>
-
+    <div style={s.page}>
       {/* Si vista es usuarios, mostrar el componente Usuarios */}
       {vista === "usuarios" && (
         <Usuarios onBack={() => setVista("fichadas")} />
       )}
 
-      {vista === "fichadas" && (<>
+      {vista === "fichadas" && (
+        <>
+          {/* ── Header ──────────────────────────────────────────────────── */}
+          <div style={s.header}>
+            <div style={s.headerLeft}>
+              <button style={s.btnVolver} onClick={onBack}>← Volver</button>
+              <div style={s.iconBox}>
+                <IconReloj />
+              </div>
+              <div>
+                <h1 style={s.titulo}>Control de Asistencia</h1>
+                <span style={s.subtitulo}>
+                  {ultimoSync
+                    ? `Actualizado a las ${fmtHora(ultimoSync.toISOString().replace("T", " "))}`
+                    : "Cargando..."}
+                </span>
+              </div>
+            </div>
+            <div style={s.headerRight}>
+              <AgenteBadge agente={agente} />
+              <button
+                style={s.btnIcon}
+                onClick={cargarFichadas}
+                title="Actualizar"
+                disabled={cargando}
+              >
+                <IconRefresh spin={cargando} />
+              </button>
+              <button style={s.btnUsuarios} onClick={() => setVista("usuarios")}>
+                👥 Usuarios
+              </button>
+              <button
+                style={{ ...s.btnSync, opacity: (syncing || !agente.connected) ? 0.5 : 1 }}
+                onClick={handleSync}
+                disabled={syncing || !agente.connected}
+              >
+                {syncing ? "Sincronizando..." : "🔄 Sincronizar"}
+              </button>
+              {syncMsg && <span style={s.syncMsg}>{syncMsg}</span>}
+            </div>
+          </div>
 
-      {/* Header */}
-      <div className="anviz-header">
-        <button className="anviz-btn sec" onClick={onBack}>← Volver</button>
-        <span className="anviz-title">🕐 Control de Accesos</span>
-        <span className={`anviz-badge ${badgeClass}`}>{badgeText}</span>
-        <button className="anviz-btn" style={{ background: "#4361ee", borderColor: "#4361ee" }} onClick={() => setVista("usuarios")}>
-          👥 Usuarios
-        </button>
-        <button className="anviz-btn grn" onClick={handleSync} disabled={syncing || !status.connected}>
-          {syncing ? "Sincronizando..." : "🔄 Sincronizar"}
-        </button>
-        {syncMsg && <span className="sync-msg">{syncMsg}</span>}
-      </div>
+          {/* Aviso si no está en red local */}
+          {agente.lastError && (
+            <div style={s.notice}>
+              ⚠️ {agente.lastError}. Los datos mostrados son los últimos sincronizados.
+              {agente.pendingQueue > 0 && ` Hay ${agente.pendingQueue} eventos pendientes de subir.`}
+            </div>
+          )}
 
-      {/* Aviso si no está en red local */}
-      {status.lastError && (
-        <div className="anviz-notice">
-          ⚠️ {status.lastError}. Los datos mostrados son los últimos sincronizados.
-          {status.pendingQueue > 0 && ` Hay ${status.pendingQueue} eventos pendientes de subir.`}
-        </div>
+          {/* ── Cards resumen ──────────────────────────────────────────── */}
+          <div style={s.cards}>
+            <StatCard label="Total"      valor={total}     color="#818cf8" />
+            <StatCard label="Entradas"   valor={entradas}  color="#34d399" />
+            <StatCard label="Salidas"    valor={salidas}   color="#fbbf24" />
+            <StatCard label="Empleados"  valor={empUnicos} color="#60a5fa" />
+          </div>
+
+          {/* ── Filtros ────────────────────────────────────────────────── */}
+          <div style={s.filtrosWrap}>
+            <div style={s.filtroFila}>
+              {/* Desde */}
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Desde</label>
+                <input
+                  type="date"
+                  value={filtroDesde}
+                  onChange={(e) => setFiltroDesde(e.target.value)}
+                  style={s.input}
+                />
+              </div>
+
+              {/* Hasta */}
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Hasta</label>
+                <input
+                  type="date"
+                  value={filtroHasta}
+                  onChange={(e) => setFiltroHasta(e.target.value)}
+                  style={s.input}
+                />
+              </div>
+
+              {/* Empleado (select por nombre) */}
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Empleado</label>
+                <select
+                  value={filtroUser}
+                  onChange={(e) => setFiltroUser(e.target.value)}
+                  style={s.input}
+                >
+                  <option value="">Todos</option>
+                  {usuarios.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.apellido} {u.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Dirección */}
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Dirección</label>
+                <select
+                  value={filtroDireccion}
+                  onChange={(e) => setFiltroDireccion(e.target.value)}
+                  style={s.input}
+                >
+                  <option value="todas">Todas</option>
+                  <option value="entrada">Entrada</option>
+                  <option value="salida">Salida</option>
+                </select>
+              </div>
+
+              <button style={s.btnBuscar} onClick={cargarFichadas}>
+                Buscar
+              </button>
+            </div>
+
+            {/* Tabs vista */}
+            <div style={s.tabs}>
+              <button
+                style={vistaTabla === "tabla" ? s.tabActive : s.tab}
+                onClick={() => setVistaTabla("tabla")}
+              >
+                Detalle
+              </button>
+              <button
+                style={vistaTabla === "resumen" ? s.tabActive : s.tab}
+                onClick={() => setVistaTabla("resumen")}
+              >
+                Por empleado
+              </button>
+            </div>
+          </div>
+
+          {/* ── Contenido ──────────────────────────────────────────────── */}
+          <div style={s.tableWrap}>
+            {error && <div style={s.errorBanner}>⚠️ {error}</div>}
+
+            {cargando ? (
+              <div style={s.estado}>
+                <div style={s.spinner} />
+                <span style={{ color: "#64748b", fontSize: 14 }}>
+                  Cargando registros...
+                </span>
+              </div>
+            ) : fichadasFiltradas.length === 0 ? (
+              <div style={s.estado}>
+                <span style={{ fontSize: 36 }}>📭</span>
+                <span style={{ color: "#64748b", fontSize: 14, marginTop: 8 }}>
+                  Sin registros para los filtros seleccionados
+                </span>
+              </div>
+            ) : vistaTabla === "tabla" ? (
+              <>
+                <table style={s.tabla}>
+                  <thead>
+                    <tr>
+                      {["#", "Empleado", "Fecha", "Hora", "Dirección"].map((c) => (
+                        <th key={c} style={s.th}>{c}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibles.map((f, i) => (
+                      <tr key={f.id ?? i}>
+                        <td style={{ ...s.td, color: "#475569", fontSize: 12, width: 40 }}>
+                          {inicio + i + 1}
+                        </td>
+                        <td style={s.td}>
+                          <div style={s.empNombre}>
+                            <span style={s.empAvatar}>
+                              {(f.nombre_completo?.trim() || `U${f.user_id}`)
+                                .charAt(0)
+                                .toUpperCase()}
+                            </span>
+                            <div>
+                              <div style={{ fontWeight: 500, fontSize: 13 }}>
+                                {f.nombre_completo?.trim() || `Usuario ${f.user_id}`}
+                              </div>
+                              <div style={{ fontSize: 11, color: "#64748b" }}>
+                                ID {f.user_id}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={s.td}>{fmtFecha(f.timestamp)}</td>
+                        <td style={{ ...s.td, fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }}>
+                          {fmtHora(f.timestamp)}
+                        </td>
+                        <td style={s.td}>
+                          <span style={f.direccion === "entrada" ? s.badgeEntrada : s.badgeSalida}>
+                            {f.direccion === "entrada" ? "↓ Entrada" : "↑ Salida"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Paginación */}
+                {total > POR_PAGINA && (
+                  <div style={s.paginacion}>
+                    <button
+                      style={s.btnPag}
+                      disabled={pagina === 1}
+                      onClick={() => setPagina((p) => p - 1)}
+                    >
+                      ← Anterior
+                    </button>
+                    <span style={{ color: "#64748b", fontSize: 13 }}>
+                      Página {pagina} de {paginas} · {total} registros
+                    </span>
+                    <button
+                      style={s.btnPag}
+                      disabled={pagina === paginas}
+                      onClick={() => setPagina((p) => p + 1)}
+                    >
+                      Siguiente →
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* ── Vista resumen por empleado ── */
+              <table style={s.tabla}>
+                <thead>
+                  <tr>
+                    {["Empleado", "Entradas", "Salidas", "Primera fichada", "Última fichada"].map((c) => (
+                      <th key={c} style={s.th}>{c}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {resumenEmpleados.map((emp) => (
+                    <tr key={emp.user_id}>
+                      <td style={s.td}>
+                        <div style={s.empNombre}>
+                          <span style={s.empAvatar}>
+                            {emp.nombre.charAt(0).toUpperCase()}
+                          </span>
+                          <div>
+                            <div style={{ fontWeight: 500, fontSize: 13 }}>{emp.nombre}</div>
+                            <div style={{ fontSize: 11, color: "#64748b" }}>ID {emp.user_id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={s.td}>
+                        <span style={s.badgeEntrada}>↓ {emp.entradas}</span>
+                      </td>
+                      <td style={s.td}>
+                        <span style={emp.salidas > 0 ? s.badgeSalida : s.badgeGray}>
+                          ↑ {emp.salidas}
+                        </span>
+                      </td>
+                      <td style={{ ...s.td, fontFamily: "monospace", fontSize: 13 }}>
+                        {fmtHora(emp.primera)}
+                      </td>
+                      <td style={{ ...s.td, fontFamily: "monospace", fontSize: 13 }}>
+                        {fmtHora(emp.ultima)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
       )}
 
-      {/* Stats */}
-      <div className="anviz-stats">
-        <div className="anviz-stat">
-          <div className="num">{fichadas.length}</div>
-          <div className="lbl">Total</div>
-        </div>
-        <div className="anviz-stat">
-          <div className="num" style={{ color: "#0a7a3c" }}>{entradas}</div>
-          <div className="lbl">Entradas</div>
-        </div>
-        <div className="anviz-stat">
-          <div className="num" style={{ color: "#c0392b" }}>{salidas}</div>
-          <div className="lbl">Salidas</div>
-        </div>
-        <div className="anviz-stat">
-          <div className="num" style={{ color: "#4361ee" }}>{usuarios}</div>
-          <div className="lbl">Usuarios</div>
-        </div>
-        {status.lastSync && (
-          <div className="anviz-stat">
-            <div className="num" style={{ fontSize: 13, paddingTop: 4 }}>
-              {new Date(status.lastSync).toLocaleTimeString("es-AR")}
-            </div>
-            <div className="lbl">Última sync</div>
-          </div>
-        )}
-      </div>
-
-      {/* Filtros */}
-      <div className="anviz-filters">
-        <input type="date" value={filtroFecha} onChange={(e) => setFiltroFecha(e.target.value)} />
-        <input
-          type="number" placeholder="User ID" value={filtroUser}
-          onChange={(e) => setFiltroUser(e.target.value)} style={{ width: 100 }}
-        />
-        <button className="anviz-btn" onClick={() => fetchFichadas(filtroFecha, filtroUser)}>Buscar</button>
-        <button className="anviz-btn sec" onClick={() => {
-          const hoy = new Date().toISOString().split("T")[0];
-          setFiltroFecha(hoy); setFiltroUser(""); fetchFichadas(hoy, "");
-        }}>Hoy</button>
-      </div>
-
-      {/* Tabla */}
-      <div className="anviz-table-wrap">
-        {loading ? (
-          <p className="empty">Cargando...</p>
-        ) : fichadas.length === 0 ? (
-          <p className="empty">Sin registros para el filtro seleccionado</p>
-        ) : (
-          <table className="anviz">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Nombre</th>
-                <th>Acción</th>
-                <th>Fecha / Hora (UTC)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fichadas.map((f) => (
-                <tr key={f.id} className={nuevasIds.has(f.id) ? "nueva" : ""}>
-                  <td style={{ color: "#99bbcc" }}>{f.user_id}</td>
-                  <td><strong>{f.nombre_completo?.trim() || `Usuario ${f.user_id}`}</strong></td>
-                  <td>
-                    <span className={`tag ${f.direccion}`}>
-                      {f.direccion === "entrada" ? "🟢 ENTRADA" : "🔴 SALIDA"}
-                    </span>
-                  </td>
-                  <td>{fmtTs(f.timestamp)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-      </>)}
+      {/* CSS keyframes globales */}
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        tr:hover td { background: rgba(99,102,241,0.04); }
+      `}</style>
     </div>
   );
 }
+
+// ─── Sub-componentes ──────────────────────────────────────────────────────────
+function StatCard({ label, valor, color }) {
+  return (
+    <div style={{ ...s.card, borderLeft: `3px solid ${color}` }}>
+      <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 30, fontWeight: 700, color: "#f1f5f9", fontVariantNumeric: "tabular-nums" }}>
+        {valor}
+      </div>
+    </div>
+  );
+}
+
+function AgenteBadge({ agente }) {
+  const online = agente?.connected;
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 7,
+      background: online ? "#052e16" : "#1c0a09",
+      border: `1px solid ${online ? "#16a34a44" : "#dc262644"}`,
+      borderRadius: 99, padding: "5px 12px",
+    }}>
+      <span style={{
+        width: 7, height: 7, borderRadius: "50%",
+        background: online ? "#4ade80" : "#f87171",
+        display: "inline-block",
+        boxShadow: online ? "0 0 6px #4ade80" : "none",
+      }} />
+      <span style={{ fontSize: 12, color: online ? "#4ade80" : "#f87171", fontWeight: 500 }}>
+        {online ? "Agente online" : "Agente offline"}
+      </span>
+    </div>
+  );
+}
+
+function IconReloj() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+      stroke="#818cf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function IconRefresh({ spin }) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+      style={spin ? { animation: "spin 0.8s linear infinite" } : {}}>
+      <polyline points="23 4 23 10 17 10" />
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+    </svg>
+  );
+}
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+const s = {
+  page: {
+    minHeight: "100vh",
+    background: "#0f172a",
+    padding: "28px 32px",
+    fontFamily: "'DM Sans','Helvetica Neue',sans-serif",
+    color: "#f1f5f9",
+  },
+  header: {
+    display: "flex", justifyContent: "space-between",
+    alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 12,
+  },
+  headerLeft:  { display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" },
+  headerRight: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" },
+  iconBox: {
+    width: 44, height: 44, background: "#1e293b",
+    border: "1px solid #334155", borderRadius: 10,
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  titulo:    { margin: 0, fontSize: 21, fontWeight: 700, color: "#f1f5f9" },
+  subtitulo: { fontSize: 12, color: "#475569" },
+  btnVolver: {
+    background: "#1e293b", border: "1px solid #334155", borderRadius: 8,
+    padding: "8px 14px", cursor: "pointer", color: "#94a3b8", fontSize: 13,
+  },
+  btnIcon: {
+    background: "#1e293b", border: "1px solid #334155", borderRadius: 8,
+    padding: "8px 10px", cursor: "pointer", color: "#94a3b8",
+    display: "flex", alignItems: "center",
+  },
+  btnUsuarios: {
+    background: "#1e293b", border: "1px solid #4361ee", borderRadius: 8,
+    padding: "8px 14px", cursor: "pointer", color: "#818cf8", fontSize: 13, fontWeight: 600,
+  },
+  btnSync: {
+    background: "#052e16", border: "1px solid #16a34a44", borderRadius: 8,
+    padding: "8px 14px", cursor: "pointer", color: "#4ade80", fontSize: 13, fontWeight: 600,
+  },
+  syncMsg: { fontSize: 12, color: "#94a3b8" },
+  notice: {
+    background: "#2d1b0060", border: "1px solid #d9770644",
+    borderRadius: 8, padding: "12px 16px",
+    fontSize: 13, color: "#fbbf24", marginBottom: 20,
+  },
+  cards: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+    gap: 12, marginBottom: 24,
+  },
+  card: {
+    background: "#1e293b", border: "1px solid #1e293b",
+    borderRadius: 12, padding: "16px 20px",
+  },
+  filtrosWrap: {
+    background: "#1e293b", border: "1px solid #334155",
+    borderRadius: 12, padding: "16px 20px", marginBottom: 20,
+  },
+  filtroFila: {
+    display: "flex", flexWrap: "wrap", gap: 12,
+    alignItems: "flex-end", marginBottom: 14,
+  },
+  filtroGrupo: { display: "flex", flexDirection: "column", gap: 4 },
+  label: {
+    fontSize: 11, color: "#475569",
+    textTransform: "uppercase", letterSpacing: "0.06em",
+  },
+  input: {
+    background: "#0f172a", border: "1px solid #334155",
+    borderRadius: 7, padding: "7px 11px",
+    color: "#f1f5f9", fontSize: 13, outline: "none", minWidth: 150,
+  },
+  btnBuscar: {
+    background: "#6366f1", border: "none", borderRadius: 7,
+    padding: "8px 22px", color: "#fff",
+    fontWeight: 600, fontSize: 13, cursor: "pointer", alignSelf: "flex-end",
+  },
+  tabs:      { display: "flex", gap: 4 },
+  tab: {
+    background: "transparent", border: "1px solid #334155",
+    borderRadius: 7, padding: "5px 16px",
+    color: "#64748b", fontSize: 13, cursor: "pointer",
+  },
+  tabActive: {
+    background: "#312e81", border: "1px solid #6366f1",
+    borderRadius: 7, padding: "5px 16px",
+    color: "#a5b4fc", fontSize: 13, cursor: "pointer", fontWeight: 600,
+  },
+  tableWrap: {
+    background: "#1e293b", border: "1px solid #334155",
+    borderRadius: 12, overflow: "hidden",
+  },
+  errorBanner: { background: "#450a0a", color: "#fca5a5", padding: "12px 20px", fontSize: 13 },
+  estado: {
+    display: "flex", flexDirection: "column",
+    alignItems: "center", justifyContent: "center",
+    gap: 10, padding: "60px 0",
+  },
+  spinner: {
+    width: 30, height: 30,
+    border: "3px solid #334155", borderTop: "3px solid #6366f1",
+    borderRadius: "50%", animation: "spin 0.8s linear infinite",
+  },
+  tabla: { width: "100%", borderCollapse: "collapse" },
+  th: {
+    padding: "11px 18px", textAlign: "left",
+    fontSize: 11, color: "#475569",
+    textTransform: "uppercase", letterSpacing: "0.07em",
+    borderBottom: "1px solid #334155", background: "#0f172a50",
+  },
+  td: {
+    padding: "12px 18px", fontSize: 13,
+    color: "#cbd5e1", borderBottom: "1px solid #1e293b",
+  },
+  empNombre: { display: "flex", alignItems: "center", gap: 10 },
+  empAvatar: {
+    width: 30, height: 30, borderRadius: "50%",
+    background: "#312e81", color: "#a5b4fc",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 13, fontWeight: 700, flexShrink: 0,
+  },
+  badgeEntrada: {
+    background: "#052e16", color: "#4ade80",
+    border: "1px solid #16a34a44", borderRadius: 99,
+    padding: "3px 10px", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
+  },
+  badgeSalida: {
+    background: "#2d1b00", color: "#fbbf24",
+    border: "1px solid #d9770644", borderRadius: 99,
+    padding: "3px 10px", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
+  },
+  badgeGray: {
+    background: "#1e293b", color: "#64748b",
+    border: "1px solid #33415544", borderRadius: 99,
+    padding: "3px 10px", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
+  },
+  paginacion: {
+    display: "flex", justifyContent: "space-between",
+    alignItems: "center", padding: "14px 18px",
+    borderTop: "1px solid #334155",
+  },
+  btnPag: {
+    background: "#0f172a", border: "1px solid #334155",
+    borderRadius: 7, padding: "6px 14px",
+    color: "#94a3b8", fontSize: 13, cursor: "pointer",
+  },
+};
