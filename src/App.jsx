@@ -99,28 +99,9 @@ const buttons = [
     color: "#e67e22",
     screen: "mueble-especial",
   },
-  {
-    id: 13,
-    label: "FACTURAS",
-    icon: "🧾",
-    color: "#27ae60",
-    screen: "facturas",
-  },
-  {
-    id: 14,
-    label: "ASISTENCIA",
-    icon: "🕐",
-    color: "#6366f1",
-    screen: "anviz",
-  },
-  {
-    id: 15,
-    label: "USUARIOS",
-    icon: "👤",
-    color: "#0ea5e9",
-    screen: "usuarios",
-  },
 ];
+
+const HOME_SECTIONS = { main: "main", admin: "admin", facturas: "facturas", proveedores: "proveedores" };
 
 export default function Root() {
   const [usuario, setUsuario] = useState(null);
@@ -134,6 +115,7 @@ function App({ usuario }) {
   const [log, setLog] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [homeSection, setHomeSection] = useState(HOME_SECTIONS.main);
 
   const [clientes, setClientes] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -949,15 +931,15 @@ function App({ usuario }) {
         .sidebar p { padding: 10px 0; cursor: pointer; color: #a0cce8; font-size: 13px; border-bottom: 1px solid #1a4a6c; transition: color 0.2s; }
         .sidebar p:hover { color: white; }
         .wrapper { width: 480px; padding: 48px 40px; background: #e8f5fd; border: 1px solid #a0cce8; border-radius: 4px; position: relative; overflow: hidden; }
-        .wrapper::before { content: ''; position: absolute; top: -120px; right: -120px; width: 300px; height: 300px; background: radial-gradient(circle, #4ab0e820 0%, transparent 70%); pointer-events: none; }
-        .top-bar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-        .title { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: #0a3a5c; letter-spacing: -0.5px; }
+        .wrapper::before { content: \'\'; position: absolute; top: -120px; right: -120px; width: 300px; height: 300px; background: radial-gradient(circle, #4ab0e820 0%, transparent 70%); pointer-events: none; }
+        .top-bar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
+        .title { font-family: \'Syne\', sans-serif; font-size: 28px; font-weight: 800; color: #0a3a5c; letter-spacing: -0.5px; }
         .subtitle { font-size: 11px; color: #6699bb; letter-spacing: 3px; text-transform: uppercase; margin-top: 6px; }
         .menu-btn { background: none; border: 1px solid #a0cce8; border-radius: 3px; padding: 6px 12px; cursor: pointer; font-size: 18px; color: #0a3a5c; transition: all 0.2s; }
         .menu-btn:hover { background: #0a3a5c; color: white; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 32px; }
-        .btn { display: flex; align-items: center; gap: 10px; padding: 16px 20px; background: #ffffff; border: 1px solid #a0cce8; border-radius: 3px; color: #2255aa; font-family: 'Space Mono', monospace; font-size: 13px; cursor: pointer; transition: all 0.15s ease; position: relative; overflow: hidden; }
-        .btn::after { content: ''; position: absolute; bottom: 0; left: 0; width: 0; height: 2px; background: var(--accent); transition: width 0.2s ease; }
+        .btn { display: flex; align-items: center; gap: 10px; padding: 16px 20px; background: #ffffff; border: 1px solid #a0cce8; border-radius: 3px; color: #2255aa; font-family: \'Space Mono\', monospace; font-size: 13px; cursor: pointer; transition: all 0.15s ease; position: relative; overflow: hidden; }
+        .btn::after { content: \'\'; position: absolute; bottom: 0; left: 0; width: 0; height: 2px; background: var(--accent); transition: width 0.2s ease; }
         .btn:hover { border-color: var(--accent); background: var(--accent); color: #ffffff; transform: translateY(-1px); box-shadow: 0 4px 20px var(--accent)44; }
         .btn:hover::after { width: 100%; }
         .btn:active, .btn.active { transform: scale(0.97); background: var(--accent)22; }
@@ -965,9 +947,24 @@ function App({ usuario }) {
         .log-title { font-size: 10px; color: #88aacc; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 12px; }
         .log-item { font-size: 12px; color: #99bbcc; padding: 4px 0; animation: fadeIn 0.3s ease; }
         .log-item:first-child { color: #2277bb; }
-        .data-summary { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+        .data-summary { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
         .sum-chip { background: #fff; border: 1px solid #a0cce8; border-radius: 20px; padding: 4px 12px; font-size: 11px; color: #4a6a8c; }
         .sum-chip strong { color: #0a3a5c; }
+        .home-section-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+        .home-section-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 10px; background: #fff; border: 1px solid #a0cce8; border-radius: 4px; cursor: pointer; transition: all 0.15s; font-family: \'Space Mono\', monospace; font-size: 11px; color: #0a3a5c; letter-spacing: 1px; text-align: center; }
+        .home-section-card:hover { background: #0a3a5c; color: #fff; border-color: #0a3a5c; transform: translateY(-1px); }
+        .home-section-card .hs-icon { font-size: 22px; }
+        .sub-back { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; background: none; border: 1px solid #a0cce8; border-radius: 3px; padding: 6px 14px; cursor: pointer; font-family: \'Space Mono\', monospace; font-size: 12px; color: #0a3a5c; transition: all 0.15s; }
+        .sub-back:hover { background: #0a3a5c; color: #fff; }
+        .sub-title { font-family: \'Syne\', sans-serif; font-size: 20px; font-weight: 800; color: #0a3a5c; margin-bottom: 20px; }
+        .sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+        .sub-card { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; background: #fff; border: 1px solid #a0cce8; border-radius: 3px; cursor: pointer; transition: all 0.15s; font-family: \'Space Mono\', monospace; }
+        .sub-card:hover { background: var(--sc-color); border-color: var(--sc-color); color: #fff; transform: translateY(-1px); }
+        .sub-card-icon { font-size: 20px; }
+        .sub-card-label { font-size: 12px; font-weight: 700; color: #0a3a5c; letter-spacing: 1px; }
+        .sub-card:hover .sub-card-label { color: #fff; }
+        .sub-card-desc { font-size: 11px; color: #6699bb; }
+        .sub-card:hover .sub-card-desc { color: #cce; }
         @keyframes fadeIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
       `}
       </style>
@@ -978,27 +975,14 @@ function App({ usuario }) {
       />
       <div className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <h3>Menú</h3>
-        <p onClick={() => setScreen("clientes")}>👥 Clientes</p>
-        <p onClick={() => setScreen("presupuestos-tabla")}>
-          📋 Presupuestos Mamparas
-        </p>
-        <p onClick={() => setScreen("presupuesto-vanitory")}>
-          🚿 Presupuesto Vanitory
-        </p>
-        <p onClick={() => setScreen("productos")}>🛒 Productos</p>
-        <p
-          onClick={() => {
-            setScreen("lista-margenes");
-            fetchListas();
-          }}
-        >
-          📊 Lista de Márgenes
-        </p>
-        <p onClick={() => setScreen("facturas")}>🧾 Facturas</p>
-        <p onClick={() => setScreen("anviz")}>🕐 Asistencia</p>
-        <p onClick={() => setScreen("usuarios")}>👤 Usuarios</p>
-        <p>⚙️ Configuración</p>
-        <p>📊 Reportes</p>
+        <p onClick={() => { setScreen("clientes"); setSidebarOpen(false); }}>👥 Clientes</p>
+        <p onClick={() => { setScreen("presupuestos-tabla"); setSidebarOpen(false); }}>📋 Presupuestos Mamparas</p>
+        <p onClick={() => { setScreen("presupuesto-vanitory"); setSidebarOpen(false); }}>🚿 Presupuesto Vanitory</p>
+        <p onClick={() => { setScreen("productos"); setSidebarOpen(false); }}>🛒 Productos</p>
+        <p onClick={() => { setScreen("lista-margenes"); fetchListas(); setSidebarOpen(false); }}>📊 Lista de Márgenes</p>
+        <p onClick={() => { setScreen("facturas"); setSidebarOpen(false); }}>🧾 Facturas</p>
+        <p onClick={() => { setScreen("anviz"); setSidebarOpen(false); }}>🕐 Asistencia</p>
+        <p onClick={() => { setScreen("usuarios"); setSidebarOpen(false); }}>👤 Usuarios</p>
       </div>
 
       <div className="wrapper">
@@ -1007,38 +991,111 @@ function App({ usuario }) {
             <h1 className="title">Panel de Control</h1>
             <p className="subtitle">Sistema integral</p>
           </div>
-          <button className="menu-btn" onClick={() => setSidebarOpen(true)}>
-            ☰
-          </button>
+          <button className="menu-btn" onClick={() => setSidebarOpen(true)}>☰</button>
         </div>
 
         <div className="data-summary">
-          <span className="sum-chip">
-            👥 <strong>{clientes.length}</strong> clientes
-          </span>
-          <span className="sum-chip">
-            🛒 <strong>{productos.length}</strong> productos
-          </span>
-          <span className="sum-chip">
-            📊 <strong>{listas.length}</strong> listas
-          </span>
-          <span className="sum-chip">
-            🏭 <strong>{proveedores.length}</strong> proveedores
-          </span>
+          <span className="sum-chip">👥 <strong>{clientes.length}</strong> clientes</span>
+          <span className="sum-chip">🛒 <strong>{productos.length}</strong> productos</span>
+          <span className="sum-chip">🏭 <strong>{proveedores.length}</strong> proveedores</span>
         </div>
 
-        <div className="grid">
-          {buttons.map((btn) => (
-            <ActionButton
-              key={btn.id}
-              label={btn.label}
-              icon={btn.icon}
-              color={btn.color}
-              isActive={active === btn.id}
-              onClick={() => handlePanelButton(btn)}
-            />
-          ))}
-        </div>
+        {/* ── Sección principal ── */}
+        {homeSection === HOME_SECTIONS.main && (
+          <>
+            <div className="home-section-cards">
+              <div className="home-section-card" onClick={() => setHomeSection(HOME_SECTIONS.admin)}>
+                <span className="hs-icon">⚙️</span>
+                ADMINISTRACIÓN
+              </div>
+              <div className="home-section-card" onClick={() => setHomeSection(HOME_SECTIONS.facturas)}>
+                <span className="hs-icon">🧾</span>
+                FACTURAS
+              </div>
+              <div className="home-section-card" onClick={() => setHomeSection(HOME_SECTIONS.proveedores)}>
+                <span className="hs-icon">🏭</span>
+                PROVEEDORES
+              </div>
+            </div>
+            <div className="grid">
+              {buttons.map((btn) => (
+                <ActionButton
+                  key={btn.id}
+                  label={btn.label}
+                  icon={btn.icon}
+                  color={btn.color}
+                  isActive={active === btn.id}
+                  onClick={() => handlePanelButton(btn)}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ── Administración ── */}
+        {homeSection === HOME_SECTIONS.admin && (
+          <>
+            <button className="sub-back" onClick={() => setHomeSection(HOME_SECTIONS.main)}>← Volver</button>
+            <p className="sub-title">⚙️ Administración</p>
+            <div className="sub-grid">
+              <div className="sub-card" style={{"--sc-color":"#6366f1"}} onClick={() => { setScreen("anviz"); setHomeSection(HOME_SECTIONS.main); }}>
+                <span className="sub-card-icon">🕐</span>
+                <span className="sub-card-label">ASISTENCIA</span>
+                <span className="sub-card-desc">Control de accesos y usuarios</span>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Facturas ── */}
+        {homeSection === HOME_SECTIONS.facturas && (
+          <>
+            <button className="sub-back" onClick={() => setHomeSection(HOME_SECTIONS.main)}>← Volver</button>
+            <p className="sub-title">🧾 Facturas</p>
+            <div className="sub-grid">
+              <div className="sub-card" style={{"--sc-color":"#27ae60"}} onClick={() => { setScreen("facturas"); setHomeSection(HOME_SECTIONS.main); }}>
+                <span className="sub-card-icon">📄</span>
+                <span className="sub-card-label">CARGAR FACTURA</span>
+                <span className="sub-card-desc">Subí y procesá un PDF</span>
+              </div>
+              <div className="sub-card" style={{"--sc-color":"#4361ee"}} onClick={() => { setScreen("lista-margenes"); fetchListas(); setHomeSection(HOME_SECTIONS.main); }}>
+                <span className="sub-card-icon">📋</span>
+                <span className="sub-card-label">HISTORIAL</span>
+                <span className="sub-card-desc">Comprobantes anteriores</span>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Proveedores ── */}
+        {homeSection === HOME_SECTIONS.proveedores && (
+          <>
+            <button className="sub-back" onClick={() => setHomeSection(HOME_SECTIONS.main)}>← Volver</button>
+            <p className="sub-title">🏭 Proveedores</p>
+            <div className="sub-grid">
+              <div className="sub-card" style={{"--sc-color":"#e67e22"}} onClick={() => { setScreen("ver-tablas"); setHomeSection(HOME_SECTIONS.main); }}>
+                <span className="sub-card-icon">📦</span>
+                <span className="sub-card-label">PLACASUR</span>
+                <span className="sub-card-desc">Distribuidora PlacaSur S.A.</span>
+              </div>
+              <div className="sub-card" style={{"--sc-color":"#c77dff"}} onClick={() => { setScreen("ver-tablas"); setHomeSection(HOME_SECTIONS.main); }}>
+                <span className="sub-card-icon">📦</span>
+                <span className="sub-card-label">AGLOLAM</span>
+                <span className="sub-card-desc">Proveedor Aglolam</span>
+              </div>
+              <div className="sub-card" style={{"--sc-color":"#ff6b6b"}} onClick={() => { setScreen("ver-tablas"); setHomeSection(HOME_SECTIONS.main); }}>
+                <span className="sub-card-icon">📦</span>
+                <span className="sub-card-label">CANTOCHAP</span>
+                <span className="sub-card-desc">Proveedor Cantochap</span>
+              </div>
+              <div className="sub-card" style={{"--sc-color":"#00c9a7"}} onClick={() => { setScreen("ver-tablas"); setHomeSection(HOME_SECTIONS.main); }}>
+                <span className="sub-card-icon">➕</span>
+                <span className="sub-card-label">AGREGAR</span>
+                <span className="sub-card-desc">Nuevo proveedor</span>
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="log">
           <p className="log-title">Registro de actividad</p>
@@ -1046,9 +1103,7 @@ function App({ usuario }) {
             <p className="log-item">— sin actividad —</p>
           ) : (
             log.map((entry, i) => (
-              <p key={i} className="log-item">
-                {entry}
-              </p>
+              <p key={i} className="log-item">{entry}</p>
             ))
           )}
         </div>
