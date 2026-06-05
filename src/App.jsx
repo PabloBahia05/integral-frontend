@@ -1008,14 +1008,6 @@ function App({ usuario }) {
                 <span className="hs-icon">⚙️</span>
                 ADMINISTRACIÓN
               </div>
-              <div className="home-section-card" onClick={() => setHomeSection(HOME_SECTIONS.facturas)}>
-                <span className="hs-icon">🧾</span>
-                FACTURAS
-              </div>
-              <div className="home-section-card" onClick={() => setHomeSection(HOME_SECTIONS.proveedores)}>
-                <span className="hs-icon">🏭</span>
-                PROVEEDORES
-              </div>
             </div>
             <div className="grid">
               {buttons.map((btn) => (
@@ -1043,6 +1035,16 @@ function App({ usuario }) {
                 <span className="sub-card-label">ASISTENCIA</span>
                 <span className="sub-card-desc">Control de accesos y usuarios</span>
               </div>
+              <div className="sub-card" style={{"--sc-color":"#27ae60"}} onClick={() => setHomeSection(HOME_SECTIONS.facturas)}>
+                <span className="sub-card-icon">🧾</span>
+                <span className="sub-card-label">FACTURAS</span>
+                <span className="sub-card-desc">Gestión de comprobantes</span>
+              </div>
+              <div className="sub-card" style={{"--sc-color":"#e67e22"}} onClick={() => setHomeSection(HOME_SECTIONS.proveedores)}>
+                <span className="sub-card-icon">🏭</span>
+                <span className="sub-card-label">PROVEEDORES</span>
+                <span className="sub-card-desc">PlacaSur, Aglolam, Cantochap</span>
+              </div>
             </div>
           </>
         )}
@@ -1050,7 +1052,7 @@ function App({ usuario }) {
         {/* ── Facturas ── */}
         {homeSection === HOME_SECTIONS.facturas && (
           <>
-            <button className="sub-back" onClick={() => setHomeSection(HOME_SECTIONS.main)}>← Volver</button>
+            <button className="sub-back" onClick={() => setHomeSection(HOME_SECTIONS.admin)}>← Volver</button>
             <p className="sub-title">🧾 Facturas</p>
             <div className="sub-grid">
               <div className="sub-card" style={{"--sc-color":"#27ae60"}} onClick={() => { setScreen("facturas"); setHomeSection(HOME_SECTIONS.main); }}>
@@ -1070,7 +1072,7 @@ function App({ usuario }) {
         {/* ── Proveedores ── */}
         {homeSection === HOME_SECTIONS.proveedores && (
           <>
-            <button className="sub-back" onClick={() => setHomeSection(HOME_SECTIONS.main)}>← Volver</button>
+            <button className="sub-back" onClick={() => setHomeSection(HOME_SECTIONS.admin)}>← Volver</button>
             <p className="sub-title">🏭 Proveedores</p>
             <div className="sub-grid">
               <div className="sub-card" style={{"--sc-color":"#e67e22"}} onClick={() => { setScreen("ver-tablas"); setHomeSection(HOME_SECTIONS.main); }}>
