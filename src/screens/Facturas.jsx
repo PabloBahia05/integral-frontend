@@ -42,18 +42,21 @@ function CabeceraPlaсaSur({ factura }) {
 }
 
 function CabeceraBonzini({ factura }) {
+  const esPresup = factura.es_presupuesto;
   return (
     <div className="factura-header bonzini">
       <div className="header-brand">
         <span className="brand-name">Herrajes Bonzini</span>
-        <span className="badge badge-blue">Factura {factura.tipo_factura || "A"}</span>
+        <span className={`badge ${esPresup ? "badge-orange" : "badge-blue"}`}>
+          {esPresup ? "Presupuesto" : `Factura ${factura.tipo_factura || "A"}`}
+        </span>
       </div>
       <div className="header-meta-grid">
         <MetaItem label="N°" value={factura.numero} mono />
         <MetaItem label="Fecha" value={factura.fecha} />
         <MetaItem label="Cond. Venta" value={factura.condicion_pago} />
-        <MetaItem label="CAE" value={factura.cae} mono />
-        <MetaItem label="Vto. CAE" value={factura.cae_vto} />
+        {!esPresup && <MetaItem label="CAE" value={factura.cae} mono />}
+        {!esPresup && <MetaItem label="Vto. CAE" value={factura.cae_vto} />}
         <MetaItem label="Cliente" value={factura.cliente_nombre} />
         <MetaItem label="CUIT Cliente" value={factura.cliente_cuit} mono />
       </div>
@@ -62,12 +65,19 @@ function CabeceraBonzini({ factura }) {
 }
 
 function TotalesBonzini({ factura }) {
+  const esPresup = factura.es_presupuesto;
   return (
     <div className="totals-section">
       <div className="totals-grid">
-        <TotalRow label="Neto gravado" value={factura.subtotal} />
-        <TotalRow label={`IVA ${factura.iva_pct || 21}%`} value={factura.iva} />
-        <TotalRow label="Total ARS" value={factura.total} highlight />
+        {esPresup ? (
+          <TotalRow label="Total ARS" value={factura.total} highlight />
+        ) : (
+          <>
+            <TotalRow label="Neto gravado" value={factura.subtotal} />
+            <TotalRow label={`IVA ${factura.iva_pct || 21}%`} value={factura.iva} />
+            <TotalRow label="Total ARS" value={factura.total} highlight />
+          </>
+        )}
       </div>
     </div>
   );
@@ -355,6 +365,7 @@ export default function Facturas() {
         .badge { font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 6px; }
         .badge-blue { background: #dbeafe; color: #1e40af; }
         .badge-gray { background: #e5e7eb; color: #374151; }
+        .badge-orange { background: #ffedd5; color: #9a3412; }
 
         .header-meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 16px; }
         .meta-item { display: flex; flex-direction: column; gap: 1px; }
