@@ -15,7 +15,6 @@ function detectarProveedor(factura) {
   if (texto.includes("placasur")) return "placasur";
   if (texto.includes("cantochap")) return "cantochap";
   if (texto.includes("aglolam")) return "aglolam";
-  if (texto.includes("bonzini")) return "bonzini";
   return "generico";
 }
 
@@ -34,29 +33,6 @@ function CabeceraPlaсaSur({ factura }) {
         <MetaItem label="Cond. Venta" value={factura.condicion_pago} />
         <MetaItem label="CAE" value={factura.cae} mono />
         <MetaItem label="Vto. CAE" value={factura.cae_vto} />
-        <MetaItem label="Cliente" value={factura.cliente_nombre} />
-        <MetaItem label="CUIT Cliente" value={factura.cliente_cuit} mono />
-      </div>
-    </div>
-  );
-}
-
-function CabeceraBonzini({ factura }) {
-  const esPresup = factura.es_presupuesto;
-  return (
-    <div className="factura-header bonzini">
-      <div className="header-brand">
-        <span className="brand-name">Herrajes Bonzini</span>
-        <span className="badge badge-blue">
-          {esPresup ? "Presupuesto" : `Factura ${factura.tipo_factura || "A"}`}
-        </span>
-      </div>
-      <div className="header-meta-grid">
-        <MetaItem label="N°" value={factura.numero} mono />
-        <MetaItem label="Fecha" value={factura.fecha} />
-        <MetaItem label="Cond. Venta" value={factura.condicion_pago} />
-        {!esPresup && <MetaItem label="CAE" value={factura.cae} mono />}
-        {!esPresup && <MetaItem label="Vto. CAE" value={factura.cae_vto} />}
         <MetaItem label="Cliente" value={factura.cliente_nombre} />
         <MetaItem label="CUIT Cliente" value={factura.cliente_cuit} mono />
       </div>
@@ -160,25 +136,6 @@ function TotalesPlacaSur({ factura }) {
   );
 }
 
-function TotalesBonzini({ factura }) {
-  const esPresup = factura.es_presupuesto;
-  return (
-    <div className="totals-section">
-      <div className="totals-grid">
-        {esPresup ? (
-          <TotalRow label="Total ARS" value={factura.total} highlight />
-        ) : (
-          <>
-            <TotalRow label="Neto gravado" value={factura.subtotal} />
-            <TotalRow label={`IVA ${factura.iva_pct || 21}%`} value={factura.iva} />
-            <TotalRow label="Total ARS" value={factura.total} highlight />
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function TotalesGenericos({ factura }) {
   return (
     <div className="totals-section">
@@ -217,15 +174,12 @@ function TotalRow({ label, value, highlight }) {
 function FacturaView({ factura, items, onReset }) {
   const proveedor = detectarProveedor(factura);
   const isPlacaSur = proveedor === "placasur";
-  const isBonzini  = proveedor === "bonzini";
 
   return (
     <div className="factura-card">
       {isPlacaSur
         ? <CabeceraPlaсaSur factura={factura} />
-        : isBonzini
-          ? <CabeceraBonzini factura={factura} />
-          : <CabeceraGenerica factura={factura} />}
+        : <CabeceraGenerica factura={factura} />}
 
       <div className="table-wrapper">
         {isPlacaSur
@@ -235,9 +189,7 @@ function FacturaView({ factura, items, onReset }) {
 
       {isPlacaSur
         ? <TotalesPlacaSur factura={factura} />
-        : isBonzini
-          ? <TotalesBonzini factura={factura} />
-          : <TotalesGenericos factura={factura} />}
+        : <TotalesGenericos factura={factura} />}
 
       <div className="factura-footer">
         <button className="btn-reset" onClick={onReset}>
@@ -357,7 +309,6 @@ export default function Facturas() {
 
         .factura-header { padding: 1rem 1.25rem; border-bottom: 1px solid #e8e8e8; }
         .factura-header.placasur { background: #f0f5ff; }
-        .factura-header.bonzini  { background: #fff7ed; }
         .factura-header.generica { background: #f7f7f7; }
         .header-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
         .brand-name { font-size: 1rem; font-weight: 600; }
