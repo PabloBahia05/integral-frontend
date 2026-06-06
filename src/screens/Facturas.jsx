@@ -47,7 +47,7 @@ function CabeceraBonzini({ factura }) {
     <div className="factura-header bonzini">
       <div className="header-brand">
         <span className="brand-name">Herrajes Bonzini</span>
-        <span className={`badge ${esPresup ? "badge-orange" : "badge-blue"}`}>
+        <span className="badge badge-blue">
           {esPresup ? "Presupuesto" : `Factura ${factura.tipo_factura || "A"}`}
         </span>
       </div>
@@ -59,6 +59,25 @@ function CabeceraBonzini({ factura }) {
         {!esPresup && <MetaItem label="Vto. CAE" value={factura.cae_vto} />}
         <MetaItem label="Cliente" value={factura.cliente_nombre} />
         <MetaItem label="CUIT Cliente" value={factura.cliente_cuit} mono />
+      </div>
+    </div>
+  );
+}
+
+function TotalesBonzini({ factura }) {
+  const esPresup = factura.es_presupuesto;
+  return (
+    <div className="totals-section">
+      <div className="totals-grid">
+        {esPresup ? (
+          <TotalRow label="Total ARS" value={factura.total} highlight />
+        ) : (
+          <>
+            <TotalRow label="Neto gravado" value={factura.subtotal} />
+            <TotalRow label={`IVA ${factura.iva_pct || 21}%`} value={factura.iva} />
+            <TotalRow label="Total ARS" value={factura.total} highlight />
+          </>
+        )}
       </div>
     </div>
   );
@@ -160,25 +179,6 @@ function TotalesPlacaSur({ factura }) {
   );
 }
 
-function TotalesBonzini({ factura }) {
-  const esPresup = factura.es_presupuesto;
-  return (
-    <div className="totals-section">
-      <div className="totals-grid">
-        {esPresup ? (
-          <TotalRow label="Total ARS" value={factura.total} highlight />
-        ) : (
-          <>
-            <TotalRow label="Neto gravado" value={factura.subtotal} />
-            <TotalRow label={`IVA ${factura.iva_pct || 21}%`} value={factura.iva} />
-            <TotalRow label="Total ARS" value={factura.total} highlight />
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function TotalesGenericos({ factura }) {
   return (
     <div className="totals-section">
@@ -259,7 +259,7 @@ function UploadZone({ onFile }) {
       <input type="file" accept=".pdf,image/*" onChange={handleChange} style={{ display: "none" }} />
       <span className="drop-icon">📄</span>
       <p className="drop-title">Seleccioná una factura</p>
-      <p className="drop-sub">PDF o imagen — PlacaSur, Aglolam, Cantochap, Bonzini</p>
+      <p className="drop-sub">PDF o imagen — PlacaSur, Aglolam, Cantochap</p>
     </label>
   );
 }
@@ -365,7 +365,6 @@ export default function Facturas() {
         .badge { font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 6px; }
         .badge-blue { background: #dbeafe; color: #1e40af; }
         .badge-gray { background: #e5e7eb; color: #374151; }
-        .badge-orange { background: #ffedd5; color: #9a3412; }
 
         .header-meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 16px; }
         .meta-item { display: flex; flex-direction: column; gap: 1px; }
