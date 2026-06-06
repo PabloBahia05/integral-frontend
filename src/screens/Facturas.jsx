@@ -64,25 +64,6 @@ function CabeceraBonzini({ factura }) {
   );
 }
 
-function TotalesBonzini({ factura }) {
-  const esPresup = factura.es_presupuesto;
-  return (
-    <div className="totals-section">
-      <div className="totals-grid">
-        {esPresup ? (
-          <TotalRow label="Total ARS" value={factura.total} highlight />
-        ) : (
-          <>
-            <TotalRow label="Neto gravado" value={factura.subtotal} />
-            <TotalRow label={`IVA ${factura.iva_pct || 21}%`} value={factura.iva} />
-            <TotalRow label="Total ARS" value={factura.total} highlight />
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function CabeceraGenerica({ factura }) {
   return (
     <div className="factura-header generica">
@@ -174,6 +155,25 @@ function TotalesPlacaSur({ factura }) {
         <TotalRow label={`IVA ${factura.iva_pct || 21}%`} value={factura.iva} />
         <TotalRow label="Percepciones IIBB" value={factura.pers_IIBB} />
         <TotalRow label="Total ARS" value={factura.total} highlight />
+      </div>
+    </div>
+  );
+}
+
+function TotalesBonzini({ factura }) {
+  const esPresup = factura.es_presupuesto;
+  return (
+    <div className="totals-section">
+      <div className="totals-grid">
+        {esPresup ? (
+          <TotalRow label="Total ARS" value={factura.total} highlight />
+        ) : (
+          <>
+            <TotalRow label="Neto gravado" value={factura.subtotal} />
+            <TotalRow label={`IVA ${factura.iva_pct || 21}%`} value={factura.iva} />
+            <TotalRow label="Total ARS" value={factura.total} highlight />
+          </>
+        )}
       </div>
     </div>
   );
