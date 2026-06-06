@@ -3,14 +3,10 @@ import { useState } from "react";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = (n) =>
   n != null
-    ? Number(n).toLocaleString("es-AR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
+    ? Number(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : "-";
 
-const OCR_WORKER_URL =
-  import.meta.env.VITE_OCR_WORKER_URL || "http://localhost:5001";
+const OCR_WORKER_URL = import.meta.env.VITE_OCR_WORKER_URL || "http://localhost:5001";
 
 // ── Detección de proveedor (lado cliente, espeja la lógica Python) ─────────────
 function detectarProveedor(factura) {
@@ -28,9 +24,7 @@ function CabeceraPlaсaSur({ factura }) {
     <div className="factura-header placasur">
       <div className="header-brand">
         <span className="brand-name">PlacaSur</span>
-        <span className="badge badge-blue">
-          Factura {factura.tipo_factura || "A"}
-        </span>
+        <span className="badge badge-blue">Factura {factura.tipo_factura || "A"}</span>
       </div>
       <div className="header-meta-grid">
         <MetaItem label="N°" value={factura.numero} mono />
@@ -51,14 +45,9 @@ function CabeceraGenerica({ factura }) {
     <div className="factura-header generica">
       <div className="header-brand">
         <span className="badge badge-gray">
-          {factura.proveedor
-            ? factura.proveedor.charAt(0).toUpperCase() +
-              factura.proveedor.slice(1)
-            : "Proveedor"}
+          {factura.proveedor ? factura.proveedor.charAt(0).toUpperCase() + factura.proveedor.slice(1) : "Proveedor"}
         </span>
-        <span className="badge badge-blue">
-          Factura {factura.tipo_factura || "-"}
-        </span>
+        <span className="badge badge-blue">Factura {factura.tipo_factura || "-"}</span>
       </div>
       <div className="header-meta-grid">
         <MetaItem label="N°" value={factura.numero} mono />
@@ -85,19 +74,13 @@ function TablaItemsPlacaSur({ items }) {
       </thead>
       <tbody>
         {items.length === 0 ? (
-          <tr>
-            <td colSpan={5} className="empty-row">
-              Sin ítems
-            </td>
-          </tr>
+          <tr><td colSpan={5} className="empty-row">Sin ítems</td></tr>
         ) : (
           items.map((item, i) => (
             <tr key={i}>
               <td className="mono small">{item.codigo || "-"}</td>
               <td>{item.descripcion || "-"}</td>
-              <td className="text-right">
-                {item.cantidad != null ? fmt(item.cantidad) : "-"}
-              </td>
+              <td className="text-right">{item.cantidad != null ? fmt(item.cantidad) : "-"}</td>
               <td className="text-right">{fmt(item.precio_unit)}</td>
               <td className="text-right bold">{fmt(item.subtotalprod)}</td>
             </tr>
@@ -122,19 +105,13 @@ function TablaItemsGenerica({ items }) {
       </thead>
       <tbody>
         {items.length === 0 ? (
-          <tr>
-            <td colSpan={5} className="empty-row">
-              Sin ítems
-            </td>
-          </tr>
+          <tr><td colSpan={5} className="empty-row">Sin ítems</td></tr>
         ) : (
           items.map((item, i) => (
             <tr key={i}>
               <td className="mono small">{item.codigo || "-"}</td>
               <td>{item.descripcion || "-"}</td>
-              <td className="text-right">
-                {item.cantidad != null ? item.cantidad : "-"}
-              </td>
+              <td className="text-right">{item.cantidad != null ? item.cantidad : "-"}</td>
               <td className="text-right">{fmt(item.precio_unit)}</td>
               <td className="text-right bold">{fmt(item.subtotalprod)}</td>
             </tr>
@@ -168,11 +145,7 @@ function TotalesGenericos({ factura }) {
         {factura.pers_IIBB != null && (
           <TotalRow label="Perc. IIBB" value={factura.pers_IIBB} />
         )}
-        <TotalRow
-          label={`Total ${factura.moneda || "ARS"}`}
-          value={factura.total}
-          highlight
-        />
+        <TotalRow label={`Total ${factura.moneda || "ARS"}`} value={factura.total} highlight />
       </div>
     </div>
   );
@@ -204,25 +177,19 @@ function FacturaView({ factura, items, onReset }) {
 
   return (
     <div className="factura-card">
-      {isPlacaSur ? (
-        <CabeceraPlaсaSur factura={factura} />
-      ) : (
-        <CabeceraGenerica factura={factura} />
-      )}
+      {isPlacaSur
+        ? <CabeceraPlaсaSur factura={factura} />
+        : <CabeceraGenerica factura={factura} />}
 
       <div className="table-wrapper">
-        {isPlacaSur ? (
-          <TablaItemsPlacaSur items={items} />
-        ) : (
-          <TablaItemsGenerica items={items} />
-        )}
+        {isPlacaSur
+          ? <TablaItemsPlacaSur items={items} />
+          : <TablaItemsGenerica items={items} />}
       </div>
 
-      {isPlacaSur ? (
-        <TotalesPlacaSur factura={factura} />
-      ) : (
-        <TotalesGenericos factura={factura} />
-      )}
+      {isPlacaSur
+        ? <TotalesPlacaSur factura={factura} />
+        : <TotalesGenericos factura={factura} />}
 
       <div className="factura-footer">
         <button className="btn-reset" onClick={onReset}>
@@ -241,12 +208,7 @@ function UploadZone({ onFile }) {
   };
   return (
     <label className="drop-zone">
-      <input
-        type="file"
-        accept=".pdf,image/*"
-        onChange={handleChange}
-        style={{ display: "none" }}
-      />
+      <input type="file" accept=".pdf,image/*" onChange={handleChange} style={{ display: "none" }} />
       <span className="drop-icon">📄</span>
       <p className="drop-title">Seleccioná una factura</p>
       <p className="drop-sub">PDF o imagen — PlacaSur, Aglolam, Cantochap</p>
@@ -301,10 +263,7 @@ export default function Facturas() {
     <div className="app">
       <header className="app-header">
         <h1>Facturas de proveedores</h1>
-        <p>
-          Cargá un PDF o imagen — el sistema detecta el proveedor
-          automáticamente
-        </p>
+        <p>Cargá un PDF o imagen — el sistema detecta el proveedor automáticamente</p>
       </header>
 
       {estado === "idle" && <UploadZone onFile={procesarArchivo} />}
@@ -319,9 +278,7 @@ export default function Facturas() {
       {estado === "error" && (
         <div className="error-box">
           <p>{errorMsg}</p>
-          <button className="btn-reset" onClick={reset}>
-            Intentar de nuevo
-          </button>
+          <button className="btn-reset" onClick={reset}>Intentar de nuevo</button>
         </div>
       )}
 
