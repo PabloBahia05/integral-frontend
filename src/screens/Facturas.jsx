@@ -64,25 +64,6 @@ function CabeceraBonzini({ factura }) {
   );
 }
 
-function TotalesBonzini({ factura }) {
-  const esPresup = factura.es_presupuesto;
-  return (
-    <div className="totals-section">
-      <div className="totals-grid">
-        {esPresup ? (
-          <TotalRow label="Total ARS" value={factura.total} highlight />
-        ) : (
-          <>
-            <TotalRow label="Neto gravado" value={factura.subtotal} />
-            <TotalRow label={`IVA ${factura.iva_pct || 21}%`} value={factura.iva} />
-            <TotalRow label="Total ARS" value={factura.total} highlight />
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function CabeceraGenerica({ factura }) {
   return (
     <div className="factura-header generica">
@@ -179,6 +160,25 @@ function TotalesPlacaSur({ factura }) {
   );
 }
 
+function TotalesBonzini({ factura }) {
+  const esPresup = factura.es_presupuesto;
+  return (
+    <div className="totals-section">
+      <div className="totals-grid">
+        {esPresup ? (
+          <TotalRow label="Total ARS" value={factura.total} highlight />
+        ) : (
+          <>
+            <TotalRow label="Neto gravado" value={factura.subtotal} />
+            <TotalRow label={`IVA ${factura.iva_pct || 21}%`} value={factura.iva} />
+            <TotalRow label="Total ARS" value={factura.total} highlight />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TotalesGenericos({ factura }) {
   return (
     <div className="totals-section">
@@ -259,7 +259,7 @@ function UploadZone({ onFile }) {
       <input type="file" accept=".pdf,image/*" onChange={handleChange} style={{ display: "none" }} />
       <span className="drop-icon">📄</span>
       <p className="drop-title">Seleccioná una factura</p>
-      <p className="drop-sub">PDF o imagen — PlacaSur, Aglolam, Cantochap</p>
+      <p className="drop-sub">PDF o imagen — PlacaSur, Aglolam, Cantochap, Bonzini</p>
     </label>
   );
 }
