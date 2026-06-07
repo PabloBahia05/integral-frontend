@@ -17,6 +17,7 @@ import PresupuestoNuevo from "./screens/PresupuestoNuevo";
 import PresupuestosNuevoTabla from "./screens/PresupuestosNuevoTabla";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
+import HistorialFacturas from "./screens/HistorialFacturas";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState } from "react";
@@ -895,6 +896,9 @@ function App({ usuario }) {
             {/* ── Facturas ── */}
             {screen === "facturas" && <Facturas proveedores={proveedores} />}
 
+            {/* ── Historial Facturas ── */}
+            {screen === "historial-facturas" && <HistorialFacturas proveedores={proveedores} />}
+
             {/* ── Lista de Márgenes ── */}
             {screen === "lista-margenes" && (
               <Lista
@@ -1060,7 +1064,7 @@ function App({ usuario }) {
                 <span className="sub-card-label">CARGAR FACTURA</span>
                 <span className="sub-card-desc">Subí y procesá un PDF</span>
               </div>
-              <div className="sub-card" style={{"--sc-color":"#4361ee"}} onClick={() => { setScreen("lista-margenes"); fetchListas(); setHomeSection(HOME_SECTIONS.main); }}>
+              <div className="sub-card" style={{"--sc-color":"#4361ee"}} onClick={() => { setScreen("historial-facturas"); setHomeSection(HOME_SECTIONS.main); }}>
                 <span className="sub-card-icon">📋</span>
                 <span className="sub-card-label">HISTORIAL</span>
                 <span className="sub-card-desc">Comprobantes anteriores</span>
