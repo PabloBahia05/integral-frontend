@@ -690,6 +690,7 @@ function App({ usuario }) {
                   setScreen(s);
                   if (s === "presupuestos-tabla") fetchPresupuestosMamparas();
                   if (s === "lista-margenes") fetchListas();
+                  if (s === "ver-tablas") setTablaInicialVerTablas(null);
                 }}
                 title={SCREENS[s].label}
               >
@@ -801,6 +802,7 @@ function App({ usuario }) {
                     setTablaInicialVerTablas(tablaId);
                     setScreen("ver-tablas");
                   } else {
+                    setTablaInicialVerTablas(null);
                     setScreen("presupuestos-nuevo-tabla");
                   }
                 }}
@@ -850,6 +852,7 @@ function App({ usuario }) {
             )}
             {screen === "ver-tablas" && (
               <VerTablas
+                key={tablaInicialVerTablas ?? "ver-tablas"}
                 clientes={clientes}
                 clientesCRUD={clientesCRUD}
                 selectedCliente={selectedCliente}
