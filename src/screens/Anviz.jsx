@@ -57,11 +57,15 @@ export default function Anviz({ onBack }) {
   const [filtroUser, setFiltroUser]           = useState("");
   const [filtroDireccion, setFiltroDireccion] = useState("todas");
 
-  // ── Paginación ─────────────────────────────────────────────────────────────
-  const [pagina, setPagina] = useState(1);
+  const [modal, setModal] = useState(null); // null | "nueva" | "editar"
+  const [modalData, setModalData] = useState({ user_id: "", direccion: "entrada", timestamp: "" });
+  const [modalFichadaId, setModalFichadaId] = useState(null);
+  const [modalGuardando, setModalGuardando] = useState(false);
+  const [modalError, setModalError] = useState("");
   const POR_PAGINA = 25;
 
-  // ── Vista tabla/resumen ────────────────────────────────────────────────────
+  // ── Paginación ─────────────────────────────────────────────────────────────
+  const [pagina, setPagina] = useState(1);
   const [vistaTabla, setVistaTabla] = useState("tabla"); // "tabla" | "resumen"
 
   const wsRef = useRef(null);
@@ -186,8 +190,65 @@ export default function Anviz({ onBack }) {
     }, {}),
   ).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
+  // ── Helpers modal ──────────────────────────────────────────────────────────
+  function abrirNueva() {
+    const ahora = new Date();
+    const local = `${ahora.getFullYear()}-${pad(ahora.getMonth()+1)}-${pad(ahora.getDate())}T${pad(ahora.getHours())}:${pad(ahora.getMinutes())}`;
+    setModalData({ user_id: "", direccion: "entrada", timestamp: local });
+    setModalFichadaId(null);
+    setModalError("");
+    setModal("nueva");
+  }
+
+  function abrirEditar(f) {
+    // Convertir timestamp a formato datetime-local
+    const d = parseMysqlTs(f.timestamp);
+    const local = d
+      ? `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+      : "";
+    setModalData({ user_id: f.user_id, direccion: f.direccion, timestamp: local });
+    setModalFichadaId(f.id);
+    setModalError("");
+    setModal("editar");
+  }
+
+  async function guardarFichada() {
+    setModalGuardando(true);
+    setModalError("");
+    // Convertir datetime-local a formato MySQL (UTC)
+    const tsMySQL = modalData.timestamp.replace("T", " ") + ":00";
+    try {
+      const url = modal === "nueva" ? `${API}/fichadas` : `${API}/fichadas/${modalFichadaId}`;
+      const method = modal === "nueva" ? "POST" : "PUT";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: Number(modalData.user_id), direccion: modalData.direccion, timestamp: tsMySQL }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al guardar");
+      setModal(null);
+      cargarFichadas();
+    } catch (e) {
+      setModalError(e.message);
+    } finally {
+      setModalGuardando(false);
+    }
+  }
+
+  async function eliminarFichada(id) {
+    if (!window.confirm("¿Eliminar esta fichada?")) return;
+    try {
+      const res = await fetch(`${API}/fichadas/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      cargarFichadas();
+    } catch (e) {
+      alert("Error al eliminar: " + e.message);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
-  return (
     <div style={s.page}>
       {/* Si vista es usuarios, mostrar el componente Usuarios */}
       {vista === "usuarios" && (
@@ -224,6 +285,9 @@ export default function Anviz({ onBack }) {
               </button>
               <button style={s.btnUsuarios} onClick={() => setVista("usuarios")}>
                 👥 Usuarios
+              </button>
+              <button style={s.btnNueva} onClick={abrirNueva}>
+                + Nueva fichada
               </button>
               <button
                 style={{ ...s.btnSync, opacity: (syncing || !agente.connected) ? 0.5 : 1 }}
@@ -353,7 +417,7 @@ export default function Anviz({ onBack }) {
                 <table style={s.tabla}>
                   <thead>
                     <tr>
-                      {["#", "Empleado", "Fecha", "Hora", "Dirección"].map((c) => (
+                      {["#", "Empleado", "Fecha", "Hora", "Dirección", ""].map((c) => (
                         <th key={c} style={s.th}>{c}</th>
                       ))}
                     </tr>
@@ -389,6 +453,12 @@ export default function Anviz({ onBack }) {
                           <span style={f.direccion === "entrada" ? s.badgeEntrada : s.badgeSalida}>
                             {f.direccion === "entrada" ? "↓ Entrada" : "↑ Salida"}
                           </span>
+                        </td>
+                        <td style={{ ...s.td, width: 90 }}>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button style={s.btnRowEdit} onClick={() => abrirEditar(f)} title="Editar">✏️</button>
+                            <button style={s.btnRowDel}  onClick={() => eliminarFichada(f.id)} title="Eliminar">🗑️</button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -463,6 +533,76 @@ export default function Anviz({ onBack }) {
             )}
           </div>
         </>
+      )}
+
+      {/* ── Modal nueva / editar fichada ────────────────────────────── */}
+      {modal && (
+        <div style={s.modalOverlay} onClick={() => setModal(null)}>
+          <div style={s.modalBox} onClick={(e) => e.stopPropagation()}>
+            <h3 style={s.modalTitulo}>
+              {modal === "nueva" ? "➕ Nueva fichada" : "✏️ Editar fichada"}
+            </h3>
+
+            {/* Empleado */}
+            <div style={s.modalGrupo}>
+              <label style={s.label}>Empleado</label>
+              <select
+                value={modalData.user_id}
+                onChange={(e) => setModalData((d) => ({ ...d, user_id: e.target.value }))}
+                style={s.input}
+              >
+                <option value="">— Seleccioná —</option>
+                {usuarios.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.apellido} {u.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Fecha y hora */}
+            <div style={s.modalGrupo}>
+              <label style={s.label}>Fecha y hora</label>
+              <input
+                type="datetime-local"
+                value={modalData.timestamp}
+                onChange={(e) => setModalData((d) => ({ ...d, timestamp: e.target.value }))}
+                style={s.input}
+              />
+            </div>
+
+            {/* Dirección */}
+            <div style={s.modalGrupo}>
+              <label style={s.label}>Dirección</label>
+              <div style={{ display: "flex", gap: 10 }}>
+                {["entrada", "salida"].map((dir) => (
+                  <button
+                    key={dir}
+                    style={modalData.direccion === dir ? s.dirBtnActive : s.dirBtn}
+                    onClick={() => setModalData((d) => ({ ...d, direccion: dir }))}
+                  >
+                    {dir === "entrada" ? "↓ Entrada" : "↑ Salida"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {modalError && <div style={s.modalError}>{modalError}</div>}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button
+                style={{ ...s.btnBuscar, flex: 1, opacity: modalGuardando ? 0.6 : 1 }}
+                onClick={guardarFichada}
+                disabled={modalGuardando || !modalData.user_id || !modalData.timestamp}
+              >
+                {modalGuardando ? "Guardando..." : "Guardar"}
+              </button>
+              <button style={s.btnPag} onClick={() => setModal(null)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* CSS keyframes globales */}
@@ -667,6 +807,41 @@ const s = {
     border: "1px solid #33415544", borderRadius: 99,
     padding: "3px 10px", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
   },
+  btnNueva: {
+    background: "#4f46e5", border: "1px solid #6366f1", borderRadius: 8,
+    padding: "8px 14px", cursor: "pointer", color: "#fff", fontSize: 13, fontWeight: 600,
+  },
+  btnRowEdit: {
+    background: "#1e3a5f", border: "1px solid #2563eb44", borderRadius: 6,
+    padding: "4px 8px", cursor: "pointer", fontSize: 13, lineHeight: 1,
+  },
+  btnRowDel: {
+    background: "#3b0f0f", border: "1px solid #dc262644", borderRadius: 6,
+    padding: "4px 8px", cursor: "pointer", fontSize: 13, lineHeight: 1,
+  },
+  modalOverlay: {
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+  },
+  modalBox: {
+    background: "#1e293b", border: "1px solid #334155", borderRadius: 14,
+    padding: "28px 32px", width: "100%", maxWidth: 420,
+  },
+  modalTitulo: {
+    margin: "0 0 20px", fontSize: 17, fontWeight: 700, color: "#f1f5f9",
+  },
+  modalGrupo: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 },
+  modalError: {
+    background: "#450a0a", color: "#fca5a5", borderRadius: 7,
+    padding: "8px 12px", fontSize: 13, marginTop: 4,
+  },
+  dirBtn: {
+    flex: 1, background: "#0f172a", border: "1px solid #334155",
+    borderRadius: 8, padding: "8px", cursor: "pointer", color: "#64748b", fontSize: 13,
+  },
+  dirBtnActive: {
+    flex: 1, background: "#312e81", border: "1px solid #6366f1",
+    borderRadius: 8, padding: "8px", cursor: "pointer", color: "#a5b4fc", fontSize: 13, fontWeight: 600,
   paginacion: {
     display: "flex", justifyContent: "space-between",
     alignItems: "center", padding: "14px 18px",
