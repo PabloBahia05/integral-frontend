@@ -843,6 +843,7 @@ const s = {
   dirBtnActive: {
     flex: 1, background: "#312e81", border: "1px solid #6366f1",
     borderRadius: 8, padding: "8px", cursor: "pointer", color: "#a5b4fc", fontSize: 13, fontWeight: 600,
+  },
   paginacion: {
     display: "flex", justifyContent: "space-between",
     alignItems: "center", padding: "14px 18px",
