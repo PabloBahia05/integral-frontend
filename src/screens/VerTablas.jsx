@@ -62,7 +62,6 @@ const TABLAS = [
     color: "#e63946",
   },
   { id: "lista", label: "Lista Margen", icon: "📊", color: "#20b2aa" },
-  { id: "proveedores",   label: "Proveedores",    icon: "🏭", color: "#7b5ea7" },
   { id: "usuarios-app", label: "Usuarios App",    icon: "🔐", color: "#e63946" },
   { id: "anviz",        label: "Accesos Anviz",   icon: "🕐", color: "#0a7a3c" },
 ];
