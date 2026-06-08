@@ -353,18 +353,6 @@ export default function Anviz({ onBack }) {
               <button style={s.btnUsuarios} onClick={() => setVista("usuarios")}>
                 👥 Empleados
               </button>
-              <button
-                style={vista === "fichadas" ? s.btnNavActive : s.btnNav}
-                onClick={() => setVista("fichadas")}
-              >
-                📋 Movimientos
-              </button>
-              <button
-                style={vista === "historial" ? s.btnNavActive : s.btnNav}
-                onClick={() => setVista("historial")}
-              >
-                📊 Historial
-              </button>
               <button style={s.btnNueva} onClick={abrirNueva}>
                 + Nueva fichada
               </button>
@@ -386,6 +374,22 @@ export default function Anviz({ onBack }) {
               {agente.pendingQueue > 0 && ` Hay ${agente.pendingQueue} eventos pendientes de subir.`}
             </div>
           )}
+
+          {/* ── Navegación principal ────────────────────────────────── */}
+          <div style={s.navBar}>
+            <button
+              style={vista === "fichadas" ? s.navBtnActive : s.navBtn}
+              onClick={() => setVista("fichadas")}
+            >
+              📋 Movimientos
+            </button>
+            <button
+              style={vista === "historial" ? s.navBtnActive : s.navBtn}
+              onClick={() => setVista("historial")}
+            >
+              📊 Historial
+            </button>
+          </div>
 
           {/* ── Cards resumen ──────────────────────────────────────────── */}
           <div style={s.cards}>
@@ -622,25 +626,29 @@ export default function Anviz({ onBack }) {
               <button style={s.btnVolver} onClick={onBack}>← Volver</button>
               <div style={s.iconBox}><IconReloj /></div>
               <div>
-                <h1 style={s.titulo}>Historial de Horas</h1>
+                <h1 style={s.titulo}>Control de Asistencia</h1>
                 <span style={s.subtitulo}>Acumulado por empleado</span>
               </div>
             </div>
             <div style={s.headerRight}>
               <AgenteBadge agente={agente} />
-              <button
-                style={vista === "fichadas" ? s.btnNavActive : s.btnNav}
-                onClick={() => setVista("fichadas")}
-              >
-                📋 Movimientos
-              </button>
-              <button
-                style={vista === "historial" ? s.btnNavActive : s.btnNav}
-                onClick={() => setVista("historial")}
-              >
-                📊 Historial
-              </button>
             </div>
+          </div>
+
+          {/* ── Navegación principal ──────────────────────────────────── */}
+          <div style={s.navBar}>
+            <button
+              style={vista === "fichadas" ? s.navBtnActive : s.navBtn}
+              onClick={() => setVista("fichadas")}
+            >
+              📋 Movimientos
+            </button>
+            <button
+              style={vista === "historial" ? s.navBtnActive : s.navBtn}
+              onClick={() => setVista("historial")}
+            >
+              📊 Historial
+            </button>
           </div>
 
           {/* Filtro de rango */}
@@ -1015,7 +1023,22 @@ const s = {
     border: "1px solid #33415544", borderRadius: 99,
     padding: "3px 10px", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
   },
-  btnNav: {
+  navBar: {
+    display: "flex", gap: 8, marginBottom: 24,
+    background: "#1e293b", border: "1px solid #334155",
+    borderRadius: 12, padding: "8px",
+    width: "fit-content",
+  },
+  navBtn: {
+    background: "transparent", border: "none", borderRadius: 8,
+    padding: "10px 24px", cursor: "pointer", color: "#64748b",
+    fontSize: 14, fontWeight: 500, transition: "all 0.15s",
+  },
+  navBtnActive: {
+    background: "#312e81", border: "none", borderRadius: 8,
+    padding: "10px 24px", cursor: "pointer", color: "#a5b4fc",
+    fontSize: 14, fontWeight: 700,
+  },
     background: "#1e293b", border: "1px solid #334155", borderRadius: 8,
     padding: "8px 16px", cursor: "pointer", color: "#94a3b8", fontSize: 13, fontWeight: 500,
   },
