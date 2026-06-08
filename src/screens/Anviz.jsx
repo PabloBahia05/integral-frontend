@@ -249,6 +249,7 @@ export default function Anviz({ onBack }) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  return (
     <div style={s.page}>
       {/* Si vista es usuarios, mostrar el componente Usuarios */}
       {vista === "usuarios" && (
