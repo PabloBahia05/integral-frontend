@@ -41,7 +41,7 @@ async function apiFetch(path) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Anviz({ onBack }) {
-  const [vista, setVista]               = useState("fichadas"); // "fichadas" | "usuarios"
+  const [vista, setVista]               = useState("fichadas"); // "fichadas" | "usuarios" | "historial"
   const [fichadas, setFichadas]         = useState([]);
   const [usuarios, setUsuarios]         = useState([]);
   const [agente, setAgente]             = useState({ connected: false, lastSync: null, lastError: null, pendingQueue: 0 });
@@ -190,7 +190,73 @@ export default function Anviz({ onBack }) {
     }, {}),
   ).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-  // ── Helpers modal ──────────────────────────────────────────────────────────
+  // ── Historial: rango de fechas ─────────────────────────────────────────────
+  const [histDesde, setHistDesde] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  });
+  const [histHasta, setHistHasta]       = useState(hoy());
+  const [histFichadas, setHistFichadas] = useState([]);
+  const [histCargando, setHistCargando] = useState(false);
+  const [histError, setHistError]       = useState(null);
+
+  const cargarHistorial = useCallback(async () => {
+    setHistCargando(true);
+    setHistError(null);
+    try {
+      const params = new URLSearchParams({ limit: 2000 });
+      if (histDesde) params.set("fecha_desde", histDesde);
+      if (histHasta) params.set("fecha_hasta", histHasta);
+      const data = await apiFetch(`/fichadas?${params}`);
+      setHistFichadas(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setHistError(e.message);
+    } finally {
+      setHistCargando(false);
+    }
+  }, [histDesde, histHasta]);
+
+  useEffect(() => {
+    if (vista === "historial") cargarHistorial();
+  }, [vista, cargarHistorial]);
+
+  // ── Calcular horas acumuladas por empleado ─────────────────────────────────
+  const historialEmpleados = (() => {
+    // Agrupar por empleado → por día → pares entrada/salida
+    const porEmp = {};
+    histFichadas
+      .slice()
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+      .forEach(f => {
+        const uid = f.user_id;
+        if (!porEmp[uid]) porEmp[uid] = {
+          user_id: uid,
+          nombre: f.nombre_completo?.trim() || `Usuario ${uid}`,
+          fichadas: [],
+        };
+        porEmp[uid].fichadas.push(f);
+      });
+
+    return Object.values(porEmp).map(emp => {
+      let totalMs = 0;
+      const fichs = emp.fichadas;
+      // Recorrer de a pares: entrada → salida
+      for (let i = 0; i < fichs.length - 1; i++) {
+        if (fichs[i].direccion === "entrada" && fichs[i+1].direccion === "salida") {
+          const tin  = parseMysqlTs(fichs[i].timestamp);
+          const tout = parseMysqlTs(fichs[i+1].timestamp);
+          if (tin && tout) totalMs += tout - tin;
+          i++; // saltar la salida ya consumida
+        }
+      }
+      const totalMin = Math.floor(totalMs / 60000);
+      const horas    = Math.floor(totalMin / 60);
+      const minutos  = totalMin % 60;
+      return { ...emp, totalMs, horas, minutos, fichadas: fichs.length };
+    }).sort((a, b) => b.totalMs - a.totalMs);
+  })();
+
+
   function abrirNueva() {
     const ahora = new Date();
     const local = `${ahora.getFullYear()}-${pad(ahora.getMonth()+1)}-${pad(ahora.getDate())}T${pad(ahora.getHours())}:${pad(ahora.getMinutes())}`;
@@ -285,7 +351,19 @@ export default function Anviz({ onBack }) {
                 <IconRefresh spin={cargando} />
               </button>
               <button style={s.btnUsuarios} onClick={() => setVista("usuarios")}>
-                👥 Usuarios
+                👥 Empleados
+              </button>
+              <button
+                style={vista === "fichadas" ? s.btnNavActive : s.btnNav}
+                onClick={() => setVista("fichadas")}
+              >
+                📋 Movimientos
+              </button>
+              <button
+                style={vista === "historial" ? s.btnNavActive : s.btnNav}
+                onClick={() => setVista("historial")}
+              >
+                📊 Historial
               </button>
               <button style={s.btnNueva} onClick={abrirNueva}>
                 + Nueva fichada
@@ -536,7 +614,136 @@ export default function Anviz({ onBack }) {
         </>
       )}
 
-      {/* ── Modal nueva / editar fichada ────────────────────────────── */}
+      {/* ── Vista Historial ─────────────────────────────────────────── */}
+      {vista === "historial" && (
+        <>
+          <div style={s.header}>
+            <div style={s.headerLeft}>
+              <button style={s.btnVolver} onClick={onBack}>← Volver</button>
+              <div style={s.iconBox}><IconReloj /></div>
+              <div>
+                <h1 style={s.titulo}>Historial de Horas</h1>
+                <span style={s.subtitulo}>Acumulado por empleado</span>
+              </div>
+            </div>
+            <div style={s.headerRight}>
+              <AgenteBadge agente={agente} />
+              <button
+                style={vista === "fichadas" ? s.btnNavActive : s.btnNav}
+                onClick={() => setVista("fichadas")}
+              >
+                📋 Movimientos
+              </button>
+              <button
+                style={vista === "historial" ? s.btnNavActive : s.btnNav}
+                onClick={() => setVista("historial")}
+              >
+                📊 Historial
+              </button>
+            </div>
+          </div>
+
+          {/* Filtro de rango */}
+          <div style={s.filtrosWrap}>
+            <div style={s.filtroFila}>
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Desde</label>
+                <input type="date" value={histDesde}
+                  onChange={e => setHistDesde(e.target.value)} style={s.input} />
+              </div>
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Hasta</label>
+                <input type="date" value={histHasta}
+                  onChange={e => setHistHasta(e.target.value)} style={s.input} />
+              </div>
+              <button style={s.btnBuscar} onClick={cargarHistorial}>
+                Buscar
+              </button>
+            </div>
+          </div>
+
+          {/* Tabla historial */}
+          <div style={s.tableWrap}>
+            {histError && <div style={s.errorBanner}>⚠️ {histError}</div>}
+            {histCargando ? (
+              <div style={s.estado}>
+                <div style={s.spinner} />
+                <span style={{ color: "#64748b", fontSize: 14 }}>Calculando horas...</span>
+              </div>
+            ) : historialEmpleados.length === 0 ? (
+              <div style={s.estado}>
+                <span style={{ fontSize: 36 }}>📭</span>
+                <span style={{ color: "#64748b", fontSize: 14, marginTop: 8 }}>
+                  Sin registros para el período seleccionado
+                </span>
+              </div>
+            ) : (
+              <table style={s.tabla}>
+                <thead>
+                  <tr>
+                    {["Empleado", "Fichadas", "Horas trabajadas", "Detalle"].map(c => (
+                      <th key={c} style={s.th}>{c}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {historialEmpleados.map(emp => (
+                    <tr key={emp.user_id}>
+                      <td style={s.td}>
+                        <div style={s.empNombre}>
+                          <span style={s.empAvatar}>
+                            {emp.nombre.charAt(0).toUpperCase()}
+                          </span>
+                          <div>
+                            <div style={{ fontWeight: 500, fontSize: 13 }}>{emp.nombre}</div>
+                            <div style={{ fontSize: 11, color: "#64748b" }}>ID {emp.user_id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={s.td}>
+                        <span style={s.badgeGray}>{emp.fichadas} registros</span>
+                      </td>
+                      <td style={s.td}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          {/* Barra de progreso relativa al máximo */}
+                          <div style={{
+                            flex: 1, height: 6, background: "#0f172a",
+                            borderRadius: 99, overflow: "hidden", maxWidth: 120,
+                          }}>
+                            <div style={{
+                              height: "100%", borderRadius: 99,
+                              background: "#6366f1",
+                              width: `${Math.min(100, (emp.totalMs / Math.max(...historialEmpleados.map(e => e.totalMs))) * 100)}%`,
+                            }} />
+                          </div>
+                          <span style={{
+                            fontFamily: "monospace", fontSize: 15, fontWeight: 700,
+                            color: emp.totalMs > 0 ? "#a5b4fc" : "#475569",
+                          }}>
+                            {emp.totalMs > 0
+                              ? `${emp.horas}h ${pad(emp.minutos)}m`
+                              : "—"}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={s.td}>
+                        {emp.totalMs === 0
+                          ? <span style={{ color: "#475569", fontSize: 12 }}>Sin pares completos</span>
+                          : <span style={{ color: "#64748b", fontSize: 12 }}>
+                              {Math.floor(emp.fichadas / 2)} jornada{Math.floor(emp.fichadas / 2) !== 1 ? "s" : ""}
+                            </span>
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+
       {modal && (
         <div style={s.modalOverlay} onClick={() => setModal(null)}>
           <div style={s.modalBox} onClick={(e) => e.stopPropagation()}>
@@ -808,7 +1015,14 @@ const s = {
     border: "1px solid #33415544", borderRadius: 99,
     padding: "3px 10px", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
   },
-  btnNueva: {
+  btnNav: {
+    background: "#1e293b", border: "1px solid #334155", borderRadius: 8,
+    padding: "8px 16px", cursor: "pointer", color: "#94a3b8", fontSize: 13, fontWeight: 500,
+  },
+  btnNavActive: {
+    background: "#312e81", border: "1px solid #6366f1", borderRadius: 8,
+    padding: "8px 16px", cursor: "pointer", color: "#a5b4fc", fontSize: 13, fontWeight: 600,
+  },
     background: "#4f46e5", border: "1px solid #6366f1", borderRadius: 8,
     padding: "8px 14px", cursor: "pointer", color: "#fff", fontSize: 13, fontWeight: 600,
   },
