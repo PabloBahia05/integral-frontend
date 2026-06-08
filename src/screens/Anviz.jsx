@@ -1023,6 +1023,7 @@ const s = {
     background: "#312e81", border: "1px solid #6366f1", borderRadius: 8,
     padding: "8px 16px", cursor: "pointer", color: "#a5b4fc", fontSize: 13, fontWeight: 600,
   },
+  btnNueva: {
     background: "#4f46e5", border: "1px solid #6366f1", borderRadius: 8,
     padding: "8px 14px", cursor: "pointer", color: "#fff", fontSize: 13, fontWeight: 600,
   },
