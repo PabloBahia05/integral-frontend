@@ -106,8 +106,6 @@ const buttons = [
 const HOME_SECTIONS = {
   main: "main",
   admin: "admin",
-  facturas: "facturas",
-  proveedores: "proveedores",
 };
 
 export default function Root() {
@@ -1136,7 +1134,10 @@ function App({ usuario }) {
               <div
                 className="sub-card"
                 style={{ "--sc-color": "#27ae60" }}
-                onClick={() => setHomeSection(HOME_SECTIONS.facturas)}
+                onClick={() => {
+                  setScreen("facturas");
+                  setHomeSection(HOME_SECTIONS.main);
+                }}
               >
                 <span className="sub-card-icon">🧾</span>
                 <span className="sub-card-label">FACTURAS</span>
@@ -1145,7 +1146,11 @@ function App({ usuario }) {
               <div
                 className="sub-card"
                 style={{ "--sc-color": "#e67e22" }}
-                onClick={() => setHomeSection(HOME_SECTIONS.proveedores)}
+                onClick={() => {
+                  setTablaInicialVerTablas("proveedores");
+                  setScreen("ver-tablas");
+                  setHomeSection(HOME_SECTIONS.main);
+                }}
               >
                 <span className="sub-card-icon">🏭</span>
                 <span className="sub-card-label">PROVEEDORES</span>
@@ -1158,109 +1163,6 @@ function App({ usuario }) {
         )}
 
         {/* ── Facturas ── */}
-        {homeSection === HOME_SECTIONS.facturas && (
-          <>
-            <button
-              className="sub-back"
-              onClick={() => setHomeSection(HOME_SECTIONS.admin)}
-            >
-              ← Volver
-            </button>
-            <p className="sub-title">🧾 Facturas</p>
-            <div className="sub-grid">
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#27ae60" }}
-                onClick={() => {
-                  setScreen("facturas");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">📄</span>
-                <span className="sub-card-label">CARGAR FACTURA</span>
-                <span className="sub-card-desc">Subí y procesá un PDF</span>
-              </div>
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#4361ee" }}
-                onClick={() => {
-                  setScreen("historial-facturas");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">📋</span>
-                <span className="sub-card-label">HISTORIAL</span>
-                <span className="sub-card-desc">Comprobantes anteriores</span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── Proveedores ── */}
-        {homeSection === HOME_SECTIONS.proveedores && (
-          <>
-            <button
-              className="sub-back"
-              onClick={() => setHomeSection(HOME_SECTIONS.admin)}
-            >
-              ← Volver
-            </button>
-            <p className="sub-title">🏭 Proveedores</p>
-            <div className="sub-grid">
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#e67e22" }}
-                onClick={() => {
-                  setScreen("ver-tablas");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">📦</span>
-                <span className="sub-card-label">PLACASUR</span>
-                <span className="sub-card-desc">
-                  Distribuidora PlacaSur S.A.
-                </span>
-              </div>
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#c77dff" }}
-                onClick={() => {
-                  setScreen("ver-tablas");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">📦</span>
-                <span className="sub-card-label">AGLOLAM</span>
-                <span className="sub-card-desc">Proveedor Aglolam</span>
-              </div>
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#ff6b6b" }}
-                onClick={() => {
-                  setScreen("ver-tablas");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">📦</span>
-                <span className="sub-card-label">CANTOCHAP</span>
-                <span className="sub-card-desc">Proveedor Cantochap</span>
-              </div>
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#00c9a7" }}
-                onClick={() => {
-                  setScreen("ver-tablas");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">➕</span>
-                <span className="sub-card-label">AGREGAR</span>
-                <span className="sub-card-desc">Nuevo proveedor</span>
-              </div>
-            </div>
-          </>
-        )}
-
         <div className="log">
           <p className="log-title">Registro de actividad</p>
           {log.length === 0 ? (
