@@ -91,49 +91,20 @@ export default function FichadasAnviz() {
   // ── Vista ──────────────────────────────────────────────────────────────────
   const [vista, setVista] = useState("tabla"); // "tabla" | "resumen"
 
-  // ── Modal nueva fichada ────────────────────────────────────────────────────
-  const [modal, setModal]               = useState(false);
-  const [modalData, setModalData]       = useState({ user_id: "", timestamp: "" });
-  const [modalGuardando, setModalGuardando] = useState(false);
-  const [modalError, setModalError]     = useState("");
+  // ── Fichadas de hoy (para el panel de presencia) ──────────────────────────
+  const [fichadasHoy, setFichadasHoy] = useState([]);
 
-  function abrirModal() {
-    const ahora = new Date();
-    const local = `${ahora.getFullYear()}-${pad(ahora.getMonth()+1)}-${pad(ahora.getDate())}T${pad(ahora.getHours())}:${pad(ahora.getMinutes())}`;
-    setModalData({ user_id: "", timestamp: local });
-    setModalError("");
-    setModal(true);
-  }
-
-  async function guardarFichada() {
-    if (!modalData.user_id || !modalData.timestamp) {
-      setModalError("Completá empleado y fecha/hora.");
-      return;
-    }
-    setModalGuardando(true);
-    setModalError("");
+  const cargarPresencia = useCallback(async () => {
     try {
-      // Convertir datetime-local a "YYYY-MM-DD HH:MM:SS" UTC
-      const d = new Date(modalData.timestamp);
-      const ts = `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ` +
-                 `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00`;
-      const res = await fetch(`${API}/fichadas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: Number(modalData.user_id), timestamp: ts }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
-      setModal(false);
-      cargarFichadas();
-    } catch (e) {
-      setModalError(e.message);
-    } finally {
-      setModalGuardando(false);
-    }
-  }
+      const params = new URLSearchParams({ fecha_desde: hoy(), fecha_hasta: hoy(), limit: 1000 });
+      const data = await apiFetch(`/fichadas?${params}`);
+      setFichadasHoy(asignarDirecciones(Array.isArray(data) ? data : []));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    cargarPresencia();
+  }, [cargarPresencia]);
 
   // ── WebSocket ref ─────────────────────────────────────────────────────────
   const wsRef = useRef(null);
@@ -196,6 +167,16 @@ export default function FichadasAnviz() {
           if (msg.type === "fichada") {
             const nueva = msg.data;
             const fechaNueva = nueva.timestamp?.slice(0, 10);
+            // Actualizar panel de presencia si es de hoy
+            if (fechaNueva === hoy()) {
+              setFichadasHoy((prev) => {
+                const mismosDia = prev.filter(
+                  (f) => f.user_id === nueva.user_id
+                );
+                const dir = mismosDia.length % 2 === 0 ? "entrada" : "salida";
+                return asignarDirecciones([{ ...nueva, direccion: dir }, ...prev]);
+              });
+            }
             if (!filtroDesde || (fechaNueva >= filtroDesde && fechaNueva <= filtroHasta)) {
               setFichadas((prev) => {
                 const mismosDia = prev.filter(
@@ -235,6 +216,24 @@ export default function FichadasAnviz() {
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const inicio = (pagina - 1) * POR_PAGINA;
   const visibles = fichadasFiltradas.slice(inicio, inicio + POR_PAGINA);
+
+  // ── Presencia actual (última dirección de cada empleado hoy) ───────────────
+  const presencia = usuarios.map((u) => {
+    const fics = fichadasHoy
+      .filter((f) => String(f.user_id) === String(u.id))
+      .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
+    const ultima = fics[fics.length - 1];
+    return {
+      id: u.id,
+      nombre: `${u.apellido} ${u.nombre}`.trim(),
+      dentro: ultima ? ultima.direccion === "entrada" : false,
+      hora: ultima ? ultima.timestamp : null,
+      fico: fics.length,
+    };
+  }).sort((a, b) => {
+    if (a.dentro !== b.dentro) return a.dentro ? -1 : 1;
+    return a.nombre.localeCompare(b.nombre);
+  });
 
   // Resumen agrupado por empleado (para vista "resumen")
   const resumenEmpleados = Object.values(
@@ -277,7 +276,6 @@ export default function FichadasAnviz() {
         </div>
         <div style={s.headerRight}>
           <AgenteBadge agente={agente} />
-          <button style={s.btnNueva} onClick={abrirModal}>+ Nueva fichada</button>
           <button
             style={s.btnIcon}
             onClick={cargarFichadas}
@@ -289,12 +287,36 @@ export default function FichadasAnviz() {
         </div>
       </div>
 
-      {/* ── Cards resumen ───────────────────────────────────────────────── */}
-      <div style={s.cards}>
-        <StatCard label="Total" valor={total} color="#818cf8" />
-        <StatCard label="Entradas" valor={entradas} color="#34d399" />
-        <StatCard label="Salidas" valor={salidas} color="#fbbf24" />
-        <StatCard label="Empleados" valor={empUnicos} color="#60a5fa" />
+      {/* ── Panel de presencia ──────────────────────────────────────────── */}
+      <div style={s.presenciaWrap}>
+        {presencia.length === 0 ? (
+          <span style={{ color: "#475569", fontSize: 13 }}>Cargando empleados...</span>
+        ) : (
+          presencia.map((emp) => (
+            <div key={emp.id} style={{
+              ...s.presenciaChip,
+              background: emp.dentro ? "#052e16" : "#1c0a09",
+              border: `1px solid ${emp.dentro ? "#16a34a55" : "#dc262655"}`,
+            }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                background: emp.dentro ? "#4ade80" : "#f87171",
+                boxShadow: emp.dentro ? "0 0 6px #4ade80" : "none",
+              }} />
+              <span style={{
+                fontSize: 13, fontWeight: 600,
+                color: emp.dentro ? "#4ade80" : "#f87171",
+              }}>
+                {emp.nombre}
+              </span>
+              {emp.hora && (
+                <span style={{ fontSize: 11, color: emp.dentro ? "#16a34a" : "#7f1d1d" }}>
+                  {emp.dentro ? "↓" : "↑"} {fmtHora(emp.hora)}
+                </span>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
       {/* ── Filtros ─────────────────────────────────────────────────────── */}
@@ -551,52 +573,6 @@ export default function FichadasAnviz() {
         @keyframes spin { to { transform: rotate(360deg); } }
         tr:hover td { background: rgba(99,102,241,0.04); }
       `}</style>
-
-      {/* ── Modal nueva fichada ──────────────────────────────────────────── */}
-      {modal && (
-        <div style={s.modalOverlay} onClick={() => setModal(false)}>
-          <div style={s.modalBox} onClick={(e) => e.stopPropagation()}>
-            <h3 style={s.modalTitulo}>➕ Nueva fichada</h3>
-
-            <div style={s.modalGrupo}>
-              <label style={s.label}>Empleado</label>
-              <select
-                value={modalData.user_id}
-                onChange={(e) => setModalData((d) => ({ ...d, user_id: e.target.value }))}
-                style={s.input}
-              >
-                <option value="">— Seleccioná —</option>
-                {usuarios.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.apellido} {u.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={s.modalGrupo}>
-              <label style={s.label}>Fecha y hora</label>
-              <input
-                type="datetime-local"
-                value={modalData.timestamp}
-                onChange={(e) => setModalData((d) => ({ ...d, timestamp: e.target.value }))}
-                style={s.input}
-              />
-            </div>
-
-            {modalError && <div style={s.modalError}>{modalError}</div>}
-
-            <div style={s.modalBtns}>
-              <button style={s.btnCancelar} onClick={() => setModal(false)}>
-                Cancelar
-              </button>
-              <button style={s.btnGuardar} onClick={guardarFichada} disabled={modalGuardando}>
-                {modalGuardando ? "Guardando..." : "Guardar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -932,63 +908,17 @@ const s = {
     cursor: "pointer",
   },
 
-  btnNueva: {
-    background: "#6366f1",
-    border: "none",
-    borderRadius: 7,
-    padding: "8px 16px",
-    color: "#fff",
-    fontWeight: 600,
-    fontSize: 13,
-    cursor: "pointer",
+  presenciaWrap: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 20,
   },
-
-  modalOverlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.6)",
+  presenciaChip: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
-    zIndex: 100,
-  },
-  modalBox: {
-    background: "#1e293b",
-    border: "1px solid #334155",
-    borderRadius: 14,
-    padding: "28px 32px",
-    width: 360,
-    display: "flex",
-    flexDirection: "column",
-    gap: 18,
-  },
-  modalTitulo: { margin: 0, fontSize: 16, fontWeight: 700, color: "#f1f5f9" },
-  modalGrupo: { display: "flex", flexDirection: "column", gap: 6 },
-  modalError: {
-    background: "#450a0a",
-    color: "#fca5a5",
-    borderRadius: 7,
-    padding: "8px 12px",
-    fontSize: 13,
-  },
-  modalBtns: { display: "flex", gap: 10, justifyContent: "flex-end" },
-  btnCancelar: {
-    background: "transparent",
-    border: "1px solid #334155",
-    borderRadius: 7,
-    padding: "8px 18px",
-    color: "#94a3b8",
-    fontSize: 13,
-    cursor: "pointer",
-  },
-  btnGuardar: {
-    background: "#6366f1",
-    border: "none",
-    borderRadius: 7,
-    padding: "8px 22px",
-    color: "#fff",
-    fontWeight: 600,
-    fontSize: 13,
-    cursor: "pointer",
+    gap: 7,
+    borderRadius: 99,
+    padding: "6px 14px",
   },
 };
