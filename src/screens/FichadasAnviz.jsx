@@ -46,6 +46,21 @@ function hoy() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// ─── Asignar entrada/salida alternado por usuario×día ────────────────────────
+function asignarDirecciones(fichadas) {
+  const estado = {};
+  return [...fichadas]
+    .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)))
+    .map((f) => {
+      const fecha = String(f.timestamp).slice(0, 10);
+      const key   = `${f.user_id}|${fecha}`;
+      if (!estado[key]) estado[key] = "entrada";
+      const dir = estado[key];
+      estado[key] = dir === "entrada" ? "salida" : "entrada";
+      return { ...f, direccion: dir };
+    });
+}
+
 // ─── Fetcher genérico ────────────────────────────────────────────────────────
 async function apiFetch(path) {
   const res = await fetch(`${API}${path}`);
@@ -97,7 +112,7 @@ export default function FichadasAnviz() {
       if (filtroUser) params.set("user_id", filtroUser);
 
       const data = await apiFetch(`/fichadas?${params}`);
-      setFichadas(Array.isArray(data) ? data : []);
+      setFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
       setUltimoSync(new Date());
       setPagina(1);
     } catch (e) {
@@ -138,7 +153,13 @@ export default function FichadasAnviz() {
             const nueva = msg.data;
             const fechaNueva = nueva.timestamp?.slice(0, 10);
             if (!filtroDesde || (fechaNueva >= filtroDesde && fechaNueva <= filtroHasta)) {
-              setFichadas((prev) => [nueva, ...prev]);
+              setFichadas((prev) => {
+                const mismosDia = prev.filter(
+                  (f) => f.user_id === nueva.user_id && String(f.timestamp).slice(0, 10) === fechaNueva
+                );
+                const dir = mismosDia.length % 2 === 0 ? "entrada" : "salida";
+                return [{ ...nueva, direccion: dir }, ...prev];
+              });
             }
           }
           if (msg.type === "anviz_status") {
@@ -152,6 +173,7 @@ export default function FichadasAnviz() {
 
   // ── Derivados ──────────────────────────────────────────────────────────────
   const fichadasFiltradas = fichadas.filter((f) => {
+    if (filtroUser && String(f.user_id) !== String(filtroUser)) return false;
     if (filtroDireccion !== "todas" && f.direccion !== filtroDireccion) return false;
     return true;
   });
