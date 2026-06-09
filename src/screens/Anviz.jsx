@@ -33,6 +33,24 @@ function hoy() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// ─── Asignar entrada/salida alternado por usuario×día ────────────────────────
+// La primera fichada de cada usuario en cada día es siempre entrada,
+// luego alterna: salida, entrada, salida, ...
+// Opera sobre un array ya ordenado por timestamp ASC.
+function asignarDirecciones(fichadas) {
+  const estado = {};
+  return [...fichadas]
+    .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)))
+    .map((f) => {
+      const fecha = String(f.timestamp).slice(0, 10); // "YYYY-MM-DD"
+      const key   = `${f.user_id}|${fecha}`;
+      if (!estado[key]) estado[key] = "entrada";
+      const dir = estado[key];
+      estado[key] = dir === "entrada" ? "salida" : "entrada";
+      return { ...f, direccion: dir };
+    });
+}
+
 async function apiFetch(path) {
   const res = await fetch(`${API}${path}`);
   if (!res.ok) throw new Error(`HTTP ${res.status} en ${path}`);
@@ -87,7 +105,7 @@ export default function Anviz({ onBack }) {
       if (filtroHasta) params.set("fecha_hasta", filtroHasta);
       if (filtroUser)  params.set("user_id", filtroUser);
       const data = await apiFetch(`/fichadas?${params}`);
-      setFichadas(Array.isArray(data) ? data : []);
+      setFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
       setUltimoSync(new Date());
       setPagina(1);
     } catch (e) {
@@ -127,7 +145,14 @@ export default function Anviz({ onBack }) {
             const nueva = msg.data;
             const fechaNueva = nueva.timestamp?.slice(0, 10);
             if (!filtroDesde || (fechaNueva >= filtroDesde && fechaNueva <= filtroHasta)) {
-              setFichadas((prev) => [nueva, ...prev]);
+              setFichadas((prev) => {
+                // Contar cuántas fichadas tiene este usuario en ese día en el estado actual
+                const mismosDia = prev.filter(
+                  (f) => f.user_id === nueva.user_id && String(f.timestamp).slice(0, 10) === fechaNueva
+                );
+                const dir = mismosDia.length % 2 === 0 ? "entrada" : "salida";
+                return [{ ...nueva, direccion: dir }, ...prev];
+              });
             }
           }
           if (msg.type === "anviz_status") {
@@ -196,6 +221,7 @@ export default function Anviz({ onBack }) {
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   });
   const [histHasta, setHistHasta]       = useState(hoy());
+  const [histFiltroUser, setHistFiltroUser] = useState("");
   const [histFichadas, setHistFichadas] = useState([]);
   const [histCargando, setHistCargando] = useState(false);
   const [histError, setHistError]       = useState(null);
@@ -205,16 +231,17 @@ export default function Anviz({ onBack }) {
     setHistError(null);
     try {
       const params = new URLSearchParams({ limit: 2000 });
-      if (histDesde) params.set("fecha_desde", histDesde);
-      if (histHasta) params.set("fecha_hasta", histHasta);
+      if (histDesde)      params.set("fecha_desde", histDesde);
+      if (histHasta)      params.set("fecha_hasta", histHasta);
+      if (histFiltroUser) params.set("user_id", histFiltroUser);
       const data = await apiFetch(`/fichadas?${params}`);
-      setHistFichadas(Array.isArray(data) ? data : []);
+      setHistFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
     } catch (e) {
       setHistError(e.message);
     } finally {
       setHistCargando(false);
     }
-  }, [histDesde, histHasta]);
+  }, [histDesde, histHasta, histFiltroUser]);
 
   useEffect(() => {
     if (vista === "historial") cargarHistorial();
@@ -673,6 +700,21 @@ export default function Anviz({ onBack }) {
                 <label style={s.label}>Hasta</label>
                 <input type="date" value={histHasta}
                   onChange={e => setHistHasta(e.target.value)} style={s.input} />
+              </div>
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Empleado</label>
+                <select
+                  value={histFiltroUser}
+                  onChange={e => setHistFiltroUser(e.target.value)}
+                  style={s.input}
+                >
+                  <option value="">Todos</option>
+                  {usuarios.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.apellido} {u.nombre}
+                    </option>
+                  ))}
+                </select>
               </div>
               <button style={s.btnBuscar} onClick={cargarHistorial}>
                 Buscar
