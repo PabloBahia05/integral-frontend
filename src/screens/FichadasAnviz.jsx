@@ -293,28 +293,12 @@ export default function FichadasAnviz() {
           <span style={{ color: "#475569", fontSize: 13 }}>Cargando empleados...</span>
         ) : (
           presencia.map((emp) => (
-            <div key={emp.id} style={{
-              ...s.presenciaChip,
-              background: emp.dentro ? "#052e16" : "#1c0a09",
-              border: `1px solid ${emp.dentro ? "#16a34a55" : "#dc262655"}`,
+            <span key={emp.id} style={{
+              fontSize: 13, fontWeight: 600,
+              color: emp.dentro ? "#4ade80" : "#f87171",
             }}>
-              <span style={{
-                width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
-                background: emp.dentro ? "#4ade80" : "#f87171",
-                boxShadow: emp.dentro ? "0 0 6px #4ade80" : "none",
-              }} />
-              <span style={{
-                fontSize: 13, fontWeight: 600,
-                color: emp.dentro ? "#4ade80" : "#f87171",
-              }}>
-                {emp.nombre}
-              </span>
-              {emp.hora && (
-                <span style={{ fontSize: 11, color: emp.dentro ? "#16a34a" : "#7f1d1d" }}>
-                  {emp.dentro ? "↓" : "↑"} {fmtHora(emp.hora)}
-                </span>
-              )}
-            </div>
+              {emp.nombre}
+            </span>
           ))
         )}
       </div>
