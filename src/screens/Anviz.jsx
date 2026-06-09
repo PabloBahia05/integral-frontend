@@ -41,7 +41,7 @@ async function apiFetch(path) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Anviz({ onBack }) {
-  const [vista, setVista]               = useState("fichadas"); // "fichadas" | "usuarios" | "historial"
+  const [vista, setVista]               = useState("inicio"); // "inicio" | "fichadas" | "usuarios" | "historial"
   const [fichadas, setFichadas]         = useState([]);
   const [usuarios, setUsuarios]         = useState([]);
   const [agente, setAgente]             = useState({ connected: false, lastSync: null, lastError: null, pendingQueue: 0 });
@@ -319,20 +319,62 @@ export default function Anviz({ onBack }) {
     <div style={s.page}>
       {/* Si vista es usuarios, mostrar el componente Usuarios */}
       {vista === "usuarios" && (
-        <Usuarios onBack={() => setVista("fichadas")} />
+        <Usuarios onBack={() => setVista("inicio")} />
       )}
+
+      {/* ── Pantalla de inicio ──────────────────────────────────────────── */}
+      {vista === "inicio" && (
+        <div style={s.page}>
+          <div style={s.header}>
+            <div style={s.headerLeft}>
+              <button style={s.btnVolver} onClick={onBack}>← Volver</button>
+              <div style={s.iconBox}><IconReloj /></div>
+              <div>
+                <h1 style={s.titulo}>Asistencia</h1>
+                <span style={s.subtitulo}>Control de personal</span>
+              </div>
+            </div>
+            <div style={s.headerRight}>
+              <AgenteBadge agente={agente} />
+            </div>
+          </div>
+
+          <div style={{
+            display: "flex", gap: 20, marginTop: 40,
+            justifyContent: "center", flexWrap: "wrap",
+          }}>
+            <div
+              style={s.inicioCard}
+              onClick={() => setVista("fichadas")}
+            >
+              <span style={s.inicioIcon}>📋</span>
+              <span style={s.inicioLabel}>Movimientos</span>
+              <span style={s.inicioDesc}>Entradas y salidas del día</span>
+            </div>
+            <div
+              style={s.inicioCard}
+              onClick={() => setVista("historial")}
+            >
+              <span style={s.inicioIcon}>📊</span>
+              <span style={s.inicioLabel}>Historial</span>
+              <span style={s.inicioDesc}>Horas acumuladas por empleado</span>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {vista === "fichadas" && (
         <>
           {/* ── Header ──────────────────────────────────────────────────── */}
           <div style={s.header}>
             <div style={s.headerLeft}>
-              <button style={s.btnVolver} onClick={onBack}>← Volver</button>
+              <button style={s.btnVolver} onClick={() => setVista("inicio")}>← Volver</button>
               <div style={s.iconBox}>
                 <IconReloj />
               </div>
               <div>
-                <h1 style={s.titulo}>Control de Asistencia</h1>
+                <h1 style={s.titulo}>Movimientos</h1>
                 <span style={s.subtitulo}>
                   {ultimoSync
                     ? `Actualizado a las ${fmtHora(ultimoSync.toISOString().replace("T", " "))}`
@@ -374,22 +416,6 @@ export default function Anviz({ onBack }) {
               {agente.pendingQueue > 0 && ` Hay ${agente.pendingQueue} eventos pendientes de subir.`}
             </div>
           )}
-
-          {/* ── Navegación principal ────────────────────────────────── */}
-          <div style={s.navBar}>
-            <button
-              style={vista === "fichadas" ? s.navBtnActive : s.navBtn}
-              onClick={() => setVista("fichadas")}
-            >
-              📋 Movimientos
-            </button>
-            <button
-              style={vista === "historial" ? s.navBtnActive : s.navBtn}
-              onClick={() => setVista("historial")}
-            >
-              📊 Historial
-            </button>
-          </div>
 
           {/* ── Cards resumen ──────────────────────────────────────────── */}
           <div style={s.cards}>
@@ -623,32 +649,16 @@ export default function Anviz({ onBack }) {
         <>
           <div style={s.header}>
             <div style={s.headerLeft}>
-              <button style={s.btnVolver} onClick={onBack}>← Volver</button>
+              <button style={s.btnVolver} onClick={() => setVista("inicio")}>← Volver</button>
               <div style={s.iconBox}><IconReloj /></div>
               <div>
-                <h1 style={s.titulo}>Control de Asistencia</h1>
+                <h1 style={s.titulo}>Historial de Horas</h1>
                 <span style={s.subtitulo}>Acumulado por empleado</span>
               </div>
             </div>
             <div style={s.headerRight}>
               <AgenteBadge agente={agente} />
             </div>
-          </div>
-
-          {/* ── Navegación principal ──────────────────────────────────── */}
-          <div style={s.navBar}>
-            <button
-              style={vista === "fichadas" ? s.navBtnActive : s.navBtn}
-              onClick={() => setVista("fichadas")}
-            >
-              📋 Movimientos
-            </button>
-            <button
-              style={vista === "historial" ? s.navBtnActive : s.navBtn}
-              onClick={() => setVista("historial")}
-            >
-              📊 Historial
-            </button>
           </div>
 
           {/* Filtro de rango */}
@@ -1023,6 +1033,15 @@ const s = {
     border: "1px solid #33415544", borderRadius: 99,
     padding: "3px 10px", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
   },
+  inicioCard: {
+    background: "#1e293b", border: "1px solid #334155", borderRadius: 16,
+    padding: "48px 56px", cursor: "pointer", display: "flex",
+    flexDirection: "column", alignItems: "center", gap: 12,
+    transition: "all 0.15s", minWidth: 220,
+  },
+  inicioIcon:  { fontSize: 48 },
+  inicioLabel: { fontSize: 20, fontWeight: 700, color: "#f1f5f9" },
+  inicioDesc:  { fontSize: 13, color: "#64748b", textAlign: "center" },
   navBar: {
     display: "flex", gap: 8, marginBottom: 24,
     background: "#1e293b", border: "1px solid #334155",
@@ -1039,6 +1058,7 @@ const s = {
     padding: "10px 24px", cursor: "pointer", color: "#a5b4fc",
     fontSize: 14, fontWeight: 700,
   },
+  btnNav: {
     background: "#1e293b", border: "1px solid #334155", borderRadius: 8,
     padding: "8px 16px", cursor: "pointer", color: "#94a3b8", fontSize: 13, fontWeight: 500,
   },
