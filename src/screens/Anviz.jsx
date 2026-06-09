@@ -144,11 +144,9 @@ export default function Anviz({ onBack }) {
           if (msg.type === "fichada") {
             const nueva = msg.data;
             const fechaNueva = nueva.timestamp?.slice(0, 10);
-            if (fechaNueva === hoy()) {
-              setFichadasHoy((prev) => asignarDirecciones([nueva, ...prev]));
-            }
             if (!filtroDesde || (fechaNueva >= filtroDesde && fechaNueva <= filtroHasta)) {
               setFichadas((prev) => {
+                // Contar cuántas fichadas tiene este usuario en ese día en el estado actual
                 const mismosDia = prev.filter(
                   (f) => f.user_id === nueva.user_id && String(f.timestamp).slice(0, 10) === fechaNueva
                 );
@@ -217,41 +215,13 @@ export default function Anviz({ onBack }) {
     }, {}),
   ).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-  // ── Fichadas de hoy (panel de presencia) ──────────────────────────────────
-  const [fichadasHoy, setFichadasHoy] = useState([]);
-
-  const cargarPresencia = useCallback(async () => {
-    try {
-      const params = new URLSearchParams({ fecha_desde: hoy(), fecha_hasta: hoy(), limit: 1000 });
-      const data = await apiFetch(`/fichadas?${params}`);
-      setFichadasHoy(asignarDirecciones(Array.isArray(data) ? data : []));
-    } catch {}
-  }, []);
-
-  useEffect(() => { cargarPresencia(); }, [cargarPresencia]);
-
-  // ── Presencia actual por empleado ──────────────────────────────────────────
-  const presencia = usuarios.map((u) => {
-    const fics = fichadasHoy
-      .filter((f) => String(f.user_id) === String(u.id))
-      .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
-    const ultima = fics[fics.length - 1];
-    return {
-      id:     u.id,
-      nombre: `${u.apellido} ${u.nombre}`.trim(),
-      dentro: ultima ? ultima.direccion === "entrada" : false,
-    };
-  }).sort((a, b) => {
-    if (a.dentro !== b.dentro) return a.dentro ? -1 : 1;
-    return a.nombre.localeCompare(b.nombre);
-  });
-
   // ── Historial: rango de fechas ─────────────────────────────────────────────
   const [histDesde, setHistDesde] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 30);
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   });
   const [histHasta, setHistHasta]       = useState(hoy());
+  const [histFiltroUser, setHistFiltroUser] = useState("");
   const [histFichadas, setHistFichadas] = useState([]);
   const [histCargando, setHistCargando] = useState(false);
   const [histError, setHistError]       = useState(null);
@@ -261,8 +231,9 @@ export default function Anviz({ onBack }) {
     setHistError(null);
     try {
       const params = new URLSearchParams({ limit: 2000 });
-      if (histDesde) params.set("fecha_desde", histDesde);
-      if (histHasta) params.set("fecha_hasta", histHasta);
+      if (histDesde)      params.set("fecha_desde", histDesde);
+      if (histHasta)      params.set("fecha_hasta", histHasta);
+      if (histFiltroUser) params.set("user_id", histFiltroUser);
       const data = await apiFetch(`/fichadas?${params}`);
       setHistFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
     } catch (e) {
@@ -270,7 +241,7 @@ export default function Anviz({ onBack }) {
     } finally {
       setHistCargando(false);
     }
-  }, [histDesde, histHasta]);
+  }, [histDesde, histHasta, histFiltroUser]);
 
   useEffect(() => {
     if (vista === "historial") cargarHistorial();
@@ -473,19 +444,12 @@ export default function Anviz({ onBack }) {
             </div>
           )}
 
-          {/* ── Panel de presencia ─────────────────────────────────────── */}
-          <div style={s.presenciaWrap}>
-            {presencia.length === 0
-              ? <span style={{ color: "#475569", fontSize: 13 }}>Cargando empleados...</span>
-              : presencia.map((emp) => (
-                <span key={emp.id} style={{
-                  fontSize: 13, fontWeight: 600,
-                  color: emp.dentro ? "#4ade80" : "#f87171",
-                }}>
-                  {emp.nombre}
-                </span>
-              ))
-            }
+          {/* ── Cards resumen ──────────────────────────────────────────── */}
+          <div style={s.cards}>
+            <StatCard label="Total"      valor={total}     color="#818cf8" />
+            <StatCard label="Entradas"   valor={entradas}  color="#34d399" />
+            <StatCard label="Salidas"    valor={salidas}   color="#fbbf24" />
+            <StatCard label="Empleados"  valor={empUnicos} color="#60a5fa" />
           </div>
 
           {/* ── Filtros ────────────────────────────────────────────────── */}
@@ -736,6 +700,21 @@ export default function Anviz({ onBack }) {
                 <label style={s.label}>Hasta</label>
                 <input type="date" value={histHasta}
                   onChange={e => setHistHasta(e.target.value)} style={s.input} />
+              </div>
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Empleado</label>
+                <select
+                  value={histFiltroUser}
+                  onChange={e => setHistFiltroUser(e.target.value)}
+                  style={s.input}
+                >
+                  <option value="">Todos</option>
+                  {usuarios.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.apellido} {u.nombre}
+                    </option>
+                  ))}
+                </select>
               </div>
               <button style={s.btnBuscar} onClick={cargarHistorial}>
                 Buscar
@@ -1004,11 +983,6 @@ const s = {
     background: "#2d1b0060", border: "1px solid #d9770644",
     borderRadius: 8, padding: "12px 16px",
     fontSize: 13, color: "#fbbf24", marginBottom: 20,
-  },
-  presenciaWrap: {
-    display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 24,
-    background: "#1e293b", border: "1px solid #334155",
-    borderRadius: 12, padding: "16px 20px",
   },
   cards: {
     display: "grid",
