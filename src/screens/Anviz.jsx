@@ -621,7 +621,12 @@ export default function Anviz({ onBack }) {
                         </td>
                         <td style={s.td}>{fmtFecha(f.timestamp)}</td>
                         <td style={{ ...s.td, fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }}>
-                          {fmtHora(f.timestamp)}
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            {fmtHora(f.timestamp)}
+                            {f.raw_hex && (
+                              <span title="Registro del dispositivo Anviz" style={{ fontSize: 13, opacity: 0.6 }}>🕐</span>
+                            )}
+                          </div>
                         </td>
                         <td style={s.td}>
                           <span style={f.direccion === "entrada" ? s.badgeEntrada : s.badgeSalida}>
