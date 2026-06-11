@@ -110,11 +110,18 @@ const HOME_SECTIONS = {
 
 export default function Root() {
   const [usuario, setUsuario] = useState(null);
-  if (!usuario) return <Login onLogin={setUsuario} />;
-  return <App usuario={usuario} />;
+  const [token, setToken]     = useState(null);
+
+  const handleLogin = (usr, tok) => {
+    setUsuario(usr);
+    setToken(tok);
+  };
+
+  if (!usuario) return <Login onLogin={handleLogin} />;
+  return <App usuario={usuario} token={token} />;
 }
 
-function App({ usuario }) {
+function App({ usuario, token }) {
   const [screen, setScreen] = useState(null);
   const [active, setActive] = useState(null);
   const [log, setLog] = useState([]);
@@ -153,6 +160,45 @@ function App({ usuario }) {
   const [selectedMargen, setSelectedMargen] = useState(null);
   const [selectedLista, setSelectedLista] = useState(null);
   const [modal, setModal] = useState(null);
+
+  // ── Helper autenticado ───────────────────────────────────
+  const authFetch = (url, options = {}) =>
+    fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+  // ── Permisos del usuario logueado ────────────────────────
+  const [permisos, setPermisos] = useState({});
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API}/permisos`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((rows) => {
+        const map = {};
+        rows.forEach(({ rol, modulo, accion, permitido }) => {
+          map[rol] = map[rol] ?? {};
+          map[rol][modulo] = map[rol][modulo] ?? {};
+          map[rol][modulo][accion] = !!permitido;
+        });
+        setPermisos(map);
+      })
+      .catch(console.error);
+  }, [token]);
+
+  // puedo("productos", "crear") → true/false
+  const puedo = (modulo, accion) => {
+    const rol = usuario?.rol ?? "operario";
+    if (rol === "admin") return true;
+    return permisos?.[rol]?.[modulo]?.[accion] ?? false;
+  };
 
   // ── Proveedores ──────────────────────────────────────────
   const [proveedores, setProveedores] = useState([]);
@@ -299,9 +345,8 @@ function App({ usuario }) {
       try {
         if (exists) {
           const { id, ...body } = item;
-          const res = await fetch(`${API}/${endpoint}/${id}`, {
+          const res = await authFetch(`${API}/${endpoint}/${id}`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           });
           if (!res.ok) {
@@ -314,9 +359,8 @@ function App({ usuario }) {
           );
         } else {
           const { id, ...body } = item;
-          const res = await fetch(`${API}/${endpoint}`, {
+          const res = await authFetch(`${API}/${endpoint}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           });
           if (!res.ok) throw new Error(await res.text());
@@ -336,7 +380,7 @@ function App({ usuario }) {
     onDelete: async (id) => {
       try {
         const item = get.find((r) => r.id === id);
-        const res = await fetch(`${API}/${endpoint}/${id}`, {
+        const res = await authFetch(`${API}/${endpoint}/${id}`, {
           method: "DELETE",
         });
         if (!res.ok) throw new Error(await res.text());
@@ -354,9 +398,8 @@ function App({ usuario }) {
     onAdd: async (item) => {
       try {
         const { id, ...body } = item;
-        const res = await fetch(`${API}/${endpoint}`, {
+        const res = await authFetch(`${API}/${endpoint}`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
         if (!res.ok) throw new Error(await res.text());
@@ -375,9 +418,8 @@ function App({ usuario }) {
     onEdit: async (item) => {
       try {
         const { id, ...body } = item;
-        const res = await fetch(`${API}/${endpoint}/${id}`, {
+        const res = await authFetch(`${API}/${endpoint}/${id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
         if (!res.ok) throw new Error(await res.text());
@@ -989,71 +1031,14 @@ function App({ usuario }) {
       />
       <div className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <h3>Menú</h3>
-        <p
-          onClick={() => {
-            setScreen("clientes");
-            setSidebarOpen(false);
-          }}
-        >
-          👥 Clientes
-        </p>
-        <p
-          onClick={() => {
-            setScreen("presupuestos-tabla");
-            setSidebarOpen(false);
-          }}
-        >
-          📋 Presupuestos Mamparas
-        </p>
-        <p
-          onClick={() => {
-            setScreen("presupuesto-vanitory");
-            setSidebarOpen(false);
-          }}
-        >
-          🚿 Presupuesto Vanitory
-        </p>
-        <p
-          onClick={() => {
-            setScreen("productos");
-            setSidebarOpen(false);
-          }}
-        >
-          🛒 Productos
-        </p>
-        <p
-          onClick={() => {
-            setScreen("lista-margenes");
-            fetchListas();
-            setSidebarOpen(false);
-          }}
-        >
-          📊 Lista de Márgenes
-        </p>
-        <p
-          onClick={() => {
-            setScreen("facturas");
-            setSidebarOpen(false);
-          }}
-        >
-          🧾 Facturas
-        </p>
-        <p
-          onClick={() => {
-            setScreen("anviz");
-            setSidebarOpen(false);
-          }}
-        >
-          🕐 Asistencia
-        </p>
-        <p
-          onClick={() => {
-            setScreen("usuarios");
-            setSidebarOpen(false);
-          }}
-        >
-          👤 Usuarios
-        </p>
+        {puedo("clientes", "ver") && <p onClick={() => { setScreen("clientes"); setSidebarOpen(false); }}>👥 Clientes</p>}
+        {puedo("presupuesto-mamparas", "ver") && <p onClick={() => { setScreen("presupuestos-tabla"); setSidebarOpen(false); }}>📋 Presupuestos Mamparas</p>}
+        {puedo("presupuesto-vanitory", "ver") && <p onClick={() => { setScreen("presupuesto-vanitory"); setSidebarOpen(false); }}>🚿 Presupuesto Vanitory</p>}
+        {puedo("productos", "ver") && <p onClick={() => { setScreen("productos"); setSidebarOpen(false); }}>🛒 Productos</p>}
+        {puedo("lista-margenes", "ver") && <p onClick={() => { setScreen("lista-margenes"); fetchListas(); setSidebarOpen(false); }}>📊 Lista de Márgenes</p>}
+        {puedo("facturas", "ver") && <p onClick={() => { setScreen("facturas"); setSidebarOpen(false); }}>🧾 Facturas</p>}
+        {puedo("anviz", "ver") && <p onClick={() => { setScreen("anviz"); setSidebarOpen(false); }}>🕐 Asistencia</p>}
+        {puedo("usuarios", "ver") && <p onClick={() => { setScreen("usuarios"); setSidebarOpen(false); }}>👤 Usuarios</p>}
       </div>
 
       <div className="wrapper">
@@ -1092,7 +1077,9 @@ function App({ usuario }) {
               </div>
             </div>
             <div className="grid">
-              {buttons.map((btn) => (
+              {buttons
+                .filter((btn) => puedo(btn.screen, "ver"))
+                .map((btn) => (
                 <ActionButton
                   key={btn.id}
                   label={btn.label}
@@ -1117,6 +1104,7 @@ function App({ usuario }) {
             </button>
             <p className="sub-title">⚙️ Administración</p>
             <div className="sub-grid">
+              {puedo("anviz", "ver") && (
               <div
                 className="sub-card"
                 style={{ "--sc-color": "#6366f1" }}
@@ -1131,6 +1119,8 @@ function App({ usuario }) {
                   Control de accesos y usuarios
                 </span>
               </div>
+              )}
+              {puedo("facturas", "ver") && (
               <div
                 className="sub-card"
                 style={{ "--sc-color": "#27ae60" }}
@@ -1143,6 +1133,8 @@ function App({ usuario }) {
                 <span className="sub-card-label">FACTURAS</span>
                 <span className="sub-card-desc">Gestión de comprobantes</span>
               </div>
+              )}
+              {puedo("ver-tablas", "ver") && (
               <div
                 className="sub-card"
                 style={{ "--sc-color": "#e67e22" }}
@@ -1158,6 +1150,7 @@ function App({ usuario }) {
                   PlacaSur, Aglolam, Cantochap
                 </span>
               </div>
+              )}
             </div>
           </>
         )}
