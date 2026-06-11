@@ -937,6 +937,7 @@ function App({ usuario, token }) {
                 proveedoresCRUD={proveedoresCRUD}
                 selectedProveedor={selectedProveedor}
                 tablaInicial={tablaInicialVerTablas}
+                token={token}
               />
             )}
 
