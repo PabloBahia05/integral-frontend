@@ -26,7 +26,7 @@ const FIELDS = [
   { field: "password", label: "Contraseña *", placeholder: "••••••••", type: "password" },
 ];
 
-export default function UsuariosApp() {
+export default function UsuariosApp({ token }) {
   const [usuarios, setUsuarios] = useState([]);
   const [selected, setSelected] = useState(null);
   const [modal, setModal]       = useState(null);
@@ -34,8 +34,13 @@ export default function UsuariosApp() {
   const [error, setError]       = useState("");
   const [search, setSearch]     = useState("");
 
+  const authHeaders = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
   const fetchUsuarios = () =>
-    fetch(`${API}/usuarios-app`)
+    fetch(`${API}/usuarios-app`, { headers: authHeaders })
       .then((r) => r.json())
       .then((d) => setUsuarios(Array.isArray(d) ? d : []))
       .catch(console.error);
@@ -85,7 +90,7 @@ export default function UsuariosApp() {
     try {
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders,
         body: JSON.stringify(body),
       });
       const data = await res.json();
@@ -101,7 +106,7 @@ export default function UsuariosApp() {
   const handleDelete = async () => {
     if (!selected) return;
     try {
-      await fetch(`${API}/usuarios-app/${selected.id}`, { method: "DELETE" });
+      await fetch(`${API}/usuarios-app/${selected.id}`, { method: "DELETE", headers: authHeaders });
       await fetchUsuarios();
       setSelected(null);
       setModal(null);
