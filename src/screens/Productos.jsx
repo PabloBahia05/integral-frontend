@@ -766,7 +766,7 @@ export default function Productos({
         >
           <option value="">— Todos los proveedores —</option>
           {proveedores.map((p) => {
-            const nombre = p.provnombre || p.nombre || p;
+            const nombre = p.fantasia || p.provnombre || p.nombre || p;
             return (
               <option key={nombre} value={nombre}>
                 {nombre}
