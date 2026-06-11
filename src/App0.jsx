@@ -1,3 +1,5 @@
+import Anviz from "./screens/Anviz";
+import Usuarios from "./screens/Usuarios";
 import Clientes from "./screens/Clientes";
 import Productos from "./screens/Productos";
 import PresupuestoMuebles from "./screens/PresupuestoMuebles";
@@ -14,10 +16,12 @@ import PresupuestoAmoblamiento from "./screens/PresupuestoAmoblamiento";
 import PresupuestoNuevo from "./screens/PresupuestoNuevo";
 import PresupuestosNuevoTabla from "./screens/PresupuestosNuevoTabla";
 import MuebleEspecial from "./screens/MuebleEspecial";
+import Facturas from "./screens/Facturas";
 import ActionButton from "./Component/ActionButton";
+import Login from "./screens/Login";
 import { useEffect, useState } from "react";
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 
 const SCREENS = {
   clientes: { label: "CLIENTES", icon: "👥" },
@@ -33,6 +37,9 @@ const SCREENS = {
   "lista-margenes": { label: "LISTA DE MÁRGENES", icon: "📊" },
   "presupuestos-nuevo-tabla": { label: "PRESUPUESTOS", icon: "📋" },
   "mueble-especial": { label: "MUEBLE ESPECIAL", icon: "🪚" },
+  facturas: { label: "FACTURAS", icon: "🧾" },
+  anviz:    { label: "ASISTENCIA", icon: "🕐" },
+  usuarios: { label: "USUARIOS", icon: "👤" },
 };
 
 const buttons = [
@@ -92,9 +99,36 @@ const buttons = [
     color: "#e67e22",
     screen: "mueble-especial",
   },
+  {
+    id: 13,
+    label: "FACTURAS",
+    icon: "🧾",
+    color: "#27ae60",
+    screen: "facturas",
+  },
+  {
+    id: 14,
+    label: "ASISTENCIA",
+    icon: "🕐",
+    color: "#6366f1",
+    screen: "anviz",
+  },
+  {
+    id: 15,
+    label: "USUARIOS",
+    icon: "👤",
+    color: "#0ea5e9",
+    screen: "usuarios",
+  },
 ];
 
-export default function App() {
+export default function Root() {
+  const [usuario, setUsuario] = useState(null);
+  if (!usuario) return <Login onLogin={setUsuario} />;
+  return <App usuario={usuario} />;
+}
+
+function App({ usuario }) {
   const [screen, setScreen] = useState(null);
   const [active, setActive] = useState(null);
   const [log, setLog] = useState([]);
@@ -148,7 +182,6 @@ export default function App() {
 
   const addLog = (msg) => setLog((prev) => [msg, ...prev.slice(0, 4)]);
 
-  // ── Cargar datos ─────────────────────────────────────────
   const fetchClientes = () =>
     fetch(`${API}/clientes`)
       .then((r) => r.json())
@@ -656,6 +689,9 @@ export default function App() {
               "ver-tablas",
               "lista-margenes",
               "mueble-especial",
+              "facturas",
+              "anviz",
+              "usuarios",
             ].map((s) => (
               <button
                 key={s}
@@ -818,6 +854,10 @@ export default function App() {
                 }
               />
             )}
+            {screen === "anviz" && <Anviz onBack={() => setScreen(null)} />}
+            {screen === "usuarios" && (
+              <Usuarios onBack={() => setScreen(null)} />
+            )}
             {screen === "ver-tablas" && (
               <VerTablas
                 clientes={clientes}
@@ -869,6 +909,9 @@ export default function App() {
 
             {/* ── Mueble Especial ── */}
             {screen === "mueble-especial" && <MuebleEspecial />}
+
+            {/* ── Facturas ── */}
+            {screen === "facturas" && <Facturas proveedores={proveedores} />}
 
             {/* ── Lista de Márgenes ── */}
             {screen === "lista-margenes" && (
@@ -951,6 +994,9 @@ export default function App() {
         >
           📊 Lista de Márgenes
         </p>
+        <p onClick={() => setScreen("facturas")}>🧾 Facturas</p>
+        <p onClick={() => setScreen("anviz")}>🕐 Asistencia</p>
+        <p onClick={() => setScreen("usuarios")}>👤 Usuarios</p>
         <p>⚙️ Configuración</p>
         <p>📊 Reportes</p>
       </div>
