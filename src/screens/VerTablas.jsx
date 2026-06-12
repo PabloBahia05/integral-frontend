@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ScreenHeader from "../Component/ScreenHeader";
 import Clientes from "./Clientes";
 import Productos from "./Productos";
@@ -45,7 +45,7 @@ function GestorPermisos({ onBack, token }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
-  useState(() => {
+  useEffect(() => {
     fetch(`${API}/permisos`, {
       headers: { Authorization: `Bearer ${token}` },
     })
