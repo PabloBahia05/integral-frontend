@@ -39,14 +39,16 @@ const MODULOS = [
 ];
 
 // ── Componente Permisos ──────────────────────────────────────────────────────
-function GestorPermisos({ onBack }) {
+function GestorPermisos({ onBack, token }) {
   const [permisos, setPermisos] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
   useState(() => {
-    fetch(`${API}/permisos`)
+    fetch(`${API}/permisos`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
       .then((r) => r.json())
       .then((rows) => {
         // rows: [{ rol, modulo, accion, permitido }, ...]
@@ -101,7 +103,10 @@ function GestorPermisos({ onBack }) {
     try {
       const res = await fetch(`${API}/permisos`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ permisos: rows }),
       });
       if (!res.ok) throw new Error();
@@ -540,7 +545,7 @@ export default function VerTablas({
 
   // ── permisos ──
   if (tablaActiva === "permisos")
-    return <GestorPermisos onBack={volver} />;
+    return <GestorPermisos onBack={volver} token={token} />;
 
   return (
     <>
