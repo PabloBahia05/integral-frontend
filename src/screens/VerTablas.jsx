@@ -20,7 +20,7 @@ import Usuarios from "./Usuarios";
 
 const API = "https://integral-backend-production.up.railway.app";
 
-const ROLES = ["admin", "supervisor", "operario"];
+const ROLES = ["admin", "gestor", "produccion", "operario"];
 
 const MODULOS = [
   { id: "clientes",                  label: "Clientes",               acciones: ["ver", "crear", "editar", "eliminar"] },
@@ -136,7 +136,8 @@ function GestorPermisos({ onBack }) {
     .rol-head { display:flex; flex-direction:column; align-items:center; gap:2px; }
     .rol-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; }
     .rol-badge.admin { background:#fde8e8; color:#c0392b; }
-    .rol-badge.supervisor { background:#fff3cd; color:#856404; }
+    .rol-badge.gestor { background:#fff3cd; color:#856404; }
+    .rol-badge.produccion { background:#e2f0d9; color:#2e6b34; }
     .rol-badge.operario { background:#e0eef8; color:#0a3a5c; }
     .perm-msg { font-size:12px; margin-left:auto; }
     .mod-separator td { background:#e8f4ff !important; font-weight:700; color:#0a3a5c; font-size:11px; letter-spacing:1px; padding:6px 12px; }
