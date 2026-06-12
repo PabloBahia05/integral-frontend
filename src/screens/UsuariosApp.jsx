@@ -14,10 +14,11 @@ const COLUMNS = [
   { key: "nombre",   label: "Nombre" },
   { key: "apellido", label: "Apellido" },
   { key: "email",    label: "Email" },
+  { key: "rol",      label: "Rol" },
   { key: "activo",   label: "Activo", render: (v) => (v ? "✅" : "❌") },
 ];
 
-const EMPTY = { nombre: "", apellido: "", email: "", password: "", activo: 1 };
+const EMPTY = { nombre: "", apellido: "", email: "", password: "", activo: 1, rol: "operario" };
 
 const FIELDS = [
   { field: "nombre",   label: "Nombre *",    placeholder: "Ej: Juan" },
@@ -66,6 +67,7 @@ export default function UsuariosApp({ token }) {
       email:    selected.email    ?? "",
       password: "",
       activo:   selected.activo   ?? 1,
+      rol:      selected.rol      ?? "operario",
     });
     setError("");
     setModal("editar");
@@ -156,6 +158,21 @@ export default function UsuariosApp({ token }) {
                   Dejá la contraseña vacía para no cambiarla.
                 </p>
               )}
+              <div style={{ marginTop: 12 }}>
+                <label style={{ fontSize: 11, color: "#4a6a8c", textTransform: "uppercase", letterSpacing: 1 }}>
+                  Rol
+                </label>
+                <select
+                  value={form.rol}
+                  onChange={(e) => setForm({ ...form, rol: e.target.value })}
+                  style={{ display: "block", marginTop: 4, padding: "8px 10px", border: "1px solid #a0cce8", borderRadius: 3, fontFamily: "inherit", fontSize: 13, width: "100%" }}
+                >
+                  <option value="admin">Admin</option>
+                  <option value="gestor">Gestor</option>
+                  <option value="produccion">Producción</option>
+                  <option value="operario">Operario</option>
+                </select>
+              </div>
               <div style={{ marginTop: 12 }}>
                 <label style={{ fontSize: 11, color: "#4a6a8c", textTransform: "uppercase", letterSpacing: 1 }}>
                   Estado
