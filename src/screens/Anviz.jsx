@@ -381,13 +381,31 @@ export default function Anviz({ onBack, usuario, token }) {
   }
 
   // ── Vacaciones y Horas ────────────────────────────────────────────────────
+  function primerDiaHabil() {
+    const hoy = new Date();
+    const primero = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    // Si cae sabado(6) o domingo(0), avanzar al lunes
+    const dia = primero.getDay();
+    if (dia === 0) primero.setDate(2);
+    else if (dia === 6) primero.setDate(3);
+    return primero.toISOString().slice(0, 10);
+  }
+
+  function hoyStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
   async function abrirVacaciones(desde, hasta) {
+    const d = desde !== undefined ? desde : primerDiaHabil();
+    const h = hasta !== undefined ? hasta : hoyStr();
+    setVacDesde(d);
+    setVacHasta(h);
     setVista("vacaciones");
     setVacCargando(true);
     try {
       const params = new URLSearchParams();
-      if (desde) params.set("fecha_desde", desde);
-      if (hasta) params.set("fecha_hasta", hasta);
+      if (d) params.set("fecha_desde", d);
+      if (h) params.set("fecha_hasta", h);
       const qs = params.toString() ? `?${params.toString()}` : "";
       const data = await apiFetch(`/empleados/vacaciones-horas${qs}`, token);
       setVacData(data);
