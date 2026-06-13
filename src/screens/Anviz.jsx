@@ -382,9 +382,7 @@ export default function Anviz({ onBack, usuario, token }) {
 
   // ── Vacaciones y Horas ────────────────────────────────────────────────────
   function primerDiaHabil() {
-    const hoy = new Date();
-    const primero = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    // Si cae sabado(6) o domingo(0), avanzar al lunes
+    const primero = new Date(new Date().getFullYear(), 0, 1);
     const dia = primero.getDay();
     if (dia === 0) primero.setDate(2);
     else if (dia === 6) primero.setDate(3);
