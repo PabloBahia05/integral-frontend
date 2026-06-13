@@ -439,6 +439,7 @@ export default function Anviz({ onBack, usuario, token }) {
                       <th style={s.th}>Vacaciones (días)</th>
                       <th style={s.th}>Horas calculadas</th>
                       <th style={s.th}>Horas acumuladas</th>
+                      <th style={s.th}>Dif. vs 44hs/sem</th>
                       {!esOperario && <th style={s.th}>Acciones</th>}
                     </tr>
                   </thead>
@@ -472,6 +473,10 @@ export default function Anviz({ onBack, usuario, token }) {
                           ) : (
                             <span>{e.horas_acumuladas}h</span>
                           )}
+                        </td>
+                        <td style={{ ...s.td, color: e.diferencia_vs_44 >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 500 }}>
+                          {e.diferencia_vs_44 >= 0 ? "+" : ""}{e.diferencia_vs_44 ?? 0}h
+                          <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>({e.semanas_con_actividad ?? 0} sem)</span>
                         </td>
                         {!esOperario && (
                           <td style={s.td}>
