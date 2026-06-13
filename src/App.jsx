@@ -886,7 +886,7 @@ function App({ usuario, token }) {
                 }
               />
             )}
-            {screen === "anviz" && <Anviz onBack={() => setScreen(null)} />}
+            {screen === "anviz" && <Anviz onBack={() => setScreen(null)} usuario={usuario} token={token} />}
             {screen === "usuarios" && (
               <Usuarios onBack={() => setScreen(null)} />
             )}
