@@ -1235,6 +1235,22 @@ export default function Anviz({ onBack, usuario, token }) {
                 onClick={async () => {
                   const uid = esOperario ? usuario.id : Number(gpsUserId);
                   if (!uid) { setGpsMsg("⚠️ Seleccioná un empleado"); return; }
+
+                  // ── Verificar zona permitida (200m de radio) ──────────────
+                  const EMPRESA_LAT = -38.746619;
+                  const EMPRESA_LNG = -62.284310;
+                  const RADIO_M = 200;
+                  const toRad = deg => deg * Math.PI / 180;
+                  const R = 6371000;
+                  const dLat = toRad(gpsCoordenadas.lat - EMPRESA_LAT);
+                  const dLng = toRad(gpsCoordenadas.lng - EMPRESA_LNG);
+                  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(EMPRESA_LAT)) * Math.cos(toRad(gpsCoordenadas.lat)) * Math.sin(dLng/2)**2;
+                  const distancia = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                  if (distancia > RADIO_M) {
+                    setGpsMsg(`⛔ Fuera de zona — estás a ${Math.round(distancia)} m del lugar de trabajo (máximo ${RADIO_M} m)`);
+                    return;
+                  }
+
                   setGpsEstado("enviando");
                   setGpsMsg("");
                   const now = new Date();
