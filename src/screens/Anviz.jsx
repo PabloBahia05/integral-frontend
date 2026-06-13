@@ -87,6 +87,10 @@ export default function Anviz({ onBack, usuario, token }) {
   // ── Paginación ─────────────────────────────────────────────────────────────
   const [pagina, setPagina] = useState(1);
   const [vistaTabla, setVistaTabla] = useState("tabla"); // "tabla" | "resumen"
+  const [vacData, setVacData]             = useState([]);
+  const [vacCargando, setVacCargando]     = useState(false);
+  const [vacEditando, setVacEditando]     = useState(null); // id del empleado editando
+  const [vacForm, setVacForm]             = useState({ vacaciones: "", horas_acumuladas: "" });
 
   const wsRef = useRef(null);
 
@@ -374,12 +378,124 @@ export default function Anviz({ onBack, usuario, token }) {
     }
   }
 
+  // ── Vacaciones y Horas ────────────────────────────────────────────────────
+  async function abrirVacaciones() {
+    setVista("vacaciones");
+    setVacCargando(true);
+    try {
+      const data = await apiFetch("/empleados/vacaciones-horas", token);
+      setVacData(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setVacCargando(false);
+    }
+  }
+
+  async function guardarVac(id) {
+    try {
+      await fetch(`${API}/empleados/${id}/vacaciones-horas`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ vacaciones: Number(vacForm.vacaciones), horas_acumuladas: Number(vacForm.horas_acumuladas) }),
+      });
+      setVacData(d => d.map(e => e.id === id ? { ...e, vacaciones: Number(vacForm.vacaciones), horas_acumuladas: Number(vacForm.horas_acumuladas) } : e));
+      setVacEditando(null);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div style={s.page}>
       {/* Si vista es usuarios, mostrar el componente Usuarios */}
       {vista === "usuarios" && (
         <Usuarios onBack={() => setVista("inicio")} />
+      )}
+
+      {/* ── Vista Vacaciones y Horas ─────────────────────────────────────── */}
+      {vista === "vacaciones" && (
+        <div style={s.page}>
+          <div style={s.header}>
+            <div style={s.headerLeft}>
+              <button style={s.btnVolver} onClick={() => setVista("inicio")}>← Volver</button>
+              <div style={s.iconBox}>🏖️</div>
+              <div>
+                <h1 style={s.titulo}>Vacaciones y Horas</h1>
+                <span style={s.subtitulo}>Resumen por empleado</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ padding: "16px" }}>
+            {vacCargando ? (
+              <p style={{ color: "var(--color-text-secondary)" }}>Cargando...</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                  <thead>
+                    <tr style={{ background: "var(--color-bg-secondary)" }}>
+                      <th style={s.th}>Empleado</th>
+                      <th style={s.th}>Vacaciones (días)</th>
+                      <th style={s.th}>Horas calculadas</th>
+                      <th style={s.th}>Horas acumuladas</th>
+                      {!esOperario && <th style={s.th}>Acciones</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vacData.map((e) => (
+                      <tr key={e.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                        <td style={s.td}>{e.apellido} {e.nombre}</td>
+                        <td style={s.td}>
+                          {vacEditando === e.id ? (
+                            <input
+                              type="number"
+                              value={vacForm.vacaciones}
+                              onChange={(ev) => setVacForm(f => ({ ...f, vacaciones: ev.target.value }))}
+                              style={{ ...s.input, width: 80 }}
+                            />
+                          ) : (
+                            <span>{e.vacaciones ?? 0} días</span>
+                          )}
+                        </td>
+                        <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
+                          {e.horas_calculadas}h
+                        </td>
+                        <td style={s.td}>
+                          {vacEditando === e.id ? (
+                            <input
+                              type="number"
+                              value={vacForm.horas_acumuladas}
+                              onChange={(ev) => setVacForm(f => ({ ...f, horas_acumuladas: ev.target.value }))}
+                              style={{ ...s.input, width: 80 }}
+                            />
+                          ) : (
+                            <span>{e.horas_acumuladas}h</span>
+                          )}
+                        </td>
+                        {!esOperario && (
+                          <td style={s.td}>
+                            {vacEditando === e.id ? (
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <button style={s.btnRowEdit} onClick={() => guardarVac(e.id)}>💾</button>
+                                <button style={s.btnRowDel} onClick={() => setVacEditando(null)}>✕</button>
+                              </div>
+                            ) : (
+                              <button style={s.btnRowEdit} onClick={() => {
+                                setVacEditando(e.id);
+                                setVacForm({ vacaciones: e.vacaciones ?? 0, horas_acumuladas: e.horas_acumuladas ?? 0 });
+                              }}>✏️</button>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ── Pantalla de inicio ──────────────────────────────────────────── */}
@@ -462,6 +578,9 @@ export default function Anviz({ onBack, usuario, token }) {
                   + Nueva fichada
                 </button>
               )}
+              <button style={s.btnVac} onClick={abrirVacaciones}>
+                🏖️ Vacaciones y Horas
+              </button>
               <button
                 style={{ ...s.btnSync, opacity: (syncing || !agente.connected) ? 0.5 : 1 }}
                 onClick={handleSync}
@@ -1165,6 +1284,17 @@ const s = {
   btnNavActive: {
     background: "#312e81", border: "1px solid #6366f1", borderRadius: 8,
     padding: "8px 16px", cursor: "pointer", color: "#a5b4fc", fontSize: 13, fontWeight: 600,
+  },
+  btnVac: {
+    padding: "8px 14px",
+    borderRadius: 8,
+    border: "none",
+    background: "var(--color-accent-secondary, #0ea5e9)",
+    color: "#fff",
+    fontWeight: 600,
+    cursor: "pointer",
+    fontSize: 13,
+    whiteSpace: "nowrap",
   },
   btnNueva: {
     background: "#4f46e5", border: "1px solid #6366f1", borderRadius: 8,
