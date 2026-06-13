@@ -94,6 +94,14 @@ export default function Anviz({ onBack, usuario, token }) {
   const [vacDesde, setVacDesde]           = useState("");
   const [vacHasta, setVacHasta]           = useState("");
 
+  // ── GPS Fichar ─────────────────────────────────────────────────────────────
+  const [gpsEstado, setGpsEstado]         = useState("idle"); // "idle" | "obteniendo" | "ok" | "error" | "enviando" | "enviado"
+  const [gpsCoordenadas, setGpsCoordenadas] = useState(null); // { lat, lng, accuracy }
+  const [gpsError, setGpsError]           = useState("");
+  const [gpsDireccion, setGpsDireccion]   = useState("entrada");
+  const [gpsMsg, setGpsMsg]               = useState("");
+  const [gpsUserId, setGpsUserId]         = useState(() => String(usuario?.id || ""));
+
   const wsRef = useRef(null);
 
   // ── Cargar empleados (una vez) ─────────────────────────────────────────────
@@ -543,29 +551,35 @@ export default function Anviz({ onBack, usuario, token }) {
           </div>
 
           <div style={{
-            display: "flex", gap: 20, marginTop: 40,
-            justifyContent: "center", flexWrap: "wrap",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: 16, marginTop: 32,
           }}>
+            {/* GPS primero y destacado para operarios */}
             <div
-              style={s.inicioCard}
-              onClick={() => setVista("fichadas")}
+              style={{
+                ...s.inicioCard,
+                order: esOperario ? -1 : 3,
+                borderColor: esOperario ? "#16a34a88" : "#334155",
+                background: esOperario ? "#0d2218" : "#1e293b",
+              }}
+              onClick={() => { setGpsEstado("idle"); setGpsMsg(""); setGpsCoordenadas(null); setGpsError(""); setVista("gps"); }}
             >
+              <span style={s.inicioIcon}>📍</span>
+              <span style={s.inicioLabel}>Fichar GPS</span>
+              <span style={s.inicioDesc}>Registrar entrada o salida con ubicación</span>
+            </div>
+            <div style={{ ...s.inicioCard, order: 0 }} onClick={() => setVista("fichadas")}>
               <span style={s.inicioIcon}>📋</span>
               <span style={s.inicioLabel}>Movimientos</span>
               <span style={s.inicioDesc}>Entradas y salidas del día</span>
             </div>
-            <div
-              style={s.inicioCard}
-              onClick={() => setVista("historial")}
-            >
+            <div style={{ ...s.inicioCard, order: 1 }} onClick={() => setVista("historial")}>
               <span style={s.inicioIcon}>📊</span>
               <span style={s.inicioLabel}>Historial</span>
               <span style={s.inicioDesc}>Horas acumuladas por empleado</span>
             </div>
-            <div
-              style={s.inicioCard}
-              onClick={abrirVacaciones}
-            >
+            <div style={{ ...s.inicioCard, order: 2 }} onClick={abrirVacaciones}>
               <span style={s.inicioIcon}>🏖️</span>
               <span style={s.inicioLabel}>Vacaciones y Horas</span>
               <span style={s.inicioDesc}>Resumen por empleado</span>
@@ -1080,10 +1094,215 @@ export default function Anviz({ onBack, usuario, token }) {
         </div>
       )}
 
+      {/* ── Vista GPS ──────────────────────────────────────────────────────── */}
+      {vista === "gps" && (
+        <div style={s.page}>
+          <div style={s.header}>
+            <div style={s.headerLeft}>
+              <button style={s.btnVolver} onClick={() => setVista("inicio")}>← Volver</button>
+              <div style={s.iconBox}>📍</div>
+              <div>
+                <h1 style={s.titulo}>Fichar GPS</h1>
+                <span style={s.subtitulo}>Registrar asistencia con ubicación</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+
+            {/* Selector de empleado (solo no-operarios) */}
+            {!esOperario && (
+              <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "20px 24px" }}>
+                <label style={{ ...s.label, display: "block", marginBottom: 8 }}>Empleado</label>
+                <select
+                  value={gpsUserId}
+                  onChange={e => setGpsUserId(e.target.value)}
+                  style={{ ...s.input, width: "100%" }}
+                >
+                  <option value="">— Seleccionar —</option>
+                  {usuarios.map(u => (
+                    <option key={u.id} value={String(u.id)}>{u.apellido} {u.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Selector entrada / salida */}
+            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "20px 24px" }}>
+              <label style={{ ...s.label, display: "block", marginBottom: 10 }}>Tipo de registro</label>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  style={gpsDireccion === "entrada" ? s.dirBtnActive : s.dirBtn}
+                  onClick={() => setGpsDireccion("entrada")}
+                >
+                  🟢 Entrada
+                </button>
+                <button
+                  style={gpsDireccion === "salida" ? { ...s.dirBtnActive, background: "#451a03", borderColor: "#d97706", color: "#fbbf24" } : s.dirBtn}
+                  onClick={() => setGpsDireccion("salida")}
+                >
+                  🟡 Salida
+                </button>
+              </div>
+            </div>
+
+            {/* Panel de ubicación */}
+            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "24px" }}>
+              <label style={{ ...s.label, display: "block", marginBottom: 16 }}>Ubicación</label>
+
+              {gpsEstado === "idle" && (
+                <button
+                  style={{ ...s.btnBuscar, width: "100%", padding: "14px", fontSize: 15 }}
+                  onClick={() => {
+                    setGpsEstado("obteniendo");
+                    setGpsError("");
+                    setGpsCoordenadas(null);
+                    navigator.geolocation.getCurrentPosition(
+                      pos => {
+                        setGpsCoordenadas({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy });
+                        setGpsEstado("ok");
+                      },
+                      err => {
+                        setGpsError(err.message || "No se pudo obtener la ubicación");
+                        setGpsEstado("error");
+                      },
+                      { enableHighAccuracy: true, timeout: 15000 }
+                    );
+                  }}
+                >
+                  📍 Obtener mi ubicación
+                </button>
+              )}
+
+              {gpsEstado === "obteniendo" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 12, color: "#94a3b8" }}>
+                  <div style={s.spinner} />
+                  <span>Obteniendo ubicación GPS...</span>
+                </div>
+              )}
+
+              {gpsEstado === "error" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={s.modalError}>{gpsError}</div>
+                  <button style={s.btnBuscar} onClick={() => setGpsEstado("idle")}>Reintentar</button>
+                </div>
+              )}
+
+              {(gpsEstado === "ok" || gpsEstado === "enviando" || gpsEstado === "enviado") && gpsCoordenadas && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ background: "#0f172a", borderRadius: 8, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ fontSize: 13, color: "#94a3b8" }}>
+                      <span style={{ color: "#64748b" }}>Latitud: </span>
+                      <span style={{ color: "#f1f5f9", fontFamily: "monospace" }}>{gpsCoordenadas.lat.toFixed(6)}</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: "#94a3b8" }}>
+                      <span style={{ color: "#64748b" }}>Longitud: </span>
+                      <span style={{ color: "#f1f5f9", fontFamily: "monospace" }}>{gpsCoordenadas.lng.toFixed(6)}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#475569" }}>
+                      Precisión: ±{Math.round(gpsCoordenadas.accuracy)} metros
+                    </div>
+                  </div>
+                  <a
+                    href={`https://maps.google.com/?q=${gpsCoordenadas.lat},${gpsCoordenadas.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 12, color: "#818cf8", textDecoration: "none" }}
+                  >
+                    Ver en Google Maps ↗
+                  </a>
+                  <button style={{ ...s.btnBuscar, background: "transparent", border: "1px solid #334155", color: "#64748b" }}
+                    onClick={() => setGpsEstado("idle")}>
+                    🔄 Actualizar ubicación
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Botón fichar */}
+            {(gpsEstado === "ok" || gpsEstado === "enviando") && (
+              <button
+                disabled={gpsEstado === "enviando" || (!esOperario && !gpsUserId)}
+                style={{
+                  background: gpsDireccion === "entrada" ? "#14532d" : "#451a03",
+                  border: `1px solid ${gpsDireccion === "entrada" ? "#16a34a" : "#d97706"}`,
+                  borderRadius: 12, padding: "18px",
+                  color: gpsDireccion === "entrada" ? "#4ade80" : "#fbbf24",
+                  fontSize: 16, fontWeight: 700, cursor: gpsEstado === "enviando" ? "not-allowed" : "pointer",
+                  opacity: gpsEstado === "enviando" ? 0.7 : 1,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                }}
+                onClick={async () => {
+                  const uid = esOperario ? usuario.id : Number(gpsUserId);
+                  if (!uid) { setGpsMsg("⚠️ Seleccioná un empleado"); return; }
+                  setGpsEstado("enviando");
+                  setGpsMsg("");
+                  const now = new Date();
+                  const pad2 = n => String(n).padStart(2, "0");
+                  const tsMySQL = `${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+                  try {
+                    const res = await fetch(`${API}/fichadas`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({
+                        user_id: uid,
+                        direccion: gpsDireccion,
+                        timestamp: tsMySQL,
+                        gps_lat: gpsCoordenadas.lat,
+                        gps_lng: gpsCoordenadas.lng,
+                        gps_accuracy: gpsCoordenadas.accuracy,
+                      }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || "Error al registrar");
+                    setGpsEstado("enviado");
+                    setGpsMsg(`✅ ${gpsDireccion === "entrada" ? "Entrada" : "Salida"} registrada a las ${pad2(now.getHours())}:${pad2(now.getMinutes())}`);
+                  } catch (e) {
+                    setGpsMsg("⚠️ " + e.message);
+                    setGpsEstado("ok");
+                  }
+                }}
+              >
+                {gpsEstado === "enviando"
+                  ? <><div style={{ ...s.spinner, width: 18, height: 18, borderTopColor: "currentColor" }} /> Registrando...</>
+                  : <>{gpsDireccion === "entrada" ? "🟢 Registrar Entrada" : "🟡 Registrar Salida"}</>
+                }
+              </button>
+            )}
+
+            {/* Mensaje de resultado */}
+            {gpsMsg && (
+              <div style={{
+                background: gpsMsg.startsWith("✅") ? "#052e16" : "#450a0a",
+                border: `1px solid ${gpsMsg.startsWith("✅") ? "#16a34a44" : "#dc262644"}`,
+                borderRadius: 10, padding: "14px 18px",
+                color: gpsMsg.startsWith("✅") ? "#4ade80" : "#fca5a5",
+                fontSize: 14, fontWeight: 500, textAlign: "center",
+              }}>
+                {gpsMsg}
+              </div>
+            )}
+
+            {/* Botón nueva fichada */}
+            {gpsEstado === "enviado" && (
+              <button
+                style={{ ...s.btnVolver, padding: "12px", textAlign: "center", borderRadius: 10 }}
+                onClick={() => { setGpsEstado("idle"); setGpsMsg(""); setGpsCoordenadas(null); }}
+              >
+                Registrar otra fichada
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* CSS keyframes globales */}
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         tr:hover td { background: rgba(99,102,241,0.04); }
+        @media (min-width: 640px) {
+          .anviz-page { padding: 28px 32px !important; }
+        }
       `}</style>
     </div>
   );
@@ -1151,7 +1370,7 @@ const s = {
   page: {
     minHeight: "100vh",
     background: "#0f172a",
-    padding: "28px 32px",
+    padding: "16px",
     fontFamily: "'DM Sans','Helvetica Neue',sans-serif",
     color: "#f1f5f9",
   },
@@ -1289,9 +1508,9 @@ const s = {
   },
   inicioCard: {
     background: "#1e293b", border: "1px solid #334155", borderRadius: 16,
-    padding: "48px 56px", cursor: "pointer", display: "flex",
-    flexDirection: "column", alignItems: "center", gap: 12,
-    transition: "all 0.15s", minWidth: 220,
+    padding: "28px 16px", cursor: "pointer", display: "flex",
+    flexDirection: "column", alignItems: "center", gap: 10,
+    transition: "all 0.15s",
   },
   inicioIcon:  { fontSize: 48 },
   inicioLabel: { fontSize: 20, fontWeight: 700, color: "#f1f5f9" },
