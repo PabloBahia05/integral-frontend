@@ -381,16 +381,23 @@ export default function Anviz({ onBack, usuario, token }) {
   }
 
   // ── Vacaciones y Horas ────────────────────────────────────────────────────
+  function toLocalDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
   function primerDiaHabil() {
     const primero = new Date(new Date().getFullYear(), 0, 1);
     const dia = primero.getDay();
     if (dia === 0) primero.setDate(2);
     else if (dia === 6) primero.setDate(3);
-    return primero.toISOString().slice(0, 10);
+    return toLocalDate(primero);
   }
 
   function hoyStr() {
-    return new Date().toISOString().slice(0, 10);
+    return toLocalDate(new Date());
   }
 
   async function abrirVacaciones(desde, hasta) {
