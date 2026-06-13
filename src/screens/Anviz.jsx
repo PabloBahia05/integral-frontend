@@ -91,6 +91,8 @@ export default function Anviz({ onBack, usuario, token }) {
   const [vacCargando, setVacCargando]     = useState(false);
   const [vacEditando, setVacEditando]     = useState(null); // id del empleado editando
   const [vacForm, setVacForm]             = useState({ vacaciones: "", horas_acumuladas: "" });
+  const [vacDesde, setVacDesde]           = useState("");
+  const [vacHasta, setVacHasta]           = useState("");
 
   const wsRef = useRef(null);
 
@@ -352,7 +354,7 @@ export default function Anviz({ onBack, usuario, token }) {
       const method = modal === "nueva" ? "POST" : "PUT";
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ user_id: Number(modalData.user_id), direccion: modalData.direccion, timestamp: tsMySQL }),
       });
       const data = await res.json();
@@ -369,7 +371,7 @@ export default function Anviz({ onBack, usuario, token }) {
   async function eliminarFichada(id) {
     if (!window.confirm("¿Eliminar esta fichada?")) return;
     try {
-      const res = await fetch(`${API}/fichadas/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API}/fichadas/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       cargarFichadas();
@@ -379,17 +381,25 @@ export default function Anviz({ onBack, usuario, token }) {
   }
 
   // ── Vacaciones y Horas ────────────────────────────────────────────────────
-  async function abrirVacaciones() {
+  async function abrirVacaciones(desde, hasta) {
     setVista("vacaciones");
     setVacCargando(true);
     try {
-      const data = await apiFetch("/empleados/vacaciones-horas", token);
+      const params = new URLSearchParams();
+      if (desde) params.set("fecha_desde", desde);
+      if (hasta) params.set("fecha_hasta", hasta);
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      const data = await apiFetch(`/empleados/vacaciones-horas${qs}`, token);
       setVacData(data);
     } catch (e) {
       console.error(e);
     } finally {
       setVacCargando(false);
     }
+  }
+
+  async function filtrarVacaciones() {
+    abrirVacaciones(vacDesde, vacHasta);
   }
 
   async function guardarVac(id) {
@@ -428,6 +438,18 @@ export default function Anviz({ onBack, usuario, token }) {
             </div>
           </div>
           <div style={{ padding: "16px" }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div>
+                <label style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
+                <input type="date" value={vacDesde} onChange={e => setVacDesde(e.target.value)} style={{ ...s.input, width: 140 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
+                <input type="date" value={vacHasta} onChange={e => setVacHasta(e.target.value)} style={{ ...s.input, width: 140 }} />
+              </div>
+              <button style={s.btnNueva} onClick={filtrarVacaciones}>Filtrar</button>
+              <button style={{ ...s.btnVolver, marginLeft: 4 }} onClick={() => { setVacDesde(""); setVacHasta(""); abrirVacaciones("", ""); }}>Limpiar</button>
+            </div>
             {vacCargando ? (
               <p style={{ color: "var(--color-text-secondary)" }}>Cargando...</p>
             ) : (
