@@ -401,8 +401,8 @@ export default function Anviz({ onBack, usuario, token }) {
   }
 
   async function abrirVacaciones(desde, hasta) {
-    const d = desde !== undefined ? desde : primerDiaHabil();
-    const h = hasta !== undefined ? hasta : hoyStr();
+    const d = (desde !== undefined && typeof desde === "string") ? desde : primerDiaHabil();
+    const h = (hasta !== undefined && typeof hasta === "string") ? hasta : hoyStr();
     setVacDesde(d);
     setVacHasta(h);
     setVista("vacaciones");
@@ -587,7 +587,7 @@ export default function Anviz({ onBack, usuario, token }) {
             </div>
             <div
               style={s.inicioCard}
-              onClick={abrirVacaciones}
+              onClick={() => abrirVacaciones()}
             >
               <span style={s.inicioIcon}>🏖️</span>
               <span style={s.inicioLabel}>Vacaciones y Horas</span>
@@ -636,7 +636,7 @@ export default function Anviz({ onBack, usuario, token }) {
                   + Nueva fichada
                 </button>
               )}
-              <button style={s.btnVac} onClick={abrirVacaciones}>
+              <button style={s.btnVac} onClick={() => abrirVacaciones()}>
                 🏖️ Vacaciones y Horas
               </button>
               <button
