@@ -51,14 +51,16 @@ function asignarDirecciones(fichadas) {
     });
 }
 
-async function apiFetch(path) {
-  const res = await fetch(`${API}${path}`);
+async function apiFetch(path, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`${API}${path}`, { headers });
   if (!res.ok) throw new Error(`HTTP ${res.status} en ${path}`);
   return res.json();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function Anviz({ onBack }) {
+export default function Anviz({ onBack, usuario, token }) {
+  const esOperario = usuario?.rol === "operario";
   const [vista, setVista]               = useState("inicio"); // "inicio" | "fichadas" | "usuarios" | "historial"
   const [fichadas, setFichadas]         = useState([]);
   const [usuarios, setUsuarios]         = useState([]);
@@ -90,7 +92,7 @@ export default function Anviz({ onBack }) {
 
   // ── Cargar empleados (una vez) ─────────────────────────────────────────────
   useEffect(() => {
-    apiFetch("/empleados")
+    apiFetch("/empleados", token)
       .then(setUsuarios)
       .catch(() => {});
   }, []);
@@ -104,7 +106,7 @@ export default function Anviz({ onBack }) {
       if (filtroDesde) params.set("fecha_desde", filtroDesde);
       if (filtroHasta) params.set("fecha_hasta", filtroHasta);
       if (filtroUser)  params.set("user_id", filtroUser);
-      const data = await apiFetch(`/fichadas?${params}`);
+      const data = await apiFetch(`/fichadas?${params}`, token);
       setFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
       setUltimoSync(new Date());
       setPagina(1);
@@ -123,7 +125,7 @@ export default function Anviz({ onBack }) {
   useEffect(() => {
     const poll = async () => {
       try {
-        const data = await apiFetch("/anviz/status");
+        const data = await apiFetch("/anviz/status", token);
         setAgente(data);
       } catch {}
     };
@@ -234,7 +236,7 @@ export default function Anviz({ onBack }) {
   const cargarPresencia = useCallback(async () => {
     try {
       const params = new URLSearchParams({ fecha_desde: hoy(), fecha_hasta: hoy(), limit: 1000 });
-      const data = await apiFetch(`/fichadas?${params}`);
+      const data = await apiFetch(`/fichadas?${params}`, token);
       setFichadasHoy(asignarDirecciones(Array.isArray(data) ? data : []));
     } catch {}
   }, []);
@@ -265,7 +267,7 @@ export default function Anviz({ onBack }) {
       if (histDesde)      params.set("fecha_desde", histDesde);
       if (histHasta)      params.set("fecha_hasta", histHasta);
       if (histFiltroUser) params.set("user_id", histFiltroUser);
-      const data = await apiFetch(`/fichadas?${params}`);
+      const data = await apiFetch(`/fichadas?${params}`, token);
       setHistFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
     } catch (e) {
       setHistError(e.message);
@@ -450,12 +452,16 @@ export default function Anviz({ onBack }) {
               >
                 <IconRefresh spin={cargando} />
               </button>
-              <button style={s.btnUsuarios} onClick={() => setVista("usuarios")}>
-                👥 Empleados
-              </button>
-              <button style={s.btnNueva} onClick={abrirNueva}>
-                + Nueva fichada
-              </button>
+              {!esOperario && (
+                <button style={s.btnUsuarios} onClick={() => setVista("usuarios")}>
+                  👥 Empleados
+                </button>
+              )}
+              {!esOperario && (
+                <button style={s.btnNueva} onClick={abrirNueva}>
+                  + Nueva fichada
+                </button>
+              )}
               <button
                 style={{ ...s.btnSync, opacity: (syncing || !agente.connected) ? 0.5 : 1 }}
                 onClick={handleSync}
@@ -515,22 +521,24 @@ export default function Anviz({ onBack }) {
                 />
               </div>
 
-              {/* Empleado (select por nombre) */}
-              <div style={s.filtroGrupo}>
-                <label style={s.label}>Empleado</label>
-                <select
-                  value={filtroUser}
-                  onChange={(e) => setFiltroUser(e.target.value)}
-                  style={s.input}
-                >
-                  <option value="">Todos</option>
-                  {usuarios.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.apellido} {u.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Empleado (select por nombre) — oculto para operarios */}
+              {!esOperario && (
+                <div style={s.filtroGrupo}>
+                  <label style={s.label}>Empleado</label>
+                  <select
+                    value={filtroUser}
+                    onChange={(e) => setFiltroUser(e.target.value)}
+                    style={s.input}
+                  >
+                    <option value="">Todos</option>
+                    {usuarios.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.apellido} {u.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Dirección */}
               <div style={s.filtroGrupo}>
@@ -633,12 +641,14 @@ export default function Anviz({ onBack }) {
                             {f.direccion === "entrada" ? "↓ Entrada" : "↑ Salida"}
                           </span>
                         </td>
-                        <td style={{ ...s.td, width: 90 }}>
-                          <div style={{ display: "flex", gap: 6 }}>
-                            <button style={s.btnRowEdit} onClick={() => abrirEditar(f)} title="Editar">✏️</button>
-                            <button style={s.btnRowDel}  onClick={() => eliminarFichada(f.id)} title="Eliminar">🗑️</button>
-                          </div>
-                        </td>
+                        {!esOperario && (
+                          <td style={{ ...s.td, width: 90 }}>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button style={s.btnRowEdit} onClick={() => abrirEditar(f)} title="Editar">✏️</button>
+                              <button style={s.btnRowDel}  onClick={() => eliminarFichada(f.id)} title="Eliminar">🗑️</button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
