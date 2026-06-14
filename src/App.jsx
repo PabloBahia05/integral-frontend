@@ -18,6 +18,7 @@ import PresupuestosNuevoTabla from "./screens/PresupuestosNuevoTabla";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
 import HistorialFacturas from "./screens/HistorialFacturas";
+import AfipIVA from "./screens/AfipIVA";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState } from "react";
@@ -41,6 +42,7 @@ const SCREENS = {
   facturas: { label: "FACTURAS", icon: "🧾" },
   "historial-facturas": { label: "HISTORIAL FACTURAS", icon: "📋" },
   anviz: { label: "ASISTENCIA", icon: "🕐" },
+  "afip-iva": { label: "AFIP IVA", icon: "🏦" },
   usuarios: { label: "USUARIOS", icon: "👤" },
 };
 
@@ -721,6 +723,7 @@ function App({ usuario, token }) {
               "facturas",
               "historial-facturas",
               "anviz",
+              "afip-iva",
               "usuarios",
             ].map((s) => (
               <button
@@ -887,6 +890,7 @@ function App({ usuario, token }) {
               />
             )}
             {screen === "anviz" && <Anviz onBack={() => setScreen(null)} usuario={usuario} token={token} />}
+            {screen === "afip-iva" && <AfipIVA onBack={() => setScreen(null)} token={token} />}
             {screen === "usuarios" && (
               <Usuarios onBack={() => setScreen(null)} />
             )}
@@ -1133,6 +1137,20 @@ function App({ usuario, token }) {
                 <span className="sub-card-icon">🧾</span>
                 <span className="sub-card-label">FACTURAS</span>
                 <span className="sub-card-desc">Gestión de comprobantes</span>
+              </div>
+              )}
+              {puedo("afip-iva", "ver") && (
+              <div
+                className="sub-card"
+                style={{ "--sc-color": "#3b6fd4" }}
+                onClick={() => {
+                  setScreen("afip-iva");
+                  setHomeSection(HOME_SECTIONS.main);
+                }}
+              >
+                <span className="sub-card-icon">🏦</span>
+                <span className="sub-card-label">AFIP IVA</span>
+                <span className="sub-card-desc">Estado de IVA en tiempo real</span>
               </div>
               )}
               {puedo("ver-tablas", "ver") && (
