@@ -309,22 +309,29 @@ function App({ usuario, token }) {
       .catch(console.error);
 
   useEffect(() => {
-    fetchClientes();
-    fetchProductos();
-    fetchColocaciones();
-    fetchMamparasTipos();
-    fetchTiposVanitory();
-    fetchTiposEscritorio();
-    fetchTiposDespensero();
-    fetchFormulas();
-    fetchMargen();
-    fetchPresupuestosMamparas();
-    fetchPresupuestosVanitory();
-    fetchAsociaciones();
-    fetchAsociacionesForm();
-    fetchListas();
-    fetchProveedores(); // ← NUEVO
-  }, []);
+    // Esperar a que los permisos estén cargados antes de hacer fetches
+    const rol = usuario?.rol ?? "operario";
+    const puedeVer = (modulo) => {
+      if (rol === "admin") return true;
+      return permisos?.[rol]?.[modulo]?.["ver"] ?? false;
+    };
+
+    if (puedeVer("clientes"))                fetchClientes();
+    if (puedeVer("productos"))               fetchProductos();
+    if (puedeVer("presupuesto-mamparas"))    fetchColocaciones();
+    if (puedeVer("presupuesto-mamparas"))    fetchMamparasTipos();
+    if (puedeVer("presupuesto-vanitory"))    fetchTiposVanitory();
+    if (puedeVer("ver-tablas"))              fetchTiposEscritorio();
+    if (puedeVer("ver-tablas"))              fetchTiposDespensero();
+    if (puedeVer("ver-tablas"))              fetchFormulas();
+    if (puedeVer("lista-margenes"))          fetchMargen();
+    if (puedeVer("presupuestos-tabla"))      fetchPresupuestosMamparas();
+    if (puedeVer("presupuestos-vanitory-tabla")) fetchPresupuestosVanitory();
+    if (puedeVer("ver-tablas"))              fetchAsociaciones();
+    if (puedeVer("ver-tablas"))              fetchAsociacionesForm();
+    if (puedeVer("lista-margenes"))          fetchListas();
+    if (puedeVer("ver-tablas"))              fetchProveedores();
+  }, [permisos]);
 
   // ── Selección activa ─────────────────────────────────────
   const currentSelected =
@@ -648,6 +655,25 @@ function App({ usuario, token }) {
   `;
 
   // ── PANTALLAS ────────────────────────────────────────────
+  if (screen && !puedo(screen, "ver")) {
+    return (
+      <>
+        <style>{GLOBAL_STYLE}</style>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "'Space Mono', monospace", gap: 16 }}>
+          <span style={{ fontSize: 48 }}>🚫</span>
+          <p style={{ color: "#0a3a5c", fontWeight: 700, fontSize: 18, letterSpacing: 2 }}>ACCESO DENEGADO</p>
+          <p style={{ color: "#6699bb", fontSize: 13 }}>No tenés permiso para ver esta sección.</p>
+          <button
+            onClick={() => setScreen(null)}
+            style={{ marginTop: 12, padding: "8px 20px", background: "#0a3a5c", color: "#fff", border: "none", borderRadius: 4, fontFamily: "'Space Mono', monospace", cursor: "pointer", fontSize: 13 }}
+          >
+            ← Volver al inicio
+          </button>
+        </div>
+      </>
+    );
+  }
+
   if (screen) {
     const crud = screen === "clientes" ? clientesCRUD : productosCRUD;
     const sel = screen === "clientes" ? selectedCliente : selectedProducto;
@@ -725,7 +751,9 @@ function App({ usuario, token }) {
               "anviz",
               "afip-iva",
               "usuarios",
-            ].map((s) => (
+            ]
+            .filter((s) => puedo(s, "ver"))
+            .map((s) => (
               <button
                 key={s}
                 className={`side-btn ${screen === s ? "active" : ""}`}
@@ -742,30 +770,40 @@ function App({ usuario, token }) {
               </button>
             ))}
             <div className="side-divider" />
-            <h3 style={{ marginTop: 8 }}>Acciones rápidas</h3>
-            <button className="side-btn" onClick={() => setModal("nuevo")}>
-              <span>＋</span>
-              <span className="btn-label">&nbsp;Nuevo registro</span>
-            </button>
-            <button
-              className="side-btn"
-              style={{ opacity: sel ? 1 : 0.4 }}
-              onClick={() => sel && setModal("editar")}
-            >
-              <span>✏️</span>
-              <span className="btn-label">&nbsp;Editar seleccionado</span>
-            </button>
-            <button
-              className="side-btn"
-              style={{
-                opacity: sel ? 1 : 0.4,
-                color: sel ? "#ff9999" : undefined,
-              }}
-              onClick={() => sel && setModal("eliminar")}
-            >
-              <span>🗑</span>
-              <span className="btn-label">&nbsp;Eliminar seleccionado</span>
-            </button>
+            {(puedo(screen, "crear") || puedo(screen, "editar") || puedo(screen, "eliminar")) && (
+              <>
+                <h3 style={{ marginTop: 8 }}>Acciones rápidas</h3>
+                {puedo(screen, "crear") && (
+                  <button className="side-btn" onClick={() => setModal("nuevo")}>
+                    <span>＋</span>
+                    <span className="btn-label">&nbsp;Nuevo registro</span>
+                  </button>
+                )}
+                {puedo(screen, "editar") && (
+                  <button
+                    className="side-btn"
+                    style={{ opacity: sel ? 1 : 0.4 }}
+                    onClick={() => sel && setModal("editar")}
+                  >
+                    <span>✏️</span>
+                    <span className="btn-label">&nbsp;Editar seleccionado</span>
+                  </button>
+                )}
+                {puedo(screen, "eliminar") && (
+                  <button
+                    className="side-btn"
+                    style={{
+                      opacity: sel ? 1 : 0.4,
+                      color: sel ? "#ff9999" : undefined,
+                    }}
+                    onClick={() => sel && setModal("eliminar")}
+                  >
+                    <span>🗑</span>
+                    <span className="btn-label">&nbsp;Eliminar seleccionado</span>
+                  </button>
+                )}
+              </>
+            )}
             <div className="side-divider" />
           </div>
 
@@ -1057,17 +1095,25 @@ function App({ usuario, token }) {
           </button>
         </div>
 
-        <div className="data-summary">
-          <span className="sum-chip">
-            👥 <strong>{clientes.length}</strong> clientes
-          </span>
-          <span className="sum-chip">
-            🛒 <strong>{productos.length}</strong> productos
-          </span>
-          <span className="sum-chip">
-            🏭 <strong>{proveedores.length}</strong> proveedores
-          </span>
-        </div>
+        {(puedo("clientes", "ver") || puedo("productos", "ver") || puedo("ver-tablas", "ver")) && (
+          <div className="data-summary">
+            {puedo("clientes", "ver") && (
+              <span className="sum-chip">
+                👥 <strong>{clientes.length}</strong> clientes
+              </span>
+            )}
+            {puedo("productos", "ver") && (
+              <span className="sum-chip">
+                🛒 <strong>{productos.length}</strong> productos
+              </span>
+            )}
+            {puedo("ver-tablas", "ver") && (
+              <span className="sum-chip">
+                🏭 <strong>{proveedores.length}</strong> proveedores
+              </span>
+            )}
+          </div>
+        )}
 
         {/* ── Sección principal ── */}
         {homeSection === HOME_SECTIONS.main && (
