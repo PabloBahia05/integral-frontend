@@ -176,7 +176,6 @@ function App({ usuario, token }) {
 
   // ── Permisos del usuario logueado ────────────────────────
   const [permisos, setPermisos] = useState({});
-  const [permisosListos, setPermisosListos] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -192,7 +191,6 @@ function App({ usuario, token }) {
           map[rol][modulo][accion] = !!permitido;
         });
         setPermisos(map);
-        setPermisosListos(true);
       })
       .catch(console.error);
   }, [token]);
@@ -704,6 +702,18 @@ function App({ usuario, token }) {
           .log-mini-title { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: #88aacc; margin-bottom: 6px; }
           .log-mini-item { font-size: 11px; color: #99bbcc; }
           .log-mini-item:first-of-type { color: #2277bb; }
+
+          @media (max-width: 600px) {
+            .screen-layout { flex-direction: column; }
+            .screen-sidebar { width: 100% !important; height: auto; padding: 10px 12px !important; flex-direction: row; flex-wrap: wrap; gap: 4px; overflow-x: auto; }
+            .screen-sidebar h3 { display: none; }
+            .screen-sidebar.collapsed { width: 100% !important; padding: 10px 12px !important; }
+            .screen-sidebar.collapsed .btn-label { opacity: 1; max-width: none; }
+            .side-btn { width: auto; padding: 8px 12px; font-size: 11px; flex-shrink: 0; }
+            .collapse-btn { display: none; }
+            .side-divider { width: 1px; height: 28px; margin: 0 4px; }
+            .screen-main { padding: 16px 12px; }
+          }
         `}
         </style>
 
@@ -734,7 +744,7 @@ function App({ usuario, token }) {
             </button>
             <div className="side-divider" />
             <h3>Navegación</h3>
-            {(usuario?.rol === "admin" || permisosListos) && [
+            {[
               "clientes",
               "productos",
               "presupuesto-mamparas",
@@ -1067,6 +1077,19 @@ function App({ usuario, token }) {
         .sub-card-desc { font-size: 11px; color: #6699bb; }
         .sub-card:hover .sub-card-desc { color: #cce; }
         @keyframes fadeIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+
+        @media (max-width: 600px) {
+          body { align-items: flex-start; }
+          .wrapper { width: 100%; max-width: 100vw; padding: 24px 16px; border-radius: 0; border-left: none; border-right: none; box-sizing: border-box; }
+          .title { font-size: 20px; }
+          .subtitle { font-size: 10px; letter-spacing: 2px; }
+          .home-section-cards { grid-template-columns: 1fr 1fr; }
+          .grid { grid-template-columns: 1fr; }
+          .sub-grid { grid-template-columns: 1fr; }
+          .data-summary { gap: 6px; }
+          .sum-chip { font-size: 10px; padding: 3px 8px; }
+          .top-bar { margin-bottom: 20px; }
+        }
       `}
       </style>
 
