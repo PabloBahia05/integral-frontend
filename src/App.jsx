@@ -176,6 +176,7 @@ function App({ usuario, token }) {
 
   // ── Permisos del usuario logueado ────────────────────────
   const [permisos, setPermisos] = useState({});
+  const [permisosListos, setPermisosListos] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -191,6 +192,7 @@ function App({ usuario, token }) {
           map[rol][modulo][accion] = !!permitido;
         });
         setPermisos(map);
+        setPermisosListos(true);
       })
       .catch(console.error);
   }, [token]);
@@ -732,7 +734,7 @@ function App({ usuario, token }) {
             </button>
             <div className="side-divider" />
             <h3>Navegación</h3>
-            {[
+            {(usuario?.rol === "admin" || permisosListos) && [
               "clientes",
               "productos",
               "presupuesto-mamparas",
