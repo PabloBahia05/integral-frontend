@@ -91,8 +91,11 @@ export default function Anviz({ onBack, usuario, token }) {
   const [vacCargando, setVacCargando]     = useState(false);
   const [vacEditando, setVacEditando]     = useState(null); // id del empleado editando
   const [vacForm, setVacForm]             = useState({ vacaciones: "", horas_acumuladas: "" });
-  const [vacDesde, setVacDesde]           = useState("");
-  const [vacHasta, setVacHasta]           = useState("");
+  const [vacDesde, setVacDesde]           = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  });
+  const [vacHasta, setVacHasta]           = useState(hoy);
 
   // ── GPS Fichar ─────────────────────────────────────────────────────────────
   const [gpsEstado, setGpsEstado]         = useState("idle"); // "idle" | "obteniendo" | "ok" | "error" | "enviando" | "enviado"
@@ -388,17 +391,58 @@ export default function Anviz({ onBack, usuario, token }) {
     }
   }
 
+  // ── Estado fichadas para vacaciones (cálculo frontend, mismo algoritmo que historial) ─
+  const [vacFichadas, setVacFichadas] = useState([]);
+
+  // ── Calcular horas trabajadas por empleado desde fichadas (igual que historialEmpleados) ─
+  const vacHorasPorEmpleado = (() => {
+    const porEmp = {};
+    [...vacFichadas]
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+      .forEach(f => {
+        const uid = f.user_id;
+        if (!porEmp[uid]) porEmp[uid] = { fichadas: [] };
+        porEmp[uid].fichadas.push(f);
+      });
+    const resultado = {};
+    Object.entries(porEmp).forEach(([uid, { fichadas }]) => {
+      let totalMs = 0;
+      for (let i = 0; i < fichadas.length - 1; i++) {
+        if (fichadas[i].direccion === "entrada" && fichadas[i+1].direccion === "salida") {
+          const tin  = parseMysqlTs(fichadas[i].timestamp);
+          const tout = parseMysqlTs(fichadas[i+1].timestamp);
+          if (tin && tout) totalMs += tout - tin;
+          i++;
+        }
+      }
+      resultado[uid] = Math.round((totalMs / 3600000) * 100) / 100; // horas con 2 decimales
+    });
+    return resultado;
+  })();
+
   // ── Vacaciones y Horas ────────────────────────────────────────────────────
   async function abrirVacaciones(desde, hasta) {
     setVista("vacaciones");
     setVacCargando(true);
     try {
-      const params = new URLSearchParams();
-      if (desde) params.set("fecha_desde", desde);
-      if (hasta) params.set("fecha_hasta", hasta);
-      const qs = params.toString() ? `?${params.toString()}` : "";
-      const data = await apiFetch(`/empleados/vacaciones-horas${qs}`, token);
-      setVacData(data);
+      // Traer empleados (vacaciones + horas_acumuladas) y fichadas del período en paralelo
+      const d = desde !== undefined ? desde : vacDesde;
+      const h = hasta !== undefined ? hasta  : vacHasta;
+      const empParams = new URLSearchParams();
+      if (d) empParams.set("fecha_desde", d);
+      if (h) empParams.set("fecha_hasta", h);
+      const qs = empParams.toString() ? `?${empParams.toString()}` : "";
+
+      const ficParams = new URLSearchParams({ limit: 5000 });
+      if (d) ficParams.set("fecha_desde", d);
+      if (h) ficParams.set("fecha_hasta", h);
+
+      const [empData, ficData] = await Promise.all([
+        apiFetch(`/empleados/vacaciones-horas${qs}`, token),
+        apiFetch(`/fichadas?${ficParams}`, token),
+      ]);
+      setVacData(empData);
+      setVacFichadas(asignarDirecciones(Array.isArray(ficData) ? ficData : []));
     } catch (e) {
       console.error(e);
     } finally {
@@ -456,7 +500,14 @@ export default function Anviz({ onBack, usuario, token }) {
                 <input type="date" value={vacHasta} onChange={e => setVacHasta(e.target.value)} style={{ ...s.input, width: 140 }} />
               </div>
               <button style={s.btnNueva} onClick={filtrarVacaciones}>Filtrar</button>
-              <button style={{ ...s.btnVolver, marginLeft: 4 }} onClick={() => { setVacDesde(""); setVacHasta(""); abrirVacaciones("", ""); }}>Limpiar</button>
+              <button style={{ ...s.btnVolver, marginLeft: 4 }} onClick={() => {
+                const d = new Date(); d.setDate(d.getDate() - 30);
+                const desde = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+                const hasta = hoy();
+                setVacDesde(desde);
+                setVacHasta(hasta);
+                abrirVacaciones(desde, hasta);
+              }}>Limpiar</button>
             </div>
             {vacCargando ? (
               <p style={{ color: "var(--color-text-secondary)" }}>Cargando...</p>
@@ -467,7 +518,7 @@ export default function Anviz({ onBack, usuario, token }) {
                     <tr style={{ background: "var(--color-bg-secondary)" }}>
                       <th style={s.th}>Empleado</th>
                       <th style={s.th}>Vacaciones (días)</th>
-                      <th style={s.th}>Horas calculadas</th>
+                      <th style={s.th}>Horas trabajadas</th>
                       <th style={s.th}>Horas acumuladas</th>
                       <th style={s.th}>Dif. vs 44hs/sem</th>
                       {!esOperario && <th style={s.th}>Acciones</th>}
@@ -490,7 +541,7 @@ export default function Anviz({ onBack, usuario, token }) {
                           )}
                         </td>
                         <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
-                          {e.horas_calculadas}h
+                          {(vacHorasPorEmpleado[e.id] ?? 0)}h
                         </td>
                         <td style={s.td}>
                           {vacEditando === e.id ? (
