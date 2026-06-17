@@ -206,6 +206,11 @@ function App({ usuario, token }) {
   const [proveedores, setProveedores] = useState([]);
   const [selectedProveedor, setSelectedProveedor] = useState(null);
 
+  // ── Feriados / Semanas del año ───────────────────────────
+  const [feriados, setFeriados] = useState([]);
+  const [selectedFeriado, setSelectedFeriado] = useState(null);
+  const [semanasAnio, setSemanasAnio] = useState([]); // solo lectura, sin selección
+
   // ── Navegación interna Vanitory ──────────────────────────
   const [vanitoryVista, setVanitoryVista] = useState("tipos");
   const [vanitoryModelo, setVanitoryModelo] = useState(null);
@@ -308,6 +313,19 @@ function App({ usuario, token }) {
       .then(setProveedores)
       .catch(console.error);
 
+  // ── NUEVO: fetch feriados y semanas del año ──────────────
+  const fetchFeriados = () =>
+    fetch(`${API}/feriados`)
+      .then((r) => r.json())
+      .then(setFeriados)
+      .catch(console.error);
+
+  const fetchSemanasAnio = () =>
+    fetch(`${API}/semanas-anio`)
+      .then((r) => r.json())
+      .then(setSemanasAnio)
+      .catch(console.error);
+
   useEffect(() => {
     // Esperar a que los permisos estén cargados antes de hacer fetches
     const rol = usuario?.rol ?? "operario";
@@ -331,6 +349,8 @@ function App({ usuario, token }) {
     if (puedeVer("ver-tablas"))              fetchAsociacionesForm();
     if (puedeVer("lista-margenes"))          fetchListas();
     if (puedeVer("ver-tablas"))              fetchProveedores();
+    if (puedeVer("ver-tablas"))              fetchFeriados();
+    if (puedeVer("ver-tablas"))              fetchSemanasAnio();
   }, [permisos]);
 
   // ── Selección activa ─────────────────────────────────────
@@ -562,6 +582,16 @@ function App({ usuario, token }) {
     setSelectedProveedor,
     fetchProveedores,
     "Proveedor",
+  );
+
+  // ── NUEVO: CRUD Feriados (semanas_anio es de solo lectura, sin CRUD) ──
+  const feriadosCRUD = makeCRUD(
+    "feriados",
+    feriados,
+    setFeriados,
+    setSelectedFeriado,
+    fetchFeriados,
+    "Feriado",
   );
 
   // ── CRUD Lista de Márgenes (definido explícitamente) ─────
@@ -990,6 +1020,11 @@ function App({ usuario, token }) {
                 proveedores={proveedores}
                 proveedoresCRUD={proveedoresCRUD}
                 selectedProveedor={selectedProveedor}
+                // ── feriados / semanas del año ──
+                feriados={feriados}
+                feriadosCRUD={feriadosCRUD}
+                selectedFeriado={selectedFeriado}
+                semanasAnio={semanasAnio}
                 tablaInicial={tablaInicialVerTablas}
                 token={token}
               />
