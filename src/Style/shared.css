@@ -436,3 +436,57 @@ body { background: #cce7f9; min-height: 100vh; font-family: 'Space Mono', monosp
 
 .formmampara-desglose-total span  { color: #60efff; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
 .formmampara-desglose-total strong { color: #fff; font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 800; }
+
+/* ── RESPONSIVE ─────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+
+  /* Encabezado */
+  .screen-title { font-size: 20px; }
+  .screen-header { margin-bottom: 20px; }
+
+  /* Action bar */
+  .action-bar { gap: 6px; }
+  .btn-action { padding: 8px 12px; font-size: 11px; }
+  .selected-info { width: 100%; margin-left: 0; }
+
+  /* Buscador */
+  .search-wrap { width: 100%; margin-left: 0; }
+  .search-input { width: 100%; }
+  .search-input:focus { width: 100%; }
+
+  /* Stats */
+  .stats-row { flex-wrap: wrap; gap: 8px; }
+  .stat-card { min-width: calc(50% - 8px); padding: 12px 14px; }
+  .stat-num { font-size: 20px; }
+
+  /* Modal */
+  .modal-box { padding: 24px 16px; width: 95vw; max-height: 95vh; }
+  .modal-title { font-size: 16px; margin-bottom: 16px; }
+
+  /* Form grid → 1 columna */
+  .form-grid { grid-template-columns: 1fr; gap: 0; }
+  .form-actions { flex-direction: column; }
+  .btn-save, .btn-cancel, .btn-danger { width: 100%; text-align: center; }
+
+  /* Tabla */
+  .table-wrap { max-height: 320px; }
+  .data-table { min-width: 600px; }
+  .data-table th, .data-table td { padding: 8px 10px; font-size: 11px; }
+
+  /* Presupuesto cards */
+  .presup-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .presup-card { padding: 20px 12px; gap: 10px; }
+  .presup-icon { font-size: 1.8rem; }
+  .presup-label { font-size: 11px; }
+
+  /* Mampara form */
+  .formmampara-wrap { max-width: 100%; }
+  .formmampara-body { padding: 16px; }
+  .formmampara-row { grid-template-columns: 1fr; gap: 0; }
+  .formmampara-vidrio { flex-direction: column; }
+  .formmampara-resultado { flex-direction: column; gap: 6px; text-align: center; }
+  .formmampara-resultado-valor { font-size: 1.3rem; }
+
+  /* screen-main padding */
+  .screen-main { padding: 12px 10px !important; }
+}
