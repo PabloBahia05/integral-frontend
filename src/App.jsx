@@ -223,105 +223,105 @@ function App({ usuario, token }) {
   const addLog = (msg) => setLog((prev) => [msg, ...prev.slice(0, 4)]);
 
   const fetchClientes = () =>
-    fetch(`${API}/clientes`)
+    authFetch(`${API}/clientes`)
       .then((r) => r.json())
       .then(setClientes)
       .catch(console.error);
 
   const fetchProductos = () =>
-    fetch(`${API}/productos`)
+    authFetch(`${API}/productos`)
       .then((r) => r.json())
       .then(setProductos)
       .catch(console.error);
 
   const fetchMamparasTipos = () =>
-    fetch(`${API}/mamparas-tipos`)
+    authFetch(`${API}/mamparas-tipos`)
       .then((r) => r.json())
       .then(setMamparasTipos)
       .catch(console.error);
 
   const fetchTiposVanitory = () =>
-    fetch(`${API}/vanitory-tipos`)
+    authFetch(`${API}/vanitory-tipos`)
       .then((r) => r.json())
       .then(setTiposVanitory)
       .catch(console.error);
 
   const fetchTiposEscritorio = () =>
-    fetch(`${API}/escritorio-tipos`)
+    authFetch(`${API}/escritorio-tipos`)
       .then((r) => r.json())
       .then(setTiposEscritorio)
       .catch(console.error);
 
   const fetchColocaciones = () =>
-    fetch(`${API}/colocacion`)
+    authFetch(`${API}/colocacion`)
       .then((r) => r.json())
       .then(setColocaciones)
       .catch(console.error);
 
   const fetchTiposDespensero = () =>
-    fetch(`${API}/despensero-tipos`)
+    authFetch(`${API}/despensero-tipos`)
       .then((r) => r.json())
       .then(setTiposDespensero)
       .catch(console.error);
 
   const fetchPresupuestosMamparas = () =>
-    fetch(`${API}/presupuestos-mamparas`)
+    authFetch(`${API}/presupuestos-mamparas`)
       .then((r) => r.json())
       .then(setPresupuestosMamparas)
       .catch(console.error);
 
   const fetchPresupuestosVanitory = () =>
-    fetch(`${API}/presupuestos-vanitory`)
+    authFetch(`${API}/presupuestos-vanitory`)
       .then((r) => r.json())
       .then(setPresupuestosVanitory)
       .catch(console.error);
 
   const fetchMargen = () =>
-    fetch(`${API}/margen`)
+    authFetch(`${API}/margen`)
       .then((r) => r.json())
       .then(setMargen)
       .catch(console.error);
 
   const fetchFormulas = () =>
-    fetch(`${API}/formulas`)
+    authFetch(`${API}/formulas`)
       .then((r) => r.json())
       .then(setFormulas)
       .catch(console.error);
 
   const fetchAsociaciones = () =>
-    fetch(`${API}/asociaciones`)
+    authFetch(`${API}/asociaciones`)
       .then((r) => r.json())
       .then(setAsociaciones)
       .catch(console.error);
 
   const fetchAsociacionesForm = () =>
-    fetch(`${API}/asociaciones-form`)
+    authFetch(`${API}/asociaciones-form`)
       .then((r) => r.json())
       .then(setAsociacionesForm)
       .catch(console.error);
 
   const fetchListas = () =>
-    fetch(`${API}/lista`)
+    authFetch(`${API}/lista`)
       .then((r) => r.json())
       .then(setListas)
       .catch(console.error);
 
   // ── NUEVO: fetch proveedores ─────────────────────────────
   const fetchProveedores = () =>
-    fetch(`${API}/proveedores`)
+    authFetch(`${API}/proveedores`)
       .then((r) => r.json())
       .then(setProveedores)
       .catch(console.error);
 
   // ── NUEVO: fetch feriados y semanas del año ──────────────
   const fetchFeriados = () =>
-    fetch(`${API}/feriados`)
+    authFetch(`${API}/feriados`)
       .then((r) => r.json())
       .then(setFeriados)
       .catch(console.error);
 
   const fetchSemanasAnio = () =>
-    fetch(`${API}/semanas-anio`)
+    authFetch(`${API}/semanas-anio`)
       .then((r) => r.json())
       .then(setSemanasAnio)
       .catch(console.error);
@@ -600,7 +600,7 @@ function App({ usuario, token }) {
     try {
       if (exists) {
         const { id, ...body } = item;
-        const res = await fetch(`${API}/lista/${id}`, {
+        const res = await authFetch(`${API}/lista/${id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -609,7 +609,7 @@ function App({ usuario, token }) {
         addLog(`✏️ Lista actualizada: ${item.lista}`);
       } else {
         const { id, ...body } = item;
-        const res = await fetch(`${API}/lista`, {
+        const res = await authFetch(`${API}/lista`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -629,7 +629,7 @@ function App({ usuario, token }) {
   const handleDeleteLista = async (id) => {
     try {
       const item = listas.find((r) => r.id === id);
-      const res = await fetch(`${API}/lista/${id}`, { method: "DELETE" });
+      const res = await authFetch(`${API}/lista/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(await res.text());
       addLog(`🗑 Lista eliminada: ${item?.lista}`);
       await fetchListas();
