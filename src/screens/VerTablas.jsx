@@ -14,6 +14,8 @@ import Asociaciones from "./Asociaciones";
 import AsociacionesForm from "./AsociacionesForm";
 import Lista from "./Lista";
 import Proveedores from "./Proveedores";
+import Feriados from "./Feriados";
+import SemanasAnio from "./SemanasAnio";
 import UsuariosApp from "./UsuariosApp";
 import Anviz from "./Anviz";
 import Usuarios from "./Usuarios";
@@ -264,6 +266,8 @@ const TABLAS = [
     color: "#e63946",
   },
   { id: "lista", label: "Lista Margen", icon: "📊", color: "#20b2aa" },
+  { id: "feriados", label: "Feriados", icon: "📅", color: "#ffb703" },
+  { id: "semanas-anio", label: "Semanas y Horas Esperadas", icon: "🗓️", color: "#3a86ff" },
   { id: "usuarios-app", label: "Usuarios App",    icon: "🔐", color: "#e63946" },
   { id: "anviz",        label: "Accesos Anviz",   icon: "🕐", color: "#0a7a3c" },
   { id: "permisos",     label: "Permisos por Rol", icon: "🛡️", color: "#6366f1" },
@@ -313,6 +317,11 @@ export default function VerTablas({
   proveedores,
   proveedoresCRUD,
   selectedProveedor,
+  // ── feriados / semanas del año ──
+  feriados,
+  feriadosCRUD,
+  selectedFeriado,
+  semanasAnio,
   tablaInicial,
   token,
 }) {
@@ -523,6 +532,30 @@ export default function VerTablas({
           {...localCRUD(proveedoresCRUD ?? {})}
           onSelect={(row) => proveedoresCRUD?.onSelect?.(row)}
         />
+      </div>
+    );
+
+  // ── feriados ──
+  if (tablaActiva === "feriados")
+    return (
+      <div>
+        {back}
+        <Feriados
+          feriados={feriados ?? []}
+          selected={selectedFeriado}
+          modal={modal}
+          {...localCRUD(feriadosCRUD ?? {})}
+          onSelect={(row) => feriadosCRUD?.onSelect?.(row)}
+        />
+      </div>
+    );
+
+  // ── semanas del año (solo lectura) ──
+  if (tablaActiva === "semanas-anio")
+    return (
+      <div>
+        {back}
+        <SemanasAnio semanasAnio={semanasAnio ?? []} />
       </div>
     );
 
