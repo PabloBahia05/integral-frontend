@@ -19,7 +19,7 @@ function parseMysqlTs(ts) {
 function fmtFecha(ts) {
   const d = parseMysqlTs(ts);
   if (!d) return "—";
-  return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth() + 1)}-${d.getUTCFullYear()}`;
 }
 
 function fmtHora(ts) {
@@ -630,6 +630,7 @@ export default function Anviz({ onBack, usuario, token }) {
                       <th style={s.th}>ART</th>
                       <th style={s.th}>Certificado</th>
                       <th style={s.th}>Horas esperadas</th>
+                      <th style={s.th}>Hs. justificadas</th>
                       <th style={s.th}>Dif. del período</th>
                       <th style={s.th}>Saldo total de horas</th>
                       {!esOperario && <th style={s.th}>Acciones</th>}
@@ -687,12 +688,12 @@ export default function Anviz({ onBack, usuario, token }) {
                         <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
                           {(e.horas_esperadas ?? 0)}h
                         </td>
+                        <td style={{ ...s.td, color: (e.horas_justificadas ?? 0) > 0 ? "var(--color-text-success)" : "var(--color-text-secondary)", fontWeight: 500 }}>
+                          {(e.horas_justificadas ?? 0) > 0 ? `+${e.horas_justificadas}h` : "—"}
+                        </td>
                         <td style={{ ...s.td, color: e.diferencia_vs_44 >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 500 }}>
                           {e.diferencia_vs_44 >= 0 ? "+" : ""}{e.diferencia_vs_44 ?? 0}h
                           <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>({e.semanas_con_actividad ?? 0} sem)</span>
-                          {(e.horas_justificadas ?? 0) > 0 && (
-                            <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>+{e.horas_justificadas}h justif.</span>
-                          )}
                         </td>
                         <td style={{ ...s.td, color: e.saldo_horas_total >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 600 }}>
                           {vacEditando === e.id ? (
