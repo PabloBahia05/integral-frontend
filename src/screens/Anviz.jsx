@@ -4,56 +4,34 @@ import Usuarios from "./Usuarios";
 const API = "https://integral-backend-production.up.railway.app";
 
 // ─── DateInput con máscara dd-mm-aaaa ─────────────────────────────────────────
-// value/onChange trabajan con "yyyy-mm-dd" (formato interno/API)
-// El usuario ve y escribe "dd-mm-aaaa"
 function DateInput({ value, onChange, style }) {
-  // Convierte yyyy-mm-dd → dd-mm-yyyy para mostrar
   function toDisplay(iso) {
     if (!iso || iso.length < 10) return iso || "";
     const [y, m, d] = iso.split("-");
     if (!y || !m || !d) return iso;
     return `${d}-${m}-${y}`;
   }
-  // Convierte dd-mm-yyyy → yyyy-mm-dd para la API
-  function toISO(display) {
-    const clean = display.replace(/[^0-9]/g, "");
-    if (clean.length < 8) return "";
-    const d = clean.slice(0, 2);
-    const m = clean.slice(2, 4);
-    const y = clean.slice(4, 8);
+  function toISO(digits) {
+    if (digits.length < 8) return "";
+    const d = digits.slice(0, 2), m = digits.slice(2, 4), y = digits.slice(4, 8);
     return `${y}-${m}-${d}`;
   }
-
   const [raw, setRaw] = useState(toDisplay(value));
-
-  // Sincronizar si value cambia desde afuera
   useEffect(() => { setRaw(toDisplay(value)); }, [value]);
-
   function handleChange(e) {
-    let v = e.target.value;
-    // Solo dígitos y guiones
-    v = v.replace(/[^0-9-]/g, "");
-    // Auto-insertar guiones
-    const digits = v.replace(/-/g, "");
+    const digits = e.target.value.replace(/[^0-9]/g, "").slice(0, 8);
     let masked = digits;
     if (digits.length >= 3) masked = digits.slice(0, 2) + "-" + digits.slice(2);
-    if (digits.length >= 5) masked = digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4, 8);
+    if (digits.length >= 5) masked = digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4);
     setRaw(masked);
     if (digits.length === 8) {
-      const iso = toISO(masked);
+      const iso = toISO(digits);
       if (iso) onChange({ target: { value: iso } });
     }
   }
-
   return (
-    <input
-      type="text"
-      value={raw}
-      onChange={handleChange}
-      placeholder="dd-mm-aaaa"
-      maxLength={10}
-      style={style}
-    />
+    <input type="text" value={raw} onChange={handleChange}
+      placeholder="dd-mm-aaaa" maxLength={10} style={style} />
   );
 }
 
@@ -73,7 +51,7 @@ function parseMysqlTs(ts) {
 function fmtFecha(ts) {
   const d = parseMysqlTs(ts);
   if (!d) return "—";
-  return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth() + 1)}-${d.getUTCFullYear()}`;
 }
 
 function fmtHora(ts) {
@@ -680,6 +658,7 @@ export default function Anviz({ onBack, usuario, token }) {
                       <th style={s.th}>ART</th>
                       <th style={s.th}>Certificado</th>
                       <th style={s.th}>Horas esperadas</th>
+                      <th style={s.th}>Hs. justificadas</th>
                       <th style={s.th}>Dif. del período</th>
                       <th style={s.th}>Saldo total de horas</th>
                       {!esOperario && <th style={s.th}>Acciones</th>}
@@ -737,12 +716,12 @@ export default function Anviz({ onBack, usuario, token }) {
                         <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
                           {(e.horas_esperadas ?? 0)}h
                         </td>
+                        <td style={{ ...s.td, color: (e.horas_justificadas ?? 0) > 0 ? "var(--color-text-success)" : "var(--color-text-secondary)", fontWeight: 500 }}>
+                          {(e.horas_justificadas ?? 0) > 0 ? `+${e.horas_justificadas}h` : "—"}
+                        </td>
                         <td style={{ ...s.td, color: e.diferencia_vs_44 >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 500 }}>
                           {e.diferencia_vs_44 >= 0 ? "+" : ""}{e.diferencia_vs_44 ?? 0}h
                           <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>({e.semanas_con_actividad ?? 0} sem)</span>
-                          {(e.horas_justificadas ?? 0) > 0 && (
-                            <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>+{e.horas_justificadas}h justif.</span>
-                          )}
                         </td>
                         <td style={{ ...s.td, color: e.saldo_horas_total >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 600 }}>
                           {vacEditando === e.id ? (
