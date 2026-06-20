@@ -470,6 +470,15 @@ export default function Anviz({ onBack, usuario, token }) {
     return diff > 0 ? diff : "";
   }
 
+  // Convierte una fecha (string YYYY-MM-DD, datetime, etc.) a DD-MM-AAAA para mostrar
+  function fmtFecha(value) {
+    if (!value) return "";
+    const iso = String(value).slice(0, 10); // yyyy-mm-dd
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return iso;
+    return `${d}-${m}-${y}`;
+  }
+
   async function agregarVacacionTomada() {
     if (!vacModalEmpleado || !vacTomadasForm.fecha_desde || !vacTomadasForm.fecha_hasta || !vacTomadasForm.dias) return;
     try {
@@ -821,7 +830,7 @@ export default function Anviz({ onBack, usuario, token }) {
                         }}
                       >
                         <span>
-                          {v.fecha_desde?.slice(0, 10)} → {v.fecha_hasta?.slice(0, 10)}
+                          {fmtFecha(v.fecha_desde)} → {fmtFecha(v.fecha_hasta)}
                           <strong style={{ marginLeft: 8 }}>{v.dias} días</strong>
                           {v.nota && <span style={{ color: "var(--color-text-secondary)", marginLeft: 8 }}>({v.nota})</span>}
                         </span>
@@ -941,7 +950,7 @@ export default function Anviz({ onBack, usuario, token }) {
                       >
                         <span>
                           <strong style={{ marginRight: 8 }}>{v.tipo === "ART" ? "🩹 ART" : "📄 Certificado"}</strong>
-                          {v.fecha_desde?.slice(0, 10)} → {v.fecha_hasta?.slice(0, 10)}
+                          {fmtFecha(v.fecha_desde)} → {fmtFecha(v.fecha_hasta)}
                           <strong style={{ marginLeft: 8 }}>{v.dias} días</strong>
                           {v.nota && <span style={{ color: "var(--color-text-secondary)", marginLeft: 8 }}>({v.nota})</span>}
                         </span>
