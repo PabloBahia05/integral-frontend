@@ -33,14 +33,14 @@ function DateInput({ value, onChange, style }) {
     setRaw(masked);
     if (digits.length === 8) {
       const iso = toISO(digits);
-      if (iso) onChange({ target: { value: iso } });
+      if (iso) onChange(iso);
     }
   }
 
   function handlePickerChange(e) {
     const iso = e.target.value;
     setRaw(toDisplay(iso));  // actualizar el texto visible inmediatamente
-    onChange({ target: { value: iso } });
+    onChange(iso);
   }
 
   return (
@@ -662,11 +662,11 @@ export default function Anviz({ onBack, usuario, token }) {
             <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
               <div>
                 <label style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
-                <DateInput value={vacDesde} onChange={e => setVacDesde(e.target.value)} style={{ ...s.input, width: 140 }} />
+                <DateInput value={vacDesde} onChange={v => setVacDesde(v)} style={{ ...s.input, width: 140 }} />
               </div>
               <div>
                 <label style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
-                <DateInput value={vacHasta} onChange={e => setVacHasta(e.target.value)} style={{ ...s.input, width: 140 }} />
+                <DateInput value={vacHasta} onChange={v => setVacHasta(v)} style={{ ...s.input, width: 140 }} />
               </div>
               <button style={s.btnNueva} onClick={filtrarVacaciones}>Filtrar</button>
               <button style={{ ...s.btnVolver, marginLeft: 4 }} onClick={() => {
@@ -835,8 +835,7 @@ export default function Anviz({ onBack, usuario, token }) {
                       <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
                       <DateInput
                         value={vacTomadasForm.fecha_desde}
-                        onChange={(ev) => {
-                          const fecha_desde = ev.target.value;
+                        onChange={(fecha_desde) => {
                           setVacTomadasForm(f => ({
                             ...f,
                             fecha_desde,
@@ -850,8 +849,7 @@ export default function Anviz({ onBack, usuario, token }) {
                       <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
                       <DateInput
                         value={vacTomadasForm.fecha_hasta}
-                        onChange={(ev) => {
-                          const fecha_hasta = ev.target.value;
+                        onChange={(fecha_hasta) => {
                           setVacTomadasForm(f => ({
                             ...f,
                             fecha_hasta,
@@ -952,8 +950,7 @@ export default function Anviz({ onBack, usuario, token }) {
                       <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
                       <DateInput
                         value={justifForm.fecha_desde}
-                        onChange={(ev) => {
-                          const fecha_desde = ev.target.value;
+                        onChange={(fecha_desde) => {
                           setJustifForm(f => ({
                             ...f,
                             fecha_desde,
@@ -967,8 +964,7 @@ export default function Anviz({ onBack, usuario, token }) {
                       <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
                       <DateInput
                         value={justifForm.fecha_hasta}
-                        onChange={(ev) => {
-                          const fecha_hasta = ev.target.value;
+                        onChange={(fecha_hasta) => {
                           setJustifForm(f => ({
                             ...f,
                             fecha_hasta,
@@ -1165,7 +1161,7 @@ export default function Anviz({ onBack, usuario, token }) {
                 <label style={s.label}>Desde</label>
                 <DateInput
                   value={filtroDesde}
-                  onChange={(e) => setFiltroDesde(e.target.value)}
+                  onChange={(v) => setFiltroDesde(v)}
                   style={s.input}
                 />
               </div>
@@ -1175,7 +1171,7 @@ export default function Anviz({ onBack, usuario, token }) {
                 <label style={s.label}>Hasta</label>
                 <DateInput
                   value={filtroHasta}
-                  onChange={(e) => setFiltroHasta(e.target.value)}
+                  onChange={(v) => setFiltroHasta(v)}
                   style={s.input}
                 />
               </div>
@@ -1406,12 +1402,12 @@ export default function Anviz({ onBack, usuario, token }) {
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Desde</label>
                 <DateInput value={histDesde}
-                  onChange={e => setHistDesde(e.target.value)} style={s.input} />
+                  onChange={v => setHistDesde(v)} style={s.input} />
               </div>
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Hasta</label>
                 <DateInput value={histHasta}
-                  onChange={e => setHistHasta(e.target.value)} style={s.input} />
+                  onChange={v => setHistHasta(v)} style={s.input} />
               </div>
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Empleado</label>
