@@ -91,6 +91,11 @@ export default function Anviz({ onBack, usuario, token }) {
   const [vacCargando, setVacCargando]     = useState(false);
   const [vacEditando, setVacEditando]     = useState(null); // id del empleado editando
   const [vacForm, setVacForm]             = useState({ vacaciones: "", horas_acumuladas: "" });
+  // ── Modal de vacaciones tomadas (alta/baja de períodos) ──
+  const [vacModalEmpleado, setVacModalEmpleado] = useState(null); // {id, nombre, apellido} o null
+  const [vacTomadasList, setVacTomadasList]     = useState([]);
+  const [vacTomadasForm, setVacTomadasForm]     = useState({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+  const [vacTomadasCargando, setVacTomadasCargando] = useState(false);
   const [vacDesde, setVacDesde]           = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 30);
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -430,6 +435,73 @@ export default function Anviz({ onBack, usuario, token }) {
     }
   }
 
+  // ── Detalle de vacaciones tomadas (períodos concretos) ──
+  async function abrirModalVacaciones(empleado) {
+    setVacModalEmpleado(empleado);
+    setVacTomadasForm({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+    setVacTomadasCargando(true);
+    try {
+      const lista = await apiFetch(`/vacaciones-tomadas?empleado_id=${empleado.id}`, token);
+      setVacTomadasList(Array.isArray(lista) ? lista : []);
+    } catch (e) {
+      console.error(e);
+      setVacTomadasList([]);
+    } finally {
+      setVacTomadasCargando(false);
+    }
+  }
+
+  function cerrarModalVacaciones() {
+    setVacModalEmpleado(null);
+    setVacTomadasList([]);
+  }
+
+  // Calcula días corridos (calendario, incluye fines de semana, como marca la ley) entre dos fechas
+  function diasCorridos(desde, hasta) {
+    if (!desde || !hasta) return "";
+    const d1 = new Date(`${desde}T00:00:00`);
+    const d2 = new Date(`${hasta}T00:00:00`);
+    const diff = Math.round((d2 - d1) / 86400000) + 1;
+    return diff > 0 ? diff : "";
+  }
+
+  async function agregarVacacionTomada() {
+    if (!vacModalEmpleado || !vacTomadasForm.fecha_desde || !vacTomadasForm.fecha_hasta || !vacTomadasForm.dias) return;
+    try {
+      const nuevo = await fetch(`${API}/vacaciones-tomadas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          empleado_id: vacModalEmpleado.id,
+          fecha_desde: vacTomadasForm.fecha_desde,
+          fecha_hasta: vacTomadasForm.fecha_hasta,
+          dias: Number(vacTomadasForm.dias),
+          nota: vacTomadasForm.nota || null,
+        }),
+      }).then(r => r.json());
+      setVacTomadasList(l => [nuevo, ...l]);
+      setVacTomadasForm({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+      // Refrescar la tabla principal para actualizar tomadas/pendientes
+      abrirVacaciones();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function eliminarVacacionTomada(id) {
+    if (!confirm("¿Eliminar este período de vacaciones?")) return;
+    try {
+      await fetch(`${API}/vacaciones-tomadas/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setVacTomadasList(l => l.filter(v => v.id !== id));
+      abrirVacaciones();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div style={s.page}>
@@ -479,11 +551,13 @@ export default function Anviz({ onBack, usuario, token }) {
                   <thead>
                     <tr style={{ background: "var(--color-bg-secondary)" }}>
                       <th style={s.th}>Empleado</th>
-                      <th style={s.th}>Vacaciones (días)</th>
+                      <th style={s.th}>Vac. correspondientes</th>
+                      <th style={s.th}>Vac. tomadas</th>
+                      <th style={s.th}>Vac. pendientes</th>
                       <th style={s.th}>Horas trabajadas</th>
                       <th style={s.th}>Horas esperadas</th>
-                      <th style={s.th}>Horas acumuladas</th>
-                      <th style={s.th}>Dif. vs esperadas</th>
+                      <th style={s.th}>Dif. del período</th>
+                      <th style={s.th}>Saldo total de horas</th>
                       {!esOperario && <th style={s.th}>Acciones</th>}
                     </tr>
                   </thead>
@@ -500,8 +574,20 @@ export default function Anviz({ onBack, usuario, token }) {
                               style={{ ...s.input, width: 80 }}
                             />
                           ) : (
-                            <span>{e.vacaciones ?? 0} días</span>
+                            <span>{e.vacaciones_correspondientes ?? e.vacaciones ?? 0} días</span>
                           )}
+                        </td>
+                        <td style={s.td}>
+                          <button
+                            style={{ ...s.btnRowEdit, background: "transparent", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
+                            onClick={() => abrirModalVacaciones(e)}
+                            title="Ver / cargar períodos tomados"
+                          >
+                            {(e.vacaciones_tomadas ?? 0)} días 📋
+                          </button>
+                        </td>
+                        <td style={{ ...s.td, color: (e.vacaciones_pendientes ?? 0) > 0 ? "var(--color-text-success)" : "var(--color-text-secondary)", fontWeight: 500 }}>
+                          {e.vacaciones_pendientes ?? 0} días
                         </td>
                         <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
                           {(e.horas_calculadas ?? 0)}h
@@ -509,21 +595,29 @@ export default function Anviz({ onBack, usuario, token }) {
                         <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
                           {(e.horas_esperadas ?? 0)}h
                         </td>
-                        <td style={s.td}>
-                          {vacEditando === e.id ? (
-                            <input
-                              type="number"
-                              value={vacForm.horas_acumuladas}
-                              onChange={(ev) => setVacForm(f => ({ ...f, horas_acumuladas: ev.target.value }))}
-                              style={{ ...s.input, width: 80 }}
-                            />
-                          ) : (
-                            <span>{e.horas_acumuladas}h</span>
-                          )}
-                        </td>
                         <td style={{ ...s.td, color: e.diferencia_vs_44 >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 500 }}>
                           {e.diferencia_vs_44 >= 0 ? "+" : ""}{e.diferencia_vs_44 ?? 0}h
                           <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>({e.semanas_con_actividad ?? 0} sem)</span>
+                        </td>
+                        <td style={{ ...s.td, color: e.saldo_horas_total >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 600 }}>
+                          {vacEditando === e.id ? (
+                            <div>
+                              <label style={{ fontSize: 10, color: "var(--color-text-secondary)", display: "block" }}>Ajuste manual</label>
+                              <input
+                                type="number"
+                                value={vacForm.horas_acumuladas}
+                                onChange={(ev) => setVacForm(f => ({ ...f, horas_acumuladas: ev.target.value }))}
+                                style={{ ...s.input, width: 80 }}
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              {e.saldo_horas_total >= 0 ? "+" : ""}{e.saldo_horas_total ?? 0}h
+                              <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4, fontWeight: 400 }}>
+                                (ajuste {e.horas_acumuladas >= 0 ? "+" : ""}{e.horas_acumuladas}h)
+                              </span>
+                            </>
+                          )}
                         </td>
                         {!esOperario && (
                           <td style={s.td}>
@@ -535,7 +629,7 @@ export default function Anviz({ onBack, usuario, token }) {
                             ) : (
                               <button style={s.btnRowEdit} onClick={() => {
                                 setVacEditando(e.id);
-                                setVacForm({ vacaciones: e.vacaciones ?? 0, horas_acumuladas: e.horas_acumuladas ?? 0 });
+                                setVacForm({ vacaciones: e.vacaciones_correspondientes ?? e.vacaciones ?? 0, horas_acumuladas: e.horas_acumuladas ?? 0 });
                               }}>✏️</button>
                             )}
                           </td>
@@ -547,6 +641,114 @@ export default function Anviz({ onBack, usuario, token }) {
               </div>
             )}
           </div>
+
+          {/* ── Modal: detalle y carga de períodos de vacaciones tomados ── */}
+          {vacModalEmpleado && (
+            <div
+              style={{
+                position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+                display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+              }}
+              onClick={cerrarModalVacaciones}
+            >
+              <div
+                style={{
+                  background: "var(--color-bg-primary)", borderRadius: 8, padding: 24,
+                  width: 480, maxWidth: "92vw", maxHeight: "85vh", overflowY: "auto",
+                }}
+                onClick={(ev) => ev.stopPropagation()}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                  <h3 style={{ margin: 0, color: "var(--color-text-primary)" }}>
+                    Vacaciones — {vacModalEmpleado.apellido} {vacModalEmpleado.nombre}
+                  </h3>
+                  <button style={s.btnRowDel} onClick={cerrarModalVacaciones}>✕</button>
+                </div>
+                <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 0, marginBottom: 16 }}>
+                  Períodos tomados en el año vigente. Los días se cuentan corridos (de calendario), como marca la ley.
+                </p>
+
+                {!esOperario && (
+                  <div style={{
+                    display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end",
+                    padding: 12, background: "var(--color-bg-secondary)", borderRadius: 6, marginBottom: 16,
+                  }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
+                      <input
+                        type="date"
+                        value={vacTomadasForm.fecha_desde}
+                        onChange={(ev) => {
+                          const fecha_desde = ev.target.value;
+                          setVacTomadasForm(f => ({
+                            ...f,
+                            fecha_desde,
+                            dias: diasCorridos(fecha_desde, f.fecha_hasta) || f.dias,
+                          }));
+                        }}
+                        style={{ ...s.input, width: 140 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
+                      <input
+                        type="date"
+                        value={vacTomadasForm.fecha_hasta}
+                        onChange={(ev) => {
+                          const fecha_hasta = ev.target.value;
+                          setVacTomadasForm(f => ({
+                            ...f,
+                            fecha_hasta,
+                            dias: diasCorridos(f.fecha_desde, fecha_hasta) || f.dias,
+                          }));
+                        }}
+                        style={{ ...s.input, width: 140 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Días</label>
+                      <input
+                        type="number"
+                        value={vacTomadasForm.dias}
+                        onChange={(ev) => setVacTomadasForm(f => ({ ...f, dias: ev.target.value }))}
+                        style={{ ...s.input, width: 70 }}
+                      />
+                    </div>
+                    <button style={s.btnNueva} onClick={agregarVacacionTomada}>＋ Agregar</button>
+                  </div>
+                )}
+
+                {vacTomadasCargando ? (
+                  <p style={{ color: "var(--color-text-secondary)" }}>Cargando...</p>
+                ) : vacTomadasList.length === 0 ? (
+                  <p style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
+                    Todavía no hay períodos cargados para este empleado.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {vacTomadasList.map((v) => (
+                      <div
+                        key={v.id}
+                        style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          padding: "8px 12px", border: "1px solid var(--color-border)", borderRadius: 6, fontSize: 13,
+                        }}
+                      >
+                        <span>
+                          {v.fecha_desde?.slice(0, 10)} → {v.fecha_hasta?.slice(0, 10)}
+                          <strong style={{ marginLeft: 8 }}>{v.dias} días</strong>
+                          {v.nota && <span style={{ color: "var(--color-text-secondary)", marginLeft: 8 }}>({v.nota})</span>}
+                        </span>
+                        {!esOperario && (
+                          <button style={s.btnRowDel} onClick={() => eliminarVacacionTomada(v.id)}>🗑</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
