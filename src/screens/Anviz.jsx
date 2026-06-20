@@ -1068,7 +1068,7 @@ export default function Anviz({ onBack, usuario, token }) {
               <span style={s.inicioLabel}>Historial</span>
               <span style={s.inicioDesc}>Horas acumuladas por empleado</span>
             </div>
-            <div style={{ ...s.inicioCard, order: 2 }} onClick={abrirVacaciones}>
+            <div style={{ ...s.inicioCard, order: 2 }} onClick={() => abrirVacaciones()}>
               <span style={s.inicioIcon}>🏖️</span>
               <span style={s.inicioLabel}>Vacaciones y Horas</span>
               <span style={s.inicioDesc}>Resumen por empleado</span>
@@ -1116,7 +1116,7 @@ export default function Anviz({ onBack, usuario, token }) {
                   + Nueva fichada
                 </button>
               )}
-              <button style={s.btnVac} onClick={abrirVacaciones}>
+              <button style={s.btnVac} onClick={() => abrirVacaciones()}>
                 🏖️ Vacaciones y Horas
               </button>
               <button
