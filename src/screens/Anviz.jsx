@@ -3,35 +3,33 @@ import Usuarios from "./Usuarios";
 
 const API = "https://integral-backend-production.up.railway.app";
 
-// ─── DateInput con máscara dd-mm-aaaa ─────────────────────────────────────────
+// ─── DateInput con máscara dd-mm-aaaa + almanaque nativo ─────────────────────
 function DateInput({ value, onChange, style }) {
+  const ref = useRef(null);
   function toDisplay(iso) {
     if (!iso || iso.length < 10) return iso || "";
     const [y, m, d] = iso.split("-");
     if (!y || !m || !d) return iso;
     return `${d}-${m}-${y}`;
   }
-  function toISO(digits) {
-    if (digits.length < 8) return "";
-    const d = digits.slice(0, 2), m = digits.slice(2, 4), y = digits.slice(4, 8);
-    return `${y}-${m}-${d}`;
-  }
-  const [raw, setRaw] = useState(toDisplay(value));
-  useEffect(() => { setRaw(toDisplay(value)); }, [value]);
-  function handleChange(e) {
-    const digits = e.target.value.replace(/[^0-9]/g, "").slice(0, 8);
-    let masked = digits;
-    if (digits.length >= 3) masked = digits.slice(0, 2) + "-" + digits.slice(2);
-    if (digits.length >= 5) masked = digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4);
-    setRaw(masked);
-    if (digits.length === 8) {
-      const iso = toISO(digits);
-      if (iso) onChange({ target: { value: iso } });
-    }
-  }
   return (
-    <input type="text" value={raw} onChange={handleChange}
-      placeholder="dd-mm-aaaa" maxLength={10} style={style} />
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <input
+        type="text"
+        value={toDisplay(value)}
+        readOnly
+        onClick={() => ref.current?.showPicker?.()}
+        placeholder="dd-mm-aaaa"
+        style={{ ...style, cursor: "pointer" }}
+      />
+      <input
+        type="date"
+        ref={ref}
+        value={value || ""}
+        onChange={onChange}
+        style={{ position: "absolute", opacity: 0, width: 0, height: 0, top: 0, left: 0, pointerEvents: "none" }}
+      />
+    </div>
   );
 }
 
