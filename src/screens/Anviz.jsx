@@ -96,6 +96,11 @@ export default function Anviz({ onBack, usuario, token }) {
   const [vacTomadasList, setVacTomadasList]     = useState([]);
   const [vacTomadasForm, setVacTomadasForm]     = useState({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
   const [vacTomadasCargando, setVacTomadasCargando] = useState(false);
+  // ── Modal de justificaciones (ART / Certificado) ──
+  const [justifModalEmpleado, setJustifModalEmpleado] = useState(null);
+  const [justifList, setJustifList]             = useState([]);
+  const [justifForm, setJustifForm]              = useState({ tipo: "ART", fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+  const [justifCargando, setJustifCargando]      = useState(false);
   const [vacDesde, setVacDesde]           = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 30);
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -502,6 +507,64 @@ export default function Anviz({ onBack, usuario, token }) {
     }
   }
 
+  // ── Detalle de justificaciones (ART / Certificado) ──
+  async function abrirModalJustificaciones(empleado) {
+    setJustifModalEmpleado(empleado);
+    setJustifForm({ tipo: "ART", fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+    setJustifCargando(true);
+    try {
+      const lista = await apiFetch(`/justificaciones?empleado_id=${empleado.id}`, token);
+      setJustifList(Array.isArray(lista) ? lista : []);
+    } catch (e) {
+      console.error(e);
+      setJustifList([]);
+    } finally {
+      setJustifCargando(false);
+    }
+  }
+
+  function cerrarModalJustificaciones() {
+    setJustifModalEmpleado(null);
+    setJustifList([]);
+  }
+
+  async function agregarJustificacion() {
+    if (!justifModalEmpleado || !justifForm.fecha_desde || !justifForm.fecha_hasta || !justifForm.dias) return;
+    try {
+      const nuevo = await fetch(`${API}/justificaciones`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          empleado_id: justifModalEmpleado.id,
+          tipo: justifForm.tipo,
+          fecha_desde: justifForm.fecha_desde,
+          fecha_hasta: justifForm.fecha_hasta,
+          dias: Number(justifForm.dias),
+          nota: justifForm.nota || null,
+        }),
+      }).then(r => r.json());
+      setJustifList(l => [nuevo, ...l]);
+      setJustifForm({ tipo: "ART", fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+      abrirVacaciones();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function eliminarJustificacion(id) {
+    if (!confirm("¿Eliminar esta justificación?")) return;
+    try {
+      await fetch(`${API}/justificaciones/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setJustifList(l => l.filter(v => v.id !== id));
+      abrirVacaciones();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div style={s.page}>
@@ -555,6 +618,8 @@ export default function Anviz({ onBack, usuario, token }) {
                       <th style={s.th}>Vac. tomadas</th>
                       <th style={s.th}>Vac. pendientes</th>
                       <th style={s.th}>Horas trabajadas</th>
+                      <th style={s.th}>ART</th>
+                      <th style={s.th}>Certificado</th>
                       <th style={s.th}>Horas esperadas</th>
                       <th style={s.th}>Dif. del período</th>
                       <th style={s.th}>Saldo total de horas</th>
@@ -592,12 +657,33 @@ export default function Anviz({ onBack, usuario, token }) {
                         <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
                           {(e.horas_calculadas ?? 0)}h
                         </td>
+                        <td style={s.td}>
+                          <button
+                            style={{ ...s.btnRowEdit, background: "transparent", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
+                            onClick={() => abrirModalJustificaciones(e)}
+                            title="Ver / cargar días de ART"
+                          >
+                            {(e.dias_art ?? 0)} días 🩹
+                          </button>
+                        </td>
+                        <td style={s.td}>
+                          <button
+                            style={{ ...s.btnRowEdit, background: "transparent", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
+                            onClick={() => abrirModalJustificaciones(e)}
+                            title="Ver / cargar días de certificado médico"
+                          >
+                            {(e.dias_certificado ?? 0)} días 📄
+                          </button>
+                        </td>
                         <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
                           {(e.horas_esperadas ?? 0)}h
                         </td>
                         <td style={{ ...s.td, color: e.diferencia_vs_44 >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 500 }}>
                           {e.diferencia_vs_44 >= 0 ? "+" : ""}{e.diferencia_vs_44 ?? 0}h
                           <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>({e.semanas_con_actividad ?? 0} sem)</span>
+                          {(e.horas_justificadas ?? 0) > 0 && (
+                            <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>+{e.horas_justificadas}h justif.</span>
+                          )}
                         </td>
                         <td style={{ ...s.td, color: e.saldo_horas_total >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 600 }}>
                           {vacEditando === e.id ? (
@@ -741,6 +827,126 @@ export default function Anviz({ onBack, usuario, token }) {
                         </span>
                         {!esOperario && (
                           <button style={s.btnRowDel} onClick={() => eliminarVacacionTomada(v.id)}>🗑</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Modal: detalle y carga de justificaciones (ART / Certificado) ── */}
+          {justifModalEmpleado && (
+            <div
+              style={{
+                position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+                display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+              }}
+              onClick={cerrarModalJustificaciones}
+            >
+              <div
+                style={{
+                  background: "var(--color-bg-primary)", borderRadius: 8, padding: 24,
+                  width: 500, maxWidth: "92vw", maxHeight: "85vh", overflowY: "auto",
+                }}
+                onClick={(ev) => ev.stopPropagation()}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                  <h3 style={{ margin: 0, color: "var(--color-text-primary)" }}>
+                    ART / Certificado — {justifModalEmpleado.apellido} {justifModalEmpleado.nombre}
+                  </h3>
+                  <button style={s.btnRowDel} onClick={cerrarModalJustificaciones}>✕</button>
+                </div>
+                <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 0, marginBottom: 16 }}>
+                  Los días hábiles cargados acá se suman como horas trabajadas/justificadas en "Dif. del período" (no penalizan al empleado).
+                </p>
+
+                {!esOperario && (
+                  <div style={{
+                    display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end",
+                    padding: 12, background: "var(--color-bg-secondary)", borderRadius: 6, marginBottom: 16,
+                  }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Tipo</label>
+                      <select
+                        value={justifForm.tipo}
+                        onChange={(ev) => setJustifForm(f => ({ ...f, tipo: ev.target.value }))}
+                        style={{ ...s.input, width: 130 }}
+                      >
+                        <option value="ART">ART</option>
+                        <option value="Certificado">Certificado</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
+                      <input
+                        type="date"
+                        value={justifForm.fecha_desde}
+                        onChange={(ev) => {
+                          const fecha_desde = ev.target.value;
+                          setJustifForm(f => ({
+                            ...f,
+                            fecha_desde,
+                            dias: diasCorridos(fecha_desde, f.fecha_hasta) || f.dias,
+                          }));
+                        }}
+                        style={{ ...s.input, width: 140 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
+                      <input
+                        type="date"
+                        value={justifForm.fecha_hasta}
+                        onChange={(ev) => {
+                          const fecha_hasta = ev.target.value;
+                          setJustifForm(f => ({
+                            ...f,
+                            fecha_hasta,
+                            dias: diasCorridos(f.fecha_desde, fecha_hasta) || f.dias,
+                          }));
+                        }}
+                        style={{ ...s.input, width: 140 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Días</label>
+                      <input
+                        type="number"
+                        value={justifForm.dias}
+                        onChange={(ev) => setJustifForm(f => ({ ...f, dias: ev.target.value }))}
+                        style={{ ...s.input, width: 70 }}
+                      />
+                    </div>
+                    <button style={s.btnNueva} onClick={agregarJustificacion}>＋ Agregar</button>
+                  </div>
+                )}
+
+                {justifCargando ? (
+                  <p style={{ color: "var(--color-text-secondary)" }}>Cargando...</p>
+                ) : justifList.length === 0 ? (
+                  <p style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
+                    Todavía no hay justificaciones cargadas para este empleado.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {justifList.map((v) => (
+                      <div
+                        key={v.id}
+                        style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          padding: "8px 12px", border: "1px solid var(--color-border)", borderRadius: 6, fontSize: 13,
+                        }}
+                      >
+                        <span>
+                          <strong style={{ marginRight: 8 }}>{v.tipo === "ART" ? "🩹 ART" : "📄 Certificado"}</strong>
+                          {v.fecha_desde?.slice(0, 10)} → {v.fecha_hasta?.slice(0, 10)}
+                          <strong style={{ marginLeft: 8 }}>{v.dias} días</strong>
+                          {v.nota && <span style={{ color: "var(--color-text-secondary)", marginLeft: 8 }}>({v.nota})</span>}
+                        </span>
+                        {!esOperario && (
+                          <button style={s.btnRowDel} onClick={() => eliminarJustificacion(v.id)}>🗑</button>
                         )}
                       </div>
                     ))}
