@@ -3,6 +3,60 @@ import Usuarios from "./Usuarios";
 
 const API = "https://integral-backend-production.up.railway.app";
 
+// ─── DateInput con máscara dd-mm-aaaa ─────────────────────────────────────────
+// value/onChange trabajan con "yyyy-mm-dd" (formato interno/API)
+// El usuario ve y escribe "dd-mm-aaaa"
+function DateInput({ value, onChange, style }) {
+  // Convierte yyyy-mm-dd → dd-mm-yyyy para mostrar
+  function toDisplay(iso) {
+    if (!iso || iso.length < 10) return iso || "";
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return iso;
+    return `${d}-${m}-${y}`;
+  }
+  // Convierte dd-mm-yyyy → yyyy-mm-dd para la API
+  function toISO(display) {
+    const clean = display.replace(/[^0-9]/g, "");
+    if (clean.length < 8) return "";
+    const d = clean.slice(0, 2);
+    const m = clean.slice(2, 4);
+    const y = clean.slice(4, 8);
+    return `${y}-${m}-${d}`;
+  }
+
+  const [raw, setRaw] = useState(toDisplay(value));
+
+  // Sincronizar si value cambia desde afuera
+  useEffect(() => { setRaw(toDisplay(value)); }, [value]);
+
+  function handleChange(e) {
+    let v = e.target.value;
+    // Solo dígitos y guiones
+    v = v.replace(/[^0-9-]/g, "");
+    // Auto-insertar guiones
+    const digits = v.replace(/-/g, "");
+    let masked = digits;
+    if (digits.length >= 3) masked = digits.slice(0, 2) + "-" + digits.slice(2);
+    if (digits.length >= 5) masked = digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4, 8);
+    setRaw(masked);
+    if (digits.length === 8) {
+      const iso = toISO(masked);
+      if (iso) onChange({ target: { value: iso } });
+    }
+  }
+
+  return (
+    <input
+      type="text"
+      value={raw}
+      onChange={handleChange}
+      placeholder="dd-mm-aaaa"
+      maxLength={10}
+      style={style}
+    />
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -19,7 +73,7 @@ function parseMysqlTs(ts) {
 function fmtFecha(ts) {
   const d = parseMysqlTs(ts);
   if (!d) return "—";
-  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth() + 1)}-${d.getUTCFullYear()}`;
+  return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
 }
 
 function fmtHora(ts) {
@@ -101,10 +155,7 @@ export default function Anviz({ onBack, usuario, token }) {
   const [justifList, setJustifList]             = useState([]);
   const [justifForm, setJustifForm]              = useState({ tipo: "ART", fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
   const [justifCargando, setJustifCargando]      = useState(false);
-  const [vacDesde, setVacDesde]           = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30);
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  });
+  const [vacDesde, setVacDesde]           = useState("2026-06-08");
   const [vacHasta, setVacHasta]           = useState(hoy);
 
   // ── GPS Fichar ─────────────────────────────────────────────────────────────
@@ -599,16 +650,15 @@ export default function Anviz({ onBack, usuario, token }) {
             <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
               <div>
                 <label style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
-                <input type="date" value={vacDesde} onChange={e => setVacDesde(e.target.value)} style={{ ...s.input, width: 140 }} />
+                <DateInput value={vacDesde} onChange={e => setVacDesde(e.target.value)} style={{ ...s.input, width: 140 }} />
               </div>
               <div>
                 <label style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
-                <input type="date" value={vacHasta} onChange={e => setVacHasta(e.target.value)} style={{ ...s.input, width: 140 }} />
+                <DateInput value={vacHasta} onChange={e => setVacHasta(e.target.value)} style={{ ...s.input, width: 140 }} />
               </div>
               <button style={s.btnNueva} onClick={filtrarVacaciones}>Filtrar</button>
               <button style={{ ...s.btnVolver, marginLeft: 4 }} onClick={() => {
-                const d = new Date(); d.setDate(d.getDate() - 30);
-                const desde = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+                const desde = "2026-06-08";
                 const hasta = hoy();
                 setVacDesde(desde);
                 setVacHasta(hasta);
@@ -630,7 +680,6 @@ export default function Anviz({ onBack, usuario, token }) {
                       <th style={s.th}>ART</th>
                       <th style={s.th}>Certificado</th>
                       <th style={s.th}>Horas esperadas</th>
-                      <th style={s.th}>Hs. justificadas</th>
                       <th style={s.th}>Dif. del período</th>
                       <th style={s.th}>Saldo total de horas</th>
                       {!esOperario && <th style={s.th}>Acciones</th>}
@@ -688,12 +737,12 @@ export default function Anviz({ onBack, usuario, token }) {
                         <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
                           {(e.horas_esperadas ?? 0)}h
                         </td>
-                        <td style={{ ...s.td, color: (e.horas_justificadas ?? 0) > 0 ? "var(--color-text-success)" : "var(--color-text-secondary)", fontWeight: 500 }}>
-                          {(e.horas_justificadas ?? 0) > 0 ? `+${e.horas_justificadas}h` : "—"}
-                        </td>
                         <td style={{ ...s.td, color: e.diferencia_vs_44 >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 500 }}>
                           {e.diferencia_vs_44 >= 0 ? "+" : ""}{e.diferencia_vs_44 ?? 0}h
                           <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>({e.semanas_con_actividad ?? 0} sem)</span>
+                          {(e.horas_justificadas ?? 0) > 0 && (
+                            <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>+{e.horas_justificadas}h justif.</span>
+                          )}
                         </td>
                         <td style={{ ...s.td, color: e.saldo_horas_total >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 600 }}>
                           {vacEditando === e.id ? (
@@ -771,8 +820,7 @@ export default function Anviz({ onBack, usuario, token }) {
                   }}>
                     <div>
                       <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
-                      <input
-                        type="date"
+                      <DateInput
                         value={vacTomadasForm.fecha_desde}
                         onChange={(ev) => {
                           const fecha_desde = ev.target.value;
@@ -787,8 +835,7 @@ export default function Anviz({ onBack, usuario, token }) {
                     </div>
                     <div>
                       <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
-                      <input
-                        type="date"
+                      <DateInput
                         value={vacTomadasForm.fecha_hasta}
                         onChange={(ev) => {
                           const fecha_hasta = ev.target.value;
@@ -890,8 +937,7 @@ export default function Anviz({ onBack, usuario, token }) {
                     </div>
                     <div>
                       <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
-                      <input
-                        type="date"
+                      <DateInput
                         value={justifForm.fecha_desde}
                         onChange={(ev) => {
                           const fecha_desde = ev.target.value;
@@ -906,8 +952,7 @@ export default function Anviz({ onBack, usuario, token }) {
                     </div>
                     <div>
                       <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
-                      <input
-                        type="date"
+                      <DateInput
                         value={justifForm.fecha_hasta}
                         onChange={(ev) => {
                           const fecha_hasta = ev.target.value;
@@ -1105,8 +1150,7 @@ export default function Anviz({ onBack, usuario, token }) {
               {/* Desde */}
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Desde</label>
-                <input
-                  type="date"
+                <DateInput
                   value={filtroDesde}
                   onChange={(e) => setFiltroDesde(e.target.value)}
                   style={s.input}
@@ -1116,8 +1160,7 @@ export default function Anviz({ onBack, usuario, token }) {
               {/* Hasta */}
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Hasta</label>
-                <input
-                  type="date"
+                <DateInput
                   value={filtroHasta}
                   onChange={(e) => setFiltroHasta(e.target.value)}
                   style={s.input}
@@ -1349,12 +1392,12 @@ export default function Anviz({ onBack, usuario, token }) {
             <div style={s.filtroFila}>
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Desde</label>
-                <input type="date" value={histDesde}
+                <DateInput value={histDesde}
                   onChange={e => setHistDesde(e.target.value)} style={s.input} />
               </div>
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Hasta</label>
-                <input type="date" value={histHasta}
+                <DateInput value={histHasta}
                   onChange={e => setHistHasta(e.target.value)} style={s.input} />
               </div>
               <div style={s.filtroGrupo}>
