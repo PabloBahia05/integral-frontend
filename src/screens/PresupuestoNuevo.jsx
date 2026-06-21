@@ -501,8 +501,20 @@ export default function PresupuestoNuevo({
   tiposVanitoryRUD = {},
   tiposDespensero = [],
   tiposDespenseroRUD = {},
+  token,
 }) {
   const listaPendienteRef = useRef(null);
+
+  // ── Helper autenticado: agrega el JWT a todas las requests ──
+  const authFetch = (url, options = {}) =>
+    fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
   const [numero, setNumero] = useState("Nuevo");
   const [numeroPres, setNumeroPres] = useState(null); // número real asignado tras primer guardado
@@ -589,13 +601,13 @@ export default function PresupuestoNuevo({
 
   // Cargar materiales/guias desde BD al montar
   useEffect(() => {
-    fetch(`${API}/articulos?familia=placas`)
+    authFetch(`${API}/articulos?familia=placas`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setMaterialesDB(data);
       })
       .catch(() => {});
-    fetch(`${API}/articulos?familia=guias`)
+    authFetch(`${API}/articulos?familia=guias`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setGuiasDB(data);
@@ -973,19 +985,19 @@ export default function PresupuestoNuevo({
 
   useEffect(() => {
     // Próximo número
-    fetch(`${API}/tabla-presupuestos/proximo-numero`)
+    authFetch(`${API}/tabla-presupuestos/proximo-numero`)
       .then((r) => r.json())
       .then((d) => {
         if (d?.proximo != null) setNumero(String(d.proximo).padStart(4, "0"));
       })
       .catch(() => {});
     // Líneas disponibles desde BD (columna linea de articulos)
-    fetch(`${API}/articulos/lineas`)
+    authFetch(`${API}/articulos/lineas`)
       .then((r) => r.json())
       .then((data) => setLineasBD(Array.isArray(data) ? data : []))
       .catch(() => {});
     // Listas de precios desde BD
-    fetch(`${API}/lista`)
+    authFetch(`${API}/lista`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
@@ -1008,7 +1020,7 @@ export default function PresupuestoNuevo({
     try {
       // 1. Traer items de tabla_presupuestos
       const rev = pres.revision ?? pres.REVISION ?? 0;
-      const r = await fetch(
+      const r = await authFetch(
         `${API}/tabla-presupuestos?numeropres=${num}&revision=${rev}`,
       );
       const items = await r.json();
@@ -1205,7 +1217,7 @@ export default function PresupuestoNuevo({
       accesorios: "Accesorios",
     };
     const familiaBD = familiaMap[familiaActivaActual] ?? familiaActivaActual;
-    fetch(
+    authFetch(
       `${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`,
     )
       .then((r) => r.json())
@@ -1558,7 +1570,7 @@ export default function PresupuestoNuevo({
       }),
     );
     try {
-      const res = await fetch(`${API}/tabla-presupuestos`, {
+      const res = await authFetch(`${API}/tabla-presupuestos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1579,7 +1591,7 @@ export default function PresupuestoNuevo({
           .map((it) => Number(it.vtabla));
 
         if (vanitoryIds.length > 0) {
-          fetch(`${API}/presupuestos-vanitory/vincular`, {
+          authFetch(`${API}/presupuestos-vanitory/vincular`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ numeropres: numAsignado, ids: vanitoryIds }),
@@ -2208,7 +2220,7 @@ export default function PresupuestoNuevo({
                       clearTimeout(window._clienteTimer);
                       if (val.length > 1) {
                         window._clienteTimer = setTimeout(() => {
-                          fetch(
+                          authFetch(
                             `${API}/clientes/buscar-nombre?q=${encodeURIComponent(val)}`,
                           )
                             .then((r) => r.json())
@@ -2327,7 +2339,7 @@ export default function PresupuestoNuevo({
                       clearTimeout(window._telTimer);
                       if (val.length > 1) {
                         window._telTimer = setTimeout(() => {
-                          fetch(
+                          authFetch(
                             `${API}/clientes/buscar-telefono?q=${encodeURIComponent(val)}`,
                           )
                             .then((r) => r.json())
@@ -6093,7 +6105,7 @@ export default function PresupuestoNuevo({
                                       <button
                                         onClick={async () => {
                                           try {
-                                            const res = await fetch(
+                                            const res = await authFetch(
                                               `${API}/presupuestos-mamparas/${presmv}`,
                                             );
                                             const data = await res.json();
