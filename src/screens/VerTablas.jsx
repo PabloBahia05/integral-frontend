@@ -19,6 +19,7 @@ import SemanasAnio from "./SemanasAnio";
 import UsuariosApp from "./UsuariosApp";
 import Anviz from "./Anviz";
 import Usuarios from "./Usuarios";
+import Selector from "./Selector";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -271,6 +272,7 @@ const TABLAS = [
   { id: "usuarios-app", label: "Usuarios App",    icon: "🔐", color: "#e63946" },
   { id: "anviz",        label: "Accesos Anviz",   icon: "🕐", color: "#0a7a3c" },
   { id: "permisos",     label: "Permisos por Rol", icon: "🛡️", color: "#6366f1" },
+  { id: "selector",     label: "Selector",         icon: "🎛️", color: "#118ab2" },
 ];
 
 export default function VerTablas({
@@ -579,6 +581,15 @@ export default function VerTablas({
   // ── permisos ──
   if (tablaActiva === "permisos")
     return <GestorPermisos onBack={volver} token={token} />;
+
+  // ── selector ──
+  if (tablaActiva === "selector")
+    return (
+      <div>
+        {back}
+        <Selector token={token} />
+      </div>
+    );
 
   return (
     <>
