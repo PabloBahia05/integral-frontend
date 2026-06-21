@@ -188,18 +188,22 @@ const toInt = (v) =>
 const fmt = (v) =>
   v != null ? `$${parseFloat(v).toLocaleString("es-AR")}` : "-";
 
-async function uploadImageToCloud(file) {
+async function uploadImageToCloud(file, token) {
   const formData = new FormData();
   formData.append("imagen", file);
   const res = await fetch(
     "https://integral-backend-production.up.railway.app/api/upload-imagen",
-    { method: "POST", body: formData },
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    },
   );
   if (!res.ok) throw new Error("Error al subir imagen");
   return (await res.json()).url;
 }
 
-function FotoUpload({ value, onChange }) {
+function FotoUpload({ value, onChange, token }) {
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -210,7 +214,7 @@ function FotoUpload({ value, onChange }) {
     setLoading(true);
     setError("");
     try {
-      onChange(await uploadImageToCloud(file));
+      onChange(await uploadImageToCloud(file, token));
     } catch {
       setError("No se pudo subir la imagen.");
     } finally {
@@ -426,7 +430,19 @@ export default function Productos({
   modal,
   onOpenModal,
   onCloseModal,
+  token,
 }) {
+  // ── Helper autenticado: agrega el JWT a todas las requests ──
+  const authFetch = (url, options = {}) =>
+    fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -451,7 +467,7 @@ export default function Productos({
   const [provFocus, setProvFocus] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/proveedores`)
+    authFetch(`${API}/proveedores`)
       .then((r) => r.json())
       .then((data) => setProveedores(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -474,7 +490,7 @@ export default function Productos({
 
   // Cargar familias únicas
   useEffect(() => {
-    fetch(`${API}/articulos/familias-todas`)
+    authFetch(`${API}/articulos/familias-todas`)
       .then((r) => r.json())
       .then((data) => setFamilias(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -482,7 +498,7 @@ export default function Productos({
 
   // Cargar rubros únicos (para el filtro y el form)
   const cargarRubros = () => {
-    fetch(`${API}/articulos/rubros`)
+    authFetch(`${API}/articulos/rubros`)
       .then((r) => r.json())
       .then((data) => setRubros(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -494,7 +510,7 @@ export default function Productos({
   // Familias del filtro — se filtran por rubro si hay uno elegido
   useEffect(() => {
     if (filtroRubro) {
-      fetch(
+      authFetch(
         `${API}/articulos/familias-por-rubro?rubro=${encodeURIComponent(filtroRubro)}`,
       )
         .then((r) => r.json())
@@ -505,7 +521,7 @@ export default function Productos({
         })
         .catch(() => {});
     } else {
-      fetch(`${API}/articulos/familias-todas`)
+      authFetch(`${API}/articulos/familias-todas`)
         .then((r) => r.json())
         .then((data) => {
           setRubrosDelFiltro(Array.isArray(data) ? data : []);
@@ -539,8 +555,8 @@ export default function Productos({
       if (filtroProveedor) countParams.set("proveedor", filtroProveedor);
       const countQ = countParams.toString() ? `?${countParams}` : "";
       const [dataRes, countRes] = await Promise.all([
-        fetch(`${API}/productos?${params}`),
-        fetch(`${API}/productos/count${countQ}`),
+        authFetch(`${API}/productos?${params}`),
+        authFetch(`${API}/productos/count${countQ}`),
       ]);
       const data = await dataRes.json();
       const count = await countRes.json();
@@ -1299,6 +1315,7 @@ export default function Productos({
               <FotoUpload
                 value={form.artfoto}
                 onChange={(val) => setForm((p) => ({ ...p, artfoto: val }))}
+                token={token}
               />
             </div>
             <div>
