@@ -859,7 +859,7 @@ function App({ usuario, token }) {
               />
             )}
             {screen === "productos" && (
-              <Productos selected={sel} modal={modal} {...crud} />
+              <Productos selected={sel} modal={modal} token={token} {...crud} />
             )}
             {screen === "presupuesto-muebles" && (
               <PresupuestoMuebles
