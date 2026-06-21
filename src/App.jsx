@@ -934,6 +934,7 @@ function App({ usuario, token }) {
                 tiposVanitoryRUD={tiposVanitoryRUD}
                 tiposDespensero={tiposDespensero}
                 tiposDespenseroRUD={tiposDespenseroRUD}
+                token={token}
               />
             )}
             {screen === "presupuestos-nuevo-tabla" && (
