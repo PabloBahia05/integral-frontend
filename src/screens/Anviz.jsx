@@ -496,8 +496,12 @@ export default function Anviz({ onBack, usuario, token }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ vacaciones: Number(vacForm.vacaciones), horas_acumuladas: Number(vacForm.horas_acumuladas) }),
       });
-      setVacData(d => d.map(e => e.id === id ? { ...e, vacaciones: Number(vacForm.vacaciones), horas_acumuladas: Number(vacForm.horas_acumuladas) } : e));
       setVacEditando(null);
+      // Recargar desde el backend en vez de actualizar a mano el estado local:
+      // el saldo total y otros campos derivados (diferencia, ajuste, etc.) se
+      // calculan en el servidor, así que esta es la única forma confiable de
+      // que la tabla quede al día después de guardar.
+      await abrirVacaciones(vacDesde, vacHasta);
     } catch (e) {
       console.error(e);
     }
