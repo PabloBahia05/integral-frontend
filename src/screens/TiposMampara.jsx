@@ -14,6 +14,12 @@ export default function TiposMampara({ onBack }) {
     fetch(`${API}/mamparas-tipos`)
       .then((r) => r.json())
       .then((data) => {
+        if (!Array.isArray(data)) {
+          console.error("Respuesta inesperada de /mamparas-tipos:", data);
+          setError(data?.error || "Respuesta inesperada del servidor.");
+          setLoading(false);
+          return;
+        }
         setTipos(data);
         setLoading(false);
       })
