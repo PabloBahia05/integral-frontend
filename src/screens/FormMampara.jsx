@@ -1,7 +1,7 @@
 import { useState } from "react";
 import ScreenHeader from "../Component/ScreenHeader";
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 const VIDRIOS = ["Incoloro", "Esmerilado"];
 
 export default function FormMampara({ modelo, onBack }) {
@@ -14,11 +14,16 @@ export default function FormMampara({ modelo, onBack }) {
     colocacion: "",
   });
 
-  const [resultado, setResultado] = useState(null); // { vidrio, heraje, total }
+  const [resultado, setResultado] = useState(null);
   const [calculando, setCalculando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
+
+  const authHeaders = () => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  });
 
   const set = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -38,7 +43,7 @@ export default function FormMampara({ modelo, onBack }) {
     try {
       const res = await fetch(`${API}/formulas/calcular`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({
           codformv: modelo?.codformv,
           variables: {
@@ -51,7 +56,7 @@ export default function FormMampara({ modelo, onBack }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setResultado(data); // { vidrio, heraje, total }
+      setResultado(data);
     } catch (e) {
       setError("Error al calcular: " + e.message);
     } finally {
@@ -88,7 +93,7 @@ export default function FormMampara({ modelo, onBack }) {
       };
       const res = await fetch(`${API}/presupuestos-mamparas`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify(body),
       });
       const data = await res.json();
