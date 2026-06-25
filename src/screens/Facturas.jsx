@@ -402,7 +402,7 @@ function SelectConFiltro({
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export default function Facturas({ proveedores = [] }) {
+export default function Facturas({ proveedores = [], token }) {
   const [facturas, setFacturas] = useState([]);
   const [selected, setSelected] = useState(null);
   const [detalle, setDetalle] = useState(null);
@@ -430,7 +430,7 @@ export default function Facturas({ proveedores = [] }) {
   const sinResolverRef = useRef([]); // ítems sin resolver guardados hasta que se pase a modal "nueva"
 
   useEffect(() => {
-    fetch(`${API}/articulos/listas-campos`)
+    fetch(`${API}/articulos/listas-campos`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((d) => {
         setListaRubros(d.rubros || []);
@@ -443,7 +443,7 @@ export default function Facturas({ proveedores = [] }) {
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchFacturas = () => {
     setLoading(true);
-    fetch(`${API}/facturas`)
+    fetch(`${API}/facturas`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((data) => {
         setFacturas(Array.isArray(data) ? data : []);
@@ -457,7 +457,7 @@ export default function Facturas({ proveedores = [] }) {
   }, []);
 
   const fetchDetalle = (id) => {
-    fetch(`${API}/facturas/${id}`)
+    fetch(`${API}/facturas/${id}`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((d) => {
         setDetalle(d);
@@ -524,6 +524,7 @@ export default function Facturas({ proveedores = [] }) {
         : `${API}/facturas/ocr-preview`;
       const res = await fetch(endpoint, {
         method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
       setOcrProgress(80);
@@ -633,6 +634,7 @@ export default function Facturas({ proveedores = [] }) {
         fd.append("imagen", imgFile);
         const up = await fetch(`${API}/api/upload-imagen-factura`, {
           method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
           body: fd,
         });
         const upData = await up.json();
@@ -664,7 +666,7 @@ export default function Facturas({ proveedores = [] }) {
       const method = modal === "editar" ? "PUT" : "POST";
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -735,6 +737,7 @@ export default function Facturas({ proveedores = [] }) {
         if (descTrim) {
           const resPP = await fetch(
             `${API}/articulos/buscar-prod-prov?q=${encodeURIComponent(descTrim)}`,
+            { headers: { Authorization: `Bearer ${token}` } },
           );
           if (resPP.ok) {
             const hits = await resPP.json();
@@ -743,7 +746,7 @@ export default function Facturas({ proveedores = [] }) {
                 `${API}/articulos/${encodeURIComponent(hits[0].codartint)}`,
                 {
                   method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                   body: JSON.stringify({
                     cantidad:
                       (Number(hits[0].cantidad) || 0) +
@@ -770,6 +773,7 @@ export default function Facturas({ proveedores = [] }) {
             try {
               const resCod = await fetch(
                 `${API}/articulos/buscar-codartprov?codartprov=${encodeURIComponent(variante)}`,
+                { headers: { Authorization: `Bearer ${token}` } },
               );
               if (!resCod.ok) continue;
               const art = await resCod.json();
@@ -779,7 +783,7 @@ export default function Facturas({ proveedores = [] }) {
                     `${API}/articulos/${encodeURIComponent(art.codartint)}`,
                     {
                       method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                       body: JSON.stringify({ prod_prov: descTrim }),
                     },
                   ).catch(() => {});
@@ -788,7 +792,7 @@ export default function Facturas({ proveedores = [] }) {
                   `${API}/articulos/${encodeURIComponent(art.codartint)}`,
                   {
                     method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                     body: JSON.stringify({
                       cantidad:
                         (Number(art.cantidad) || 0) +
@@ -809,6 +813,7 @@ export default function Facturas({ proveedores = [] }) {
         if (!resuelto && descTrim) {
           const resDesc = await fetch(
             `${API}/articulos/buscar-descripcion?q=${encodeURIComponent(descTrim)}`,
+            { headers: { Authorization: `Bearer ${token}` } },
           );
           if (resDesc.ok) {
             const hits = await resDesc.json();
@@ -817,7 +822,7 @@ export default function Facturas({ proveedores = [] }) {
                 `${API}/articulos/${encodeURIComponent(hits[0].codartint)}`,
                 {
                   method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                   body: JSON.stringify({
                     cantidad:
                       (Number(hits[0].cantidad) || 0) +
@@ -870,7 +875,7 @@ export default function Facturas({ proveedores = [] }) {
     try {
       await fetch(`${API}/articulos`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           codartint: codartintFinal,
           codartprov: codartprovFinal,
@@ -956,7 +961,7 @@ export default function Facturas({ proveedores = [] }) {
     const usarCoincidencia = async (art) => {
       await fetch(`${API}/articulos/${encodeURIComponent(art.codartint)}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           cantidad: (Number(art.cantidad) || 0) + (Number(item.cantidad) || 0),
         }),
@@ -974,6 +979,7 @@ export default function Facturas({ proveedores = [] }) {
       try {
         const r = await fetch(
           `${API}/articulos/buscar-descripcion?q=${encodeURIComponent(q)}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         if (r.ok) setResEditar(await r.json());
       } catch {
@@ -985,7 +991,7 @@ export default function Facturas({ proveedores = [] }) {
     const vincularExistente = async (art) => {
       await fetch(`${API}/articulos/${encodeURIComponent(art.codartint)}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           prod_prov: (item.descripcion || "").trim() || art.prod_prov,
           ...(art.codartprov ? {} : { codartprov: item.codigo || null }),
@@ -1515,7 +1521,7 @@ export default function Facturas({ proveedores = [] }) {
 
   const eliminarFactura = async (id) => {
     if (!confirm("¿Eliminar esta factura y sus ítems?")) return;
-    await fetch(`${API}/facturas/${id}`, { method: "DELETE" });
+    await fetch(`${API}/facturas/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     setSelected(null);
     fetchFacturas();
   };
@@ -1555,7 +1561,7 @@ export default function Facturas({ proveedores = [] }) {
       total: f.total ?? "",
       moneda: f.moneda ?? "ARS",
     });
-    fetch(`${API}/facturas-items/${f.id}`)
+    fetch(`${API}/facturas-items/${f.id}`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((items) =>
         setItemsForm(
@@ -1604,6 +1610,7 @@ export default function Facturas({ proveedores = [] }) {
     try {
       const resPP = await fetch(
         `${API}/articulos/buscar-prod-prov?q=${encodeURIComponent(desc)}`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       if (resPP.ok) {
         const hits = await resPP.json();
@@ -1641,6 +1648,7 @@ export default function Facturas({ proveedores = [] }) {
         try {
           const resCod = await fetch(
             `${API}/articulos/buscar-codartprov?codartprov=${encodeURIComponent(variante)}`,
+            { headers: { Authorization: `Bearer ${token}` } },
           );
           if (!resCod.ok) continue;
           const art = await resCod.json();
@@ -1649,7 +1657,7 @@ export default function Facturas({ proveedores = [] }) {
             if (!(art.prod_prov || "").trim()) {
               fetch(`${API}/articulos/${encodeURIComponent(art.codartint)}`, {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ prod_prov: desc }),
               }).catch(() => {});
             }
@@ -1680,6 +1688,7 @@ export default function Facturas({ proveedores = [] }) {
     try {
       const resDesc = await fetch(
         `${API}/articulos/buscar-descripcion?q=${encodeURIComponent(desc)}`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       if (resDesc.ok) {
         const hits = await resDesc.json();
@@ -1738,6 +1747,7 @@ export default function Facturas({ proveedores = [] }) {
             try {
               const r = await fetch(
                 `${API}/articulos/buscar-codartprov?codartprov=${encodeURIComponent(variante)}`,
+                { headers: { Authorization: `Bearer ${token}` } },
               );
               if (!r.ok) continue; // 304, 404, o cualquier error → probar siguiente variante
               const art = await r.json();
@@ -1747,7 +1757,7 @@ export default function Facturas({ proveedores = [] }) {
                     `${API}/articulos/${encodeURIComponent(art.codartint)}`,
                     {
                       method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                       body: JSON.stringify({ prod_prov: desc }),
                     },
                   ).catch(() => {});
@@ -1769,6 +1779,7 @@ export default function Facturas({ proveedores = [] }) {
             try {
               const rPP = await fetch(
                 `${API}/articulos/buscar-prod-prov?q=${encodeURIComponent(desc)}`,
+                { headers: { Authorization: `Bearer ${token}` } },
               );
               if (rPP.ok) {
                 const hits = await rPP.json();
@@ -1790,6 +1801,7 @@ export default function Facturas({ proveedores = [] }) {
             try {
               const rDesc = await fetch(
                 `${API}/articulos/buscar-descripcion?q=${encodeURIComponent(desc)}`,
+                { headers: { Authorization: `Bearer ${token}` } },
               );
               if (rDesc.ok) {
                 const hits = await rDesc.json();
@@ -1817,6 +1829,7 @@ export default function Facturas({ proveedores = [] }) {
           try {
             const r = await fetch(
               `${API}/articulos/buscar-prod-prov?q=${encodeURIComponent(desc)}`,
+              { headers: { Authorization: `Bearer ${token}` } },
             );
             if (r.ok) {
               const hits = await r.json();
