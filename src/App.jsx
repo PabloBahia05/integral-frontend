@@ -1035,11 +1035,11 @@ function App({ usuario, token }) {
             {screen === "mueble-especial" && <MuebleEspecial />}
 
             {/* ── Facturas ── */}
-            {screen === "facturas" && <Facturas proveedores={proveedores} />}
+            {screen === "facturas" && <Facturas proveedores={proveedores} token={token} />}
 
             {/* ── Historial Facturas ── */}
             {screen === "historial-facturas" && (
-              <HistorialFacturas proveedores={proveedores} />
+              <HistorialFacturas proveedores={proveedores} token={token} />
             )}
 
             {/* ── Lista de Márgenes ── */}
