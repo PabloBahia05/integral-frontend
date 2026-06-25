@@ -10,15 +10,16 @@ import StatCards from "../Component/StatCards";
 const API = "https://integral-backend-production.up.railway.app";
 
 const COLUMNS = [
-  { key: "id",       label: "ID" },
-  { key: "nombre",   label: "Nombre" },
-  { key: "apellido", label: "Apellido" },
-  { key: "email",    label: "Email" },
-  { key: "rol",      label: "Rol" },
-  { key: "activo",   label: "Activo", render: (v) => (v ? "✅" : "❌") },
+  { key: "id",          label: "ID" },
+  { key: "nombre",      label: "Nombre" },
+  { key: "apellido",    label: "Apellido" },
+  { key: "email",       label: "Email" },
+  { key: "rol",         label: "Rol" },
+  { key: "empleado_id", label: "Empleado ID", render: (v) => v ?? "—" },
+  { key: "activo",      label: "Activo", render: (v) => (v ? "✅" : "❌") },
 ];
 
-const EMPTY = { nombre: "", apellido: "", email: "", password: "", activo: 1, rol: "operario" };
+const EMPTY = { nombre: "", apellido: "", email: "", password: "", activo: 1, rol: "operario", empleado_id: null };
 
 const FIELDS = [
   { field: "nombre",   label: "Nombre *",    placeholder: "Ej: Juan" },
@@ -29,6 +30,7 @@ const FIELDS = [
 
 export default function UsuariosApp({ token }) {
   const [usuarios, setUsuarios] = useState([]);
+  const [empleados, setEmpleados] = useState([]);
   const [selected, setSelected] = useState(null);
   const [modal, setModal]       = useState(null);
   const [form, setForm]         = useState(EMPTY);
@@ -46,7 +48,13 @@ export default function UsuariosApp({ token }) {
       .then((d) => setUsuarios(Array.isArray(d) ? d : []))
       .catch(console.error);
 
-  useEffect(() => { fetchUsuarios(); }, []);
+  const fetchEmpleados = () =>
+    fetch(`${API}/empleados`, { headers: authHeaders })
+      .then((r) => r.json())
+      .then((d) => setEmpleados(Array.isArray(d) ? d : []))
+      .catch(console.error);
+
+  useEffect(() => { fetchUsuarios(); fetchEmpleados(); }, []);
 
   const filtered = usuarios.filter((u) => {
     const q = search.toLowerCase();
@@ -62,12 +70,13 @@ export default function UsuariosApp({ token }) {
   const openEdit = () => {
     if (!selected) return;
     setForm({
-      nombre:   selected.nombre   ?? "",
-      apellido: selected.apellido ?? "",
-      email:    selected.email    ?? "",
-      password: "",
-      activo:   selected.activo   ?? 1,
-      rol:      selected.rol      ?? "operario",
+      nombre:      selected.nombre      ?? "",
+      apellido:    selected.apellido    ?? "",
+      email:       selected.email       ?? "",
+      password:    "",
+      activo:      selected.activo      ?? 1,
+      rol:         selected.rol         ?? "operario",
+      empleado_id: selected.empleado_id ?? null,
     });
     setError("");
     setModal("editar");
@@ -185,6 +194,26 @@ export default function UsuariosApp({ token }) {
                   <option value={1}>Activo</option>
                   <option value={0}>Inactivo</option>
                 </select>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <label style={{ fontSize: 11, color: "#4a6a8c", textTransform: "uppercase", letterSpacing: 1 }}>
+                  Empleado vinculado
+                </label>
+                <select
+                  value={form.empleado_id ?? ""}
+                  onChange={(e) => setForm({ ...form, empleado_id: e.target.value ? Number(e.target.value) : null })}
+                  style={{ display: "block", marginTop: 4, padding: "8px 10px", border: "1px solid #a0cce8", borderRadius: 3, fontFamily: "inherit", fontSize: 13, width: "100%" }}
+                >
+                  <option value="">— Sin vincular —</option>
+                  {empleados.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.apellido}, {emp.nombre}
+                    </option>
+                  ))}
+                </select>
+                <p style={{ fontSize: 11, color: "#6699bb", marginTop: 4 }}>
+                  Vinculá este usuario con su registro de empleado (para fichadas GPS y vacaciones).
+                </p>
               </div>
             </div>
           </div>
