@@ -11,7 +11,12 @@ export default function TiposMampara({ onBack }) {
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    fetch(`${API}/mamparas-tipos`)
+    const token = localStorage.getItem("token");
+    fetch(`${API}/mamparas-tipos`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
       .then((r) => r.json())
       .then((data) => {
         if (!Array.isArray(data)) {
