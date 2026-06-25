@@ -1724,8 +1724,8 @@ export default function Anviz({ onBack, usuario, token }) {
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                 }}
                 onClick={async () => {
-                  const uid = esOperario ? usuario.id : Number(gpsUserId);
-                  if (!uid) { setGpsMsg("⚠️ Seleccioná un empleado"); return; }
+                  const uid = esOperario ? 0 : Number(gpsUserId);
+                  if (!esOperario && !uid) { setGpsMsg("⚠️ Seleccioná un empleado"); return; }
 
                   // ── Verificar zona permitida (200m de radio) ──────────────
                   const EMPRESA_LAT = -38.746619;
