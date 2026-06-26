@@ -133,6 +133,11 @@ export default function PresupuestoMamparas({
   useEffect(() => {
     fetch(
       "https://integral-backend-production.up.railway.app/productos/mamparas",
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     )
       .then((r) => r.json())
       .then((data) => {
@@ -159,6 +164,11 @@ export default function PresupuestoMamparas({
   const fetchProximoNumero = () => {
     fetch(
       "https://integral-backend-production.up.railway.app/presupuestos-mamparas/proximo-numero",
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     )
       .then((r) => r.json())
       .then((data) => {
@@ -190,6 +200,11 @@ export default function PresupuestoMamparas({
     if (!articuloSeleccionado?.codart) return;
     fetch(
       `https://integral-backend-production.up.railway.app/colocacion/buscar?codart=${encodeURIComponent(articuloSeleccionado.codart)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      },
     )
       .then((r) => r.json())
       .then((data) => {
@@ -225,10 +240,19 @@ export default function PresupuestoMamparas({
     Promise.all([
       fetch(
         "https://integral-backend-production.up.railway.app/asociaciones",
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
       )
         .then((r) => r.json())
         .catch(() => []),
-      fetch("https://integral-backend-production.up.railway.app/margen")
+      fetch("https://integral-backend-production.up.railway.app/margen", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      })
         .then((r) => r.json())
         .catch(() => []),
     ])
@@ -333,6 +357,11 @@ export default function PresupuestoMamparas({
       // Obtener textos de fórmulas para resolver dependencias FORM_XXX
       const resFormulas = await fetch(
         "https://integral-backend-production.up.railway.app/formulas",
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
       )
         .then((r) => r.json())
         .catch(() => []);
@@ -388,7 +417,10 @@ export default function PresupuestoMamparas({
             "https://integral-backend-production.up.railway.app/formulas/calcular",
             {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
               body: JSON.stringify({
                 codform,
                 codart_modelo: asoc.cod,
@@ -545,7 +577,10 @@ export default function PresupuestoMamparas({
         "https://integral-backend-production.up.railway.app/presupuestos-mamparas",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
           body: JSON.stringify(payload),
         },
       );
