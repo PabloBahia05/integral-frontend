@@ -8,10 +8,10 @@ export default function FormMampara({ modelo, onBack }) {
   const [form, setForm] = useState({
     nombre: "",
     cantidad: "1",
-    ancho: "",
-    alto: "",
+    ancho: "80",
+    alto: "200",
     vidrio: "Incoloro",
-    colocacion: "",
+    colocacion: "0",
   });
 
   const [resultado, setResultado] = useState(null);
@@ -77,19 +77,20 @@ export default function FormMampara({ modelo, onBack }) {
     setGuardando(true);
     setError("");
     try {
-      const today = new Date().toISOString().split("T")[0];
       const body = {
-        NOMBRE: form.nombre,
-        FECHA: today,
-        CANTIDAD: parseInt(form.cantidad),
-        MODELO: modelo?.label ?? "",
-        ANCHO: parseFloat(form.ancho),
-        ALTO: parseFloat(form.alto),
-        VIDRIO: form.vidrio,
-        COLOCACION: parseFloat(form.colocacion) || 0,
-        VALOR_VIDRIO: resultado.vidrio,
-        VALOR_HERAJE: resultado.heraje,
-        TOTAL: resultado.total,
+        fecha: new Date().toISOString().slice(0, 19).replace("T", " "),
+        cantidad: parseInt(form.cantidad),
+        modelo: modelo?.label ?? "",
+        ancho: parseFloat(form.ancho),
+        alto: parseFloat(form.alto),
+        vidrio: form.vidrio,
+        colocacion: parseFloat(form.colocacion) || 0,
+        precio: resultado.total,
+        art1: "Vidrio",
+        valor1: String(resultado.vidrio ?? 0),
+        art2: "Heraje",
+        valor2: String(resultado.heraje ?? 0),
+        revision: 0,
       };
       const res = await fetch(`${API}/presupuestos-mamparas`, {
         method: "POST",
@@ -98,7 +99,7 @@ export default function FormMampara({ modelo, onBack }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setExito("✅ Presupuesto guardado correctamente (ID: " + data.id + ")");
+      setExito(`✅ Presupuesto guardado correctamente (${data.presm ?? data.id})`);
     } catch (e) {
       setError("Error al guardar: " + e.message);
     } finally {
@@ -140,7 +141,6 @@ export default function FormMampara({ modelo, onBack }) {
               className="form-input"
               type="number"
               min="1"
-              placeholder="1"
               value={form.cantidad}
               onChange={(e) => set("cantidad", e.target.value)}
             />
@@ -153,7 +153,6 @@ export default function FormMampara({ modelo, onBack }) {
               <input
                 className="form-input"
                 type="number"
-                placeholder="Ej: 80"
                 value={form.ancho}
                 onChange={(e) => set("ancho", e.target.value)}
               />
@@ -163,7 +162,6 @@ export default function FormMampara({ modelo, onBack }) {
               <input
                 className="form-input"
                 type="number"
-                placeholder="Ej: 200"
                 value={form.alto}
                 onChange={(e) => set("alto", e.target.value)}
               />
@@ -193,7 +191,6 @@ export default function FormMampara({ modelo, onBack }) {
             <input
               className="form-input"
               type="number"
-              placeholder="Ej: 5000"
               value={form.colocacion}
               onChange={(e) => set("colocacion", e.target.value)}
             />
