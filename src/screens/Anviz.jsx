@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Usuarios from "./Usuarios";
+import { useAuth } from "../context/AuthContext";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -125,7 +126,8 @@ async function apiFetch(path, token) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function Anviz({ onBack, usuario, token }) {
+export default function Anviz({ onBack }) {
+  const { usuario, token, authFetch } = useAuth();
   const esOperario = usuario?.rol === "operario";
   const [vista, setVista]               = useState("inicio"); // "inicio" | "fichadas" | "usuarios" | "historial"
   const [fichadas, setFichadas]         = useState([]);
@@ -263,7 +265,7 @@ export default function Anviz({ onBack, usuario, token }) {
   const handleSync = () => {
     setSyncing(true);
     setSyncMsg("");
-    fetch(`${API}/anviz/sync`, { method: "POST" })
+    authFetch(`${API}/anviz/sync`, { method: "POST" })
       .then((r) => r.json())
       .then((d) => {
         setSyncMsg(d.ok ? "✅ Sincronización iniciada" : `⚠️ ${d.error}`);
@@ -436,9 +438,8 @@ export default function Anviz({ onBack, usuario, token }) {
     try {
       const url = modal === "nueva" ? `${API}/fichadas` : `${API}/fichadas/${modalFichadaId}`;
       const method = modal === "nueva" ? "POST" : "PUT";
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ user_id: Number(modalData.user_id), direccion: modalData.direccion, timestamp: tsMySQL }),
       });
       const data = await res.json();
@@ -455,7 +456,7 @@ export default function Anviz({ onBack, usuario, token }) {
   async function eliminarFichada(id) {
     if (!window.confirm("¿Eliminar esta fichada?")) return;
     try {
-      const res = await fetch(`${API}/fichadas/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const res = await authFetch(`${API}/fichadas/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       cargarFichadas();
@@ -491,9 +492,8 @@ export default function Anviz({ onBack, usuario, token }) {
 
   async function guardarVac(id) {
     try {
-      await fetch(`${API}/empleados/${id}/vacaciones-horas`, {
+      await authFetch(`${API}/empleados/${id}/vacaciones-horas`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ vacaciones: Number(vacForm.vacaciones), horas_acumuladas: Number(vacForm.horas_acumuladas) }),
       });
       setVacEditando(null);
@@ -549,9 +549,8 @@ export default function Anviz({ onBack, usuario, token }) {
   async function agregarVacacionTomada() {
     if (!vacModalEmpleado || !vacTomadasForm.fecha_desde || !vacTomadasForm.fecha_hasta || !vacTomadasForm.dias) return;
     try {
-      const nuevo = await fetch(`${API}/vacaciones-tomadas`, {
+      const nuevo = await authFetch(`${API}/vacaciones-tomadas`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           empleado_id: vacModalEmpleado.id,
           fecha_desde: vacTomadasForm.fecha_desde,
@@ -572,9 +571,8 @@ export default function Anviz({ onBack, usuario, token }) {
   async function eliminarVacacionTomada(id) {
     if (!confirm("¿Eliminar este período de vacaciones?")) return;
     try {
-      await fetch(`${API}/vacaciones-tomadas/${id}`, {
+      await authFetch(`${API}/vacaciones-tomadas/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
       setVacTomadasList(l => l.filter(v => v.id !== id));
       abrirVacaciones();
@@ -607,9 +605,8 @@ export default function Anviz({ onBack, usuario, token }) {
   async function agregarJustificacion() {
     if (!justifModalEmpleado || !justifForm.fecha_desde || !justifForm.fecha_hasta || !justifForm.dias) return;
     try {
-      const nuevo = await fetch(`${API}/justificaciones`, {
+      const nuevo = await authFetch(`${API}/justificaciones`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           empleado_id: justifModalEmpleado.id,
           tipo: justifForm.tipo,
@@ -630,9 +627,8 @@ export default function Anviz({ onBack, usuario, token }) {
   async function eliminarJustificacion(id) {
     if (!confirm("¿Eliminar esta justificación?")) return;
     try {
-      await fetch(`${API}/justificaciones/${id}`, {
+      await authFetch(`${API}/justificaciones/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
       setJustifList(l => l.filter(v => v.id !== id));
       abrirVacaciones();
@@ -1748,9 +1744,8 @@ export default function Anviz({ onBack, usuario, token }) {
                   const pad2 = n => String(n).padStart(2, "0");
                   const tsMySQL = `${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
                   try {
-                    const res = await fetch(`${API}/fichadas/gps`, {
+                    const res = await authFetch(`${API}/fichadas/gps`, {
                       method: "POST",
-                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                       body: JSON.stringify({
                         user_id: uid,
                         direccion: gpsDireccion,
