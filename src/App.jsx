@@ -22,6 +22,7 @@ import AfipIVA from "./screens/AfipIVA";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState } from "react";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -111,19 +112,21 @@ const HOME_SECTIONS = {
 };
 
 export default function Root() {
-  const [usuario, setUsuario] = useState(null);
-  const [token, setToken]     = useState(null);
-
-  const handleLogin = (usr, tok) => {
-    setUsuario(usr);
-    setToken(tok);
-  };
-
-  if (!usuario) return <Login onLogin={handleLogin} />;
-  return <App usuario={usuario} token={token} />;
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
+  );
 }
 
-function App({ usuario, token }) {
+function AuthGate() {
+  const { usuario } = useAuth();
+  if (!usuario) return <Login />;
+  return <App />;
+}
+
+function App() {
+  const { usuario, token, authFetch, logout } = useAuth();
   const [screen, setScreen] = useState(null);
   const [active, setActive] = useState(null);
   const [log, setLog] = useState([]);
@@ -163,16 +166,7 @@ function App({ usuario, token }) {
   const [selectedLista, setSelectedLista] = useState(null);
   const [modal, setModal] = useState(null);
 
-  // ── Helper autenticado ───────────────────────────────────
-  const authFetch = (url, options = {}) =>
-    fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers ?? {}),
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  // ── authFetch ahora viene de useAuth() (ver arriba) ──────
 
   // ── Permisos del usuario logueado ────────────────────────
   const [permisos, setPermisos] = useState({});
@@ -970,7 +964,7 @@ function App({ usuario, token }) {
                 }
               />
             )}
-            {screen === "anviz" && <Anviz onBack={() => setScreen(null)} usuario={usuario} token={token} />}
+            {screen === "anviz" && <Anviz onBack={() => setScreen(null)} />}
             {screen === "afip-iva" && <AfipIVA onBack={() => setScreen(null)} token={token} />}
             {screen === "usuarios" && (
               <Usuarios onBack={() => setScreen(null)} />
@@ -1143,6 +1137,7 @@ function App({ usuario, token }) {
         {puedo("facturas", "ver") && <p onClick={() => { setScreen("facturas"); setSidebarOpen(false); }}>🧾 Facturas</p>}
         {puedo("anviz", "ver") && <p onClick={() => { setScreen("anviz"); setSidebarOpen(false); }}>🕐 Asistencia</p>}
         {puedo("usuarios", "ver") && <p onClick={() => { setScreen("usuarios"); setSidebarOpen(false); }}>👤 Usuarios</p>}
+        <p onClick={logout} style={{ color: "#cc3333" }}>🚪 Cerrar sesión</p>
       </div>
 
       <div className="wrapper">
