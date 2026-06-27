@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useAuth } from "../context/AuthContext";
 
 export default function PresupuestoMamparas({
   presupuestoACargar = null,
@@ -8,6 +9,7 @@ export default function PresupuestoMamparas({
   codclienteInicial = null,
   numeroPres = null,
 }) {
+  const { authFetch } = useAuth();
   const [presupuestoId, setPresupuestoId] = useState(null); // número entero, null = sin asignar
   const [revision, setRevision] = useState(0);
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
@@ -131,13 +133,8 @@ export default function PresupuestoMamparas({
 
   // ── Cargar catálogo de mamparas ─────────────────────────────────────────────
   useEffect(() => {
-    fetch(
+    authFetch(
       "https://integral-backend-production.up.railway.app/productos/mamparas",
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      },
     )
       .then((r) => r.json())
       .then((data) => {
@@ -162,13 +159,8 @@ export default function PresupuestoMamparas({
   // Se usa una ref para evitar que el fetch asíncrono pise el número
   // que ya seteó el useEffect de "cargar presupuesto existente".
   const fetchProximoNumero = () => {
-    fetch(
+    authFetch(
       "https://integral-backend-production.up.railway.app/presupuestos-mamparas/proximo-numero",
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      },
     )
       .then((r) => r.json())
       .then((data) => {
@@ -198,13 +190,8 @@ export default function PresupuestoMamparas({
   // ── Colocación desde BD al cambiar artículo ─────────────────────────────────
   useEffect(() => {
     if (!articuloSeleccionado?.codart) return;
-    fetch(
+    authFetch(
       `https://integral-backend-production.up.railway.app/colocacion/buscar?codart=${encodeURIComponent(articuloSeleccionado.codart)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      },
     )
       .then((r) => r.json())
       .then((data) => {
@@ -238,21 +225,12 @@ export default function PresupuestoMamparas({
 
     // Traer asociaciones y tabla MARGEN en paralelo
     Promise.all([
-      fetch(
+      authFetch(
         "https://integral-backend-production.up.railway.app/asociaciones",
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       )
         .then((r) => r.json())
         .catch(() => []),
-      fetch("https://integral-backend-production.up.railway.app/margen", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      })
+      authFetch("https://integral-backend-production.up.railway.app/margen")
         .then((r) => r.json())
         .catch(() => []),
     ])
@@ -355,13 +333,8 @@ export default function PresupuestoMamparas({
 
     try {
       // Obtener textos de fórmulas para resolver dependencias FORM_XXX
-      const resFormulas = await fetch(
+      const resFormulas = await authFetch(
         "https://integral-backend-production.up.railway.app/formulas",
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
       )
         .then((r) => r.json())
         .catch(() => []);
@@ -413,14 +386,10 @@ export default function PresupuestoMamparas({
             ),
           };
 
-          const res = await fetch(
+          const res = await authFetch(
             "https://integral-backend-production.up.railway.app/formulas/calcular",
             {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
               body: JSON.stringify({
                 codform,
                 codart_modelo: asoc.cod,
@@ -573,14 +542,10 @@ export default function PresupuestoMamparas({
     };
 
     try {
-      const res = await fetch(
+      const res = await authFetch(
         "https://integral-backend-production.up.railway.app/presupuestos-mamparas",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
           body: JSON.stringify(payload),
         },
       );
