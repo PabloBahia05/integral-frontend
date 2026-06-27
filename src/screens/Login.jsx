@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
 const API = "https://integral-backend-production.up.railway.app";
 
-export default function Login({ onLogin }) {
+export default function Login() {
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -20,7 +22,7 @@ export default function Login({ onLogin }) {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Error al iniciar sesión."); return; }
-      onLogin(data.usuario, data.token);
+      login(data.usuario, data.token);
     } catch {
       setError("No se pudo conectar al servidor.");
     } finally {

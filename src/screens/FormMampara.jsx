@@ -1,10 +1,12 @@
 import { useState } from "react";
 import ScreenHeader from "../Component/ScreenHeader";
+import { useAuth } from "../context/AuthContext";
 
 const API = "https://integral-backend-production.up.railway.app";
 const VIDRIOS = ["Incoloro", "Esmerilado"];
 
 export default function FormMampara({ modelo, onBack }) {
+  const { authFetch } = useAuth();
   const [form, setForm] = useState({
     nombre: "",
     cantidad: "1",
@@ -19,11 +21,6 @@ export default function FormMampara({ modelo, onBack }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
-
-  const authHeaders = () => ({
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-  });
 
   const set = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -41,9 +38,8 @@ export default function FormMampara({ modelo, onBack }) {
     setCalculando(true);
     setError("");
     try {
-      const res = await fetch(`${API}/formulas/calcular`, {
+      const res = await authFetch(`${API}/formulas/calcular`, {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify({
           codformv: modelo?.codformv,
           variables: {
@@ -92,9 +88,8 @@ export default function FormMampara({ modelo, onBack }) {
         valor2: String(resultado.heraje ?? 0),
         revision: 0,
       };
-      const res = await fetch(`${API}/presupuestos-mamparas`, {
+      const res = await authFetch(`${API}/presupuestos-mamparas`, {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify(body),
       });
       const data = await res.json();
