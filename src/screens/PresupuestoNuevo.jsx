@@ -4433,12 +4433,15 @@ export default function PresupuestoNuevo({
                                           );
                                           const precioBaseUsar =
                                             preciosBase[0]?.precioBase ?? "";
-                                          const precioUsar =
-                                            precios[0]?.precio ?? "";
-                                          const nombreart =
-                                            p.nombreart ?? p.NOMBREART ?? base;
                                           const precioPlacard =
                                             p.precio_un ?? p.PRECIO_UN ?? "";
+                                          const precioUsar =
+                                            precios[0]?.precio ??
+                                            (lineasActivas.length === 0
+                                              ? precioPlacard
+                                              : "");
+                                          const nombreart =
+                                            p.nombreart ?? p.NOMBREART ?? base;
                                           setPlacardFila((f) => ({
                                             ...f,
                                             articulo: base,
@@ -4901,11 +4904,15 @@ export default function PresupuestoNuevo({
                                   }));
                                   const precioBaseUsar =
                                     preciosBase[0]?.precioBase ?? "";
-                                  const precioUsar = precios[0]?.precio ?? "";
-                                  const nombreart =
-                                    p.nombreart ?? p.NOMBREART ?? base;
                                   const precioPlacard =
                                     p.precio_un ?? p.PRECIO_UN ?? "";
+                                  const precioUsar =
+                                    precios[0]?.precio ??
+                                    (lineasActivas.length === 0
+                                      ? precioPlacard
+                                      : "");
+                                  const nombreart =
+                                    p.nombreart ?? p.NOMBREART ?? base;
                                   setPlacardFila((f) => ({
                                     ...f,
                                     articulo: base,
