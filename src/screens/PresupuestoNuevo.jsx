@@ -601,13 +601,13 @@ export default function PresupuestoNuevo({
 
   // Cargar materiales/guias desde BD al montar
   useEffect(() => {
-    authFetch(`${API}/articulos?familia=placas`)
+    authFetch(`${API}/articulos/por-familia?familia=placas`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setMaterialesDB(data);
       })
       .catch(() => {});
-    authFetch(`${API}/articulos?familia=guias`)
+    authFetch(`${API}/articulos/por-familia?familia=guias`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setGuiasDB(data);
