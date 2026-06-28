@@ -969,6 +969,7 @@ export default function PresupuestoNuevo({
     cantidad: 1,
     precio: "",
     precios: [],
+    precioPlacard: "",
     margen: null,
     valor1: null,
     porcentaje1: null,
@@ -1452,6 +1453,7 @@ export default function PresupuestoNuevo({
       cantidad: 1,
       precio: "",
       precios: [],
+      precioPlacard: "",
       margen: null,
       valor1: null,
       porcentaje1: null,
@@ -1484,6 +1486,7 @@ export default function PresupuestoNuevo({
       cantidad: 1,
       precio: "",
       precios: [],
+      precioPlacard: "",
       margen: null,
       valor1: null,
       porcentaje1: null,
@@ -4180,6 +4183,7 @@ export default function PresupuestoNuevo({
                       cantidad: 1,
                       precio: "",
                       precios: [],
+                      precioPlacard: "",
                       margen: null,
                       valor1: null,
                       porcentaje1: null,
@@ -4285,6 +4289,17 @@ export default function PresupuestoNuevo({
                         }}
                       >
                         Cant.
+                      </th>
+                      <th
+                        style={{
+                          padding: "8px 12px",
+                          textAlign: "right",
+                          border: "1px solid #c8dae8",
+                          fontWeight: 700,
+                          width: 110,
+                        }}
+                      >
+                        Placard
                       </th>
                       <th
                         style={{
@@ -4422,12 +4437,15 @@ export default function PresupuestoNuevo({
                                             precios[0]?.precio ?? "";
                                           const nombreart =
                                             p.nombreart ?? p.NOMBREART ?? base;
+                                          const precioPlacard =
+                                            p.precio_un ?? p.PRECIO_UN ?? "";
                                           setPlacardFila((f) => ({
                                             ...f,
                                             articulo: base,
                                             nombreart,
                                             precio: String(precioUsar),
                                             precioBase: String(precioBaseUsar),
+                                            precioPlacard: String(precioPlacard),
                                             precios,
                                             preciosBase,
                                           }));
@@ -4485,6 +4503,33 @@ export default function PresupuestoNuevo({
                                 fontSize: 12,
                                 border: "1px solid #7aaac8",
                                 padding: "4px 4px",
+                                borderRadius: 2,
+                              }}
+                            />
+                          </td>
+                          <td
+                            style={{
+                              padding: "6px 8px",
+                              border: "1px solid #c8dae8",
+                            }}
+                          >
+                            <input
+                              type="number"
+                              min="0"
+                              value={placardFila.precioPlacard ?? ""}
+                              onChange={(e) =>
+                                setPlacardFila((f) => ({
+                                  ...f,
+                                  precioPlacard: e.target.value,
+                                }))
+                              }
+                              style={{
+                                width: "100%",
+                                textAlign: "right",
+                                fontFamily: "'Space Mono',monospace",
+                                fontSize: 12,
+                                border: "1px solid #7aaac8",
+                                padding: "4px 8px",
                                 borderRadius: 2,
                               }}
                             />
@@ -4564,6 +4609,7 @@ export default function PresupuestoNuevo({
                                   cantidad: 1,
                                   precio: "",
                                   precios: [],
+                                  precioPlacard: "",
                                   margen: null,
                                   valor1: null,
                                   porcentaje1: null,
@@ -4621,6 +4667,19 @@ export default function PresupuestoNuevo({
                             }}
                           >
                             {fila.cantidad}
+                          </td>
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              border: "1px solid #c8dae8",
+                              textAlign: "right",
+                            }}
+                          >
+                            $
+                            {Number(fila.precioPlacard ?? 0).toLocaleString(
+                              "es-AR",
+                              { minimumFractionDigits: 2 },
+                            )}
                           </td>
                           <td
                             style={{
@@ -4713,7 +4772,7 @@ export default function PresupuestoNuevo({
                     )}
                     <tr style={{ background: "#e8f4ee" }}>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         style={{
                           padding: "8px 12px",
                           border: "1px solid #c8dae8",
@@ -4845,12 +4904,15 @@ export default function PresupuestoNuevo({
                                   const precioUsar = precios[0]?.precio ?? "";
                                   const nombreart =
                                     p.nombreart ?? p.NOMBREART ?? base;
+                                  const precioPlacard =
+                                    p.precio_un ?? p.PRECIO_UN ?? "";
                                   setPlacardFila((f) => ({
                                     ...f,
                                     articulo: base,
                                     nombreart,
                                     precio: String(precioUsar),
                                     precioBase: String(precioBaseUsar),
+                                    precioPlacard: String(precioPlacard),
                                     precios,
                                     preciosBase,
                                   }));
@@ -4939,6 +5001,40 @@ export default function PresupuestoNuevo({
                           fontSize: 12,
                           border: "1px solid #b8cfe0",
                           padding: "6px 6px",
+                          borderRadius: 2,
+                        }}
+                      />
+                    </div>
+                    {/* Columna fija "Placard" — siempre visible, precio_un del artículo */}
+                    <div style={{ flex: "1 1 120px" }}>
+                      <label
+                        style={{
+                          display: "block",
+                          fontSize: 11,
+                          color: "#6699bb",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Placard
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={placardFila.precioPlacard ?? ""}
+                        onChange={(e) =>
+                          setPlacardFila((f) => ({
+                            ...f,
+                            precioPlacard: e.target.value,
+                          }))
+                        }
+                        placeholder="0.00"
+                        style={{
+                          width: "100%",
+                          textAlign: "right",
+                          fontFamily: "'Space Mono',monospace",
+                          fontSize: 12,
+                          border: "1px solid #b8cfe0",
+                          padding: "6px 10px",
                           borderRadius: 2,
                         }}
                       />
