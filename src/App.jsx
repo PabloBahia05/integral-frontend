@@ -933,6 +933,7 @@ function App() {
             )}
             {screen === "presupuestos-nuevo-tabla" && (
               <PresupuestosNuevoTabla
+                authFetch={authFetch}
                 onAbrirPresupuesto={(row) => {
                   setPresupuestoAbierto(row);
                   setScreen("presupuesto-nuevo");
