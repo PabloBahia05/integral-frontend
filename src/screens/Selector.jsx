@@ -24,16 +24,19 @@ const columns = [
 ];
 
 export default function Selector({ token }) {
-  // ── Helper autenticado: agrega el JWT a todas las requests ──
-  const authFetch = (url, options = {}) =>
-    fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers ?? {}),
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  // ── Helper autenticado ──────────────────────────────────
+  const authFetch = useCallback(
+    (url, options = {}) =>
+      fetch(url, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers ?? {}),
+          Authorization: `Bearer ${token}`,
+        },
+      }),
+    [token],
+  );
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -50,7 +53,7 @@ export default function Selector({ token }) {
       .then((data) => setRows(Array.isArray(data) ? data : []))
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [authFetch]);
 
   useEffect(() => {
     fetchRows();
