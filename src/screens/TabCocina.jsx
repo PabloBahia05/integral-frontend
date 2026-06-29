@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+const API = "https://integral-backend-production.up.railway.app";
 
 const FILA_VACIA = {
   articulo: "",
@@ -19,27 +21,62 @@ export default function TabCocina({
   // estado de items
   cocinaItems,
   setCocinaItems,
-  // familia activa
+  // familia activa (elevada al padre para que el sync con presupuesto funcione)
   cocinaFamilia,
   setCocinaFamilia,
-  // líneas activas (del encabezado)
+  // líneas activas y precio (del encabezado)
   lineasActivas,
   listaPorcentaje,
   aplicarPorcentaje,
-  // productos filtrados del autocomplete (ya calculados en padre)
-  productosFiltrados,
   // navegar a presupuesto
   onVerPresupuesto,
   // popover de precio
   abrirPrecioPopover,
+  // authFetch para llamadas autenticadas
+  authFetch,
 }) {
   // ── Estado local del tab ──────────────────────────────────
   const [cocinaEditIdx, setCocinaEditIdx] = useState(null);
   const [cocinaFila, setCocinaFila] = useState({ ...FILA_VACIA });
   const [cocinaSearch, setCocinaSearch] = useState("");
   const [cocinaSearchFocus, setCocinaSearchFocus] = useState(false);
+  const [articulosFamilia, setArticulosFamilia] = useState([]);
+
+  // ── Fetch artículos cuando cambia la familia activa ───────
+  useEffect(() => {
+    if (!cocinaFamilia) {
+      setArticulosFamilia([]);
+      return;
+    }
+    const familiaMap = {
+      bajomesadas: "Bajomesada",
+      alacenas: "Alacena",
+    };
+    const familiaBD = familiaMap[cocinaFamilia] ?? cocinaFamilia;
+    authFetch(
+      `${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`,
+    )
+      .then((r) => r.json())
+      .then((data) => setArticulosFamilia(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [cocinaFamilia]);
 
   // ── Helpers ───────────────────────────────────────────────
+  const normalizar = (s) =>
+    String(s ?? "")
+      .toLowerCase()
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  const productosFiltrados = articulosFamilia
+    .filter(
+      (a) =>
+        !cocinaSearch.trim() ||
+        normalizar(a.articulo).includes(normalizar(cocinaSearch)),
+    )
+    .slice(0, 10);
+
   const resetFila = () => {
     setCocinaFila({ ...FILA_VACIA });
     setCocinaSearch("");
@@ -494,10 +531,7 @@ export default function TabCocina({
                                 }
                               >
                                 <span
-                                  style={{
-                                    color: "#0a3a5c",
-                                    fontWeight: 600,
-                                  }}
+                                  style={{ color: "#0a3a5c", fontWeight: 600 }}
                                 >
                                   {base}
                                 </span>
@@ -1184,7 +1218,10 @@ export default function TabCocina({
                                 precio: "",
                               }))),
                         ];
-                        precios[li] = { ...precios[li], precio: e.target.value };
+                        precios[li] = {
+                          ...precios[li],
+                          precio: e.target.value,
+                        };
                         return {
                           ...f,
                           precio: precios[0]?.precio ?? "",
@@ -1245,7 +1282,9 @@ export default function TabCocina({
                 disabled={!cocinaFila.articulo.trim()}
                 style={{
                   padding: "6px 20px",
-                  background: cocinaFila.articulo.trim() ? "#0a3a5c" : "#c8dae8",
+                  background: cocinaFila.articulo.trim()
+                    ? "#0a3a5c"
+                    : "#c8dae8",
                   color: "#fff",
                   border: "none",
                   borderRadius: 2,
