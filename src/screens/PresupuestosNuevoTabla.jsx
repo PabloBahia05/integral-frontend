@@ -102,7 +102,7 @@ const COLS_HISTORIAL = [
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
+export default function PresupuestosNuevoTabla({ onAbrirPresupuesto, authFetch }) {
   // Encabezados (un registro por numeropres, última revisión)
   const [encabezados, setEncabezados] = useState([]);
   const [loadingEnc, setLoadingEnc] = useState(true);
@@ -124,7 +124,7 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
 
   const fetchEncabezados = () => {
     setLoadingEnc(true);
-    fetch(`${API}/tabla-presupuestos/encabezados`)
+    authFetch(`${API}/tabla-presupuestos/encabezados`)
       .then((r) => r.json())
       .then((data) =>
         setEncabezados(
@@ -152,7 +152,7 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
       return;
     }
     setLoadingItems(true);
-    fetch(
+    authFetch(
       `${API}/tabla-presupuestos?numeropres=${selected.numeropres}&revision=${selected.revision}`,
     )
       .then((r) => r.json())
@@ -167,7 +167,7 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
     if (!selected) return;
     setLoadingRev(true);
     setModalHistorial(true);
-    fetch(`${API}/tabla-presupuestos/revisiones/${selected.numeropres}`)
+    authFetch(`${API}/tabla-presupuestos/revisiones/${selected.numeropres}`)
       .then((r) => r.json())
       .then((data) =>
         setRevisiones(
@@ -212,7 +212,7 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto }) {
     try {
       await Promise.all(
         itemsDetalle.map((it) =>
-          fetch(`${API}/tabla-presupuestos/${it.id}`, { method: "DELETE" }),
+          authFetch(`${API}/tabla-presupuestos/${it.id}`, { method: "DELETE" }),
         ),
       );
       fetchEncabezados();
