@@ -876,6 +876,7 @@ function App() {
             {screen === "presupuesto-vanitory" && vanitoryVista === "armar" && (
               <ArmarVanitory
                 modelo={vanitoryModelo}
+                token={token}
                 onVolver={() => {
                   setVanitoryVista("tipos");
                   setVanitoryModelo(null);
@@ -933,7 +934,6 @@ function App() {
             )}
             {screen === "presupuestos-nuevo-tabla" && (
               <PresupuestosNuevoTabla
-                authFetch={authFetch}
                 onAbrirPresupuesto={(row) => {
                   setPresupuestoAbierto(row);
                   setScreen("presupuesto-nuevo");
