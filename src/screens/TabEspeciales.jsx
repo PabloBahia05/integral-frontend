@@ -230,45 +230,63 @@ function EspecialesMedidasForm({
                 borderColor: medidas.materialPlaca ? "#7aaac8" : "#b8cfe0",
               }}
             />
-            {materialFocus && materialesFiltrados.length > 0 && (
-              <div style={dropdownStyle}>
-                {materialesFiltrados.map((m, i) => {
-                  const nombre =
-                    m.nombreart ?? m.NOMBREART ?? m.articulo ?? m.ARTICULO ?? "";
-                  const codigo = m.articulo ?? m.ARTICULO ?? "";
-                  return (
-                    <div
-                      key={i}
-                      style={dropItemStyle}
-                      onMouseDown={() => {
-                        const val = nombre || codigo;
-                        setMaterialSearch(val);
-                        setMedidas((md) => ({ ...md, materialPlaca: val }));
-                      }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.background = "#ddeefa")
-                      }
-                      onMouseOut={(e) =>
-                        (e.currentTarget.style.background = "#fff")
-                      }
-                    >
-                      <span style={{ fontWeight: 700 }}>{nombre}</span>
-                      {codigo && nombre !== codigo && (
-                        <span
-                          style={{
-                            color: "#8aabcc",
-                            marginLeft: 8,
-                            fontSize: 10,
-                          }}
-                        >
-                          {codigo}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            {materialFocus && (materialesColorDB.length > 0 || materialesBlancooDB.length > 0) && (() => {
+              const colorFilt = materialesColorDB.filter(
+                (m) =>
+                  (m.articulo ?? m.ARTICULO ?? "").toLowerCase().includes(materialSearch.toLowerCase()) ||
+                  (m.nombreart ?? m.NOMBREART ?? "").toLowerCase().includes(materialSearch.toLowerCase()),
+              );
+              const blancoFilt = materialesBlancooDB.filter(
+                (m) =>
+                  (m.articulo ?? m.ARTICULO ?? "").toLowerCase().includes(materialSearch.toLowerCase()) ||
+                  (m.nombreart ?? m.NOMBREART ?? "").toLowerCase().includes(materialSearch.toLowerCase()),
+              );
+              if (colorFilt.length === 0 && blancoFilt.length === 0) return null;
+              const renderItem = (m, i) => {
+                const nombre = m.nombreart ?? m.NOMBREART ?? m.articulo ?? m.ARTICULO ?? "";
+                const codigo = m.articulo ?? m.ARTICULO ?? "";
+                return (
+                  <div
+                    key={i}
+                    style={dropItemStyle}
+                    onMouseDown={() => {
+                      const val = nombre || codigo;
+                      setMaterialSearch(val);
+                      setMedidas((md) => ({ ...md, materialPlaca: val }));
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
+                    onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+                  >
+                    <span style={{ fontWeight: 700 }}>{nombre}</span>
+                    {codigo && nombre !== codigo && (
+                      <span style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}>
+                        {codigo}
+                      </span>
+                    )}
+                  </div>
+                );
+              };
+              return (
+                <div style={dropdownStyle}>
+                  {colorFilt.length > 0 && (
+                    <>
+                      <div style={{ padding: "5px 12px 3px", fontSize: 10, fontWeight: 700, color: "#4a90c8", letterSpacing: "0.08em", textTransform: "uppercase", borderBottom: "1px solid #e8f0f7" }}>
+                        🎨 Material Color
+                      </div>
+                      {colorFilt.slice(0, 8).map(renderItem)}
+                    </>
+                  )}
+                  {blancoFilt.length > 0 && (
+                    <>
+                      <div style={{ padding: "5px 12px 3px", fontSize: 10, fontWeight: 700, color: "#6699bb", letterSpacing: "0.08em", textTransform: "uppercase", borderBottom: "1px solid #e8f0f7", borderTop: colorFilt.length > 0 ? "2px solid #dde6ef" : "none" }}>
+                        ⬜ Material Blanco
+                      </div>
+                      {blancoFilt.slice(0, 8).map(renderItem)}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
             {materialFocus &&
               materialesFiltrados.length === 0 &&
               materialSearch.length > 0 && (
@@ -519,7 +537,8 @@ export default function TabEspeciales({
   // Búsqueda material placa
   const [materialSearch, setMaterialSearch] = useState("");
   const [materialFocus, setMaterialFocus] = useState(false);
-  const [materialesDB, setMaterialesDB] = useState([]);
+  const [materialesColorDB, setMaterialesColorDB] = useState([]);   // area = 3
+  const [materialesBlancooDB, setMaterialesBlancooDB] = useState([]); // area = 2
 
   // Búsqueda guías
   const [guiasSearch, setGuiasSearch] = useState("");
@@ -528,17 +547,22 @@ export default function TabEspeciales({
 
   // Cargar materiales/guías al montar
   useEffect(() => {
-    authFetch(`${API}/articulos/por-familia?familia=placas`)
+    authFetch(`${API}/productos/placas-muebles-esp-color`)
       .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data)) setMaterialesDB(data); })
+      .then((data) => { if (Array.isArray(data)) setMaterialesColorDB(data); })
       .catch(() => {});
-    authFetch(`${API}/articulos/por-familia?familia=guias`)
+    authFetch(`${API}/productos/placas-muebles-esp`)
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setMaterialesBlancooDB(data); })
+      .catch(() => {});
+    authFetch(`${API}/productos/guias-muebles-esp`)
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setGuiasDB(data); })
       .catch(() => {});
   }, []);
 
-  const materialesFiltrados = materialesDB
+  // Filtro unificado: primero color (area=3), luego blanco (area=2)
+  const materialesFiltrados = [...materialesColorDB, ...materialesBlancooDB]
     .filter(
       (m) =>
         (m.articulo ?? m.ARTICULO ?? "").toLowerCase().includes(materialSearch.toLowerCase()) ||
