@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
 export function useCrud(endpoint, name = "Registro", addLog = () => {}) {
-  const API = "http://https://integral-backend-production.up.railway.app";
+  const API = "https://integral-backend-production.up.railway.app";
 
   const [data, setData] = useState([]);
   const [selected, setSelected] = useState(null);
