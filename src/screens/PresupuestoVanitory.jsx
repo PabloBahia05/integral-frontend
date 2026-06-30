@@ -105,7 +105,7 @@ export default function PresupuestoVanitory({
   // Cargar colocación desde BD cuando hay modelo con codart
   useEffect(() => {
     if (!modelo?.codart) return;
-    fetch(
+    authFetch(
       `${API}/colocacion/buscar?codart=${encodeURIComponent(modelo.codart)}`,
     )
       .then((r) => r.json())
@@ -153,7 +153,7 @@ export default function PresupuestoVanitory({
     };
 
     // Ruta correcta del backend: /margen/por-codart?codart=...
-    fetch(
+    authFetch(
       `${API}/margen/por-codart?codart=${encodeURIComponent(modelo.codart)}`,
     )
       .then((r) => r.json())
@@ -245,7 +245,7 @@ export default function PresupuestoVanitory({
     };
 
     Promise.all([
-      fetch(
+      authFetch(
         `${API}/asociaciones-form?codart=${encodeURIComponent(modelo.codart)}`,
       )
         .then((r) => r.json())
@@ -315,7 +315,7 @@ export default function PresupuestoVanitory({
         await Promise.all(
           codartsBD.map(async (cod) => {
             try {
-              const res = await fetch(
+              const res = await authFetch(
                 `${API}/articulos/${encodeURIComponent(cod)}`,
               );
               const data = await res.json();
