@@ -20,7 +20,7 @@ export default function Login({ onLogin }) {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Error al iniciar sesión."); return; }
-      onLogin(data.usuario);
+      onLogin(data.usuario, data.token);
     } catch {
       setError("No se pudo conectar al servidor.");
     } finally {

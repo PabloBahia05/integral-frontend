@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import ScreenHeader from "../Component/ScreenHeader";
 import PresupuestoVanitory from "./PresupuestoVanitory";
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 
 const OTROS_ITEMS = [
   { id: "cocina", label: "Cocina", icon: "🍳" },

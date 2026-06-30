@@ -18,7 +18,7 @@ import ConfirmDelete from "../Component/ConfirmDelete";
      GET    /articulos/rubro-de?codart= → { rubro }
 ───────────────────────────────────────────── */
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 
 const EMPTY_FORM = {
   id: null,

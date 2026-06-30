@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 const EMPTY = () => ({

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 
 export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
   const modelo = modeloRaw

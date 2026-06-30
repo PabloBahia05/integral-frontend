@@ -3,6 +3,72 @@ import Usuarios from "./Usuarios";
 
 const API = "https://integral-backend-production.up.railway.app";
 
+// ─── DateInput con máscara dd-mm-aaaa + almanaque nativo ─────────────────────
+function DateInput({ value, onChange, style }) {
+  const ref = useRef(null);
+
+  function toDisplay(iso) {
+    if (!iso || iso.length < 10) return iso || "";
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return iso;
+    return `${d}-${m}-${y}`;
+  }
+  function toISO(digits) {
+    if (digits.length < 8) return "";
+    return `${digits.slice(4, 8)}-${digits.slice(2, 4)}-${digits.slice(0, 2)}`;
+  }
+
+  const [raw, setRaw] = useState(toDisplay(value));
+
+  // Sincronizar cuando value cambia desde afuera (ej: picker o reset)
+  useEffect(() => {
+    setRaw(toDisplay(value));
+  }, [value]);
+
+  function handleChange(e) {
+    const digits = e.target.value.replace(/[^0-9]/g, "").slice(0, 8);
+    let masked = digits;
+    if (digits.length >= 3) masked = digits.slice(0, 2) + "-" + digits.slice(2);
+    if (digits.length >= 5) masked = digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4);
+    setRaw(masked);
+    if (digits.length === 8) {
+      const iso = toISO(digits);
+      if (iso) onChange(iso);
+    }
+  }
+
+  function handlePickerChange(e) {
+    const iso = e.target.value;
+    setRaw(toDisplay(iso));  // actualizar el texto visible inmediatamente
+    onChange(iso);
+  }
+
+  return (
+    <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <input
+        type="text"
+        value={raw}
+        onChange={handleChange}
+        placeholder="dd-mm-aaaa"
+        maxLength={10}
+        style={style}
+      />
+      <span
+        onClick={() => ref.current?.showPicker?.()}
+        style={{ position: "absolute", right: 8, cursor: "pointer", fontSize: 14, opacity: 0.6, userSelect: "none" }}
+        title="Abrir calendario"
+      >📅</span>
+      <input
+        type="date"
+        ref={ref}
+        value={value || ""}
+        onChange={handlePickerChange}
+        style={{ position: "absolute", opacity: 0, width: 0, height: 0, top: 0, left: 0, pointerEvents: "none" }}
+      />
+    </div>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -19,7 +85,7 @@ function parseMysqlTs(ts) {
 function fmtFecha(ts) {
   const d = parseMysqlTs(ts);
   if (!d) return "—";
-  return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth() + 1)}-${d.getUTCFullYear()}`;
 }
 
 function fmtHora(ts) {
@@ -51,14 +117,16 @@ function asignarDirecciones(fichadas) {
     });
 }
 
-async function apiFetch(path) {
-  const res = await fetch(`${API}${path}`);
+async function apiFetch(path, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`${API}${path}`, { headers });
   if (!res.ok) throw new Error(`HTTP ${res.status} en ${path}`);
   return res.json();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function Anviz({ onBack }) {
+export default function Anviz({ onBack, usuario, token }) {
+  const esOperario = usuario?.rol === "operario";
   const [vista, setVista]               = useState("inicio"); // "inicio" | "fichadas" | "usuarios" | "historial"
   const [fichadas, setFichadas]         = useState([]);
   const [usuarios, setUsuarios]         = useState([]);
@@ -85,12 +153,36 @@ export default function Anviz({ onBack }) {
   // ── Paginación ─────────────────────────────────────────────────────────────
   const [pagina, setPagina] = useState(1);
   const [vistaTabla, setVistaTabla] = useState("tabla"); // "tabla" | "resumen"
+  const [vacData, setVacData]             = useState([]);
+  const [vacCargando, setVacCargando]     = useState(false);
+  const [vacEditando, setVacEditando]     = useState(null); // id del empleado editando
+  const [vacForm, setVacForm]             = useState({ vacaciones: "", horas_acumuladas: "" });
+  // ── Modal de vacaciones tomadas (alta/baja de períodos) ──
+  const [vacModalEmpleado, setVacModalEmpleado] = useState(null); // {id, nombre, apellido} o null
+  const [vacTomadasList, setVacTomadasList]     = useState([]);
+  const [vacTomadasForm, setVacTomadasForm]     = useState({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+  const [vacTomadasCargando, setVacTomadasCargando] = useState(false);
+  // ── Modal de justificaciones (ART / Certificado) ──
+  const [justifModalEmpleado, setJustifModalEmpleado] = useState(null);
+  const [justifList, setJustifList]             = useState([]);
+  const [justifForm, setJustifForm]              = useState({ tipo: "ART", fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+  const [justifCargando, setJustifCargando]      = useState(false);
+  const [vacDesde, setVacDesde]           = useState("2026-06-08");
+  const [vacHasta, setVacHasta]           = useState(hoy);
+
+  // ── GPS Fichar ─────────────────────────────────────────────────────────────
+  const [gpsEstado, setGpsEstado]         = useState("idle"); // "idle" | "obteniendo" | "ok" | "error" | "enviando" | "enviado"
+  const [gpsCoordenadas, setGpsCoordenadas] = useState(null); // { lat, lng, accuracy }
+  const [gpsError, setGpsError]           = useState("");
+  const [gpsDireccion, setGpsDireccion]   = useState("entrada");
+  const [gpsMsg, setGpsMsg]               = useState("");
+  const [gpsUserId, setGpsUserId]         = useState(() => String(usuario?.id || ""));
 
   const wsRef = useRef(null);
 
   // ── Cargar empleados (una vez) ─────────────────────────────────────────────
   useEffect(() => {
-    apiFetch("/empleados")
+    apiFetch("/empleados", token)
       .then(setUsuarios)
       .catch(() => {});
   }, []);
@@ -104,7 +196,7 @@ export default function Anviz({ onBack }) {
       if (filtroDesde) params.set("fecha_desde", filtroDesde);
       if (filtroHasta) params.set("fecha_hasta", filtroHasta);
       if (filtroUser)  params.set("user_id", filtroUser);
-      const data = await apiFetch(`/fichadas?${params}`);
+      const data = await apiFetch(`/fichadas?${params}`, token);
       setFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
       setUltimoSync(new Date());
       setPagina(1);
@@ -123,7 +215,7 @@ export default function Anviz({ onBack }) {
   useEffect(() => {
     const poll = async () => {
       try {
-        const data = await apiFetch("/anviz/status");
+        const data = await apiFetch("/anviz/status", token);
         setAgente(data);
       } catch {}
     };
@@ -234,7 +326,7 @@ export default function Anviz({ onBack }) {
   const cargarPresencia = useCallback(async () => {
     try {
       const params = new URLSearchParams({ fecha_desde: hoy(), fecha_hasta: hoy(), limit: 1000 });
-      const data = await apiFetch(`/fichadas?${params}`);
+      const data = await apiFetch(`/fichadas?${params}`, token);
       setFichadasHoy(asignarDirecciones(Array.isArray(data) ? data : []));
     } catch {}
   }, []);
@@ -265,7 +357,7 @@ export default function Anviz({ onBack }) {
       if (histDesde)      params.set("fecha_desde", histDesde);
       if (histHasta)      params.set("fecha_hasta", histHasta);
       if (histFiltroUser) params.set("user_id", histFiltroUser);
-      const data = await apiFetch(`/fichadas?${params}`);
+      const data = await apiFetch(`/fichadas?${params}`, token);
       setHistFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
     } catch (e) {
       setHistError(e.message);
@@ -346,7 +438,7 @@ export default function Anviz({ onBack }) {
       const method = modal === "nueva" ? "POST" : "PUT";
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ user_id: Number(modalData.user_id), direccion: modalData.direccion, timestamp: tsMySQL }),
       });
       const data = await res.json();
@@ -363,12 +455,189 @@ export default function Anviz({ onBack }) {
   async function eliminarFichada(id) {
     if (!window.confirm("¿Eliminar esta fichada?")) return;
     try {
-      const res = await fetch(`${API}/fichadas/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API}/fichadas/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       cargarFichadas();
     } catch (e) {
       alert("Error al eliminar: " + e.message);
+    }
+  }
+
+  // ── Vacaciones y Horas ────────────────────────────────────────────────────
+  async function abrirVacaciones(desde, hasta) {
+    setVista("vacaciones");
+    setVacCargando(true);
+    try {
+      const d = desde !== undefined ? desde : vacDesde;
+      const h = hasta !== undefined ? hasta  : vacHasta;
+      const empParams = new URLSearchParams();
+      if (d) empParams.set("fecha_desde", d);
+      if (h) empParams.set("fecha_hasta", h);
+      const qs = empParams.toString() ? `?${empParams.toString()}` : "";
+
+      const empData = await apiFetch(`/empleados/vacaciones-horas${qs}`, token);
+      setVacData(empData);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setVacCargando(false);
+    }
+  }
+
+  async function filtrarVacaciones() {
+    abrirVacaciones(vacDesde, vacHasta);
+  }
+
+  async function guardarVac(id) {
+    try {
+      await fetch(`${API}/empleados/${id}/vacaciones-horas`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ vacaciones: Number(vacForm.vacaciones), horas_acumuladas: Number(vacForm.horas_acumuladas) }),
+      });
+      setVacEditando(null);
+      // Recargar desde el backend en vez de actualizar a mano el estado local:
+      // el saldo total y otros campos derivados (diferencia, ajuste, etc.) se
+      // calculan en el servidor, así que esta es la única forma confiable de
+      // que la tabla quede al día después de guardar.
+      await abrirVacaciones(vacDesde, vacHasta);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // ── Detalle de vacaciones tomadas (períodos concretos) ──
+  async function abrirModalVacaciones(empleado) {
+    setVacModalEmpleado(empleado);
+    setVacTomadasForm({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+    setVacTomadasCargando(true);
+    try {
+      const lista = await apiFetch(`/vacaciones-tomadas?empleado_id=${empleado.id}`, token);
+      setVacTomadasList(Array.isArray(lista) ? lista : []);
+    } catch (e) {
+      console.error(e);
+      setVacTomadasList([]);
+    } finally {
+      setVacTomadasCargando(false);
+    }
+  }
+
+  function cerrarModalVacaciones() {
+    setVacModalEmpleado(null);
+    setVacTomadasList([]);
+  }
+
+  // Calcula días corridos (calendario, incluye fines de semana, como marca la ley) entre dos fechas
+  function diasCorridos(desde, hasta) {
+    if (!desde || !hasta) return "";
+    const d1 = new Date(`${desde}T00:00:00`);
+    const d2 = new Date(`${hasta}T00:00:00`);
+    const diff = Math.round((d2 - d1) / 86400000) + 1;
+    return diff > 0 ? diff : "";
+  }
+
+  // Convierte una fecha (string YYYY-MM-DD, datetime, etc.) a DD-MM-AAAA para mostrar
+  function fmtFecha(value) {
+    if (!value) return "";
+    const iso = String(value).slice(0, 10); // yyyy-mm-dd
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return iso;
+    return `${d}-${m}-${y}`;
+  }
+
+  async function agregarVacacionTomada() {
+    if (!vacModalEmpleado || !vacTomadasForm.fecha_desde || !vacTomadasForm.fecha_hasta || !vacTomadasForm.dias) return;
+    try {
+      const nuevo = await fetch(`${API}/vacaciones-tomadas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          empleado_id: vacModalEmpleado.id,
+          fecha_desde: vacTomadasForm.fecha_desde,
+          fecha_hasta: vacTomadasForm.fecha_hasta,
+          dias: Number(vacTomadasForm.dias),
+          nota: vacTomadasForm.nota || null,
+        }),
+      }).then(r => r.json());
+      setVacTomadasList(l => [nuevo, ...l]);
+      setVacTomadasForm({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+      // Refrescar la tabla principal para actualizar tomadas/pendientes
+      abrirVacaciones();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function eliminarVacacionTomada(id) {
+    if (!confirm("¿Eliminar este período de vacaciones?")) return;
+    try {
+      await fetch(`${API}/vacaciones-tomadas/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setVacTomadasList(l => l.filter(v => v.id !== id));
+      abrirVacaciones();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // ── Detalle de justificaciones (ART / Certificado) ──
+  async function abrirModalJustificaciones(empleado) {
+    setJustifModalEmpleado(empleado);
+    setJustifForm({ tipo: "ART", fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+    setJustifCargando(true);
+    try {
+      const lista = await apiFetch(`/justificaciones?empleado_id=${empleado.id}`, token);
+      setJustifList(Array.isArray(lista) ? lista : []);
+    } catch (e) {
+      console.error(e);
+      setJustifList([]);
+    } finally {
+      setJustifCargando(false);
+    }
+  }
+
+  function cerrarModalJustificaciones() {
+    setJustifModalEmpleado(null);
+    setJustifList([]);
+  }
+
+  async function agregarJustificacion() {
+    if (!justifModalEmpleado || !justifForm.fecha_desde || !justifForm.fecha_hasta || !justifForm.dias) return;
+    try {
+      const nuevo = await fetch(`${API}/justificaciones`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          empleado_id: justifModalEmpleado.id,
+          tipo: justifForm.tipo,
+          fecha_desde: justifForm.fecha_desde,
+          fecha_hasta: justifForm.fecha_hasta,
+          dias: Number(justifForm.dias),
+          nota: justifForm.nota || null,
+        }),
+      }).then(r => r.json());
+      setJustifList(l => [nuevo, ...l]);
+      setJustifForm({ tipo: "ART", fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+      abrirVacaciones();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function eliminarJustificacion(id) {
+    if (!confirm("¿Eliminar esta justificación?")) return;
+    try {
+      await fetch(`${API}/justificaciones/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setJustifList(l => l.filter(v => v.id !== id));
+      abrirVacaciones();
+    } catch (e) {
+      console.error(e);
     }
   }
 
@@ -378,6 +647,383 @@ export default function Anviz({ onBack }) {
       {/* Si vista es usuarios, mostrar el componente Usuarios */}
       {vista === "usuarios" && (
         <Usuarios onBack={() => setVista("inicio")} />
+      )}
+
+      {/* ── Vista Vacaciones y Horas ─────────────────────────────────────── */}
+      {vista === "vacaciones" && (
+        <div style={s.page}>
+          <div style={s.header}>
+            <div style={s.headerLeft}>
+              <button style={s.btnVolver} onClick={() => setVista("inicio")}>← Volver</button>
+              <div style={s.iconBox}>🏖️</div>
+              <div>
+                <h1 style={s.titulo}>Vacaciones y Horas</h1>
+                <span style={s.subtitulo}>Resumen por empleado</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ padding: "16px" }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div>
+                <label style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
+                <DateInput value={vacDesde} onChange={v => setVacDesde(v)} style={{ ...s.input, width: 140 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
+                <DateInput value={vacHasta} onChange={v => setVacHasta(v)} style={{ ...s.input, width: 140 }} />
+              </div>
+              <button style={s.btnNueva} onClick={filtrarVacaciones}>Filtrar</button>
+              <button style={{ ...s.btnVolver, marginLeft: 4 }} onClick={() => {
+                const desde = "2026-06-08";
+                const hasta = hoy();
+                setVacDesde(desde);
+                setVacHasta(hasta);
+                abrirVacaciones(desde, hasta);
+              }}>Limpiar</button>
+            </div>
+            {vacCargando ? (
+              <p style={{ color: "var(--color-text-secondary)" }}>Cargando...</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                  <thead>
+                    <tr style={{ background: "var(--color-bg-secondary)" }}>
+                      <th style={s.th}>Empleado</th>
+                      <th style={s.th}>Vac. correspondientes</th>
+                      <th style={s.th}>Vac. tomadas</th>
+                      <th style={s.th}>Vac. pendientes</th>
+                      <th style={s.th}>Horas trabajadas</th>
+                      <th style={s.th}>ART</th>
+                      <th style={s.th}>Certificado</th>
+                      <th style={s.th}>Horas esperadas</th>
+                      <th style={s.th}>Hs. justificadas</th>
+                      <th style={s.th}>Dif. del período</th>
+                      <th style={s.th}>Saldo total de horas</th>
+                      {!esOperario && <th style={s.th}>Acciones</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vacData.map((e) => (
+                      <tr key={e.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                        <td style={s.td}>{e.apellido} {e.nombre}</td>
+                        <td style={s.td}>
+                          {vacEditando === e.id ? (
+                            <input
+                              type="number"
+                              value={vacForm.vacaciones}
+                              onChange={(ev) => setVacForm(f => ({ ...f, vacaciones: ev.target.value }))}
+                              style={{ ...s.input, width: 80 }}
+                            />
+                          ) : (
+                            <span>{e.vacaciones_correspondientes ?? e.vacaciones ?? 0} días</span>
+                          )}
+                        </td>
+                        <td style={s.td}>
+                          <button
+                            style={{ ...s.btnRowEdit, background: "transparent", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
+                            onClick={() => abrirModalVacaciones(e)}
+                            title="Ver / cargar períodos tomados"
+                          >
+                            {(e.vacaciones_tomadas ?? 0)} días 📋
+                          </button>
+                        </td>
+                        <td style={{ ...s.td, color: (e.vacaciones_pendientes ?? 0) > 0 ? "var(--color-text-success)" : "var(--color-text-secondary)", fontWeight: 500 }}>
+                          {e.vacaciones_pendientes ?? 0} días
+                        </td>
+                        <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
+                          {(e.horas_calculadas ?? 0)}h
+                        </td>
+                        <td style={s.td}>
+                          <button
+                            style={{ ...s.btnRowEdit, background: "transparent", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
+                            onClick={() => abrirModalJustificaciones(e)}
+                            title="Ver / cargar días de ART"
+                          >
+                            {(e.dias_art ?? 0)} días 🩹
+                          </button>
+                        </td>
+                        <td style={s.td}>
+                          <button
+                            style={{ ...s.btnRowEdit, background: "transparent", border: "1px solid var(--color-border)", color: "var(--color-text-primary)" }}
+                            onClick={() => abrirModalJustificaciones(e)}
+                            title="Ver / cargar días de certificado médico"
+                          >
+                            {(e.dias_certificado ?? 0)} días 📄
+                          </button>
+                        </td>
+                        <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
+                          {(e.horas_esperadas ?? 0)}h
+                        </td>
+                        <td style={{ ...s.td, color: (e.horas_justificadas ?? 0) > 0 ? "var(--color-text-success)" : "var(--color-text-secondary)", fontWeight: 500 }}>
+                          {(e.horas_justificadas ?? 0) > 0 ? `+${e.horas_justificadas}h` : "—"}
+                        </td>
+                        <td style={{ ...s.td, color: e.diferencia_vs_44 >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 500 }}>
+                          {e.diferencia_vs_44 >= 0 ? "+" : ""}{e.diferencia_vs_44 ?? 0}h
+                          <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>({e.semanas_con_actividad ?? 0} sem)</span>
+                        </td>
+                        <td style={{ ...s.td, color: e.saldo_horas_total >= 0 ? "var(--color-text-success)" : "var(--color-text-danger)", fontWeight: 600 }}>
+                          {vacEditando === e.id ? (
+                            <div>
+                              <label style={{ fontSize: 10, color: "var(--color-text-secondary)", display: "block" }}>Ajuste manual</label>
+                              <input
+                                type="number"
+                                value={vacForm.horas_acumuladas}
+                                onChange={(ev) => setVacForm(f => ({ ...f, horas_acumuladas: ev.target.value }))}
+                                style={{ ...s.input, width: 80 }}
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              {e.saldo_horas_total >= 0 ? "+" : ""}{e.saldo_horas_total ?? 0}h
+                              <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4, fontWeight: 400 }}>
+                                (ajuste {e.horas_acumuladas >= 0 ? "+" : ""}{e.horas_acumuladas}h)
+                              </span>
+                            </>
+                          )}
+                        </td>
+                        {!esOperario && (
+                          <td style={s.td}>
+                            {vacEditando === e.id ? (
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <button style={s.btnRowEdit} onClick={() => guardarVac(e.id)}>💾</button>
+                                <button style={s.btnRowDel} onClick={() => setVacEditando(null)}>✕</button>
+                              </div>
+                            ) : (
+                              <button style={s.btnRowEdit} onClick={() => {
+                                setVacEditando(e.id);
+                                setVacForm({ vacaciones: e.vacaciones_correspondientes ?? e.vacaciones ?? 0, horas_acumuladas: e.horas_acumuladas ?? 0 });
+                              }}>✏️</button>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ── Modal: detalle y carga de períodos de vacaciones tomados ── */}
+          {vacModalEmpleado && (
+            <div
+              style={{
+                position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+                display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+              }}
+              onClick={cerrarModalVacaciones}
+            >
+              <div
+                style={{
+                  background: "var(--color-bg-primary)", borderRadius: 8, padding: 24,
+                  width: 480, maxWidth: "92vw", maxHeight: "85vh", overflowY: "auto",
+                }}
+                onClick={(ev) => ev.stopPropagation()}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                  <h3 style={{ margin: 0, color: "var(--color-text-primary)" }}>
+                    Vacaciones — {vacModalEmpleado.apellido} {vacModalEmpleado.nombre}
+                  </h3>
+                  <button style={s.btnRowDel} onClick={cerrarModalVacaciones}>✕</button>
+                </div>
+                <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 0, marginBottom: 16 }}>
+                  Períodos tomados en el año vigente. Los días se cuentan corridos (de calendario), como marca la ley.
+                </p>
+
+                {!esOperario && (
+                  <div style={{
+                    display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end",
+                    padding: 12, background: "var(--color-bg-secondary)", borderRadius: 6, marginBottom: 16,
+                  }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
+                      <DateInput
+                        value={vacTomadasForm.fecha_desde}
+                        onChange={(fecha_desde) => {
+                          setVacTomadasForm(f => ({
+                            ...f,
+                            fecha_desde,
+                            dias: diasCorridos(fecha_desde, f.fecha_hasta) || f.dias,
+                          }));
+                        }}
+                        style={{ ...s.input, width: 140 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
+                      <DateInput
+                        value={vacTomadasForm.fecha_hasta}
+                        onChange={(fecha_hasta) => {
+                          setVacTomadasForm(f => ({
+                            ...f,
+                            fecha_hasta,
+                            dias: diasCorridos(f.fecha_desde, fecha_hasta) || f.dias,
+                          }));
+                        }}
+                        style={{ ...s.input, width: 140 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Días</label>
+                      <input
+                        type="number"
+                        value={vacTomadasForm.dias}
+                        onChange={(ev) => setVacTomadasForm(f => ({ ...f, dias: ev.target.value }))}
+                        style={{ ...s.input, width: 70 }}
+                      />
+                    </div>
+                    <button style={s.btnNueva} onClick={agregarVacacionTomada}>＋ Agregar</button>
+                  </div>
+                )}
+
+                {vacTomadasCargando ? (
+                  <p style={{ color: "var(--color-text-secondary)" }}>Cargando...</p>
+                ) : vacTomadasList.length === 0 ? (
+                  <p style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
+                    Todavía no hay períodos cargados para este empleado.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {vacTomadasList.map((v) => (
+                      <div
+                        key={v.id}
+                        style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          padding: "8px 12px", border: "1px solid var(--color-border)", borderRadius: 6, fontSize: 13,
+                        }}
+                      >
+                        <span>
+                          {fmtFecha(v.fecha_desde)} → {fmtFecha(v.fecha_hasta)}
+                          <strong style={{ marginLeft: 8 }}>{v.dias} días</strong>
+                          {v.nota && <span style={{ color: "var(--color-text-secondary)", marginLeft: 8 }}>({v.nota})</span>}
+                        </span>
+                        {!esOperario && (
+                          <button style={s.btnRowDel} onClick={() => eliminarVacacionTomada(v.id)}>🗑</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Modal: detalle y carga de justificaciones (ART / Certificado) ── */}
+          {justifModalEmpleado && (
+            <div
+              style={{
+                position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+                display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+              }}
+              onClick={cerrarModalJustificaciones}
+            >
+              <div
+                style={{
+                  background: "var(--color-bg-primary)", borderRadius: 8, padding: 24,
+                  width: 500, maxWidth: "92vw", maxHeight: "85vh", overflowY: "auto",
+                }}
+                onClick={(ev) => ev.stopPropagation()}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                  <h3 style={{ margin: 0, color: "var(--color-text-primary)" }}>
+                    ART / Certificado — {justifModalEmpleado.apellido} {justifModalEmpleado.nombre}
+                  </h3>
+                  <button style={s.btnRowDel} onClick={cerrarModalJustificaciones}>✕</button>
+                </div>
+                <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 0, marginBottom: 16 }}>
+                  Los días hábiles cargados acá se suman como horas trabajadas/justificadas en "Dif. del período" (no penalizan al empleado).
+                </p>
+
+                {!esOperario && (
+                  <div style={{
+                    display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end",
+                    padding: 12, background: "var(--color-bg-secondary)", borderRadius: 6, marginBottom: 16,
+                  }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Tipo</label>
+                      <select
+                        value={justifForm.tipo}
+                        onChange={(ev) => setJustifForm(f => ({ ...f, tipo: ev.target.value }))}
+                        style={{ ...s.input, width: 130 }}
+                      >
+                        <option value="ART">ART</option>
+                        <option value="Certificado">Certificado</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
+                      <DateInput
+                        value={justifForm.fecha_desde}
+                        onChange={(fecha_desde) => {
+                          setJustifForm(f => ({
+                            ...f,
+                            fecha_desde,
+                            dias: diasCorridos(fecha_desde, f.fecha_hasta) || f.dias,
+                          }));
+                        }}
+                        style={{ ...s.input, width: 140 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
+                      <DateInput
+                        value={justifForm.fecha_hasta}
+                        onChange={(fecha_hasta) => {
+                          setJustifForm(f => ({
+                            ...f,
+                            fecha_hasta,
+                            dias: diasCorridos(f.fecha_desde, fecha_hasta) || f.dias,
+                          }));
+                        }}
+                        style={{ ...s.input, width: 140 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Días</label>
+                      <input
+                        type="number"
+                        value={justifForm.dias}
+                        onChange={(ev) => setJustifForm(f => ({ ...f, dias: ev.target.value }))}
+                        style={{ ...s.input, width: 70 }}
+                      />
+                    </div>
+                    <button style={s.btnNueva} onClick={agregarJustificacion}>＋ Agregar</button>
+                  </div>
+                )}
+
+                {justifCargando ? (
+                  <p style={{ color: "var(--color-text-secondary)" }}>Cargando...</p>
+                ) : justifList.length === 0 ? (
+                  <p style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
+                    Todavía no hay justificaciones cargadas para este empleado.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {justifList.map((v) => (
+                      <div
+                        key={v.id}
+                        style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          padding: "8px 12px", border: "1px solid var(--color-border)", borderRadius: 6, fontSize: 13,
+                        }}
+                      >
+                        <span>
+                          <strong style={{ marginRight: 8 }}>{v.tipo === "ART" ? "🩹 ART" : "📄 Certificado"}</strong>
+                          {fmtFecha(v.fecha_desde)} → {fmtFecha(v.fecha_hasta)}
+                          <strong style={{ marginLeft: 8 }}>{v.dias} días</strong>
+                          {v.nota && <span style={{ color: "var(--color-text-secondary)", marginLeft: 8 }}>({v.nota})</span>}
+                        </span>
+                        {!esOperario && (
+                          <button style={s.btnRowDel} onClick={() => eliminarJustificacion(v.id)}>🗑</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── Pantalla de inicio ──────────────────────────────────────────── */}
@@ -398,24 +1044,38 @@ export default function Anviz({ onBack }) {
           </div>
 
           <div style={{
-            display: "flex", gap: 20, marginTop: 40,
-            justifyContent: "center", flexWrap: "wrap",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: 16, marginTop: 32,
           }}>
+            {/* GPS primero y destacado para operarios */}
             <div
-              style={s.inicioCard}
-              onClick={() => setVista("fichadas")}
+              style={{
+                ...s.inicioCard,
+                order: esOperario ? -1 : 3,
+                borderColor: esOperario ? "#16a34a88" : "#334155",
+                background: esOperario ? "#0d2218" : "#1e293b",
+              }}
+              onClick={() => { setGpsEstado("idle"); setGpsMsg(""); setGpsCoordenadas(null); setGpsError(""); setVista("gps"); }}
             >
+              <span style={s.inicioIcon}>📍</span>
+              <span style={s.inicioLabel}>Fichar GPS</span>
+              <span style={s.inicioDesc}>Registrar entrada o salida con ubicación</span>
+            </div>
+            <div style={{ ...s.inicioCard, order: 0 }} onClick={() => setVista("fichadas")}>
               <span style={s.inicioIcon}>📋</span>
               <span style={s.inicioLabel}>Movimientos</span>
               <span style={s.inicioDesc}>Entradas y salidas del día</span>
             </div>
-            <div
-              style={s.inicioCard}
-              onClick={() => setVista("historial")}
-            >
+            <div style={{ ...s.inicioCard, order: 1 }} onClick={() => setVista("historial")}>
               <span style={s.inicioIcon}>📊</span>
               <span style={s.inicioLabel}>Historial</span>
               <span style={s.inicioDesc}>Horas acumuladas por empleado</span>
+            </div>
+            <div style={{ ...s.inicioCard, order: 2 }} onClick={() => abrirVacaciones()}>
+              <span style={s.inicioIcon}>🏖️</span>
+              <span style={s.inicioLabel}>Vacaciones y Horas</span>
+              <span style={s.inicioDesc}>Resumen por empleado</span>
             </div>
           </div>
         </div>
@@ -450,11 +1110,18 @@ export default function Anviz({ onBack }) {
               >
                 <IconRefresh spin={cargando} />
               </button>
-              <button style={s.btnUsuarios} onClick={() => setVista("usuarios")}>
-                👥 Empleados
-              </button>
-              <button style={s.btnNueva} onClick={abrirNueva}>
-                + Nueva fichada
+              {!esOperario && (
+                <button style={s.btnUsuarios} onClick={() => setVista("usuarios")}>
+                  👥 Empleados
+                </button>
+              )}
+              {!esOperario && (
+                <button style={s.btnNueva} onClick={abrirNueva}>
+                  + Nueva fichada
+                </button>
+              )}
+              <button style={s.btnVac} onClick={() => abrirVacaciones()}>
+                🏖️ Vacaciones y Horas
               </button>
               <button
                 style={{ ...s.btnSync, opacity: (syncing || !agente.connected) ? 0.5 : 1 }}
@@ -496,10 +1163,9 @@ export default function Anviz({ onBack }) {
               {/* Desde */}
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Desde</label>
-                <input
-                  type="date"
+                <DateInput
                   value={filtroDesde}
-                  onChange={(e) => setFiltroDesde(e.target.value)}
+                  onChange={(v) => setFiltroDesde(v)}
                   style={s.input}
                 />
               </div>
@@ -507,30 +1173,31 @@ export default function Anviz({ onBack }) {
               {/* Hasta */}
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Hasta</label>
-                <input
-                  type="date"
+                <DateInput
                   value={filtroHasta}
-                  onChange={(e) => setFiltroHasta(e.target.value)}
+                  onChange={(v) => setFiltroHasta(v)}
                   style={s.input}
                 />
               </div>
 
-              {/* Empleado (select por nombre) */}
-              <div style={s.filtroGrupo}>
-                <label style={s.label}>Empleado</label>
-                <select
-                  value={filtroUser}
-                  onChange={(e) => setFiltroUser(e.target.value)}
-                  style={s.input}
-                >
-                  <option value="">Todos</option>
-                  {usuarios.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.apellido} {u.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Empleado (select por nombre) — oculto para operarios */}
+              {!esOperario && (
+                <div style={s.filtroGrupo}>
+                  <label style={s.label}>Empleado</label>
+                  <select
+                    value={filtroUser}
+                    onChange={(e) => setFiltroUser(e.target.value)}
+                    style={s.input}
+                  >
+                    <option value="">Todos</option>
+                    {usuarios.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.apellido} {u.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Dirección */}
               <div style={s.filtroGrupo}>
@@ -621,19 +1288,26 @@ export default function Anviz({ onBack }) {
                         </td>
                         <td style={s.td}>{fmtFecha(f.timestamp)}</td>
                         <td style={{ ...s.td, fontFamily: "monospace", fontVariantNumeric: "tabular-nums" }}>
-                          {fmtHora(f.timestamp)}
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            {fmtHora(f.timestamp)}
+                            {f.raw_hex && (
+                              <span title="Registro del dispositivo Anviz" style={{ fontSize: 13, opacity: 0.6 }}>🕐</span>
+                            )}
+                          </div>
                         </td>
                         <td style={s.td}>
                           <span style={f.direccion === "entrada" ? s.badgeEntrada : s.badgeSalida}>
                             {f.direccion === "entrada" ? "↓ Entrada" : "↑ Salida"}
                           </span>
                         </td>
-                        <td style={{ ...s.td, width: 90 }}>
-                          <div style={{ display: "flex", gap: 6 }}>
-                            <button style={s.btnRowEdit} onClick={() => abrirEditar(f)} title="Editar">✏️</button>
-                            <button style={s.btnRowDel}  onClick={() => eliminarFichada(f.id)} title="Eliminar">🗑️</button>
-                          </div>
-                        </td>
+                        {!esOperario && (
+                          <td style={{ ...s.td, width: 90 }}>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button style={s.btnRowEdit} onClick={() => abrirEditar(f)} title="Editar">✏️</button>
+                              <button style={s.btnRowDel}  onClick={() => eliminarFichada(f.id)} title="Eliminar">🗑️</button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -731,13 +1405,13 @@ export default function Anviz({ onBack }) {
             <div style={s.filtroFila}>
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Desde</label>
-                <input type="date" value={histDesde}
-                  onChange={e => setHistDesde(e.target.value)} style={s.input} />
+                <DateInput value={histDesde}
+                  onChange={v => setHistDesde(v)} style={s.input} />
               </div>
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Hasta</label>
-                <input type="date" value={histHasta}
-                  onChange={e => setHistHasta(e.target.value)} style={s.input} />
+                <DateInput value={histHasta}
+                  onChange={v => setHistHasta(v)} style={s.input} />
               </div>
               <div style={s.filtroGrupo}>
                 <label style={s.label}>Empleado</label>
@@ -911,10 +1585,231 @@ export default function Anviz({ onBack }) {
         </div>
       )}
 
+      {/* ── Vista GPS ──────────────────────────────────────────────────────── */}
+      {vista === "gps" && (
+        <div style={s.page}>
+          <div style={s.header}>
+            <div style={s.headerLeft}>
+              <button style={s.btnVolver} onClick={() => setVista("inicio")}>← Volver</button>
+              <div style={s.iconBox}>📍</div>
+              <div>
+                <h1 style={s.titulo}>Fichar GPS</h1>
+                <span style={s.subtitulo}>Registrar asistencia con ubicación</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+
+            {/* Selector de empleado (solo no-operarios) */}
+            {!esOperario && (
+              <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "20px 24px" }}>
+                <label style={{ ...s.label, display: "block", marginBottom: 8 }}>Empleado</label>
+                <select
+                  value={gpsUserId}
+                  onChange={e => setGpsUserId(e.target.value)}
+                  style={{ ...s.input, width: "100%" }}
+                >
+                  <option value="">— Seleccionar —</option>
+                  {usuarios.map(u => (
+                    <option key={u.id} value={String(u.id)}>{u.apellido} {u.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Selector entrada / salida */}
+            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "20px 24px" }}>
+              <label style={{ ...s.label, display: "block", marginBottom: 10 }}>Tipo de registro</label>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  style={gpsDireccion === "entrada" ? s.dirBtnActive : s.dirBtn}
+                  onClick={() => setGpsDireccion("entrada")}
+                >
+                  🟢 Entrada
+                </button>
+                <button
+                  style={gpsDireccion === "salida" ? { ...s.dirBtnActive, background: "#451a03", borderColor: "#d97706", color: "#fbbf24" } : s.dirBtn}
+                  onClick={() => setGpsDireccion("salida")}
+                >
+                  🟡 Salida
+                </button>
+              </div>
+            </div>
+
+            {/* Panel de ubicación */}
+            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "24px" }}>
+              <label style={{ ...s.label, display: "block", marginBottom: 16 }}>Ubicación</label>
+
+              {gpsEstado === "idle" && (
+                <button
+                  style={{ ...s.btnBuscar, width: "100%", padding: "14px", fontSize: 15 }}
+                  onClick={() => {
+                    setGpsEstado("obteniendo");
+                    setGpsError("");
+                    setGpsCoordenadas(null);
+                    navigator.geolocation.getCurrentPosition(
+                      pos => {
+                        setGpsCoordenadas({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy });
+                        setGpsEstado("ok");
+                      },
+                      err => {
+                        setGpsError(err.message || "No se pudo obtener la ubicación");
+                        setGpsEstado("error");
+                      },
+                      { enableHighAccuracy: true, timeout: 15000 }
+                    );
+                  }}
+                >
+                  📍 Obtener mi ubicación
+                </button>
+              )}
+
+              {gpsEstado === "obteniendo" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 12, color: "#94a3b8" }}>
+                  <div style={s.spinner} />
+                  <span>Obteniendo ubicación GPS...</span>
+                </div>
+              )}
+
+              {gpsEstado === "error" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={s.modalError}>{gpsError}</div>
+                  <button style={s.btnBuscar} onClick={() => setGpsEstado("idle")}>Reintentar</button>
+                </div>
+              )}
+
+              {(gpsEstado === "ok" || gpsEstado === "enviando" || gpsEstado === "enviado") && gpsCoordenadas && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ background: "#0f172a", borderRadius: 8, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ fontSize: 13, color: "#94a3b8" }}>
+                      <span style={{ color: "#64748b" }}>Latitud: </span>
+                      <span style={{ color: "#f1f5f9", fontFamily: "monospace" }}>{gpsCoordenadas.lat.toFixed(6)}</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: "#94a3b8" }}>
+                      <span style={{ color: "#64748b" }}>Longitud: </span>
+                      <span style={{ color: "#f1f5f9", fontFamily: "monospace" }}>{gpsCoordenadas.lng.toFixed(6)}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#475569" }}>
+                      Precisión: ±{Math.round(gpsCoordenadas.accuracy)} metros
+                    </div>
+                  </div>
+                  <a
+                    href={`https://maps.google.com/?q=${gpsCoordenadas.lat},${gpsCoordenadas.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 12, color: "#818cf8", textDecoration: "none" }}
+                  >
+                    Ver en Google Maps ↗
+                  </a>
+                  <button style={{ ...s.btnBuscar, background: "transparent", border: "1px solid #334155", color: "#64748b" }}
+                    onClick={() => setGpsEstado("idle")}>
+                    🔄 Actualizar ubicación
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Botón fichar */}
+            {(gpsEstado === "ok" || gpsEstado === "enviando") && (
+              <button
+                disabled={gpsEstado === "enviando" || (!esOperario && !gpsUserId)}
+                style={{
+                  background: gpsDireccion === "entrada" ? "#14532d" : "#451a03",
+                  border: `1px solid ${gpsDireccion === "entrada" ? "#16a34a" : "#d97706"}`,
+                  borderRadius: 12, padding: "18px",
+                  color: gpsDireccion === "entrada" ? "#4ade80" : "#fbbf24",
+                  fontSize: 16, fontWeight: 700, cursor: gpsEstado === "enviando" ? "not-allowed" : "pointer",
+                  opacity: gpsEstado === "enviando" ? 0.7 : 1,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                }}
+                onClick={async () => {
+                  const uid = esOperario ? (usuario?.empleado_id || usuario?.id) : Number(gpsUserId);
+                  if (!esOperario && !uid) { setGpsMsg("⚠️ Seleccioná un empleado"); return; }
+
+                  // ── Verificar zona permitida (200m de radio) ──────────────
+                  const EMPRESA_LAT = -38.746619;
+                  const EMPRESA_LNG = -62.284310;
+                  const RADIO_M = 200;
+                  const toRad = deg => deg * Math.PI / 180;
+                  const R = 6371000;
+                  const dLat = toRad(gpsCoordenadas.lat - EMPRESA_LAT);
+                  const dLng = toRad(gpsCoordenadas.lng - EMPRESA_LNG);
+                  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(EMPRESA_LAT)) * Math.cos(toRad(gpsCoordenadas.lat)) * Math.sin(dLng/2)**2;
+                  const distancia = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                  if (distancia > RADIO_M) {
+                    setGpsMsg(`⛔ Fuera de zona — estás a ${Math.round(distancia)} m del lugar de trabajo (máximo ${RADIO_M} m)`);
+                    return;
+                  }
+
+                  setGpsEstado("enviando");
+                  setGpsMsg("");
+                  const now = new Date();
+                  const pad2 = n => String(n).padStart(2, "0");
+                  const tsMySQL = `${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+                  try {
+                    const res = await fetch(`${API}/fichadas/gps`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({
+                        user_id: uid,
+                        direccion: gpsDireccion,
+                        timestamp: tsMySQL,
+                        gps_lat: gpsCoordenadas.lat,
+                        gps_lng: gpsCoordenadas.lng,
+                        gps_accuracy: gpsCoordenadas.accuracy,
+                      }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || "Error al registrar");
+                    setGpsEstado("enviado");
+                    setGpsMsg(`✅ ${gpsDireccion === "entrada" ? "Entrada" : "Salida"} registrada a las ${pad2(now.getHours())}:${pad2(now.getMinutes())}`);
+                  } catch (e) {
+                    setGpsMsg("⚠️ " + e.message);
+                    setGpsEstado("ok");
+                  }
+                }}
+              >
+                {gpsEstado === "enviando"
+                  ? <><div style={{ ...s.spinner, width: 18, height: 18, borderTopColor: "currentColor" }} /> Registrando...</>
+                  : <>{gpsDireccion === "entrada" ? "🟢 Registrar Entrada" : "🟡 Registrar Salida"}</>
+                }
+              </button>
+            )}
+
+            {/* Mensaje de resultado */}
+            {gpsMsg && (
+              <div style={{
+                background: gpsMsg.startsWith("✅") ? "#052e16" : "#450a0a",
+                border: `1px solid ${gpsMsg.startsWith("✅") ? "#16a34a44" : "#dc262644"}`,
+                borderRadius: 10, padding: "14px 18px",
+                color: gpsMsg.startsWith("✅") ? "#4ade80" : "#fca5a5",
+                fontSize: 14, fontWeight: 500, textAlign: "center",
+              }}>
+                {gpsMsg}
+              </div>
+            )}
+
+            {/* Botón nueva fichada */}
+            {gpsEstado === "enviado" && (
+              <button
+                style={{ ...s.btnVolver, padding: "12px", textAlign: "center", borderRadius: 10 }}
+                onClick={() => { setGpsEstado("idle"); setGpsMsg(""); setGpsCoordenadas(null); }}
+              >
+                Registrar otra fichada
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* CSS keyframes globales */}
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         tr:hover td { background: rgba(99,102,241,0.04); }
+        @media (min-width: 640px) {
+          .anviz-page { padding: 28px 32px !important; }
+        }
       `}</style>
     </div>
   );
@@ -982,7 +1877,7 @@ const s = {
   page: {
     minHeight: "100vh",
     background: "#0f172a",
-    padding: "28px 32px",
+    padding: "16px",
     fontFamily: "'DM Sans','Helvetica Neue',sans-serif",
     color: "#f1f5f9",
   },
@@ -1120,9 +2015,9 @@ const s = {
   },
   inicioCard: {
     background: "#1e293b", border: "1px solid #334155", borderRadius: 16,
-    padding: "48px 56px", cursor: "pointer", display: "flex",
-    flexDirection: "column", alignItems: "center", gap: 12,
-    transition: "all 0.15s", minWidth: 220,
+    padding: "28px 16px", cursor: "pointer", display: "flex",
+    flexDirection: "column", alignItems: "center", gap: 10,
+    transition: "all 0.15s",
   },
   inicioIcon:  { fontSize: 48 },
   inicioLabel: { fontSize: 20, fontWeight: 700, color: "#f1f5f9" },
@@ -1150,6 +2045,17 @@ const s = {
   btnNavActive: {
     background: "#312e81", border: "1px solid #6366f1", borderRadius: 8,
     padding: "8px 16px", cursor: "pointer", color: "#a5b4fc", fontSize: 13, fontWeight: 600,
+  },
+  btnVac: {
+    padding: "8px 14px",
+    borderRadius: 8,
+    border: "none",
+    background: "var(--color-accent-secondary, #0ea5e9)",
+    color: "#fff",
+    fontWeight: 600,
+    cursor: "pointer",
+    fontSize: 13,
+    whiteSpace: "nowrap",
   },
   btnNueva: {
     background: "#4f46e5", border: "1px solid #6366f1", borderRadius: 8,
