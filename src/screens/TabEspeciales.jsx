@@ -230,63 +230,45 @@ function EspecialesMedidasForm({
                 borderColor: medidas.materialPlaca ? "#7aaac8" : "#b8cfe0",
               }}
             />
-            {materialFocus && (materialesColorDB.length > 0 || materialesBlancooDB.length > 0) && (() => {
-              const colorFilt = materialesColorDB.filter(
-                (m) =>
-                  (m.articulo ?? m.ARTICULO ?? "").toLowerCase().includes(materialSearch.toLowerCase()) ||
-                  (m.nombreart ?? m.NOMBREART ?? "").toLowerCase().includes(materialSearch.toLowerCase()),
-              );
-              const blancoFilt = materialesBlancooDB.filter(
-                (m) =>
-                  (m.articulo ?? m.ARTICULO ?? "").toLowerCase().includes(materialSearch.toLowerCase()) ||
-                  (m.nombreart ?? m.NOMBREART ?? "").toLowerCase().includes(materialSearch.toLowerCase()),
-              );
-              if (colorFilt.length === 0 && blancoFilt.length === 0) return null;
-              const renderItem = (m, i) => {
-                const nombre = m.nombreart ?? m.NOMBREART ?? m.articulo ?? m.ARTICULO ?? "";
-                const codigo = m.articulo ?? m.ARTICULO ?? "";
-                return (
-                  <div
-                    key={i}
-                    style={dropItemStyle}
-                    onMouseDown={() => {
-                      const val = nombre || codigo;
-                      setMaterialSearch(val);
-                      setMedidas((md) => ({ ...md, materialPlaca: val }));
-                    }}
-                    onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
-                    onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
-                  >
-                    <span style={{ fontWeight: 700 }}>{nombre}</span>
-                    {codigo && nombre !== codigo && (
-                      <span style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}>
-                        {codigo}
-                      </span>
-                    )}
-                  </div>
-                );
-              };
-              return (
-                <div style={dropdownStyle}>
-                  {colorFilt.length > 0 && (
-                    <>
-                      <div style={{ padding: "5px 12px 3px", fontSize: 10, fontWeight: 700, color: "#4a90c8", letterSpacing: "0.08em", textTransform: "uppercase", borderBottom: "1px solid #e8f0f7" }}>
-                        🎨 Material Color
-                      </div>
-                      {colorFilt.slice(0, 8).map(renderItem)}
-                    </>
-                  )}
-                  {blancoFilt.length > 0 && (
-                    <>
-                      <div style={{ padding: "5px 12px 3px", fontSize: 10, fontWeight: 700, color: "#6699bb", letterSpacing: "0.08em", textTransform: "uppercase", borderBottom: "1px solid #e8f0f7", borderTop: colorFilt.length > 0 ? "2px solid #dde6ef" : "none" }}>
-                        ⬜ Material Blanco
-                      </div>
-                      {blancoFilt.slice(0, 8).map(renderItem)}
-                    </>
-                  )}
-                </div>
-              );
-            })()}
+            {materialFocus && materialesFiltrados.length > 0 && (
+              <div style={dropdownStyle}>
+                {materialesFiltrados.map((m, i) => {
+                  const nombre =
+                    m.nombreart ?? m.NOMBREART ?? m.articulo ?? m.ARTICULO ?? "";
+                  const codigo = m.articulo ?? m.ARTICULO ?? "";
+                  return (
+                    <div
+                      key={i}
+                      style={dropItemStyle}
+                      onMouseDown={() => {
+                        const val = nombre || codigo;
+                        setMaterialSearch(val);
+                        setMedidas((md) => ({ ...md, materialPlaca: val }));
+                      }}
+                      onMouseOver={(e) =>
+                        (e.currentTarget.style.background = "#ddeefa")
+                      }
+                      onMouseOut={(e) =>
+                        (e.currentTarget.style.background = "#fff")
+                      }
+                    >
+                      <span style={{ fontWeight: 700 }}>{nombre}</span>
+                      {codigo && nombre !== codigo && (
+                        <span
+                          style={{
+                            color: "#8aabcc",
+                            marginLeft: 8,
+                            fontSize: 10,
+                          }}
+                        >
+                          {codigo}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {materialFocus &&
               materialesFiltrados.length === 0 &&
               materialSearch.length > 0 && (
@@ -537,8 +519,7 @@ export default function TabEspeciales({
   // Búsqueda material placa
   const [materialSearch, setMaterialSearch] = useState("");
   const [materialFocus, setMaterialFocus] = useState(false);
-  const [materialesColorDB, setMaterialesColorDB] = useState([]);   // area = 3
-  const [materialesBlancooDB, setMaterialesBlancooDB] = useState([]); // area = 2
+  const [materialesDB, setMaterialesDB] = useState([]);
 
   // Búsqueda guías
   const [guiasSearch, setGuiasSearch] = useState("");
@@ -547,22 +528,17 @@ export default function TabEspeciales({
 
   // Cargar materiales/guías al montar
   useEffect(() => {
-    authFetch(`${API}/productos/placas-muebles-esp-color`)
+    authFetch(`${API}/articulos/por-familia?familia=placas`)
       .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data)) setMaterialesColorDB(data); })
+      .then((data) => { if (Array.isArray(data)) setMaterialesDB(data); })
       .catch(() => {});
-    authFetch(`${API}/productos/placas-muebles-esp`)
-      .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data)) setMaterialesBlancooDB(data); })
-      .catch(() => {});
-    authFetch(`${API}/productos/guias-muebles-esp`)
+    authFetch(`${API}/articulos/por-familia?familia=guias`)
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setGuiasDB(data); })
       .catch(() => {});
   }, []);
 
-  // Filtro unificado: primero color (area=3), luego blanco (area=2)
-  const materialesFiltrados = [...materialesColorDB, ...materialesBlancooDB]
+  const materialesFiltrados = materialesDB
     .filter(
       (m) =>
         (m.articulo ?? m.ARTICULO ?? "").toLowerCase().includes(materialSearch.toLowerCase()) ||
@@ -708,6 +684,7 @@ export default function TabEspeciales({
     return (
       <ArmarVanitory
         modelo={vanitoryModelo}
+        token={token}
         onVolver={() => {
           setVanitoryVista("tipos");
           setVanitoryModelo(null);
@@ -719,7 +696,10 @@ export default function TabEspeciales({
   // ── VANITORY: BREAKDOWN ──────────────────────────────────
   if (vista === "vanitory" && vanitoryVista === "breakdown") {
     return (
-      <BreakdownFormulasVanitory onVolver={() => setVanitoryVista("tipos")} />
+      <BreakdownFormulasVanitory
+        token={token}
+        onVolver={() => setVanitoryVista("tipos")}
+      />
     );
   }
 
@@ -760,6 +740,7 @@ export default function TabEspeciales({
         cliente={cliente}
         codcliente={codcliente}
         revision={revision}
+        token={token}
         onGuardado={(data) => {
           if (!data) return;
           const vtablaId = data.vtabla ?? data.id ?? null;
@@ -791,7 +772,12 @@ export default function TabEspeciales({
 
   // ── WALL PANEL ───────────────────────────────────────────
   if (vista === "wallpanel") {
-    return <PresupuestoWallPanel onVolver={() => setVista("selector")} />;
+    return (
+      <PresupuestoWallPanel
+        token={token}
+        onVolver={() => setVista("selector")}
+      />
+    );
   }
 
   // ── ESCRITORIO: MEDIDAS ──────────────────────────────────
@@ -927,6 +913,7 @@ export default function TabEspeciales({
     return (
       <PresupuestoDespensero
         modelo={despenseroModelo}
+        token={token}
         onVolver={() => {
           setDespenseroVista("tipos");
           setDespenseroModelo(null);
