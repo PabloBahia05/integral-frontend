@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 
 export default function PresupuestoVanitory({
   modelo: modeloRaw,
@@ -10,7 +10,18 @@ export default function PresupuestoVanitory({
   codcliente,
   revision,
   onGuardado,
+  token,
 }) {
+  const authFetch = (url, options = {}) =>
+    fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
   const modelo = modeloRaw
     ? {
         ...modeloRaw,
@@ -82,7 +93,7 @@ export default function PresupuestoVanitory({
   const [bisagras, setBisagras] = useState([]);
   // Próximo número de presupuesto
   useEffect(() => {
-    fetch(`${API}/presupuestos-vanitory/proximo-numero`)
+    authFetch(`${API}/presupuestos-vanitory/proximo-numero`)
       .then((r) => r.json())
       .then((d) => {
         const n = d?.proximo ?? null;
@@ -239,7 +250,7 @@ export default function PresupuestoVanitory({
       )
         .then((r) => r.json())
         .catch(() => null),
-      fetch(`${API}/formulas`)
+      authFetch(`${API}/formulas`)
         .then((r) => r.json())
         .catch(() => []),
     ])
@@ -499,16 +510,16 @@ export default function PresupuestoVanitory({
 
     Promise.all([
       // Placas: articulo LIKE %PLACA% AND proveedor != DANIEL ROQUE SRL
-      fetch(`${API}/productos/placas-vanitory`)
+      authFetch(`${API}/productos/placas-vanitory`)
         .then((r) => r.json())
         .then((data) => (Array.isArray(data) ? data : []).map(normalizar))
         .catch(() => []),
       // Guías: articulo LIKE %GUIAS TELESCOPICAS%
-      fetch(`${API}/productos/bisagras-vanitory`)
+      authFetch(`${API}/productos/bisagras-vanitory`)
         .then((r) => r.json())
         .then((d) => (Array.isArray(d) ? d : []))
         .catch(() => []),
-      fetch(`${API}/productos/guias-vanitory`)
+      authFetch(`${API}/productos/guias-vanitory`)
         .then((r) => r.json())
         .then((data) => (Array.isArray(data) ? data : []).map(normalizar))
         .catch(() => []),
@@ -573,7 +584,7 @@ export default function PresupuestoVanitory({
     };
 
     try {
-      const res = await fetch(`${API}/formulas/calcular`, {
+      const res = await authFetch(`${API}/formulas/calcular`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ codart_modelo: modelo.codart, variables }),
@@ -659,7 +670,7 @@ export default function PresupuestoVanitory({
     };
 
     try {
-      const res = await fetch(`${API}/presupuestos-vanitory`, {
+      const res = await authFetch(`${API}/presupuestos-vanitory`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -675,7 +686,7 @@ export default function PresupuestoVanitory({
         (vtablaId != null ? `V${String(vtablaId).padStart(5, "0")}` : null);
       if (onGuardado)
         onGuardado({ ...payload, id: vtablaId, vtabla: vtablaId, presv });
-      fetch(`${API}/presupuestos-vanitory/proximo-numero`)
+      authFetch(`${API}/presupuestos-vanitory/proximo-numero`)
         .then((r) => r.json())
         .then((d) => {
           const n = d?.proximo ?? null;
