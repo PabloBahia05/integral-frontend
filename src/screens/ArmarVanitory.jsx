@@ -1,10 +1,20 @@
 import { useState, useEffect } from "react";
 
-const API = "http://https://integral-backend-production.up.railway.app";
+const API = "https://integral-backend-production.up.railway.app";
 
 const CAJON_EMPTY = { cantidad: "", ancho: "", alto: "", prof: "" };
 
-export default function ArmarVanitory({ modelo: modeloRaw, onVolver }) {
+export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
+  const authFetch = (url, options = {}) =>
+    fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
   const modelo = modeloRaw
     ? { ...modeloRaw, codart: modeloRaw.codart ?? modeloRaw.codtipvan ?? null }
     : null;
@@ -45,14 +55,14 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver }) {
 
   // Próximo número — se carga al montar y muestra el siguiente disponible
   useEffect(() => {
-    fetch(`${API}/presupuestos-vanitory/proximo-numero`)
+    authFetch(`${API}/presupuestos-vanitory/proximo-numero`)
       .then((r) => r.json())
       .then((d) => {
         const n = d?.proximo ?? d?.siguiente ?? d?.next ?? null;
         if (n != null) setPresupuestoId(String(n).padStart(4, "0"));
         else {
           // Fallback: traer todos y tomar el máximo
-          fetch(`${API}/presupuestos-vanitory`)
+          authFetch(`${API}/presupuestos-vanitory`)
             .then((r) => r.json())
             .then((rows) => {
               const max =
@@ -87,7 +97,7 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver }) {
   // Margen desde BD
   useEffect(() => {
     if (!modelo?.codart) return;
-    fetch(`${API}/margenes?codart=${encodeURIComponent(modelo.codart)}`)
+    authFetch(`${API}/margenes?codart=${encodeURIComponent(modelo.codart)}`)
       .then((r) => r.json())
       .then((d) => {
         const row = Array.isArray(d) ? d[0] : d;
@@ -147,7 +157,7 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver }) {
     const { ancho, alto, profundo, cantidad, colocacion, materialPrecio } =
       form;
     try {
-      const res = await fetch(`${API}/formulas/calcular`, {
+      const res = await authFetch(`${API}/formulas/calcular`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -276,7 +286,7 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver }) {
       INT: form.intermedios !== "" ? Number(form.intermedios) : null,
     };
     try {
-      const res = await fetch(`${API}/presupuestos-vanitory`, {
+      const res = await authFetch(`${API}/presupuestos-vanitory`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -284,7 +294,7 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error al guardar");
       setGuardadoOk(true);
-      fetch(`${API}/presupuestos-vanitory/proximo-numero`)
+      authFetch(`${API}/presupuestos-vanitory/proximo-numero`)
         .then((r) => r.json())
         .then((d) => {
           const n = d?.proximo ?? null;
