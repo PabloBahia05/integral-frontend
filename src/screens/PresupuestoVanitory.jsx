@@ -232,6 +232,9 @@ export default function PresupuestoVanitory({
       "mano_obra",
       "manoobra",
       "vidrio",
+      "techo",
+      "lateral",
+      "bisagra",
     ]);
 
     // Extrae todos los codart que aparecen como precio_XXXX en una expresión
