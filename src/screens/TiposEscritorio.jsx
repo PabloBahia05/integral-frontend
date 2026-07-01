@@ -91,7 +91,7 @@ export default function TiposEscritorio({
   const artTimer = useRef(null);
 
   const cargarRubros = () => {
-    fetch(`${API}/articulos/rubros`)
+    authFetch(`${API}/articulos/rubros`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setRubros(data);
@@ -112,7 +112,7 @@ export default function TiposEscritorio({
     }
     artTimer.current = setTimeout(() => {
       setArtBuscando(true);
-      fetch(
+      authFetch(
         `${API}/escritorio-tipos/buscar-articulo?q=${encodeURIComponent(q)}`,
       )
         .then((r) => r.json())

@@ -76,7 +76,13 @@ export default function TiposDespensero({
   onArmar,
   onVolver,
   modoSelector = false,
+  token,
 }) {
+  const authFetch = (url, options = {}) => {
+    const headers = { ...(options.headers || {}) };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(url, { ...options, headers });
+  };
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -94,7 +100,7 @@ export default function TiposDespensero({
   const artTimer = useRef(null);
 
   const cargarRubros = () => {
-    fetch(`${API}/articulos/rubros`)
+    authFetch(`${API}/articulos/rubros`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setRubros(data);
@@ -116,7 +122,7 @@ export default function TiposDespensero({
     }
     artTimer.current = setTimeout(() => {
       setArtBuscando(true);
-      fetch(
+      authFetch(
         `${API}/despensero-tipos/buscar-articulo?q=${encodeURIComponent(q)}`,
       )
         .then((r) => r.json())

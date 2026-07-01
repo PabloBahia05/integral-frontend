@@ -36,7 +36,12 @@ const DISPLAY_COLUMNS = [
   { key: "porcentajeDisplay", label: "Porcentaje %" },
 ];
 
-export default function Colocacion() {
+export default function Colocacion({ token }) {
+  const authFetch = (url, options = {}) => {
+    const headers = { ...(options.headers || {}) };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(url, { ...options, headers });
+  };
   const [selected, setSelected] = useState(null);
   const [modal, setModal] = useState(null);
   const onSelect = (row) => setSelected(row?.id === selected?.id ? null : row);
@@ -57,7 +62,7 @@ export default function Colocacion() {
 
   /* ── cargar colocaciones al montar ── */
   useEffect(() => {
-    fetch(`${API}/colocacion`)
+    authFetch(`${API}/colocacion`)
       .then((r) => r.json())
       .then((d) => setColocaciones(Array.isArray(d) ? d : []))
       .catch(() => setColocaciones([]));
@@ -66,7 +71,7 @@ export default function Colocacion() {
   /* ── cargar rubros al montar ── */
   useEffect(() => {
     setLoadingRubros(true);
-    fetch(`${API}/articulos/rubros`)
+    authFetch(`${API}/articulos/rubros`)
       .then((r) => r.json())
       .then((d) => setRubros(Array.isArray(d) ? d : []))
       .catch(() => setRubros([]))
@@ -80,7 +85,7 @@ export default function Colocacion() {
       return;
     }
     setLoadingArticulos(true);
-    fetch(`${API}/articulos/por-rubro?rubro=${encodeURIComponent(form.rubro)}`)
+    authFetch(`${API}/articulos/por-rubro?rubro=${encodeURIComponent(form.rubro)}`)
       .then((r) => r.json())
       .then((d) => {
         const arts = Array.isArray(d) ? d : [];
@@ -195,7 +200,7 @@ export default function Colocacion() {
     try {
       if (modal === "nuevo") {
         /* ── POST ── */
-        const res = await fetch(`${API}/colocacion`, {
+        const res = await authFetch(`${API}/colocacion`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -205,7 +210,7 @@ export default function Colocacion() {
         setColocaciones((prev) => [...prev, nueva]);
       } else {
         /* ── PUT ── */
-        const res = await fetch(`${API}/colocacion/${form.id}`, {
+        const res = await authFetch(`${API}/colocacion/${form.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -229,7 +234,7 @@ export default function Colocacion() {
   /* ── eliminar: DELETE directo al servidor ── */
   const handleDelete = async () => {
     try {
-      const res = await fetch(`${API}/colocacion/${selected?.id}`, {
+      const res = await authFetch(`${API}/colocacion/${selected?.id}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Error al eliminar");

@@ -77,7 +77,13 @@ export default function TiposVanitory({
   onPrueba,
   onVolver,
   modoSelector = false,
+  token,
 }) {
+  const authFetch = (url, options = {}) => {
+    const headers = { ...(options.headers || {}) };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(url, { ...options, headers });
+  };
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -95,7 +101,7 @@ export default function TiposVanitory({
   const artTimer = useRef(null);
 
   const cargarRubros = () => {
-    fetch(`${API}/articulos/rubros`)
+    authFetch(`${API}/articulos/rubros`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setRubros(data);
@@ -116,7 +122,7 @@ export default function TiposVanitory({
     }
     artTimer.current = setTimeout(() => {
       setArtBuscando(true);
-      fetch(`${API}/vanitory-tipos/buscar-articulo?q=${encodeURIComponent(q)}`)
+      authFetch(`${API}/vanitory-tipos/buscar-articulo?q=${encodeURIComponent(q)}`)
         .then((r) => r.json())
         .then((data) => setArtResultados(Array.isArray(data) ? data : []))
         .catch(() => setArtResultados([]))
