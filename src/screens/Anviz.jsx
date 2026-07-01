@@ -158,7 +158,7 @@ export default function Anviz({ onBack }) {
   const [vacData, setVacData]             = useState([]);
   const [vacCargando, setVacCargando]     = useState(false);
   const [vacEditando, setVacEditando]     = useState(null); // id del empleado editando
-  const [vacForm, setVacForm]             = useState({ vacaciones: "", horas_acumuladas: "" });
+  const [vacForm, setVacForm]             = useState({ vacaciones: "", horas_acumuladas: "", vacaciones_ajuste: "" });
   // ── Modal de vacaciones tomadas (alta/baja de períodos) ──
   const [vacModalEmpleado, setVacModalEmpleado] = useState(null); // {id, nombre, apellido} o null
   const [vacTomadasList, setVacTomadasList]     = useState([]);
@@ -494,7 +494,11 @@ export default function Anviz({ onBack }) {
     try {
       await authFetch(`${API}/empleados/${id}/vacaciones-horas`, {
         method: "PUT",
-        body: JSON.stringify({ vacaciones: Number(vacForm.vacaciones), horas_acumuladas: Number(vacForm.horas_acumuladas) }),
+        body: JSON.stringify({
+          vacaciones: Number(vacForm.vacaciones),
+          horas_acumuladas: Number(vacForm.horas_acumuladas),
+          vacaciones_ajuste: Number(vacForm.vacaciones_ajuste),
+        }),
       });
       setVacEditando(null);
       // Recargar desde el backend en vez de actualizar a mano el estado local:
@@ -769,6 +773,23 @@ export default function Anviz({ onBack }) {
                           >
                             {(e.vacaciones_tomadas ?? 0)} sem. 📋
                           </button>
+                          {(e.vacaciones_ajuste ?? 0) !== 0 && (
+                            <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 2 }}>
+                              ({e.vacaciones_tomadas_auto ?? 0} auto {e.vacaciones_ajuste >= 0 ? "+" : ""}{e.vacaciones_ajuste} ajuste)
+                            </div>
+                          )}
+                          {vacEditando === e.id && (
+                            <div style={{ marginTop: 4 }}>
+                              <label style={{ fontSize: 10, color: "var(--color-text-secondary)", display: "block" }}>Ajuste manual (sem.)</label>
+                              <input
+                                type="number"
+                                value={vacForm.vacaciones_ajuste}
+                                onChange={(ev) => setVacForm(f => ({ ...f, vacaciones_ajuste: ev.target.value }))}
+                                style={{ ...s.input, width: 80 }}
+                                title="Se suma (o resta si es negativo) a las semanas tomadas calculadas automáticamente desde los períodos cargados"
+                              />
+                            </div>
+                          )}
                         </td>
                         <td style={{ ...s.td, color: (e.vacaciones_pendientes ?? 0) > 0 ? "var(--color-text-success)" : "var(--color-text-secondary)", fontWeight: 500 }}>
                           {e.vacaciones_pendientes ?? 0} sem.
@@ -843,7 +864,11 @@ export default function Anviz({ onBack }) {
                             ) : (
                               <button style={s.btnRowEdit} onClick={() => {
                                 setVacEditando(e.id);
-                                setVacForm({ vacaciones: e.vacaciones_correspondientes ?? e.vacaciones ?? 0, horas_acumuladas: e.horas_acumuladas ?? 0 });
+                                setVacForm({
+                                  vacaciones: e.vacaciones_correspondientes ?? e.vacaciones ?? 0,
+                                  horas_acumuladas: e.horas_acumuladas ?? 0,
+                                  vacaciones_ajuste: e.vacaciones_ajuste ?? 0,
+                                });
                               }}>✏️</button>
                             )}
                           </td>
