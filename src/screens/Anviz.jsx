@@ -162,7 +162,7 @@ export default function Anviz({ onBack }) {
   // ── Modal de vacaciones tomadas (alta/baja de períodos) ──
   const [vacModalEmpleado, setVacModalEmpleado] = useState(null); // {id, nombre, apellido} o null
   const [vacTomadasList, setVacTomadasList]     = useState([]);
-  const [vacTomadasForm, setVacTomadasForm]     = useState({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+  const [vacTomadasForm, setVacTomadasForm]     = useState({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "", computa_credito: true });
   const [vacTomadasCargando, setVacTomadasCargando] = useState(false);
   // ── Modal de justificaciones (ART / Certificado) ──
   const [justifModalEmpleado, setJustifModalEmpleado] = useState(null);
@@ -510,7 +510,7 @@ export default function Anviz({ onBack }) {
   // ── Detalle de vacaciones tomadas (períodos concretos) ──
   async function abrirModalVacaciones(empleado) {
     setVacModalEmpleado(empleado);
-    setVacTomadasForm({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+    setVacTomadasForm({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "", computa_credito: true });
     setVacTomadasCargando(true);
     try {
       const lista = await apiFetch(`/vacaciones-tomadas?empleado_id=${empleado.id}`, token);
@@ -557,10 +557,11 @@ export default function Anviz({ onBack }) {
           fecha_hasta: vacTomadasForm.fecha_hasta,
           dias: Number(vacTomadasForm.dias),
           nota: vacTomadasForm.nota || null,
+          computa_credito: vacTomadasForm.computa_credito,
         }),
       }).then(r => r.json());
       setVacTomadasList(l => [nuevo, ...l]);
-      setVacTomadasForm({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
+      setVacTomadasForm({ fecha_desde: "", fecha_hasta: "", dias: "", nota: "", computa_credito: true });
       // Refrescar la tabla principal para actualizar tomadas/pendientes
       abrirVacaciones();
     } catch (e) {
@@ -871,6 +872,23 @@ export default function Anviz({ onBack }) {
                         style={{ ...s.input, width: 70 }}
                       />
                     </div>
+                    <div>
+                      <label
+                        style={{
+                          fontSize: 11, color: "var(--color-text-secondary)",
+                          display: "flex", alignItems: "center", gap: 4, cursor: "pointer",
+                          height: 32,
+                        }}
+                        title="Si está marcado, esta semana de vacaciones acredita 44hs al saldo histórico total"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={vacTomadasForm.computa_credito}
+                          onChange={(ev) => setVacTomadasForm(f => ({ ...f, computa_credito: ev.target.checked }))}
+                        />
+                        Computa crédito de hs.
+                      </label>
+                    </div>
                     <button style={s.btnNueva} onClick={agregarVacacionTomada}>＋ Agregar</button>
                   </div>
                 )}
@@ -895,6 +913,17 @@ export default function Anviz({ onBack }) {
                           {fmtFecha(v.fecha_desde)} → {fmtFecha(v.fecha_hasta)}
                           <strong style={{ marginLeft: 8 }}>{v.dias} días</strong>
                           {v.nota && <span style={{ color: "var(--color-text-secondary)", marginLeft: 8 }}>({v.nota})</span>}
+                          <span
+                            style={{
+                              marginLeft: 8, fontSize: 11, padding: "2px 6px", borderRadius: 4,
+                              fontWeight: 500,
+                              color: (v.computa_credito ?? 1) ? "var(--color-text-success)" : "var(--color-text-secondary)",
+                              background: (v.computa_credito ?? 1) ? "rgba(34,197,94,0.12)" : "rgba(148,163,184,0.15)",
+                            }}
+                            title={(v.computa_credito ?? 1) ? "Acredita 44hs al saldo histórico" : "No acredita horas al saldo histórico"}
+                          >
+                            {(v.computa_credito ?? 1) ? "✓ crédito hs." : "✕ sin crédito"}
+                          </span>
                         </span>
                         {!esOperario && (
                           <button style={s.btnRowDel} onClick={() => eliminarVacacionTomada(v.id)}>🗑</button>
