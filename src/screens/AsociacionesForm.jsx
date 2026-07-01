@@ -338,7 +338,13 @@ export default function AsociacionesForm({
   onDelete,
   onOpenModal,
   onCloseModal,
+  token,
 }) {
+  const authFetch = (url, options = {}) => {
+    const headers = { ...(options.headers || {}) };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(url, { ...options, headers });
+  };
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(EMPTY());
   const [editId, setEditId] = useState(null);
@@ -399,15 +405,15 @@ export default function AsociacionesForm({
   // const formulaRef = useRef(null);
 
   useEffect(() => {
-    fetch(`${API}/articulos/rubros`)
+    authFetch(`${API}/articulos/rubros`)
       .then((r) => r.json())
       .then(setRubros)
       .catch(() => {});
-    fetch(`${API}/articulos/familias-todas`)
+    authFetch(`${API}/articulos/familias-todas`)
       .then((r) => r.json())
       .then(setFamilias)
       .catch(() => {});
-    fetch(`${API}/formulas`)
+    authFetch(`${API}/formulas`)
       .then((r) => r.json())
       .then(setFormulas)
       .catch(() => {});
@@ -422,7 +428,7 @@ export default function AsociacionesForm({
     if (rubroPadre) url += `rubro=${encodeURIComponent(rubroPadre)}`;
     if (familiaPadre)
       url += `${rubroPadre ? "&" : ""}familia=${encodeURIComponent(familiaPadre)}`;
-    fetch(url)
+    authFetch(url)
       .then((r) => r.json())
       .then((data) => setArtsPadre(Array.isArray(data) ? data : []))
       .catch(() => setArtsPadre([]));

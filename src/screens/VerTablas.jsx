@@ -499,6 +499,7 @@ export default function VerTablas({
           modal={modal}
           {...localCRUD(asociacionesFormCRUD ?? {})}
           onSelect={(row) => asociacionesFormCRUD?.onSelect?.(row)}
+          token={token}
         />
       </div>
     );
