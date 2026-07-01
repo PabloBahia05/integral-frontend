@@ -559,10 +559,8 @@ export default function PresupuestoVanitory({
 
   // Calcular
   const calcular = async () => {
-    if (!modelo?.codart && !modelo?.custom) {
-      setErrorCalc("Este modelo no tiene código de artículo configurado.");
-      return;
-    }
+    if (!modelo?.codart && !modelo?.custom) return;
+    if (modelo?.codart === "") return;
     if (modelo?.custom) {
       setResult({ subtotal: 0 });
       return;
