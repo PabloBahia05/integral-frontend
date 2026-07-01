@@ -582,6 +582,49 @@ export default function Anviz({ onBack }) {
     }
   }
 
+  // ── Aplicar horas adeudadas como descuento de vacaciones (con orden del gestor) ──
+  // Equivalencia fija: 44hs adeudadas = 7 días de vacaciones. No se fracciona:
+  // solo se aplican lotes completos de 44hs / 7 días.
+  async function aplicarHorasAdeudadas(empleado) {
+    const saldo = Number(empleado.saldo_horas_total ?? 0);
+    const deuda = saldo < 0 ? -saldo : 0;
+    const lotesDisponibles = Math.floor(deuda / 44);
+    if (lotesDisponibles < 1) return;
+
+    const input = window.prompt(
+      `${empleado.apellido} ${empleado.nombre} tiene ${Math.round(deuda * 100) / 100}hs adeudadas.\n` +
+      `Lotes disponibles (44hs = 7 días c/u): ${lotesDisponibles}\n\n` +
+      `¿Cuántos lotes desea aplicar?`,
+      String(lotesDisponibles)
+    );
+    if (input == null) return; // canceló
+    const lotes = parseInt(input, 10);
+    if (!Number.isInteger(lotes) || lotes < 1 || lotes > lotesDisponibles) {
+      alert(`Ingresá un número entero entre 1 y ${lotesDisponibles}.`);
+      return;
+    }
+
+    const horas = lotes * 44;
+    const dias = lotes * 7;
+    if (!confirm(
+      `Se acreditarán ${horas}hs al saldo y se descontarán ${dias} días de vacaciones ` +
+      `de ${empleado.apellido} ${empleado.nombre}, con orden del gestor.\n\n¿Confirmar?`
+    )) return;
+
+    try {
+      const resp = await authFetch(`${API}/empleados/${empleado.id}/aplicar-horas-adeudadas`, {
+        method: "POST",
+        body: JSON.stringify({ lotes }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "No se pudo aplicar el descuento");
+      abrirVacaciones();
+    } catch (e) {
+      console.error(e);
+      alert("Error al aplicar horas adeudadas: " + e.message);
+    }
+  }
+
   // ── Detalle de justificaciones (ART / Certificado) ──
   async function abrirModalJustificaciones(empleado) {
     setJustifModalEmpleado(empleado);
@@ -778,6 +821,15 @@ export default function Anviz({ onBack }) {
                               <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4, fontWeight: 400 }}>
                                 (ajuste {e.horas_acumuladas >= 0 ? "+" : ""}{e.horas_acumuladas}h)
                               </span>
+                              {!esOperario && e.saldo_horas_total <= -44 && (
+                                <button
+                                  style={{ ...s.btnRowEdit, display: "block", marginTop: 4, fontSize: 11, fontWeight: 400 }}
+                                  onClick={() => aplicarHorasAdeudadas(e)}
+                                  title="Descontar horas adeudadas de las vacaciones (44hs = 7 días, no se fracciona)"
+                                >
+                                  🔻 Aplicar hs. adeudadas
+                                </button>
+                              )}
                             </>
                           )}
                         </td>
