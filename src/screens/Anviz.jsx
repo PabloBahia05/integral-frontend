@@ -704,14 +704,17 @@ export default function Anviz({ onBack }) {
                         <td style={s.td}>{e.apellido} {e.nombre}</td>
                         <td style={s.td}>
                           {vacEditando === e.id ? (
-                            <input
-                              type="number"
-                              value={vacForm.vacaciones}
-                              onChange={(ev) => setVacForm(f => ({ ...f, vacaciones: ev.target.value }))}
-                              style={{ ...s.input, width: 80 }}
-                            />
+                            <div>
+                              <label style={{ fontSize: 10, color: "var(--color-text-secondary)", display: "block" }}>Semanas</label>
+                              <input
+                                type="number"
+                                value={vacForm.vacaciones}
+                                onChange={(ev) => setVacForm(f => ({ ...f, vacaciones: ev.target.value }))}
+                                style={{ ...s.input, width: 80 }}
+                              />
+                            </div>
                           ) : (
-                            <span>{e.vacaciones_correspondientes ?? e.vacaciones ?? 0} días</span>
+                            <span>{e.vacaciones_correspondientes ?? e.vacaciones ?? 0} sem.</span>
                           )}
                         </td>
                         <td style={s.td}>
@@ -720,11 +723,11 @@ export default function Anviz({ onBack }) {
                             onClick={() => abrirModalVacaciones(e)}
                             title="Ver / cargar períodos tomados"
                           >
-                            {(e.vacaciones_tomadas ?? 0)} días 📋
+                            {(e.vacaciones_tomadas ?? 0)} sem. 📋
                           </button>
                         </td>
                         <td style={{ ...s.td, color: (e.vacaciones_pendientes ?? 0) > 0 ? "var(--color-text-success)" : "var(--color-text-secondary)", fontWeight: 500 }}>
-                          {e.vacaciones_pendientes ?? 0} días
+                          {e.vacaciones_pendientes ?? 0} sem.
                         </td>
                         <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
                           {(e.horas_calculadas ?? 0)}h
