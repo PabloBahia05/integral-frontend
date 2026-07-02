@@ -583,6 +583,14 @@ export default function PresupuestoVanitory({
       precio_material: Number(materialPrecio) || 0,
       precio_base: modelo?.PRECIO_BASE ? parseFloat(modelo.PRECIO_BASE) : 0,
     };
+    // La fórmula del modelo puede referenciar el resultado de otra fórmula
+    // asociada (ej. FORM_FCAJVANA) — se las pasamos como variables ya evaluadas
+    // en el front (slotsFormulas), para que el backend pueda resolverlas.
+    slotsFormulas.forEach((s) => {
+      if (s.codform) {
+        variables[`FORM_${s.codform.toUpperCase()}`] = s.resultado ?? 0;
+      }
+    });
 
     try {
       const res = await authFetch(`${API}/formulas/calcular`, {
@@ -600,7 +608,9 @@ export default function PresupuestoVanitory({
     }
   };
 
-  // Auto-calcular cuando cambian inputs
+  // Auto-calcular cuando cambian inputs (incluye slotsFormulas: la fórmula del
+  // modelo puede depender del resultado de otras fórmulas asociadas, así que
+  // hay que recalcular en cuanto terminan de resolverse — no solo al montar)
   useEffect(() => {
     if (!modelo?.codart) return;
     calcular();
@@ -613,6 +623,7 @@ export default function PresupuestoVanitory({
     form.cantidad,
     form.colocacion,
     form.materialPrecio,
+    slotsFormulas,
   ]);
 
   // Totales
