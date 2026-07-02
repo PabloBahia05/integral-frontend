@@ -392,6 +392,7 @@ export default function VerTablas({
           tiposVanitory={tiposVanitory ?? []}
           selected={selectedTipoVanitory}
           modal={modal}
+          token={token}
           {...localCRUD(tiposVanitoryRUD ?? {})}
         />
       </div>
