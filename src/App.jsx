@@ -865,6 +865,7 @@ function App() {
                 tiposVanitory={tiposVanitory}
                 selected={selectedTipoVanitory}
                 modal={modal}
+                token={token}
                 {...tiposVanitoryRUD}
                 onArmar={(modelo) => {
                   setVanitoryModelo(modelo);
