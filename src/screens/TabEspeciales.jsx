@@ -663,6 +663,7 @@ export default function TabEspeciales({
         tiposVanitory={tiposVanitory}
         selected={null}
         modal={null}
+        token={token}
         {...tiposVanitoryRUD}
         modoSelector={true}
         onArmar={(modelo) => {
