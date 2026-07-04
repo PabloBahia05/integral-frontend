@@ -153,6 +153,10 @@ function App() {
   const [selectedAsociacion, setSelectedAsociacion] = useState(null);
   const [asociacionesForm, setAsociacionesForm] = useState([]);
   const [selectedAsociacionForm, setSelectedAsociacionForm] = useState(null);
+  const [formStd, setFormStd] = useState([]);
+  const [selectedFormStd, setSelectedFormStd] = useState(null);
+  const [asocFormStd, setAsocFormStd] = useState([]);
+  const [selectedAsocFormStd, setSelectedAsocFormStd] = useState(null);
   const [colocaciones, setColocaciones] = useState([]);
   const [selectedColocacion, setSelectedColocacion] = useState(null);
   const [selectedCliente, setSelectedCliente] = useState(null);
@@ -294,6 +298,18 @@ function App() {
       .then(setAsociacionesForm)
       .catch(console.error);
 
+  const fetchFormStd = () =>
+    authFetch(`${API}/form-std`)
+      .then((r) => r.json())
+      .then(setFormStd)
+      .catch(console.error);
+
+  const fetchAsocFormStd = () =>
+    authFetch(`${API}/asoc-form-std`)
+      .then((r) => r.json())
+      .then(setAsocFormStd)
+      .catch(console.error);
+
   const fetchListas = () =>
     authFetch(`${API}/lista`)
       .then((r) => r.json())
@@ -341,6 +357,8 @@ function App() {
     if (puedeVer("presupuestos-vanitory-tabla")) fetchPresupuestosVanitory();
     if (puedeVer("ver-tablas"))              fetchAsociaciones();
     if (puedeVer("ver-tablas"))              fetchAsociacionesForm();
+    if (puedeVer("ver-tablas"))              fetchFormStd();
+    if (puedeVer("ver-tablas"))              fetchAsocFormStd();
     if (puedeVer("lista-margenes"))          fetchListas();
     if (puedeVer("ver-tablas"))              fetchProveedores();
     if (puedeVer("ver-tablas"))              fetchFeriados();
@@ -566,6 +584,22 @@ function App() {
     setSelectedAsociacionForm,
     fetchAsociacionesForm,
     "Asociación de Fórmula",
+  );
+  const formStdCRUD = makeCRUD(
+    "form-std",
+    formStd,
+    setFormStd,
+    setSelectedFormStd,
+    fetchFormStd,
+    "Fórmula Estándar",
+  );
+  const asocFormStdCRUD = makeCRUD(
+    "asoc-form-std",
+    asocFormStd,
+    setAsocFormStd,
+    setSelectedAsocFormStd,
+    fetchAsocFormStd,
+    "Asociación de Fórmula Estándar",
   );
 
   // ── NUEVO: CRUD Proveedores ──────────────────────────────
@@ -1010,6 +1044,12 @@ function App() {
                 asociacionesForm={asociacionesForm}
                 asociacionesFormCRUD={asociacionesFormCRUD}
                 selectedAsociacionForm={selectedAsociacionForm}
+                formStd={formStd}
+                formStdCRUD={formStdCRUD}
+                selectedFormStd={selectedFormStd}
+                asocFormStd={asocFormStd}
+                asocFormStdCRUD={asocFormStdCRUD}
+                selectedAsocFormStd={selectedAsocFormStd}
                 listas={listas}
                 onSaveLista={handleSaveLista}
                 onDeleteLista={handleDeleteLista}
