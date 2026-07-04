@@ -112,6 +112,7 @@ const makeColumns = (onVer) => [
   { key: "cantidad", label: "Cantidad" },
   { key: "ancho", label: "Ancho" },
   { key: "alto", label: "Alto" },
+  { key: "prof", label: "Prof." },
   { key: "linea", label: "Línea" },
   { key: "color", label: "Color" },
   { key: "area", label: "Área" },
@@ -130,6 +131,7 @@ const EMPTY = {
   cantidad: "",
   ancho: "",
   alto: "",
+  prof: "",
   linea: "",
   color: "",
   familia: "",
@@ -176,6 +178,7 @@ const FIELDS_LEFT_BOTTOM = [
 const FIELDS_RIGHT = [
   { field: "ancho", label: "Ancho (cm)", placeholder: "Ej: 80" },
   { field: "alto", label: "Alto (cm)", placeholder: "Ej: 200" },
+  { field: "prof", label: "Prof. (cm)", placeholder: "Ej: 45" },
   { field: "linea", label: "Línea", placeholder: "Ej: Living" },
   { field: "color", label: "Color", placeholder: "Ej: 1" },
   { field: "area", label: "Área", placeholder: "Ej: 01" },
@@ -406,11 +409,12 @@ function DetalleArticulo({ producto }) {
           <span>Cantidad</span>
           <strong>{producto.cantidad ?? "-"}</strong>
         </div>
-        {(producto.ancho || producto.alto) && (
+        {(producto.ancho || producto.alto || producto.prof) && (
           <div className="detalle-precio-row">
             <span>Medidas</span>
             <strong>
-              {producto.ancho ?? "?"} × {producto.alto ?? "?"} cm
+              {producto.ancho ?? "?"} × {producto.alto ?? "?"} ×{" "}
+              {producto.prof ?? "?"} cm
             </strong>
           </div>
         )}
@@ -620,6 +624,7 @@ export default function Productos({
       cantidad: s(selected.cantidad),
       ancho: s(selected.ancho),
       alto: s(selected.alto),
+      prof: s(selected.prof),
       linea: s(selected.linea),
       color: s(selected.color),
       familia: s(selected.familia),
@@ -669,6 +674,7 @@ export default function Productos({
       cantidad: toInt(form.cantidad),
       ancho: toDecimal(form.ancho),
       alto: toDecimal(form.alto),
+      prof: toDecimal(form.prof),
       linea: form.linea || null,
       color: form.color || null,
       familia: form.familia || null,
