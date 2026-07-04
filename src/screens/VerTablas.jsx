@@ -12,6 +12,8 @@ import PresupuestosMamparasTabla from "./PresupuestosMamparasTabla";
 import Colocacion from "./Colocacion";
 import Asociaciones from "./Asociaciones";
 import AsociacionesForm from "./AsociacionesForm";
+import FormStd from "./FormStd";
+import AsocFormStd from "./AsocFormStd";
 import Lista from "./Lista";
 import Proveedores from "./Proveedores";
 import Feriados from "./Feriados";
@@ -266,6 +268,13 @@ const TABLAS = [
     icon: "🧮",
     color: "#e63946",
   },
+  { id: "form-std", label: "Fórmulas Estándar", icon: "🧮", color: "#8338ec" },
+  {
+    id: "asoc-form-std",
+    label: "Asoc. Fórmulas Estándar",
+    icon: "🧮",
+    color: "#8338ec",
+  },
   { id: "lista", label: "Lista Margen", icon: "📊", color: "#20b2aa" },
   { id: "feriados", label: "Feriados", icon: "📅", color: "#ffb703" },
   { id: "semanas-anio", label: "Semanas y Horas Esperadas", icon: "🗓️", color: "#3a86ff" },
@@ -312,6 +321,12 @@ export default function VerTablas({
   asociacionesForm,
   asociacionesFormCRUD,
   selectedAsociacionForm,
+  formStd,
+  formStdCRUD,
+  selectedFormStd,
+  asocFormStd,
+  asocFormStdCRUD,
+  selectedAsocFormStd,
   listas,
   onSaveLista,
   onDeleteLista,
@@ -500,6 +515,35 @@ export default function VerTablas({
           modal={modal}
           {...localCRUD(asociacionesFormCRUD ?? {})}
           onSelect={(row) => asociacionesFormCRUD?.onSelect?.(row)}
+          token={token}
+        />
+      </div>
+    );
+
+  if (tablaActiva === "form-std")
+    return (
+      <div>
+        {back}
+        <FormStd
+          formulas={formStd ?? []}
+          selected={selectedFormStd}
+          modal={modal}
+          {...localCRUD(formStdCRUD ?? {})}
+        />
+      </div>
+    );
+
+  if (tablaActiva === "asoc-form-std")
+    return (
+      <div>
+        {back}
+        <AsocFormStd
+          asocFormStd={asocFormStd ?? []}
+          productos={productos ?? []}
+          selected={selectedAsocFormStd}
+          modal={modal}
+          {...localCRUD(asocFormStdCRUD ?? {})}
+          onSelect={(row) => asocFormStdCRUD?.onSelect?.(row)}
           token={token}
         />
       </div>
