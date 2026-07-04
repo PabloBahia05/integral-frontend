@@ -529,6 +529,7 @@ export default function VerTablas({
           selected={selectedFormStd}
           modal={modal}
           {...localCRUD(formStdCRUD ?? {})}
+          token={token}
         />
       </div>
     );
