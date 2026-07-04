@@ -116,8 +116,7 @@ const makeColumns = (onVer) => [
   { key: "linea", label: "Línea" },
   { key: "color", label: "Color" },
   { key: "area", label: "Área" },
-  { key: "codfam", label: "Cód. Familia" },
-  { key: "codrub", label: "Cód. Rubro" },
+  { key: "mca", label: "MCA" },
 ];
 
 const EMPTY = {
@@ -145,8 +144,7 @@ const EMPTY = {
   flete: "",
   valorlista: "",
   margen: "",
-  codfam: "",
-  codrub: "",
+  mca: "",
   codartprov: "",
   prod_prov: "",
 };
@@ -362,14 +360,9 @@ function DetalleArticulo({ producto }) {
           Familia: <strong>{producto.familia}</strong>
         </p>
       )}
-      {producto.codfam && (
+      {producto.mca != null && producto.mca !== "" && (
         <p className="detalle-codigo">
-          Cód. Familia: <strong>{producto.codfam}</strong>
-        </p>
-      )}
-      {producto.codrub && (
-        <p className="detalle-codigo">
-          Cód. Rubro: <strong>{producto.codrub}</strong>
+          MCA: <strong>{producto.mca}</strong>
         </p>
       )}
       <div className="detalle-precios">
