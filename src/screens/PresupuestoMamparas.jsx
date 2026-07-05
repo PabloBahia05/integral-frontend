@@ -46,6 +46,8 @@ export default function PresupuestoMamparas({
     codcliente: codclienteInicial,
     cantidad: 1,
     ancho: 80,
+    ancho_fijo: 40,
+    ancho_bat: 40,
     alto: 200,
     vidrio: "esmerilado",
     colocacion: 0,
@@ -93,6 +95,11 @@ export default function PresupuestoMamparas({
       codcliente: p.CODCLIENTE ?? null,
       cantidad: Number(p.CANTIDAD ?? 1),
       ancho: Number(p.ANCHO ?? 80),
+      // No se persiste el reparto fijo/batiente por separado; al reabrir
+      // se asume todo el ancho como "fijo" y 0 como "batiente" para que
+      // la suma siga coincidiendo con el ANCHO total guardado.
+      ancho_fijo: Number(p.ANCHO ?? 80),
+      ancho_bat: 0,
       alto: Number(p.ALTO ?? 200),
       vidrio: p.VIDRIO ?? "esmerilado",
       colocacion: Number(p.COLOCACION ?? 0),
@@ -381,6 +388,12 @@ export default function PresupuestoMamparas({
             cantidad: Number(form.cantidad),
             colocacion: Number(form.colocacion),
             precio: asoc.precio,
+            ...(esFijoBatiente
+              ? {
+                  ancho_fijo: Number(form.ancho_fijo),
+                  ancho_bat: Number(form.ancho_bat),
+                }
+              : {}),
             ...Object.fromEntries(
               Object.entries(resultadosMap).map(([cf, v]) => [`FORM_${cf}`, v]),
             ),
@@ -444,6 +457,8 @@ export default function PresupuestoMamparas({
   }, [
     articuloSeleccionado?.codart,
     form.ancho,
+    form.ancho_fijo,
+    form.ancho_bat,
     form.alto,
     form.cantidad,
     form.colocacion,
@@ -479,6 +494,28 @@ export default function PresupuestoMamparas({
     Number(n)
       .toLocaleString("es-AR", { minimumFractionDigits: 0 })
       .replace(/,/g, ".");
+
+  // ── Tipo "Paño fijo y batiente" → requiere 3 medidas en vez de 2 ────────────
+  const normalizarTexto = (s) =>
+    (s ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // saca tildes
+      .trim()
+      .toUpperCase();
+  const esFijoBatiente =
+    normalizarTexto(busqueda) === normalizarTexto("PAÑO FIJO Y BATIENTE");
+
+  // Mantener form.ancho (ancho total) sincronizado con la suma de las 2 medidas
+  // cuando el tipo es "Paño fijo y batiente", para que todo lo que ya usa
+  // form.ancho (guardado, PDF, impresión, cálculo genérico) siga funcionando.
+  useEffect(() => {
+    if (!esFijoBatiente) return;
+    const suma = Number(form.ancho_fijo || 0) + Number(form.ancho_bat || 0);
+    if (suma !== Number(form.ancho)) {
+      setForm((prev) => ({ ...prev, ancho: suma }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esFijoBatiente, form.ancho_fijo, form.ancho_bat]);
 
   // ── Artículos filtrados para los selects ─────────────────────────────────────
   const articulosFiltradosPorTipo = busqueda
@@ -603,6 +640,8 @@ export default function PresupuestoMamparas({
       cliente: clienteInicial,
       cantidad: 1,
       ancho: 80,
+      ancho_fijo: 40,
+      ancho_bat: 40,
       alto: 200,
       vidrio: "esmerilado",
       colocacion: 0,
@@ -1276,30 +1315,74 @@ export default function PresupuestoMamparas({
                 </div>
 
                 {/* Ancho / Alto */}
-                <div className="row">
-                  <div className="field">
-                    <span className="label-text">ANCHO (CM)</span>
-                    <input
-                      className="input"
-                      type="number"
-                      value={form.ancho}
-                      onChange={(e) =>
-                        setForm({ ...form, ancho: Number(e.target.value) })
-                      }
-                    />
+                {esFijoBatiente ? (
+                  <div className="row">
+                    <div className="field">
+                      <span className="label-text">ANCHO PAÑO FIJO (CM)</span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={form.ancho_fijo}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            ancho_fijo: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <span className="label-text">ANCHO BATIENTE (CM)</span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={form.ancho_bat}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            ancho_bat: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <span className="label-text">ALTO (CM)</span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={form.alto}
+                        onChange={(e) =>
+                          setForm({ ...form, alto: Number(e.target.value) })
+                        }
+                      />
+                    </div>
                   </div>
-                  <div className="field">
-                    <span className="label-text">ALTO (CM)</span>
-                    <input
-                      className="input"
-                      type="number"
-                      value={form.alto}
-                      onChange={(e) =>
-                        setForm({ ...form, alto: Number(e.target.value) })
-                      }
-                    />
+                ) : (
+                  <div className="row">
+                    <div className="field">
+                      <span className="label-text">ANCHO (CM)</span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={form.ancho}
+                        onChange={(e) =>
+                          setForm({ ...form, ancho: Number(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <span className="label-text">ALTO (CM)</span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={form.alto}
+                        onChange={(e) =>
+                          setForm({ ...form, alto: Number(e.target.value) })
+                        }
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Colocación */}
                 <div className="field">
