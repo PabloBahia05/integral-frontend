@@ -4,6 +4,7 @@ import Modal from "../Component/Modal";
 import ActionBar from "../Component/ActionBar";
 import ScreenHeader from "../Component/ScreenHeader";
 import ConfirmDelete from "../Component/ConfirmDelete";
+import { useAuth } from "../context/AuthContext";
 
 const COLUMNS = [
   { key: "id", label: "ID" },
@@ -329,6 +330,7 @@ function InsertarFormula({ formulaRef, setForm, formulas, codformActual }) {
 
 // ── Insertar margen del artículo vinculado (codart del form) ─────────────────
 function InsertarMargen({ formulaRef, setForm, codart }) {
+  const { authFetch } = useAuth();
   const [margenInfo, setMargenInfo] = useState(null);
   const [cargando, setCargando] = useState(false);
 
@@ -338,7 +340,7 @@ function InsertarMargen({ formulaRef, setForm, codart }) {
       return;
     }
     setCargando(true);
-    fetch(
+    authFetch(
       `https://integral-backend-production.up.railway.app/margen/buscar?q=${encodeURIComponent(codart)}`,
     )
       .then((r) => r.json())
@@ -491,6 +493,7 @@ export default function Formulas({
   onOpenModal,
   onCloseModal,
 }) {
+  const { authFetch } = useAuth();
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -513,7 +516,7 @@ export default function Formulas({
     const variables = { ancho: 100, alto: 200, cantidad: 1, colocacion: 5000 };
     const codart_modelo = form.codartint || null;
     try {
-      const res = await fetch(
+      const res = await authFetch(
         "https://integral-backend-production.up.railway.app/formulas/verificar",
         {
           method: "POST",
@@ -549,13 +552,13 @@ export default function Formulas({
   // Cargar familias y rubros al abrir modal
   useEffect(() => {
     if (modal === "nuevo" || modal === "editar") {
-      fetch(
+      authFetch(
         "https://integral-backend-production.up.railway.app/articulos/familias-todas",
       )
         .then((r) => r.json())
         .then((data) => setFamilias(Array.isArray(data) ? data : []))
         .catch(() => {});
-      fetch(
+      authFetch(
         "https://integral-backend-production.up.railway.app/articulos/rubros",
       )
         .then((r) => r.json())
@@ -576,7 +579,7 @@ export default function Formulas({
     setForm((p) => ({ ...p, codartint: "" }));
     if (rubro) {
       // Cargar familias de ese rubro
-      fetch(
+      authFetch(
         `https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(rubro)}`,
       )
         .then((r) => r.json())
@@ -585,13 +588,13 @@ export default function Formulas({
       // Cargar artículos del rubro + GENERAL
       (async () => {
         try {
-          const arts = await fetch(
+          const arts = await authFetch(
             `https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(rubro)}`,
           ).then((r) => r.json());
           let todos = Array.isArray(arts) ? arts : [];
           if (rubro.toUpperCase() !== "GENERAL") {
             try {
-              const g = await fetch(
+              const g = await authFetch(
                 "https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=GENERAL",
               ).then((r) => r.json());
               const codsSeen = new Set(todos.map((a) => a.codartint));
@@ -607,7 +610,7 @@ export default function Formulas({
       })();
     } else {
       // Sin rubro → recargar todas las familias
-      fetch(
+      authFetch(
         "https://integral-backend-production.up.railway.app/articulos/familias-todas",
       )
         .then((r) => r.json())
@@ -623,7 +626,7 @@ export default function Formulas({
       ? `&rubro=${encodeURIComponent(rubroElegido)}`
       : "";
     if (familia) {
-      fetch(
+      authFetch(
         `https://integral-backend-production.up.railway.app/articulos/por-rubro?familia=${encodeURIComponent(familia)}${rubroParam}`,
       )
         .then((r) => r.json())
@@ -631,7 +634,7 @@ export default function Formulas({
         .catch(() => {});
     } else if (rubroElegido) {
       // Sin familia pero con rubro → recargar artículos del rubro
-      fetch(
+      authFetch(
         `https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(rubroElegido)}`,
       )
         .then((r) => r.json())
@@ -689,20 +692,20 @@ export default function Formulas({
     const codVinculado = selected.codart ?? "";
     if (codVinculado) {
       try {
-        const res = await fetch(
+        const res = await authFetch(
           `https://integral-backend-production.up.railway.app/articulos/rubro-de?codart=${encodeURIComponent(codVinculado)}`,
         );
         const data = await res.json();
         if (data.rubro) {
           setRubroElegido(data.rubro);
           // Cargar familias de ese rubro
-          const resFam = await fetch(
+          const resFam = await authFetch(
             `https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(data.rubro)}`,
           );
           const fams = await resFam.json();
           if (Array.isArray(fams) && fams.length > 0) setFamilias(fams);
           // Cargar TODOS los artículos del rubro (sin filtrar familia)
-          const resArts = await fetch(
+          const resArts = await authFetch(
             `https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(data.rubro)}`,
           );
           const arts = await resArts.json();
@@ -717,7 +720,7 @@ export default function Formulas({
     } else if (selected.rubro) {
       // Sin artículo vinculado pero con rubro en la fórmula → cargar familias del rubro
       try {
-        const resFam = await fetch(
+        const resFam = await authFetch(
           `https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(selected.rubro)}`,
         );
         const fams = await resFam.json();
@@ -744,7 +747,7 @@ export default function Formulas({
 
     if (modal === "nuevo") {
       try {
-        const res = await fetch(
+        const res = await authFetch(
           "https://integral-backend-production.up.railway.app/formulas",
           {
             method: "POST",
