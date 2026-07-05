@@ -1523,6 +1523,239 @@ export default function PresupuestoNuevo({
     }
   };
 
+  // ── Generar PDF del presupuesto ─────────────────────────────────────────────
+  const handlePDF = () => {
+    const formatPeso = (v) =>
+      "$" +
+      Number(v || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 });
+
+    const fechaFmt = fecha
+      ? new Date(fecha + "T00:00:00").toLocaleDateString("es-AR", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        })
+      : new Date().toLocaleDateString("es-AR", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        });
+
+    const nro =
+      numeroPres != null
+        ? String(numeroPres).padStart(5, "0")
+        : numero !== "Nuevo"
+          ? numero
+          : "----";
+
+    // Color de acento configurable desde el encabezado (si no se cargó, usa el azul de siempre)
+    const accent = color && color.trim() ? color.trim() : "#2d7fc1";
+    const accentLight = color && color.trim() ? color.trim() : "#60b4f0";
+
+    // Cantidad de columnas de la tabla según qué se decida incluir
+    const colsExtra = (mostrarCosto ? 1 : 0) + (incluirPrecio ? 1 : 0);
+    const totalCols = 3 + colsExtra + 1; // producto+desc+cant + (costo/precio) + subtotal
+
+    // Agrupa los ítems por sección, respetando el orden en que fueron agregados
+    const secciones = [...new Set(presupuestoItems.map((p) => p.seccion))];
+
+    const filasHTML = secciones
+      .map((sec) => {
+        const items = presupuestoItems.filter((p) => p.seccion === sec);
+        const subtotalSec = items.reduce((s, it) => s + (it.subtotal || 0), 0);
+
+        const filasItems = items
+          .map((item) => {
+            const medida =
+              item.seccion === "Mampara" && item.ancho && item.alto
+                ? ` <span class="medida">(${item.ancho} × ${item.alto} cm)</span>`
+                : "";
+            return `
+        <tr>
+          <td>${item.nombreart ?? ""}</td>
+          <td>${item.descripcion ?? ""}${medida}</td>
+          <td class="center">${item.cantidad ?? 1}</td>
+          ${mostrarCosto ? `<td class="right">${item.costo != null ? formatPeso(item.costo) : "—"}</td>` : ""}
+          ${incluirPrecio ? `<td class="right">${formatPeso(item.precio)}</td>` : ""}
+          <td class="right"><strong>${formatPeso(item.subtotal)}</strong></td>
+        </tr>`;
+          })
+          .join("");
+
+        return `
+      <tr class="seccion-row"><td colspan="${totalCols}">${sec}</td></tr>
+      ${filasItems}
+      <tr class="subtotal-row">
+        <td colspan="${totalCols - 1}">Subtotal ${sec}</td>
+        <td class="right">${formatPeso(subtotalSec)}</td>
+      </tr>`;
+      })
+      .join("");
+
+    const totalGeneral = presupuestoItems.reduce(
+      (s, it) => s + (it.subtotal || 0),
+      0,
+    );
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Presupuesto N° ${nro}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Source Sans 3', Arial, sans-serif; background: #fff; color: #1a2a3a; font-size: 13px; }
+    .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 0; display: flex; flex-direction: column; }
+    .header { background: #0f2944; color: #fff; padding: 32px 48px 28px; display: flex; justify-content: space-between; align-items: flex-start; }
+    .company-name { font-family: 'Rajdhani', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+    .company-sub { font-size: 11px; color: #7ab2d4; letter-spacing: 0.18em; text-transform: uppercase; margin-top: 4px; }
+    .company-contact { font-size: 11px; color: #a8c4d8; margin-top: 10px; line-height: 1.7; }
+    .header-right { text-align: right; }
+    .doc-title { font-family: 'Rajdhani', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: ${accentLight}; }
+    .doc-nro { font-family: 'Rajdhani', sans-serif; font-size: 42px; font-weight: 700; color: #fff; line-height: 1; }
+    .doc-fecha { font-size: 11px; color: #7ab2d4; margin-top: 6px; }
+    .accent-bar { height: 4px; background: linear-gradient(90deg, ${accent} 0%, ${accentLight} 50%, ${accent} 100%); }
+    .body { padding: 36px 48px; flex: 1; }
+    .client-block { display: flex; gap: 24px; margin-bottom: 28px; }
+    .info-box { flex: 1; border: 1px solid #d0dde8; border-radius: 6px; padding: 16px 20px; }
+    .info-box-title { font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: ${accent}; margin-bottom: 10px; border-bottom: 1px solid #e8f0f7; padding-bottom: 6px; }
+    .info-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+    .info-label { color: #6a8aa0; }
+    .info-value { font-weight: 600; color: #0f2944; text-align: right; }
+    .leyenda { font-size: 12px; font-style: italic; color: #4a6a8c; background: #f5f9fc; border-left: 3px solid ${accent}; padding: 10px 14px; margin-bottom: 24px; border-radius: 0 4px 4px 0; }
+    .section-title { font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: ${accent}; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    thead tr { background: #0f2944; }
+    thead th { color: #fff; font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; padding: 10px 12px; text-align: left; }
+    thead th.center { text-align: center; }
+    thead th.right { text-align: right; }
+    tbody td { padding: 8px 12px; font-size: 12px; color: #2a3a4a; border-bottom: 1px solid #e8f0f7; }
+    tbody td.center { text-align: center; }
+    tbody td.right { text-align: right; }
+    .medida { color: #7a94a8; font-size: 11px; }
+    tr.seccion-row td { background: #ddeefa; font-weight: 700; color: #0f2944; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; padding: 7px 12px; }
+    tr.subtotal-row td { background: #f5f9fc; font-weight: 700; color: #0a5c3a; text-align: right; padding: 7px 12px; border-top: 1px solid #d0dde8; }
+    .totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 24px; }
+    .totals-box { width: 300px; }
+    .totals-total { display: flex; justify-content: space-between; padding: 13px 16px; background: #0f2944; border-radius: 4px; }
+    .totals-total .t-label { color: #a8c4d8; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; }
+    .totals-total .t-value { color: #fff; font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; }
+    .iva-note { font-size: 10px; color: #6a8aa0; text-align: right; margin-top: 6px; }
+    .clausula { font-size: 11px; color: #6a8aa0; border-top: 1px dashed #d0dde8; padding-top: 10px; margin-bottom: 20px; }
+    .observaciones { font-size: 12px; color: #2a3a4a; white-space: pre-wrap; margin-bottom: 20px; }
+    .footer { background: #f0f6fb; border-top: 2px solid #d0dde8; padding: 20px 48px; display: flex; justify-content: space-between; align-items: center; }
+    .footer-left { font-size: 11px; color: #6a8aa0; line-height: 1.6; }
+    .footer-right { text-align: right; font-size: 11px; color: #6a8aa0; }
+    .footer-brand { font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700; color: #0f2944; letter-spacing: 0.06em; }
+    @media print {
+      .page { width: auto; min-height: auto; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div>
+      <div class="company-name">Integral</div>
+      <div class="company-sub">Muebles y equipamiento a medida</div>
+      <div class="company-contact">
+        📍 Bahía Blanca, Buenos Aires<br/>
+        📞 291 - 000 0000
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="doc-title">Presupuesto</div>
+      <div class="doc-nro">N° ${nro}</div>
+      <div class="doc-fecha">Fecha: ${fechaFmt}</div>
+      <div class="doc-fecha" style="margin-top:4px; color:#a8c4d8;">Revisión: ${revision}</div>
+    </div>
+  </div>
+  <div class="accent-bar"></div>
+  <div class="body">
+    <div class="client-block">
+      <div class="info-box">
+        <div class="info-box-title">Datos del cliente</div>
+        <div class="info-row"><span class="info-label">Cliente</span><span class="info-value">${cliente || "Consumidor final"}</span></div>
+        ${telefono1 ? `<div class="info-row"><span class="info-label">Teléfono</span><span class="info-value">${telefono1}</span></div>` : ""}
+        ${telefono2 ? `<div class="info-row"><span class="info-label">Teléfono 2</span><span class="info-value">${telefono2}</span></div>` : ""}
+        ${wapp ? `<div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value">${wapp}</span></div>` : ""}
+      </div>
+      <div class="info-box">
+        <div class="info-box-title">Domicilio</div>
+        <div class="info-row"><span class="info-label">Domicilio</span><span class="info-value">${domicilio || "—"}</span></div>
+        ${domicilioFiscal ? `<div class="info-row"><span class="info-label">Dom. fiscal</span><span class="info-value">${domicilioFiscal}</span></div>` : ""}
+        <div class="info-row"><span class="info-label">Localidad</span><span class="info-value">${localidad || "—"}</span></div>
+      </div>
+    </div>
+
+    ${leyenda ? `<div class="leyenda">${leyenda.replace(/\n/g, "<br/>")}</div>` : ""}
+
+    <div class="section-title">Detalle del presupuesto</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Descripción</th>
+          <th class="center">Cant.</th>
+          ${mostrarCosto ? `<th class="right">Costo</th>` : ""}
+          ${incluirPrecio ? `<th class="right">Precio unit.</th>` : ""}
+          <th class="right">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filasHTML}
+      </tbody>
+    </table>
+
+    ${
+      incluirTotal
+        ? `<div class="totals-wrap">
+      <div class="totals-box">
+        <div class="totals-total"><span class="t-label">TOTAL</span><span class="t-value">${formatPeso(totalGeneral)}</span></div>
+        ${agregarIVA ? `<div class="iva-note">Precios con IVA incluido</div>` : ""}
+      </div>
+    </div>`
+        : ""
+    }
+
+    ${
+      incluirTextoColoc
+        ? `<div class="clausula">La colocación no está incluida en este presupuesto, salvo que se indique lo contrario.</div>`
+        : ""
+    }
+
+    ${
+      observaciones
+        ? `<div class="section-title" style="margin-top:8px;">Observaciones</div><div class="observaciones">${observaciones.replace(/\n/g, "<br/>")}</div>`
+        : ""
+    }
+  </div>
+  <div class="footer">
+    <div class="footer-left">
+      <div class="footer-brand">Integral</div>
+      Bahía Blanca, Buenos Aires
+    </div>
+    <div class="footer-right">
+      Presupuesto N° ${nro} — Rev. ${revision}<br/>
+      Emitido el ${fechaFmt}
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) {
+      alert("Habilitá las ventanas emergentes para generar el PDF.");
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 800);
+  };
+
   return (
     <>
       <style>{`
@@ -2024,6 +2257,25 @@ export default function PresupuestoNuevo({
               🔖 {guardando ? "Guardando..." : "Nueva Revisión"}
             </button>
           )}
+          <button
+            className="pn-tool-btn"
+            onClick={handlePDF}
+            disabled={presupuestoItems.length === 0}
+            title={
+              presupuestoItems.length === 0
+                ? "Agregá al menos un ítem al presupuesto para generar el PDF"
+                : "Genera el PDF del presupuesto"
+            }
+            style={{
+              background: "#e8f0f7",
+              borderColor: "#2277bb",
+              color: "#0a3a5c",
+              fontWeight: 700,
+              opacity: presupuestoItems.length === 0 ? 0.5 : 1,
+            }}
+          >
+            🖨️ Generar PDF
+          </button>
         </div>
 
         {/* Tabs */}
