@@ -874,37 +874,39 @@ export default function Formulas({
           <div className="form-grid">
             <div className="form-group" style={{ position: "relative" }}>
               <label className="form-label">Rubro</label>
-              <input
+              <select
                 className="form-input"
-                list="rubros-list"
-                placeholder="Escribí o elegí un rubro..."
                 value={form.rubro ?? ""}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, rubro: e.target.value }))
                 }
-              />
-              <datalist id="rubros-list">
+                style={{ cursor: "pointer" }}
+              >
+                <option value="">— Seleccioná un rubro —</option>
                 {rubros.map((r) => (
-                  <option key={r} value={r} />
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
                 ))}
-              </datalist>
+              </select>
             </div>
             <div className="form-group" style={{ position: "relative" }}>
               <label className="form-label">Familia</label>
-              <input
+              <select
                 className="form-input"
-                list="familias-list"
-                placeholder="Escribí o elegí una familia..."
                 value={form.familia ?? ""}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, familia: e.target.value }))
                 }
-              />
-              <datalist id="familias-list">
+                style={{ cursor: "pointer" }}
+              >
+                <option value="">— Seleccioná una familia —</option>
                 {familias.map((f) => (
-                  <option key={f} value={f} />
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
                 ))}
-              </datalist>
+              </select>
             </div>
           </div>
 
