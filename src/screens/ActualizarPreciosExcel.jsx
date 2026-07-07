@@ -4,8 +4,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function ActualizarPreciosExcel() {
   const { authFetch } = useAuth();
-  const [ubicacion, setUbicacion] = useState("");
-  const [archivo, setArchivo] = useState("");
+  const [archivo, setArchivo] = useState(null);
   const [hoja, setHoja] = useState("Resultado");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
@@ -15,22 +14,26 @@ export default function ActualizarPreciosExcel() {
     setError("");
     setResultado(null);
 
-    if (!ubicacion.trim() || !archivo.trim() || !hoja.trim()) {
-      setError("Completá ubicación, nombre de archivo y hoja.");
+    if (!archivo) {
+      setError("Elegí un archivo Excel (.xlsx).");
+      return;
+    }
+    if (!hoja.trim()) {
+      setError("Completá el nombre de la hoja.");
       return;
     }
 
     setCargando(true);
     try {
+      const formData = new FormData();
+      formData.append("archivo", archivo);
+      formData.append("hoja", hoja.trim());
+
       const res = await authFetch(
         "https://integral-backend-production.up.railway.app/articulos/actualizar-precios-excel",
         {
           method: "POST",
-          body: JSON.stringify({
-            ubicacion: ubicacion.trim(),
-            archivo: archivo.trim(),
-            hoja: hoja.trim(),
-          }),
+          body: formData,
         },
       );
       const data = await res.json();
@@ -65,25 +68,18 @@ export default function ActualizarPreciosExcel() {
         }}
       >
         <div style={{ marginBottom: 18 }}>
-          <label style={labelStyle}>Ubicación del archivo</label>
+          <label style={labelStyle}>Archivo Excel</label>
           <input
             style={inputStyle}
-            type="text"
-            placeholder="Ej: C:\Archivos\Precios o /home/precios"
-            value={ubicacion}
-            onChange={(e) => setUbicacion(e.target.value)}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
           />
-        </div>
-
-        <div style={{ marginBottom: 18 }}>
-          <label style={labelStyle}>Nombre del archivo</label>
-          <input
-            style={inputStyle}
-            type="text"
-            placeholder="Ej: listado_precios.xlsx"
-            value={archivo}
-            onChange={(e) => setArchivo(e.target.value)}
-          />
+          {archivo && (
+            <div style={{ fontSize: 12, color: "#5a7488", marginTop: 6 }}>
+              Seleccionado: {archivo.name}
+            </div>
+          )}
         </div>
 
         <div style={{ marginBottom: 24 }}>
