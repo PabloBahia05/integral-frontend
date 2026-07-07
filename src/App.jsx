@@ -19,6 +19,7 @@ import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
 import HistorialFacturas from "./screens/HistorialFacturas";
 import AfipIVA from "./screens/AfipIVA";
+import ActualizarPreciosExcel from "./screens/ActualizarPreciosExcel";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState } from "react";
@@ -45,6 +46,7 @@ const SCREENS = {
   anviz: { label: "ASISTENCIA", icon: "🕐" },
   "afip-iva": { label: "AFIP IVA", icon: "🏦" },
   usuarios: { label: "USUARIOS", icon: "👤" },
+  "actualizar-precios": { label: "ACTUALIZAR PRECIOS", icon: "💲" },
 };
 
 const buttons = [
@@ -821,6 +823,7 @@ function App() {
               "anviz",
               "afip-iva",
               "usuarios",
+              "actualizar-precios",
             ]
             .filter((s) => puedo(s, "ver"))
             .map((s) => (
@@ -889,6 +892,7 @@ function App() {
             {screen === "productos" && (
               <Productos selected={sel} modal={modal} token={token} {...crud} />
             )}
+            {screen === "actualizar-precios" && <ActualizarPreciosExcel />}
             {screen === "presupuesto-muebles" && (
               <PresupuestoMuebles
                 onSelectItem={(item) => console.log("Mueble:", item)}
@@ -1179,6 +1183,7 @@ function App() {
         {puedo("facturas", "ver") && <p onClick={() => { setScreen("facturas"); setSidebarOpen(false); }}>🧾 Facturas</p>}
         {puedo("anviz", "ver") && <p onClick={() => { setScreen("anviz"); setSidebarOpen(false); }}>🕐 Asistencia</p>}
         {puedo("usuarios", "ver") && <p onClick={() => { setScreen("usuarios"); setSidebarOpen(false); }}>👤 Usuarios</p>}
+        {puedo("actualizar-precios", "ver") && <p onClick={() => { setScreen("actualizar-precios"); setSidebarOpen(false); }}>💲 Actualizar Precios</p>}
         <p onClick={logout} style={{ color: "#cc3333" }}>🚪 Cerrar sesión</p>
       </div>
 
