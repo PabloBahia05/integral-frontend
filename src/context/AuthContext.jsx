@@ -39,15 +39,18 @@ export function AuthProvider({ children }) {
   // Helper para hacer fetch autenticado sin repetir headers en cada componente.
   // Uso: const { authFetch } = useAuth(); authFetch(url, { method: "POST", body: ... })
   const authFetch = useCallback(
-    (url, options = {}) =>
-      fetch(url, {
+    (url, options = {}) => {
+      const esFormData =
+        typeof FormData !== "undefined" && options.body instanceof FormData;
+      return fetch(url, {
         ...options,
         headers: {
-          "Content-Type": "application/json",
+          ...(esFormData ? {} : { "Content-Type": "application/json" }),
           ...(options.headers ?? {}),
           Authorization: `Bearer ${token}`,
         },
-      }),
+      });
+    },
     [token],
   );
 
