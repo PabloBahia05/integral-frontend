@@ -751,6 +751,9 @@ export default function Facturas({ proveedores = [], token }) {
                     cantidad:
                       (Number(hits[0].cantidad) || 0) +
                       (Number(item.cantidad) || 0),
+                    ...(item.precio_unit
+                      ? { valorlista: Number(item.precio_unit) }
+                      : {}),
                   }),
                 },
               );
@@ -797,6 +800,9 @@ export default function Facturas({ proveedores = [], token }) {
                       cantidad:
                         (Number(art.cantidad) || 0) +
                         (Number(item.cantidad) || 0),
+                      ...(item.precio_unit
+                        ? { valorlista: Number(item.precio_unit) }
+                        : {}),
                     }),
                   },
                 );
@@ -827,6 +833,9 @@ export default function Facturas({ proveedores = [], token }) {
                     cantidad:
                       (Number(hits[0].cantidad) || 0) +
                       (Number(item.cantidad) || 0),
+                    ...(item.precio_unit
+                      ? { valorlista: Number(item.precio_unit) }
+                      : {}),
                   }),
                 },
               );
@@ -886,6 +895,9 @@ export default function Facturas({ proveedores = [], token }) {
           prod_prov: descFactura || null,
           proveedor: datosExtra.proveedor || item.proveedorNombre || "",
           cantidad: Number(item.cantidad) || 0,
+          ...(item.precio_unit
+            ? { valorlista: Number(item.precio_unit) }
+            : {}),
           rubro: datosExtra.rubro || null,
           familia: datosExtra.familia || null,
           unidad: datosExtra.unidad || null,
@@ -964,6 +976,9 @@ export default function Facturas({ proveedores = [], token }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           cantidad: (Number(art.cantidad) || 0) + (Number(item.cantidad) || 0),
+          ...(item.precio_unit
+            ? { valorlista: Number(item.precio_unit) }
+            : {}),
         }),
       });
       avanzarCola();
@@ -996,6 +1011,9 @@ export default function Facturas({ proveedores = [], token }) {
           prod_prov: (item.descripcion || "").trim() || art.prod_prov,
           ...(art.codartprov ? {} : { codartprov: item.codigo || null }),
           cantidad: (Number(art.cantidad) || 0) + (Number(item.cantidad) || 0),
+          ...(item.precio_unit
+            ? { valorlista: Number(item.precio_unit) }
+            : {}),
         }),
       });
       avanzarCola();
