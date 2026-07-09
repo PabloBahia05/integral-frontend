@@ -676,7 +676,7 @@ export default function Facturas({ proveedores = [], token }) {
       const provNombre =
         proveedores.find((p) => String(p.id) === String(form.proveedor_id))
           ?.provnombre ?? "";
-      await sincronizarArticulos(itemsForm, provNombre);
+      await sincronizarArticulos(itemsForm, provNombre, form.proveedor_id);
 
       fetchFacturas();
       cerrarModal();
@@ -741,7 +741,25 @@ export default function Facturas({ proveedores = [], token }) {
   //      → 1 coincidencia: sumar cantidad
   //      → Varias: encolar con coincidencias para que el usuario elija
   //      → Ninguna: encolar → modal pregunta si quiere Editar existente o Agregar nuevo
-  const sincronizarArticulos = async (items, provNombre) => {
+  // ── Costo Si (precio de lista con descuento del proveedor aplicado) ────────
+  // descuento en tabla proveedor se guarda como entero (ej: 20 = 20%)
+  const obtenerDescuentoProveedor = (proveedorId) => {
+    if (!proveedorId) return 0;
+    const prov = proveedores.find(
+      (p) => String(p.id) === String(proveedorId),
+    );
+    const d = prov?.descuento;
+    return d !== null && d !== undefined && d !== "" ? Number(d) : 0;
+  };
+
+  const calcularCostosi = (precioUnit, proveedorId) => {
+    const precio = Number(precioUnit);
+    if (!precio) return null;
+    const descuento = obtenerDescuentoProveedor(proveedorId);
+    return +(precio * (1 - descuento / 100)).toFixed(2);
+  };
+
+  const sincronizarArticulos = async (items, provNombre, proveedorId) => {
     const itemsValidos = items.filter(
       (it) =>
         (it.codigo && it.codigo.trim()) ||
@@ -770,21 +788,20 @@ export default function Facturas({ proveedores = [], token }) {
                 cantidad:
                   (Number(hits[0].cantidad) || 0) + (Number(item.cantidad) || 0),
                 ...(item.precio_unit
-                  ? { valorlista: Number(item.precio_unit) }
+                  ? {
+                      valorlista: Number(item.precio_unit),
+                      ...(calcularCostosi(item.precio_unit, proveedorId) !== null
+                        ? { costosi: calcularCostosi(item.precio_unit, proveedorId) }
+                        : {}),
+                    }
                   : {}),
               });
               resuelto = true;
             } else if (hits.length > 1) {
-              // DEBUG TEMPORAL
-              console.log(
-                "[SYNC][paso1 varios hits] item.precio_unit antes de encolar:",
-                item.precio_unit,
-                "| item completo:",
-                item,
-              );
               noExisten.push({
                 ...item,
                 proveedorNombre: provNombre,
+                proveedorId,
                 coincidencias: hits,
               });
               resuelto = true;
@@ -818,7 +835,12 @@ export default function Facturas({ proveedores = [], token }) {
                   cantidad:
                     (Number(art.cantidad) || 0) + (Number(item.cantidad) || 0),
                   ...(item.precio_unit
-                    ? { valorlista: Number(item.precio_unit) }
+                    ? {
+                        valorlista: Number(item.precio_unit),
+                        ...(calcularCostosi(item.precio_unit, proveedorId) !== null
+                          ? { costosi: calcularCostosi(item.precio_unit, proveedorId) }
+                          : {}),
+                      }
                     : {}),
                 });
                 resuelto = true;
@@ -843,7 +865,12 @@ export default function Facturas({ proveedores = [], token }) {
                 cantidad:
                   (Number(hits[0].cantidad) || 0) + (Number(item.cantidad) || 0),
                 ...(item.precio_unit
-                  ? { valorlista: Number(item.precio_unit) }
+                  ? {
+                      valorlista: Number(item.precio_unit),
+                      ...(calcularCostosi(item.precio_unit, proveedorId) !== null
+                        ? { costosi: calcularCostosi(item.precio_unit, proveedorId) }
+                        : {}),
+                    }
                   : {}),
               });
               resuelto = true;
@@ -851,6 +878,7 @@ export default function Facturas({ proveedores = [], token }) {
               noExisten.push({
                 ...item,
                 proveedorNombre: provNombre,
+                proveedorId,
                 coincidencias: hits,
               });
               resuelto = true;
@@ -860,7 +888,7 @@ export default function Facturas({ proveedores = [], token }) {
 
         // ── Sin coincidencias: encolar para editar/agregar ──
         if (!resuelto) {
-          noExisten.push({ ...item, proveedorNombre: provNombre });
+          noExisten.push({ ...item, proveedorNombre: provNombre, proveedorId });
         }
       } catch {
         /* ignorar error individual */
@@ -903,7 +931,12 @@ export default function Facturas({ proveedores = [], token }) {
           proveedor: datosExtra.proveedor || item.proveedorNombre || "",
           cantidad: Number(item.cantidad) || 0,
           ...(item.precio_unit
-            ? { valorlista: Number(item.precio_unit) }
+            ? {
+                valorlista: Number(item.precio_unit),
+                ...(calcularCostosi(item.precio_unit, item.proveedorId) !== null
+                  ? { costosi: calcularCostosi(item.precio_unit, item.proveedorId) }
+                  : {}),
+              }
             : {}),
           rubro: datosExtra.rubro || null,
           familia: datosExtra.familia || null,
@@ -972,15 +1005,6 @@ export default function Facturas({ proveedores = [], token }) {
   const renderModalArticulo = () => {
     if (!modalArticulo) return null;
     const item = modalArticulo;
-    // DEBUG TEMPORAL — sacar una vez resuelto el bug de valorlista sin actualizar
-    console.log(
-      "[VINCULAR] item completo:",
-      item,
-      "| precio_unit:",
-      item.precio_unit,
-      "| typeof:",
-      typeof item.precio_unit,
-    );
     const total = articulosCola.length;
     const tieneCoincidencias =
       item.coincidencias && item.coincidencias.length > 0;
@@ -990,7 +1014,12 @@ export default function Facturas({ proveedores = [], token }) {
       await patchArticulo(art.codartint, {
         cantidad: (Number(art.cantidad) || 0) + (Number(item.cantidad) || 0),
         ...(item.precio_unit
-          ? { valorlista: Number(item.precio_unit) }
+          ? {
+              valorlista: Number(item.precio_unit),
+              ...(calcularCostosi(item.precio_unit, item.proveedorId) !== null
+                ? { costosi: calcularCostosi(item.precio_unit, item.proveedorId) }
+                : {}),
+            }
           : {}),
       });
       avanzarCola();
@@ -1021,7 +1050,12 @@ export default function Facturas({ proveedores = [], token }) {
         ...(art.codartprov ? {} : { codartprov: item.codigo || null }),
         cantidad: (Number(art.cantidad) || 0) + (Number(item.cantidad) || 0),
         ...(item.precio_unit
-          ? { valorlista: Number(item.precio_unit) }
+          ? {
+              valorlista: Number(item.precio_unit),
+              ...(calcularCostosi(item.precio_unit, item.proveedorId) !== null
+                ? { costosi: calcularCostosi(item.precio_unit, item.proveedorId) }
+                : {}),
+            }
           : {}),
       });
       avanzarCola();
