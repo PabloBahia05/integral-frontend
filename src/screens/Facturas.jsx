@@ -700,6 +700,30 @@ export default function Facturas({ proveedores = [], token }) {
   //         → Varias              → encolar con coincidencias
   //         → Ninguna             → encolar para agregar nuevo (no habrá código, el usuario lo asignará)
 
+  // Helper: PATCH a /articulos con log de depuración (temporal, para diagnosticar
+  // por qué valorlista no se está actualizando). Revisá la consola del navegador
+  // (F12 → Console) después de cargar una factura para ver el body enviado y
+  // la respuesta cruda del backend.
+  const patchArticulo = async (codartint, body) => {
+    console.log("[PATCH articulos]", codartint, body);
+    const res = await fetch(`${API}/articulos/${encodeURIComponent(codartint)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      /* respuesta sin body */
+    }
+    console.log("[PATCH articulos] respuesta", res.status, data);
+    return { res, data };
+  };
+
   // Genera variantes normalizadas de un código para manejar prefijos/sufijos del OCR.
   // AGLOLAM usa códigos como "14018F" pero el OCR los lee con "S" inicial: "S14018F".
   const normalizarCodigo = (codigo) => {
@@ -742,21 +766,13 @@ export default function Facturas({ proveedores = [], token }) {
           if (resPP.ok) {
             const hits = await resPP.json();
             if (hits.length === 1) {
-              await fetch(
-                `${API}/articulos/${encodeURIComponent(hits[0].codartint)}`,
-                {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                  body: JSON.stringify({
-                    cantidad:
-                      (Number(hits[0].cantidad) || 0) +
-                      (Number(item.cantidad) || 0),
-                    ...(item.precio_unit
-                      ? { valorlista: Number(item.precio_unit) }
-                      : {}),
-                  }),
-                },
-              );
+              await patchArticulo(hits[0].codartint, {
+                cantidad:
+                  (Number(hits[0].cantidad) || 0) + (Number(item.cantidad) || 0),
+                ...(item.precio_unit
+                  ? { valorlista: Number(item.precio_unit) }
+                  : {}),
+              });
               resuelto = true;
             } else if (hits.length > 1) {
               noExisten.push({
@@ -791,21 +807,13 @@ export default function Facturas({ proveedores = [], token }) {
                     },
                   ).catch(() => {});
                 }
-                await fetch(
-                  `${API}/articulos/${encodeURIComponent(art.codartint)}`,
-                  {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({
-                      cantidad:
-                        (Number(art.cantidad) || 0) +
-                        (Number(item.cantidad) || 0),
-                      ...(item.precio_unit
-                        ? { valorlista: Number(item.precio_unit) }
-                        : {}),
-                    }),
-                  },
-                );
+                await patchArticulo(art.codartint, {
+                  cantidad:
+                    (Number(art.cantidad) || 0) + (Number(item.cantidad) || 0),
+                  ...(item.precio_unit
+                    ? { valorlista: Number(item.precio_unit) }
+                    : {}),
+                });
                 resuelto = true;
                 break;
               }
@@ -824,21 +832,13 @@ export default function Facturas({ proveedores = [], token }) {
           if (resDesc.ok) {
             const hits = await resDesc.json();
             if (hits.length === 1) {
-              await fetch(
-                `${API}/articulos/${encodeURIComponent(hits[0].codartint)}`,
-                {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                  body: JSON.stringify({
-                    cantidad:
-                      (Number(hits[0].cantidad) || 0) +
-                      (Number(item.cantidad) || 0),
-                    ...(item.precio_unit
-                      ? { valorlista: Number(item.precio_unit) }
-                      : {}),
-                  }),
-                },
-              );
+              await patchArticulo(hits[0].codartint, {
+                cantidad:
+                  (Number(hits[0].cantidad) || 0) + (Number(item.cantidad) || 0),
+                ...(item.precio_unit
+                  ? { valorlista: Number(item.precio_unit) }
+                  : {}),
+              });
               resuelto = true;
             } else if (hits.length > 1) {
               noExisten.push({
@@ -971,15 +971,11 @@ export default function Facturas({ proveedores = [], token }) {
 
     // Sumar cantidad a un artículo existente y avanzar
     const usarCoincidencia = async (art) => {
-      await fetch(`${API}/articulos/${encodeURIComponent(art.codartint)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          cantidad: (Number(art.cantidad) || 0) + (Number(item.cantidad) || 0),
-          ...(item.precio_unit
-            ? { valorlista: Number(item.precio_unit) }
-            : {}),
-        }),
+      await patchArticulo(art.codartint, {
+        cantidad: (Number(art.cantidad) || 0) + (Number(item.cantidad) || 0),
+        ...(item.precio_unit
+          ? { valorlista: Number(item.precio_unit) }
+          : {}),
       });
       avanzarCola();
     };
@@ -1004,17 +1000,13 @@ export default function Facturas({ proveedores = [], token }) {
 
     // Vincular artículo existente: guardar prod_prov con la desc de la factura y sumar cantidad
     const vincularExistente = async (art) => {
-      await fetch(`${API}/articulos/${encodeURIComponent(art.codartint)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          prod_prov: (item.descripcion || "").trim() || art.prod_prov,
-          ...(art.codartprov ? {} : { codartprov: item.codigo || null }),
-          cantidad: (Number(art.cantidad) || 0) + (Number(item.cantidad) || 0),
-          ...(item.precio_unit
-            ? { valorlista: Number(item.precio_unit) }
-            : {}),
-        }),
+      await patchArticulo(art.codartint, {
+        prod_prov: (item.descripcion || "").trim() || art.prod_prov,
+        ...(art.codartprov ? {} : { codartprov: item.codigo || null }),
+        cantidad: (Number(art.cantidad) || 0) + (Number(item.cantidad) || 0),
+        ...(item.precio_unit
+          ? { valorlista: Number(item.precio_unit) }
+          : {}),
       });
       avanzarCola();
     };
