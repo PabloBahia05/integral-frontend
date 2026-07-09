@@ -775,6 +775,13 @@ export default function Facturas({ proveedores = [], token }) {
               });
               resuelto = true;
             } else if (hits.length > 1) {
+              // DEBUG TEMPORAL
+              console.log(
+                "[SYNC][paso1 varios hits] item.precio_unit antes de encolar:",
+                item.precio_unit,
+                "| item completo:",
+                item,
+              );
               noExisten.push({
                 ...item,
                 proveedorNombre: provNombre,
@@ -965,6 +972,15 @@ export default function Facturas({ proveedores = [], token }) {
   const renderModalArticulo = () => {
     if (!modalArticulo) return null;
     const item = modalArticulo;
+    // DEBUG TEMPORAL — sacar una vez resuelto el bug de valorlista sin actualizar
+    console.log(
+      "[VINCULAR] item completo:",
+      item,
+      "| precio_unit:",
+      item.precio_unit,
+      "| typeof:",
+      typeof item.precio_unit,
+    );
     const total = articulosCola.length;
     const tieneCoincidencias =
       item.coincidencias && item.coincidencias.length > 0;
