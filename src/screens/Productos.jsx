@@ -682,6 +682,7 @@ export default function Productos({
       margen: toDecimal(form.margen),
       codartprov: form.codartprov || null,
       prod_prov: form.prod_prov || null,
+      mca: form.mca || null,
     };
     const payload = modal === "nuevo" ? data : { ...data, id: selected.id };
     onSave(payload);
