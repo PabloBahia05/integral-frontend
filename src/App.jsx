@@ -435,6 +435,7 @@ function App() {
         setModal(null);
       } catch (err) {
         console.error(`Error eliminando ${name}:`, err);
+        alert(`Error al eliminar: ${err.message}`);
       }
     },
 
