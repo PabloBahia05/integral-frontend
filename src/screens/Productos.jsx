@@ -180,6 +180,7 @@ const FIELDS_RIGHT = [
   { field: "linea", label: "Línea", placeholder: "Ej: Living" },
   { field: "color", label: "Color", placeholder: "Ej: 1" },
   { field: "area", label: "Área", placeholder: "Ej: 01" },
+  { field: "mca", label: "MCA", placeholder: "Ej: MCA-001" },
 ];
 
 const toDecimal = (v) =>
