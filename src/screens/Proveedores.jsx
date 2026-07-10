@@ -209,7 +209,7 @@ export default function Proveedores({
     onCloseModal();
   };
   const handleEliminar = () => {
-    onDelete(selected);
+    onDelete(selected.id);
     onCloseModal();
   };
 
