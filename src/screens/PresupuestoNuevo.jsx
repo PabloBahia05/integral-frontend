@@ -561,7 +561,7 @@ export default function PresupuestoNuevo({
   };
   const [mostrarCosto, setMostrarCosto] = useState(false);
   const [incluirPrecio, setIncluirPrecio] = useState(false);
-  const [incluirTotal, setIncluirTotal] = useState(false);
+  const [incluirTotal, setIncluirTotal] = useState(true);
   const [color, setColor] = useState("");
   const [incluirTextoColoc, setIncluirTextoColoc] = useState(false);
   const [agregarIVA, setAgregarIVA] = useState(true);
