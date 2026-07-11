@@ -346,6 +346,7 @@ export default function AsociacionesForm({
     return fetch(url, { ...options, headers });
   };
   const [search, setSearch] = useState("");
+  const [filtroRubro, setFiltroRubro] = useState("");
   const [form, setForm] = useState(EMPTY());
   const [editId, setEditId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -527,12 +528,13 @@ export default function AsociacionesForm({
     () =>
       asociacionesForm.filter(
         (a) =>
-          !search ||
-          (a.articulo ?? "").toLowerCase().includes(search.toLowerCase()) ||
-          (a.codart ?? "").toLowerCase().includes(search.toLowerCase()) ||
-          (a.codf ?? "").toLowerCase().includes(search.toLowerCase()),
+          (!search ||
+            (a.articulo ?? "").toLowerCase().includes(search.toLowerCase()) ||
+            (a.codart ?? "").toLowerCase().includes(search.toLowerCase()) ||
+            (a.codf ?? "").toLowerCase().includes(search.toLowerCase())) &&
+          (!filtroRubro || a.rubro === filtroRubro),
       ),
-    [asociacionesForm, search],
+    [asociacionesForm, search, filtroRubro],
   );
 
   const showModal = modal === "form" || modalOpen;
@@ -561,6 +563,28 @@ export default function AsociacionesForm({
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <select
+            className="aform-field-select"
+            value={filtroRubro}
+            onChange={(e) => setFiltroRubro(e.target.value)}
+            style={{
+              padding: "10px 14px",
+              border: "1.5px solid #dde4ef",
+              borderRadius: 10,
+              background: "#fff",
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 14,
+              color: "#1a2332",
+              outline: "none",
+            }}
+          >
+            <option value="">— Todos los rubros —</option>
+            {rubros.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
           <button className="aform-btn-add" onClick={openAdd}>
             <span>＋</span> Agregar
           </button>
