@@ -100,6 +100,7 @@ const CSS = `
   .bic:hover { transform:scale(1.08); }
   .bic-ed { background:#eff4ff; } .bic-ed:hover { background:#dbeafe; }
   .bic-dl { background:#fff1f0; } .bic-dl:hover { background:#fee2e2; }
+  .bic-dup { background:#f0fdf4; } .bic-dup:hover { background:#bbf7d0; }
   .bic-ok { background:#dcfce7; } .bic-ok:hover { background:#bbf7d0; }
   .bic-cx { background:#f1f5f9; } .bic-cx:hover { background:#e2e8f0; }
 
@@ -500,6 +501,24 @@ export default function Asociaciones({
     closeNew();
   };
 
+  // duplicar: precarga el modal "Nuevo" con los slots de una asociación
+  // existente, pero sin id y sin artículo padre (para que se elija uno nuevo)
+  const openDuplicate = (row) => {
+    const { id, ...rest } = row;
+    setNewForm({ ...EMPTY(), ...rest, codart: "", articulo: "" });
+    setNewRubroPadre("");
+    setNewRubroSlots(
+      Object.fromEntries(
+        SLOTS.map((n) => {
+          const f = articulosList.find((a) => a.articulo === row[`art${n}`]);
+          return [n, f?.rubro ?? ""];
+        }),
+      ),
+    );
+    setModalOpen(true);
+    onOpenModal?.("form");
+  };
+
   const filtered = asociaciones.filter(
     (a) =>
       !search ||
@@ -650,6 +669,16 @@ export default function Asociaciones({
                                   }}
                                 >
                                   ✏️
+                                </button>
+                                <button
+                                  className="bic bic-dup"
+                                  title="Duplicar"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openDuplicate(row);
+                                  }}
+                                >
+                                  📋
                                 </button>
                                 <button
                                   className="bic bic-dl"
