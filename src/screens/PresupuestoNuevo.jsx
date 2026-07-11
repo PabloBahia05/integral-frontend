@@ -561,7 +561,7 @@ export default function PresupuestoNuevo({
   };
   const [mostrarCosto, setMostrarCosto] = useState(false);
   const [incluirPrecio, setIncluirPrecio] = useState(false);
-  const [incluirTotal, setIncluirTotal] = useState(true);
+  const [incluirTotal, setIncluirTotal] = useState(false);
   const [color, setColor] = useState("");
   const [incluirTextoColoc, setIncluirTextoColoc] = useState(false);
   const [agregarIVA, setAgregarIVA] = useState(true);
@@ -1342,13 +1342,11 @@ export default function PresupuestoNuevo({
   };
 
   // Filtra artículos por texto de búsqueda — solo para placard (cocina filtra internamente en TabCocina)
-  const productosFiltrados = articulosFamilia
-    .filter(
-      (a) =>
-        !placardSearch.trim() ||
-        normalizar(a.articulo).includes(normalizar(placardSearch)),
-    )
-    .slice(0, 10);
+  const productosFiltrados = articulosFamilia.filter(
+    (a) =>
+      !placardSearch.trim() ||
+      normalizar(a.articulo).includes(normalizar(placardSearch)),
+  );
 
   // ── Helpers Placard ──────────────────────────────────────
   const placardAgregarFila = () => {
@@ -3308,6 +3306,8 @@ export default function PresupuestoNuevo({
                                     zIndex: 50,
                                     boxShadow: "0 4px 12px #0002",
                                     minWidth: 480,
+                                    maxHeight: 200,
+                                    overflowY: "auto",
                                   }}
                                 >
                                   {productosFiltrados.map((p, pi) => {
