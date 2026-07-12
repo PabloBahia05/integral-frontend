@@ -561,7 +561,7 @@ export default function PresupuestoNuevo({
   };
   const [mostrarCosto, setMostrarCosto] = useState(false);
   const [incluirPrecio, setIncluirPrecio] = useState(false);
-  const [incluirTotal, setIncluirTotal] = useState(false);
+  const [incluirTotal, setIncluirTotal] = useState(true);
   const [color, setColor] = useState("");
   const [incluirTextoColoc, setIncluirTextoColoc] = useState(false);
   const [agregarIVA, setAgregarIVA] = useState(true);
@@ -1339,6 +1339,24 @@ export default function PresupuestoNuevo({
   const getPrecioParaLinea = (base, lineaNombre) => {
     const art = articulosFamilia.find((a) => a.articulo === base);
     return art?.precios?.[String(lineaNombre)] ?? null;
+  };
+
+  // Placard tiene su propia línea de precios fija en la base de datos (línea 15),
+  // independiente de las líneas que se hayan elegido en el Encabezado (16, 21, etc.).
+  // Si el artículo no tiene precio cargado para ninguna de las líneas activas,
+  // se usa la línea 15 como respaldo — sin necesidad de activarla en Encabezado.
+  const LINEA_FIJA_PLACARD = "15";
+  const resolverPrecioBasePlacard = (articuloBD) => {
+    const preciosBase = lineasActivas.map((l) => ({
+      linea: l.linea,
+      precioBase: articuloBD.precios?.[String(l.linea)] ?? "",
+    }));
+    let precioBaseUsar = preciosBase[0]?.precioBase;
+    if (precioBaseUsar == null || precioBaseUsar === "") {
+      const p15 = articuloBD.precios?.[LINEA_FIJA_PLACARD];
+      precioBaseUsar = p15 != null && p15 !== "" ? p15 : "";
+    }
+    return { preciosBase, precioBaseUsar };
   };
 
   // Filtra artículos por texto de búsqueda — solo para placard (cocina filtra internamente en TabCocina)
@@ -3316,14 +3334,8 @@ export default function PresupuestoNuevo({
                                       <div
                                         key={pi}
                                         onClick={() => {
-                                          const preciosBase = lineasActivas.map(
-                                            (l) => ({
-                                              linea: l.linea,
-                                              precioBase:
-                                                p.precios?.[String(l.linea)] ??
-                                                "",
-                                            }),
-                                          );
+                                          const { preciosBase, precioBaseUsar } =
+                                            resolverPrecioBasePlacard(p);
                                           const precios = preciosBase.map(
                                             (pb) => ({
                                               linea: pb.linea,
@@ -3333,15 +3345,22 @@ export default function PresupuestoNuevo({
                                               ),
                                             }),
                                           );
-                                          const precioBaseUsar =
-                                            preciosBase[0]?.precioBase ?? "";
                                           const precioPlacard =
                                             p.precio_un ?? p.PRECIO_UN ?? "";
+                                          const precioUsarLineas =
+                                            precios[0]?.precio &&
+                                            precios[0].precio !== ""
+                                              ? precios[0].precio
+                                              : aplicarPorcentaje(
+                                                  precioBaseUsar,
+                                                );
                                           const precioUsar =
-                                            precios[0]?.precio ??
-                                            (lineasActivas.length === 0
-                                              ? precioPlacard
-                                              : "");
+                                            precioUsarLineas &&
+                                            precioUsarLineas !== ""
+                                              ? precioUsarLineas
+                                              : lineasActivas.length === 0
+                                                ? precioPlacard
+                                                : "";
                                           const nombreart =
                                             p.nombreart ?? p.NOMBREART ?? base;
                                           setPlacardFila((f) => ({
@@ -3793,27 +3812,26 @@ export default function PresupuestoNuevo({
                               <div
                                 key={pi}
                                 onClick={() => {
-                                  const preciosBase = lineasActivas.map(
-                                    (l) => ({
-                                      linea: l.linea,
-                                      precioBase:
-                                        p.precios?.[String(l.linea)] ?? "",
-                                    }),
-                                  );
+                                  const { preciosBase, precioBaseUsar } =
+                                    resolverPrecioBasePlacard(p);
                                   const precios = preciosBase.map((pb) => ({
                                     linea: pb.linea,
                                     precioBase: pb.precioBase,
                                     precio: aplicarPorcentaje(pb.precioBase),
                                   }));
-                                  const precioBaseUsar =
-                                    preciosBase[0]?.precioBase ?? "";
                                   const precioPlacard =
                                     p.precio_un ?? p.PRECIO_UN ?? "";
+                                  const precioUsarLineas =
+                                    precios[0]?.precio &&
+                                    precios[0].precio !== ""
+                                      ? precios[0].precio
+                                      : aplicarPorcentaje(precioBaseUsar);
                                   const precioUsar =
-                                    precios[0]?.precio ??
-                                    (lineasActivas.length === 0
-                                      ? precioPlacard
-                                      : "");
+                                    precioUsarLineas && precioUsarLineas !== ""
+                                      ? precioUsarLineas
+                                      : lineasActivas.length === 0
+                                        ? precioPlacard
+                                        : "";
                                   const nombreart =
                                     p.nombreart ?? p.NOMBREART ?? base;
                                   setPlacardFila((f) => ({
