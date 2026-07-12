@@ -562,6 +562,7 @@ export default function PresupuestoNuevo({
   const [mostrarCosto, setMostrarCosto] = useState(false);
   const [incluirPrecio, setIncluirPrecio] = useState(false);
   const [incluirSubtotalItem, setIncluirSubtotalItem] = useState(false);
+  const [generandoPDF, setGenerandoPDF] = useState(false);
   const [incluirTotal, setIncluirTotal] = useState(true);
   const [color, setColor] = useState("");
   const [incluirTextoColoc, setIncluirTextoColoc] = useState(false);
@@ -1194,7 +1195,7 @@ export default function PresupuestoNuevo({
       bajomesadas: "Bajomesada",
       alacenas: "Alacena",
       placard: "PLACARD",
-      frente: "Frente",
+      frente: "FRENTE DE PLACARD",
       auxiliares: "Auxiliares",
       accesorios: "Accesorios",
     };
@@ -1614,16 +1615,11 @@ export default function PresupuestoNuevo({
       0,
     );
 
-    const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Presupuesto N° ${nro}</title>
-  <style>
+    const styleCSS = `
     @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Source Sans 3', Arial, sans-serif; background: #fff; color: #1a2a3a; font-size: 13px; }
-    .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 0; display: flex; flex-direction: column; }
+    .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 0; display: flex; flex-direction: column; background: #fff; }
     .header { background: #0f2944; color: #fff; padding: 32px 48px 28px; display: flex; justify-content: space-between; align-items: flex-start; }
     .company-name { font-family: 'Rajdhani', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
     .company-sub { font-size: 11px; color: #7ab2d4; letter-spacing: 0.18em; text-transform: uppercase; margin-top: 4px; }
@@ -1665,12 +1661,9 @@ export default function PresupuestoNuevo({
     .footer-left { font-size: 11px; color: #6a8aa0; line-height: 1.6; }
     .footer-right { text-align: right; font-size: 11px; color: #6a8aa0; }
     .footer-brand { font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700; color: #0f2944; letter-spacing: 0.06em; }
-    @media print {
-      .page { width: auto; min-height: auto; }
-    }
-  </style>
-</head>
-<body>
+    `;
+
+    const pageHTML = `
 <div class="page">
   <div class="header">
     <div>
@@ -1758,19 +1751,75 @@ export default function PresupuestoNuevo({
       Emitido el ${fechaFmt}
     </div>
   </div>
-</div>
-</body>
-</html>`;
+</div>`;
 
-    const win = window.open("", "_blank");
-    if (!win) {
-      alert("Habilitá las ventanas emergentes para generar el PDF.");
-      return;
+    // Genera el PDF real en el cliente (html2pdf.js = html2canvas + jsPDF) y lo descarga.
+    // Reemplaza al viejo mecanismo de window.print(), que dependía de que el
+    // navegador abriera solo el diálogo de impresión — poco confiable en algunos
+    // navegadores/extensiones.
+    const generarDescarga = () => {
+      setGenerandoPDF(true);
+      const contenedor = document.createElement("div");
+      contenedor.style.cssText =
+        "position:fixed; left:-9999px; top:0; width:794px; background:#fff; z-index:-1;";
+      contenedor.innerHTML = `<style>${styleCSS}</style>${pageHTML}`;
+      document.body.appendChild(contenedor);
+
+      const limpiar = () => {
+        if (contenedor.parentNode) contenedor.parentNode.removeChild(contenedor);
+        setGenerandoPDF(false);
+      };
+
+      const paginaEl = contenedor.querySelector(".page");
+      const esperarFuentes =
+        document.fonts && document.fonts.ready
+          ? document.fonts.ready
+          : Promise.resolve();
+
+      esperarFuentes
+        .then(() => new Promise((resolve) => setTimeout(resolve, 300)))
+        .then(() =>
+          window
+            .html2pdf()
+            .set({
+              margin: 0,
+              filename: `Presupuesto_${nro}.pdf`,
+              image: { type: "jpeg", quality: 0.98 },
+              html2canvas: {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: "#ffffff",
+              },
+              jsPDF: {
+                unit: "px",
+                format: [794, Math.max(paginaEl.scrollHeight, 1123)],
+                orientation: "portrait",
+              },
+            })
+            .from(paginaEl)
+            .save(),
+        )
+        .catch((err) => {
+          console.error("Error generando PDF:", err);
+          alert("Ocurrió un error generando el PDF. Probá de nuevo.");
+        })
+        .finally(limpiar);
+    };
+
+    if (window.html2pdf) {
+      generarDescarga();
+    } else {
+      const script = document.createElement("script");
+      script.src =
+        "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+      script.onload = generarDescarga;
+      script.onerror = () => {
+        alert(
+          "No se pudo cargar el generador de PDF. Revisá la conexión a internet e intentá de nuevo.",
+        );
+      };
+      document.head.appendChild(script);
     }
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 800);
   };
 
   return (
@@ -2277,21 +2326,21 @@ export default function PresupuestoNuevo({
           <button
             className="pn-tool-btn"
             onClick={handlePDF}
-            disabled={presupuestoItems.length === 0}
+            disabled={presupuestoItems.length === 0 || generandoPDF}
             title={
               presupuestoItems.length === 0
                 ? "Agregá al menos un ítem al presupuesto para generar el PDF"
-                : "Genera el PDF del presupuesto"
+                : "Genera y descarga el PDF del presupuesto"
             }
             style={{
               background: "#e8f0f7",
               borderColor: "#2277bb",
               color: "#0a3a5c",
               fontWeight: 700,
-              opacity: presupuestoItems.length === 0 ? 0.5 : 1,
+              opacity: presupuestoItems.length === 0 || generandoPDF ? 0.5 : 1,
             }}
           >
-            🖨️ Generar PDF
+            🖨️ {generandoPDF ? "Generando..." : "Generar PDF"}
           </button>
         </div>
 
