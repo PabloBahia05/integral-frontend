@@ -1193,7 +1193,7 @@ export default function PresupuestoNuevo({
     const familiaMap = {
       bajomesadas: "Bajomesada",
       alacenas: "Alacena",
-      placard: "Placard",
+      placard: "PLACARD",
       frente: "Frente",
       auxiliares: "Auxiliares",
       accesorios: "Accesorios",
