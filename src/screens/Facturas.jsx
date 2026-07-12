@@ -408,6 +408,7 @@ export default function Facturas({ proveedores = [], token }) {
   const [detalle, setDetalle] = useState(null);
   const [modal, setModal] = useState(null); // "nueva"|"editar"|"detalle"|"ocr"
   const [loading, setLoading] = useState(false);
+  const [guardandoFactura, setGuardandoFactura] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrResult, setOcrResult] = useState(null);
   const [form, setForm] = useState(EMPTY_FACTURA);
@@ -612,6 +613,8 @@ export default function Facturas({ proveedores = [], token }) {
 
   // ── Guardar (manual o post-OCR) ────────────────────────────────────────────
   const guardarFactura = async () => {
+    if (guardandoFactura) return; // evita doble POST por doble clic
+    setGuardandoFactura(true);
     try {
       // Verificar número de factura duplicado (solo en modo nueva)
       if (modal !== "editar" && form.numero && form.numero.trim() !== "") {
@@ -682,6 +685,8 @@ export default function Facturas({ proveedores = [], token }) {
       cerrarModal();
     } catch (e) {
       alert("Error al guardar: " + e.message);
+    } finally {
+      setGuardandoFactura(false);
     }
   };
 
@@ -2531,8 +2536,21 @@ export default function Facturas({ proveedores = [], token }) {
           <button style={S.btnSecondary} onClick={cerrarModal}>
             Cancelar
           </button>
-          <button style={S.btnPrimary} onClick={guardarFactura}>
-            {modal === "editar" ? "Guardar cambios" : "Guardar factura"}
+          <button
+            style={{
+              ...S.btnPrimary,
+              ...(guardandoFactura
+                ? { opacity: 0.6, cursor: "not-allowed" }
+                : {}),
+            }}
+            onClick={guardarFactura}
+            disabled={guardandoFactura}
+          >
+            {guardandoFactura
+              ? "Guardando…"
+              : modal === "editar"
+                ? "Guardar cambios"
+                : "Guardar factura"}
           </button>
         </div>
       </div>
