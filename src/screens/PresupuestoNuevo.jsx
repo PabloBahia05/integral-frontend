@@ -561,6 +561,7 @@ export default function PresupuestoNuevo({
   };
   const [mostrarCosto, setMostrarCosto] = useState(false);
   const [incluirPrecio, setIncluirPrecio] = useState(false);
+  const [incluirSubtotalItem, setIncluirSubtotalItem] = useState(false);
   const [incluirTotal, setIncluirTotal] = useState(true);
   const [color, setColor] = useState("");
   const [incluirTextoColoc, setIncluirTextoColoc] = useState(false);
@@ -1570,7 +1571,7 @@ export default function PresupuestoNuevo({
 
     // Cantidad de columnas de la tabla según qué se decida incluir
     const colsExtra = (mostrarCosto ? 1 : 0) + (incluirPrecio ? 1 : 0);
-    const totalCols = 3 + colsExtra + 1; // producto+desc+cant + (costo/precio) + subtotal
+    const totalCols = 3 + colsExtra + (incluirSubtotalItem ? 1 : 0); // producto+desc+cant + (costo/precio) + (subtotal por ítem, opcional)
 
     // Agrupa los ítems por sección, respetando el orden en que fueron agregados
     const secciones = [...new Set(presupuestoItems.map((p) => p.seccion))];
@@ -1593,7 +1594,7 @@ export default function PresupuestoNuevo({
           <td class="center">${item.cantidad ?? 1}</td>
           ${mostrarCosto ? `<td class="right">${item.costo != null ? formatPeso(item.costo) : "—"}</td>` : ""}
           ${incluirPrecio ? `<td class="right">${formatPeso(item.precio)}</td>` : ""}
-          <td class="right"><strong>${formatPeso(item.subtotal)}</strong></td>
+          ${incluirSubtotalItem ? `<td class="right"><strong>${formatPeso(item.subtotal)}</strong></td>` : ""}
         </tr>`;
           })
           .join("");
@@ -1716,7 +1717,7 @@ export default function PresupuestoNuevo({
           <th class="center">Cant.</th>
           ${mostrarCosto ? `<th class="right">Costo</th>` : ""}
           ${incluirPrecio ? `<th class="right">Precio unit.</th>` : ""}
-          <th class="right">Subtotal</th>
+          ${incluirSubtotalItem ? `<th class="right">Subtotal</th>` : ""}
         </tr>
       </thead>
       <tbody>
@@ -2837,6 +2838,16 @@ export default function PresupuestoNuevo({
                       onChange={(e) => setIncluirPrecio(e.target.checked)}
                     />{" "}
                     Incluir precio
+                  </label>
+                  <label className="pn-check-row">
+                    <input
+                      type="checkbox"
+                      checked={incluirSubtotalItem}
+                      onChange={(e) =>
+                        setIncluirSubtotalItem(e.target.checked)
+                      }
+                    />{" "}
+                    Incluir subtotal por ítem
                   </label>
                   <label className="pn-check-row">
                     <input
