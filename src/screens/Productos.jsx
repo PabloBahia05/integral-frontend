@@ -69,6 +69,11 @@ const makeColumns = (onVer) => [
       v != null ? `$${parseFloat(v).toLocaleString("es-AR")}` : "-",
   },
   {
+    key: "fecha_precio",
+    label: "Fecha Precio",
+    render: (v) => (v ? String(v).slice(0, 10) : "-"),
+  },
+  {
     key: "costosi",
     label: "Costo s/imp.",
     render: (v) =>
@@ -143,7 +148,7 @@ const EMPTY = {
   descuento: "",
   flete: "",
   valorlista: "",
-  margen: "",
+  fecha_precio: "",
   mca: "",
   codartprov: "",
   prod_prov: "",
@@ -370,6 +375,14 @@ function DetalleArticulo({ producto }) {
         <div className="detalle-precio-row">
           <span>Val. lista proveedor</span>
           <strong>{fmt(producto.valorlista)}</strong>
+        </div>
+        <div className="detalle-precio-row">
+          <span>Fecha precio</span>
+          <strong>
+            {producto.fecha_precio
+              ? String(producto.fecha_precio).slice(0, 10)
+              : "-"}
+          </strong>
         </div>
         <div className="detalle-precio-row">
           <span>Costo s/imp.</span>
@@ -630,6 +643,9 @@ export default function Productos({
       descuento: s(selected.descuento),
       flete: s(selected.flete),
       valorlista: s(selected.valorlista),
+      fecha_precio: selected.fecha_precio
+        ? String(selected.fecha_precio).slice(0, 10)
+        : "",
       margen: s(selected.margen),
       codartprov: s(selected.codartprov),
       prod_prov: s(selected.prod_prov),
@@ -679,6 +695,7 @@ export default function Productos({
       costo_placa: toDecimal(form.costo_placa),
       descuento: toDecimal(form.descuento),
       valorlista: toDecimal(form.valorlista),
+      fecha_precio: form.fecha_precio || null,
       margen: toDecimal(form.margen),
       codartprov: form.codartprov || null,
       prod_prov: form.prod_prov || null,
@@ -1204,6 +1221,23 @@ export default function Productos({
                           const calc = recalcular(vl, dto, form.margen);
                           setForm((p) => ({ ...p, valorlista: vl, ...calc }));
                         }}
+                      />
+                    </div>
+
+                    {/* Fecha del precio — editable manualmente */}
+                    <div className="form-group">
+                      <label className="form-label">Fecha precio</label>
+                      <input
+                        className="form-input"
+                        style={inputStyle}
+                        type="date"
+                        value={form.fecha_precio}
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            fecha_precio: e.target.value,
+                          }))
+                        }
                       />
                     </div>
 
