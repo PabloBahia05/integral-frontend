@@ -790,6 +790,7 @@ export default function Facturas({ proveedores = [], token }) {
                 ...(item.precio_unit
                   ? {
                       valorlista: Number(item.precio_unit),
+                      fecha_precio: form.fecha || null,
                       ...(calcularCostosi(item.precio_unit, proveedorId) !== null
                         ? { costosi: calcularCostosi(item.precio_unit, proveedorId) }
                         : {}),
@@ -837,6 +838,7 @@ export default function Facturas({ proveedores = [], token }) {
                   ...(item.precio_unit
                     ? {
                         valorlista: Number(item.precio_unit),
+                        fecha_precio: form.fecha || null,
                         ...(calcularCostosi(item.precio_unit, proveedorId) !== null
                           ? { costosi: calcularCostosi(item.precio_unit, proveedorId) }
                           : {}),
@@ -867,6 +869,7 @@ export default function Facturas({ proveedores = [], token }) {
                 ...(item.precio_unit
                   ? {
                       valorlista: Number(item.precio_unit),
+                      fecha_precio: form.fecha || null,
                       ...(calcularCostosi(item.precio_unit, proveedorId) !== null
                         ? { costosi: calcularCostosi(item.precio_unit, proveedorId) }
                         : {}),
@@ -933,6 +936,7 @@ export default function Facturas({ proveedores = [], token }) {
           ...(item.precio_unit
             ? {
                 valorlista: Number(item.precio_unit),
+                fecha_precio: form.fecha || null,
                 ...(calcularCostosi(item.precio_unit, item.proveedorId) !== null
                   ? { costosi: calcularCostosi(item.precio_unit, item.proveedorId) }
                   : {}),
@@ -1016,6 +1020,7 @@ export default function Facturas({ proveedores = [], token }) {
         ...(item.precio_unit
           ? {
               valorlista: Number(item.precio_unit),
+              fecha_precio: form.fecha || null,
               ...(calcularCostosi(item.precio_unit, item.proveedorId) !== null
                 ? { costosi: calcularCostosi(item.precio_unit, item.proveedorId) }
                 : {}),
@@ -1052,6 +1057,7 @@ export default function Facturas({ proveedores = [], token }) {
         ...(item.precio_unit
           ? {
               valorlista: Number(item.precio_unit),
+              fecha_precio: form.fecha || null,
               ...(calcularCostosi(item.precio_unit, item.proveedorId) !== null
                 ? { costosi: calcularCostosi(item.precio_unit, item.proveedorId) }
                 : {}),
