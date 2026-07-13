@@ -978,6 +978,7 @@ function App() {
                   setPresupuestoAbierto(row);
                   setScreen("presupuesto-nuevo");
                 }}
+                authFetch={authFetch}
               />
             )}
             {screen === "presupuesto-amoblamiento" &&
