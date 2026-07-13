@@ -511,6 +511,22 @@ export default function Anviz({ onBack }) {
     }
   }
 
+  // ── Último control (ult_con) — carga manual de fecha, independiente del modo edición ──
+  async function guardarUltimoControl(id, fecha) {
+    // Actualización optimista para que se vea al toque en la tabla
+    setVacData(prev => prev.map(e => e.id === id ? { ...e, ult_con: fecha } : e));
+    try {
+      await authFetch(`${API}/empleados/${id}/vacaciones-horas`, {
+        method: "PUT",
+        body: JSON.stringify({ ult_con: fecha }),
+      });
+    } catch (e) {
+      console.error(e);
+      // Si falla el guardado, recargamos desde el backend para no dejar el dato desincronizado
+      await abrirVacaciones(vacDesde, vacHasta);
+    }
+  }
+
   // ── Detalle de vacaciones tomadas (períodos concretos) ──
   async function abrirModalVacaciones(empleado) {
     setVacModalEmpleado(empleado);
@@ -743,6 +759,7 @@ export default function Anviz({ onBack }) {
                       <th style={s.th}>Hs. justificadas</th>
                       <th style={s.th}>Dif. del período</th>
                       <th style={s.th}>Saldo total de horas</th>
+                      <th style={s.th}>Último control</th>
                       {!esOperario && <th style={s.th}>Acciones</th>}
                     </tr>
                   </thead>
@@ -853,6 +870,13 @@ export default function Anviz({ onBack }) {
                               )}
                             </>
                           )}
+                        </td>
+                        <td style={s.td}>
+                          <DateInput
+                            value={e.ult_con ? String(e.ult_con).slice(0, 10) : ""}
+                            onChange={(iso) => guardarUltimoControl(e.id, iso)}
+                            style={{ ...s.input, width: 110 }}
+                          />
                         </td>
                         {!esOperario && (
                           <td style={s.td}>
