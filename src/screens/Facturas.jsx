@@ -414,8 +414,8 @@ export default function Facturas({ proveedores = [], token }) {
   const [form, setForm] = useState(EMPTY_FACTURA);
   const [itemsForm, setItemsForm] = useState([]);
   const [dragOver, setDragOver] = useState(false);
-  const [imgPreview, setImgPreview] = useState(null);
-  const [imgFile, setImgFile] = useState(null);
+  const [imgPreviews, setImgPreviews] = useState([]); // previews de cada hoja (solo imágenes)
+  const [imgFiles, setImgFiles] = useState([]); // File[] — una o varias hojas de la misma factura
   const [fileType, setFileType] = useState(null); // "image" | "pdf"
   const [filtro, setFiltro] = useState("");
   const [provId, setProvId] = useState("");
@@ -500,22 +500,46 @@ export default function Facturas({ proveedores = [], token }) {
   const [ocrValidacion, setOcrValidacion] = useState(null); // {subtotal, iva, pers_IIBB, totalOcr, totalCalc}
 
   // ── OCR ────────────────────────────────────────────────────────────────────
-  const handleFile = (file) => {
-    if (!file) return;
-    const isPdf =
-      file.type === "application/pdf" ||
-      file.name.toLowerCase().endsWith(".pdf");
-    setImgFile(file);
-    setFileType(isPdf ? "pdf" : "image");
-    setImgPreview(isPdf ? null : URL.createObjectURL(file));
+  // Acepta una o varias imágenes (las hojas de una misma factura) o un único
+  // PDF. Si se selecciona un PDF, reemplaza cualquier selección de imágenes
+  // previa (no se combinan hojas sueltas con un PDF). Si son imágenes, se
+  // van acumulando en el orden en que se agregan (hoja 1, hoja 2, ...).
+  const esPdf = (file) =>
+    file.type === "application/pdf" ||
+    file.name.toLowerCase().endsWith(".pdf");
+
+  const handleFiles = (fileList) => {
+    const files = Array.from(fileList || []).filter(Boolean);
+    if (!files.length) return;
+    const pdf = files.find(esPdf);
+    if (pdf) {
+      setImgFiles([pdf]);
+      setImgPreviews([]);
+      setFileType("pdf");
+      return;
+    }
+    setImgFiles((prev) => [...prev, ...files]);
+    setImgPreviews((prev) => [...prev, ...files.map((f) => URL.createObjectURL(f))]);
+    setFileType("image");
+  };
+
+  const quitarHoja = (idx) => {
+    setImgFiles((prev) => prev.filter((_, i) => i !== idx));
+    setImgPreviews((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const lanzarOcr = async () => {
-    if (!imgFile) return;
+    if (!imgFiles.length) return;
     setOcrProgress(10);
     const fd = new FormData();
     const isPdf = fileType === "pdf";
-    fd.append(isPdf ? "pdf" : "imagen", imgFile);
+    if (isPdf) {
+      fd.append("pdf", imgFiles[0]);
+    } else {
+      // Misma clave 'imagen' repetida, una por hoja, en orden — el backend
+      // las concatena antes de detectar proveedor y parsear.
+      imgFiles.forEach((file) => fd.append("imagen", file));
+    }
     if (provId) fd.append("proveedor_id", provId);
 
     try {
@@ -632,9 +656,10 @@ export default function Facturas({ proveedores = [], token }) {
       }
 
       let imagenUrl = null;
-      if (imgFile && !ocrResult) {
+      if (imgFiles.length && !ocrResult) {
+        // Se guarda solo la primera hoja como imagen de referencia de la factura.
         const fd = new FormData();
-        fd.append("imagen", imgFile);
+        fd.append("imagen", imgFiles[0]);
         const up = await fetch(`${API}/api/upload-imagen-factura`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
@@ -1603,8 +1628,8 @@ export default function Facturas({ proveedores = [], token }) {
     setForm(EMPTY_FACTURA);
     setItemsForm([]);
     setOcrResult(null);
-    setImgFile(null);
-    setImgPreview(null);
+    setImgFiles([]);
+    setImgPreviews([]);
     setFileType(null);
     setProvId("");
     setOcrProgress(0);
@@ -2085,26 +2110,79 @@ export default function Facturas({ proveedores = [], token }) {
           onDrop={(e) => {
             e.preventDefault();
             setDragOver(false);
-            handleFile(e.dataTransfer.files[0]);
+            handleFiles(e.dataTransfer.files);
           }}
           onClick={() => fileRef.current.click()}
         >
-          {imgFile && fileType === "pdf" ? (
+          {fileType === "pdf" && imgFiles[0] ? (
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 40, marginBottom: 8 }}>📑</div>
               <div style={{ fontSize: 13, color: "#0a3a5c", fontWeight: 700 }}>
-                {imgFile.name}
+                {imgFiles[0].name}
               </div>
               <div style={{ fontSize: 11, marginTop: 4, color: "#6699bb" }}>
-                {(imgFile.size / 1024).toFixed(0)} KB · PDF listo para procesar
+                {(imgFiles[0].size / 1024).toFixed(0)} KB · PDF listo para procesar
               </div>
             </div>
-          ) : imgPreview ? (
-            <img
-              src={imgPreview}
-              alt="preview"
-              style={{ maxHeight: 180, maxWidth: "100%", borderRadius: 4 }}
-            />
+          ) : imgPreviews.length > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                justifyContent: "center",
+              }}
+            >
+              {imgPreviews.map((src, idx) => (
+                <div key={idx} style={{ position: "relative" }}>
+                  <img
+                    src={src}
+                    alt={`hoja ${idx + 1}`}
+                    style={{
+                      maxHeight: 140,
+                      maxWidth: 140,
+                      borderRadius: 4,
+                      display: "block",
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: 10,
+                      textAlign: "center",
+                      color: "#6699bb",
+                      marginTop: 2,
+                    }}
+                  >
+                    Hoja {idx + 1}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      quitarHoja(idx);
+                    }}
+                    title="Quitar esta hoja"
+                    style={{
+                      position: "absolute",
+                      top: -6,
+                      right: -6,
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: "none",
+                      background: "#c0392b",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      lineHeight: "20px",
+                      padding: 0,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
           ) : (
             <>
               <div style={{ fontSize: 36, marginBottom: 10 }}>📄</div>
@@ -2113,17 +2191,36 @@ export default function Facturas({ proveedores = [], token }) {
                 <br />o hacé clic para seleccionar
               </div>
               <div style={{ fontSize: 11, marginTop: 8, color: "#99bbcc" }}>
-                JPG · PNG · TIFF · BMP · PDF
+                JPG · PNG · TIFF · BMP · PDF — si la factura tiene varias
+                hojas, seleccioná o arrastrá todas juntas (o agregalas de a
+                una)
               </div>
             </>
           )}
         </div>
+
+        {fileType === "image" && imgPreviews.length > 0 && (
+          <div style={{ textAlign: "center", margin: "8px 0" }}>
+            <button
+              type="button"
+              style={{ ...S.btnSecondary, fontSize: 12, padding: "4px 10px" }}
+              onClick={() => fileRef.current.click()}
+            >
+              + Agregar otra hoja
+            </button>
+          </div>
+        )}
+
         <input
           ref={fileRef}
           type="file"
           accept="image/*,.pdf,application/pdf"
+          multiple
           style={{ display: "none" }}
-          onChange={(e) => handleFile(e.target.files[0])}
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = ""; // permite volver a elegir/agregar la misma hoja
+          }}
         />
 
         <div style={S.field}>
@@ -2172,7 +2269,7 @@ export default function Facturas({ proveedores = [], token }) {
             <button
               style={S.btnPrimary}
               onClick={lanzarOcr}
-              disabled={!imgFile}
+              disabled={!imgFiles.length}
             >
               {ocrProgress > 0 ? "Procesando…" : "Extraer datos"}
             </button>
