@@ -527,6 +527,22 @@ export default function Anviz({ onBack }) {
     }
   }
 
+  // ── Fecha de ingreso — carga manual, mismo patrón que Último control ──
+  async function guardarFechaIngreso(id, fecha) {
+    // Actualización optimista para que se vea al toque en la tabla
+    setVacData(prev => prev.map(e => e.id === id ? { ...e, fecha_ingreso: fecha } : e));
+    try {
+      await authFetch(`${API}/empleados/${id}/vacaciones-horas`, {
+        method: "PUT",
+        body: JSON.stringify({ fecha_ingreso: fecha }),
+      });
+    } catch (e) {
+      console.error(e);
+      // Si falla el guardado, recargamos desde el backend para no dejar el dato desincronizado
+      await abrirVacaciones(vacDesde, vacHasta);
+    }
+  }
+
   // ── Detalle de vacaciones tomadas (períodos concretos) ──
   async function abrirModalVacaciones(empleado) {
     setVacModalEmpleado(empleado);
@@ -749,6 +765,7 @@ export default function Anviz({ onBack }) {
                   <thead>
                     <tr style={{ background: "var(--color-bg-secondary)" }}>
                       <th style={s.th}>Empleado</th>
+                      <th style={s.th}>Fecha ingreso</th>
                       <th style={s.th}>Vac. correspondientes</th>
                       <th style={s.th}>Vac. tomadas</th>
                       <th style={s.th}>Vac. pendientes</th>
@@ -767,6 +784,13 @@ export default function Anviz({ onBack }) {
                     {vacData.map((e) => (
                       <tr key={e.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
                         <td style={s.td}>{e.apellido} {e.nombre}</td>
+                        <td style={s.td}>
+                          <DateInput
+                            value={e.fecha_ingreso ? String(e.fecha_ingreso).slice(0, 10) : ""}
+                            onChange={(iso) => guardarFechaIngreso(e.id, iso)}
+                            style={{ ...s.input, width: 110 }}
+                          />
+                        </td>
                         <td style={s.td}>
                           {vacEditando === e.id ? (
                             <div>
