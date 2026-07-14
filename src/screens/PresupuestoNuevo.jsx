@@ -535,6 +535,10 @@ export default function PresupuestoNuevo({
   const [wapp, setWapp] = useState("");
   const [domicilio, setDomicilio] = useState("");
   const [domicilioFiscal, setDomicilioFiscal] = useState("");
+  // Resolución automática de cliente: busca por nombre, luego por teléfono,
+  // y si no existe lo da de alta solo, sin que el usuario elija de una lista.
+  const [resolviendoCliente, setResolviendoCliente] = useState(false);
+  const [clienteAutoResuelto, setClienteAutoResuelto] = useState(null); // "existente" | "nuevo" | null
   const [localidad, setLocalidad] = useState("Bahía Blanca");
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [leyenda, setLeyenda] = useState("");
@@ -1300,6 +1304,95 @@ export default function PresupuestoNuevo({
       return [...cocinaRows, ...placardRows, ...otros];
     });
   }, [cocinaItems, placardItems]);
+
+  // ── Resolución automática de cliente ────────────────────────────────────
+  // Cuando el usuario carga nombre + teléfono a mano (sin elegir una
+  // sugerencia de la lista), buscamos primero por nombre exacto, si no
+  // aparece buscamos por teléfono, y si tampoco existe damos de alta el
+  // cliente solos, sin pedirle nada más al usuario.
+  useEffect(() => {
+    if (numeroPres !== null) return; // no autoresolver al editar un presupuesto existente
+    if (codcliente) return; // ya está vinculado a un cliente (elegido o ya resuelto)
+
+    const nombreVal = cliente.trim();
+    const telVal = telefonoSearch.trim();
+    if (!nombreVal || !telVal) return; // esperamos nombre Y teléfono
+
+    const timer = setTimeout(async () => {
+      setResolviendoCliente(true);
+      try {
+        // 1) Buscar por nombre exacto
+        let encontrado = null;
+        try {
+          const rNombre = await authFetch(
+            `${API}/clientes/buscar-nombre?q=${encodeURIComponent(nombreVal)}`,
+          );
+          const dNombre = await rNombre.json();
+          if (Array.isArray(dNombre)) {
+            encontrado = dNombre.find(
+              (c) =>
+                (c.nombre ?? c.NOMBRE ?? "").trim().toLowerCase() ===
+                nombreVal.toLowerCase(),
+            );
+          }
+        } catch (e) {
+          console.error("[autoresolverCliente] error buscando por nombre:", e);
+        }
+
+        // 2) Si no hay match exacto por nombre, buscar por teléfono
+        if (!encontrado) {
+          try {
+            const rTel = await authFetch(
+              `${API}/clientes/buscar-telefono?q=${encodeURIComponent(telVal)}`,
+            );
+            const dTel = await rTel.json();
+            if (Array.isArray(dTel) && dTel.length > 0) {
+              encontrado = dTel[0];
+            }
+          } catch (e) {
+            console.error("[autoresolverCliente] error buscando por teléfono:", e);
+          }
+        }
+
+        if (encontrado) {
+          // Cliente existente: lo vinculamos sin pisar lo que el usuario ya escribió
+          setCodcliente(encontrado.codcliente ?? encontrado.CODCLIENTE ?? null);
+          setTelefono1(encontrado.telefono1 ?? encontrado.TELEFONO1 ?? telVal);
+          setTelefono2(encontrado.telefono2 ?? encontrado.TELEFONO2 ?? "");
+          setWapp(encontrado.wapp ?? encontrado.WAPP ?? "");
+          setDomicilio(encontrado.domrem ?? encontrado.DOMREM ?? "");
+          setDomicilioFiscal(
+            encontrado.domiciliofiscal ??
+              encontrado["domicilio fiscal"] ??
+              encontrado.DOMICILIO_FISCAL ??
+              "",
+          );
+          setClienteAutoResuelto("existente");
+        } else {
+          // 3) No existe ni por nombre ni por teléfono → alta automática
+          const rNuevo = await authFetch(`${API}/clientes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nombre: nombreVal, telefono1: telVal }),
+          });
+          const dNuevo = await rNuevo.json();
+          if (rNuevo.ok) {
+            setCodcliente(
+              dNuevo.codcliente ?? dNuevo.CODCLIENTE ?? dNuevo.id ?? null,
+            );
+            setTelefono1(telVal);
+            setClienteAutoResuelto("nuevo");
+          } else {
+            console.error("[autoresolverCliente] no se pudo crear el cliente:", dNuevo);
+          }
+        }
+      } finally {
+        setResolviendoCliente(false);
+      }
+    }, 900); // esperamos a que el usuario termine de tipear ambos campos
+
+    return () => clearTimeout(timer);
+  }, [cliente, telefonoSearch, codcliente, numeroPres]);
 
   const setLinea = (idx, field, val) => {
     setLineas((prev) =>
@@ -2448,6 +2541,7 @@ export default function PresupuestoNuevo({
                       const val = e.target.value;
                       setCliente(val);
                       setCodcliente(null); // resetear si escribe a mano
+                      setClienteAutoResuelto(null);
                       clearTimeout(window._clienteTimer);
                       if (val.length > 1) {
                         window._clienteTimer = setTimeout(() => {
@@ -2513,6 +2607,7 @@ export default function PresupuestoNuevo({
                                   "",
                               );
                               setTelefonoSearch(tel1 || tel2 || wp);
+                              setClienteAutoResuelto("existente");
                               setClientesSugeridos([]);
                             }}
                             style={{
@@ -2631,6 +2726,7 @@ export default function PresupuestoNuevo({
                                   "",
                               );
                               setTelefonoSearch(tel1 || tel2 || wp);
+                              setClienteAutoResuelto("existente");
                               setTelefonosSugeridos([]);
                             }}
                             style={{
@@ -2669,6 +2765,44 @@ export default function PresupuestoNuevo({
                     </div>
                   )}
                 </div>
+
+                {/* Estado de la resolución automática de cliente */}
+                {resolviendoCliente && (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "#4a8ab5",
+                      fontFamily: "'Space Mono',monospace",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    🔎 Verificando cliente...
+                  </span>
+                )}
+                {!resolviendoCliente && clienteAutoResuelto === "existente" && (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "#1b5e20",
+                      fontFamily: "'Space Mono',monospace",
+                    }}
+                  >
+                    ✅ Cliente existente vinculado
+                  </span>
+                )}
+                {!resolviendoCliente && clienteAutoResuelto === "nuevo" && (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "#856404",
+                      fontFamily: "'Space Mono',monospace",
+                    }}
+                  >
+                    🆕 Cliente nuevo dado de alta
+                  </span>
+                )}
 
                 {/* Chips de teléfonos del cliente seleccionado */}
                 {(telefono1 || telefono2 || wapp) && (
@@ -3418,9 +3552,7 @@ export default function PresupuestoNuevo({
                                             precioUsarLineas &&
                                             precioUsarLineas !== ""
                                               ? precioUsarLineas
-                                              : lineasActivas.length === 0
-                                                ? precioPlacard
-                                                : "";
+                                              : precioPlacard || "";
                                           const nombreart =
                                             p.nombreart ?? p.NOMBREART ?? base;
                                           setPlacardFila((f) => ({
@@ -3889,9 +4021,7 @@ export default function PresupuestoNuevo({
                                   const precioUsar =
                                     precioUsarLineas && precioUsarLineas !== ""
                                       ? precioUsarLineas
-                                      : lineasActivas.length === 0
-                                        ? precioPlacard
-                                        : "";
+                                      : precioPlacard || "";
                                   const nombreart =
                                     p.nombreart ?? p.NOMBREART ?? base;
                                   setPlacardFila((f) => ({
