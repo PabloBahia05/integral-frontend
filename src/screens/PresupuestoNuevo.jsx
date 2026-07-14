@@ -1750,8 +1750,14 @@ export default function PresupuestoNuevo({
     const accentLight = color && color.trim() ? color.trim() : "#60b4f0";
 
     // Cantidad de columnas de la tabla según qué se decida incluir
-    const colsExtra = (mostrarCosto ? 1 : 0) + (incluirPrecio ? 1 : 0);
-    const totalCols = 3 + colsExtra + (incluirSubtotalItem ? 1 : 0); // producto+desc+cant + (costo/precio) + (subtotal por ítem, opcional)
+    // Si hay líneas cargadas, se muestra una columna de precio por cada línea
+    // (igual que en la tabla "Presupuesto" en pantalla). Si no hay líneas, se
+    // usa la columna única "Precio unit." controlada por incluirPrecio.
+    const mostrarLineas = lineasActivas.length > 0;
+    const colsExtra =
+      (mostrarCosto ? 1 : 0) +
+      (mostrarLineas ? lineasActivas.length : incluirPrecio ? 1 : 0);
+    const totalCols = 3 + colsExtra + (incluirSubtotalItem ? 1 : 0); // producto+desc+cant + (costo/líneas) + (subtotal por ítem, opcional)
 
     // Agrupa los ítems por sección, respetando el orden en que fueron agregados
     const secciones = [...new Set(presupuestoItems.map((p) => p.seccion))];
@@ -1760,6 +1766,15 @@ export default function PresupuestoNuevo({
       .map((sec) => {
         const items = presupuestoItems.filter((p) => p.seccion === sec);
         const subtotalSec = items.reduce((s, it) => s + (it.subtotal || 0), 0);
+        const subtotalesLineaSec = mostrarLineas
+          ? lineasActivas.map((l, li) =>
+              items.reduce((s, it) => {
+                const pr =
+                  parseFloat(it.precios?.[li]?.precio ?? it.precio ?? 0) || 0;
+                return s + pr * (parseFloat(it.cantidad) || 1);
+              }, 0),
+            )
+          : [];
 
         const filasItems = items
           .map((item) => {
@@ -1767,23 +1782,42 @@ export default function PresupuestoNuevo({
               item.seccion === "Mampara" && item.ancho && item.alto
                 ? ` <span class="medida">(${item.ancho} × ${item.alto} cm)</span>`
                 : "";
+            const celdasPrecio = mostrarLineas
+              ? lineasActivas
+                  .map((l, li) => {
+                    const pr = item.precios?.[li]?.precio ?? item.precio ?? 0;
+                    return `<td class="right">${formatPeso(pr)}</td>`;
+                  })
+                  .join("")
+              : incluirPrecio
+                ? `<td class="right">${formatPeso(item.precio)}</td>`
+                : "";
             return `
         <tr>
           <td>${item.nombreart ?? ""}</td>
           <td>${item.descripcion ?? ""}${medida}</td>
           <td class="center">${item.cantidad ?? 1}</td>
           ${mostrarCosto ? `<td class="right">${item.costo != null ? formatPeso(item.costo) : "—"}</td>` : ""}
-          ${incluirPrecio ? `<td class="right">${formatPeso(item.precio)}</td>` : ""}
+          ${celdasPrecio}
           ${incluirSubtotalItem ? `<td class="right"><strong>${formatPeso(item.subtotal)}</strong></td>` : ""}
         </tr>`;
           })
           .join("");
 
+        const labelColspan =
+          totalCols - (mostrarLineas ? lineasActivas.length : 0) - 1;
+        const celdasSubtotalLinea = mostrarLineas
+          ? subtotalesLineaSec
+              .map((st) => `<td class="right">${formatPeso(st)}</td>`)
+              .join("")
+          : "";
+
         return `
       <tr class="seccion-row"><td colspan="${totalCols}">${sec}</td></tr>
       ${filasItems}
       <tr class="subtotal-row">
-        <td colspan="${totalCols - 1}">Subtotal ${sec}</td>
+        <td colspan="${labelColspan}">Subtotal ${sec}</td>
+        ${celdasSubtotalLinea}
         <td class="right">${formatPeso(subtotalSec)}</td>
       </tr>`;
       })
@@ -1888,7 +1922,15 @@ export default function PresupuestoNuevo({
           <th>Descripción</th>
           <th class="center">Cant.</th>
           ${mostrarCosto ? `<th class="right">Costo</th>` : ""}
-          ${incluirPrecio ? `<th class="right">Precio unit.</th>` : ""}
+          ${
+            mostrarLineas
+              ? lineasActivas
+                  .map((l) => `<th class="right">Línea ${l.linea}</th>`)
+                  .join("")
+              : incluirPrecio
+                ? `<th class="right">Precio unit.</th>`
+                : ""
+          }
           ${incluirSubtotalItem ? `<th class="right">Subtotal</th>` : ""}
         </tr>
       </thead>
