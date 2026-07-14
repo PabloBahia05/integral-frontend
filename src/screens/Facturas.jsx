@@ -789,6 +789,17 @@ export default function Facturas({ proveedores = [], token }) {
     return +(precio * (1 - descuento / 100)).toFixed(2);
   };
 
+  // ── Intervidrio: vidrios cuya descripción vuelca el precio_unit directo a
+  // la columna "precio" de articulos (sin importar el resto del texto) ────────
+  const DESCRIPCIONES_PRECIO_ESPECIAL = [
+    "templado float incoloro 8 mm",
+    "templado float esmerilado 8 mm",
+  ];
+  const esVidrioPrecioEspecial = (descripcion) => {
+    const d = (descripcion || "").toLowerCase();
+    return DESCRIPCIONES_PRECIO_ESPECIAL.some((patron) => d.includes(patron));
+  };
+
   const sincronizarArticulos = async (items, provNombre, proveedorId) => {
     const itemsValidos = items.filter(
       (it) =>
@@ -823,6 +834,9 @@ export default function Facturas({ proveedores = [], token }) {
                       fecha_precio: form.fecha || null,
                       ...(calcularCostosi(item.precio_unit, proveedorId) !== null
                         ? { costosi: calcularCostosi(item.precio_unit, proveedorId) }
+                        : {}),
+                      ...(esVidrioPrecioEspecial(item.descripcion)
+                        ? { precio: Number(item.precio_unit) }
                         : {}),
                     }
                   : {}),
@@ -872,6 +886,9 @@ export default function Facturas({ proveedores = [], token }) {
                         ...(calcularCostosi(item.precio_unit, proveedorId) !== null
                           ? { costosi: calcularCostosi(item.precio_unit, proveedorId) }
                           : {}),
+                        ...(esVidrioPrecioEspecial(item.descripcion)
+                          ? { precio: Number(item.precio_unit) }
+                          : {}),
                       }
                     : {}),
                 });
@@ -902,6 +919,9 @@ export default function Facturas({ proveedores = [], token }) {
                       fecha_precio: form.fecha || null,
                       ...(calcularCostosi(item.precio_unit, proveedorId) !== null
                         ? { costosi: calcularCostosi(item.precio_unit, proveedorId) }
+                        : {}),
+                      ...(esVidrioPrecioEspecial(item.descripcion)
+                        ? { precio: Number(item.precio_unit) }
                         : {}),
                     }
                   : {}),
@@ -969,6 +989,9 @@ export default function Facturas({ proveedores = [], token }) {
                 fecha_precio: form.fecha || null,
                 ...(calcularCostosi(item.precio_unit, item.proveedorId) !== null
                   ? { costosi: calcularCostosi(item.precio_unit, item.proveedorId) }
+                  : {}),
+                ...(esVidrioPrecioEspecial(item.descripcion)
+                  ? { precio: Number(item.precio_unit) }
                   : {}),
               }
             : {}),
@@ -1054,6 +1077,9 @@ export default function Facturas({ proveedores = [], token }) {
               ...(calcularCostosi(item.precio_unit, item.proveedorId) !== null
                 ? { costosi: calcularCostosi(item.precio_unit, item.proveedorId) }
                 : {}),
+              ...(esVidrioPrecioEspecial(item.descripcion)
+                ? { precio: Number(item.precio_unit) }
+                : {}),
             }
           : {}),
       });
@@ -1090,6 +1116,9 @@ export default function Facturas({ proveedores = [], token }) {
               fecha_precio: form.fecha || null,
               ...(calcularCostosi(item.precio_unit, item.proveedorId) !== null
                 ? { costosi: calcularCostosi(item.precio_unit, item.proveedorId) }
+                : {}),
+              ...(esVidrioPrecioEspecial(item.descripcion)
+                ? { precio: Number(item.precio_unit) }
                 : {}),
             }
           : {}),
