@@ -11,6 +11,8 @@ const COLUMNS = [
   { key: "id",               label: "ID" },
   { key: "codcliente",       label: "Cód. Cliente" },
   { key: "nombre",           label: "Nombre" },
+  { key: "nombre1",          label: "Nombre Adjunto" },
+  { key: "nombre2",          label: "Nombre Ligado" },
   { key: "domicilio fiscal", label: "Domicilio" },
   { key: "localidad",        label: "Localidad" },
   { key: "telefono1",        label: "Teléfono" },
@@ -19,7 +21,7 @@ const COLUMNS = [
 ];
 
 const EMPTY = {
-  codcliente: "", nombre: "", "domicilio fiscal": "", codloc: "",
+  codcliente: "", nombre: "", nombre1: "", nombre2: "", "domicilio fiscal": "", codloc: "",
   telefono1: "", telefono2: "", wapp: "", domrem: "",
   ubicacion: "", cuit: "", dni: "", tipofact: "",
   profesional: "", localidad: "", codpostal: "",
@@ -28,6 +30,8 @@ const EMPTY = {
 const FIELDS_LEFT = [
   { field: "codcliente",       label: "Código Cliente",  placeholder: "Ej: 1001" },
   { field: "nombre",           label: "Nombre *",         placeholder: "Ej: Juan Pérez" },
+  { field: "nombre1",          label: "Nombre Adjunto",   placeholder: "Ej: esposa, socio, etc." },
+  { field: "nombre2",          label: "Nombre Ligado",    placeholder: "Ej: familiar, contacto, etc." },
   { field: "domicilio fiscal", label: "Domicilio Fiscal", placeholder: "Ej: Av. Colón 123" },
   { field: "domrem",           label: "Dom. Remito",      placeholder: "Ej: Av. Alem 456" },
   { field: "localidad",        label: "Localidad",        placeholder: "Ej: Bahía Blanca" },
@@ -55,6 +59,8 @@ export default function Clientes({ clientes, onSave, onDelete, selected, onSelec
     const q = search.toLowerCase();
     return (
       (c.nombre              ?? "").toLowerCase().includes(q) ||
+      (c.nombre1             ?? "").toLowerCase().includes(q) ||
+      (c.nombre2             ?? "").toLowerCase().includes(q) ||
       (c.localidad           ?? "").toLowerCase().includes(q) ||
       (c["domicilio fiscal"] ?? "").toLowerCase().includes(q) ||
       String(c.cuit       ?? "").includes(q) ||
@@ -69,6 +75,8 @@ export default function Clientes({ clientes, onSave, onDelete, selected, onSelec
     setForm({
       codcliente:         selected.codcliente          ?? "",
       nombre:             selected.nombre              ?? "",
+      nombre1:            selected.nombre1             ?? "",
+      nombre2:            selected.nombre2             ?? "",
       "domicilio fiscal": selected["domicilio fiscal"] ?? "",
       codloc:             selected.codloc              ?? "",
       telefono1:          selected.telefono1           ?? "",
