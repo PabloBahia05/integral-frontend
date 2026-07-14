@@ -526,6 +526,7 @@ export default function PresupuestoNuevo({
   const [revision, setRevision] = useState(1);
   const [cliente, setCliente] = useState("");
   const [codcliente, setCodcliente] = useState(null);
+  const cargandoPresupuestoRef = useRef(false); // true mientras cargarPresupuesto está en curso
   const [clientesSugeridos, setClientesSugeridos] = useState([]);
   const [lineasBD, setLineasBD] = useState([]); // valores distintos de columna 'linea' en articulos
   const [telefonoSearch, setTelefonoSearch] = useState("");
@@ -1007,6 +1008,7 @@ export default function PresupuestoNuevo({
   const cargarPresupuesto = async (pres) => {
     if (!pres) return;
     const num = pres.numeropres ?? pres.id;
+    cargandoPresupuestoRef.current = true;
     try {
       // 1. Traer items de tabla_presupuestos
       const rev = pres.revision ?? pres.REVISION ?? 0;
@@ -1176,6 +1178,8 @@ export default function PresupuestoNuevo({
       }
     } catch (e) {
       console.error("Error cargando presupuesto:", e);
+    } finally {
+      cargandoPresupuestoRef.current = false;
     }
   };
 
@@ -1324,7 +1328,7 @@ export default function PresupuestoNuevo({
   //   - PUT /clientes/:id  acepta un body parcial, ej { telefono2: "..." }.
   //   - POST /clientes acepta { nombre, telefono1 } y devuelve el cliente creado.
   useEffect(() => {
-    if (numeroPres !== null) return; // no autoresolver al editar un presupuesto existente
+    if (cargandoPresupuestoRef.current) return; // no autoresolver mientras se está cargando un presupuesto existente
     if (codcliente) return; // ya está vinculado a un cliente (elegido o ya resuelto)
 
     const nombreVal = cliente.trim();
