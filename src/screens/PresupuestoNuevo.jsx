@@ -1307,9 +1307,22 @@ export default function PresupuestoNuevo({
 
   // ── Resolución automática de cliente ────────────────────────────────────
   // Cuando el usuario carga nombre + teléfono a mano (sin elegir una
-  // sugerencia de la lista), buscamos primero por nombre exacto, si no
-  // aparece buscamos por teléfono, y si tampoco existe damos de alta el
-  // cliente solos, sin pedirle nada más al usuario.
+  // sugerencia de la lista):
+  //   1) Busca coincidencia de nombre en nombre / nombre1 / nombre2.
+  //   2) Si no hay, busca coincidencia de teléfono en telefono1 / telefono2 / wapp.
+  //   3) Si encontró cliente por nombre pero el teléfono no coincide con
+  //      ninguna de sus 3 casillas, agrega el teléfono a la primera casilla
+  //      vacía (telefono1 → telefono2 → wapp).
+  //   4) Si encontró cliente por teléfono pero el nombre no coincide con
+  //      ninguna de sus 3 casillas, agrega el nombre a la primera casilla
+  //      vacía de nombre (nombre1 → nombre2). No pisa el campo "nombre" principal.
+  //   5) Si no encuentra nada por ninguno de los dos, da de alta el cliente solo.
+  //
+  // ⚠️ Asunciones sobre el backend (ajustar si no coinciden con tu API real):
+  //   - GET /clientes/buscar-nombre?q=   ya busca también en nombre1 y nombre2.
+  //   - GET /clientes/buscar-telefono?q= ya busca en telefono1, telefono2 y wapp.
+  //   - PUT /clientes/:id  acepta un body parcial, ej { telefono2: "..." }.
+  //   - POST /clientes acepta { nombre, telefono1 } y devuelve el cliente creado.
   useEffect(() => {
     if (numeroPres !== null) return; // no autoresolver al editar un presupuesto existente
     if (codcliente) return; // ya está vinculado a un cliente (elegido o ya resuelto)
@@ -1318,36 +1331,81 @@ export default function PresupuestoNuevo({
     const telVal = telefonoSearch.trim();
     if (!nombreVal || !telVal) return; // esperamos nombre Y teléfono
 
+    // Compara ignorando mayúsculas/tildes/espacios
+    const norm = (s) =>
+      String(s ?? "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    const nombresDe = (c) => [
+      c.nombre ?? c.NOMBRE ?? "",
+      c.nombre1 ?? c.NOMBRE1 ?? "",
+      c.nombre2 ?? c.NOMBRE2 ?? "",
+    ];
+    const telefonosDe = (c) => [
+      c.telefono1 ?? c.TELEFONO1 ?? "",
+      c.telefono2 ?? c.TELEFONO2 ?? "",
+      c.wapp ?? c.WAPP ?? "",
+    ];
+
+    // Actualiza en el cliente encontrado el primer campo vacío de una lista dada
+    const completarCasillaVacia = async (encontrado, campos, valor) => {
+      const idCliente = encontrado.id ?? encontrado.codcliente ?? encontrado.CODCLIENTE;
+      if (idCliente == null) return;
+      const actual = {};
+      campos.forEach((campo) => {
+        actual[campo] = encontrado[campo] ?? encontrado[campo.toUpperCase()] ?? "";
+      });
+      const campoVacio = campos.find((campo) => !String(actual[campo] ?? "").trim());
+      if (!campoVacio) return; // las 3 casillas ya están ocupadas, no forzamos nada
+      try {
+        await authFetch(`${API}/clientes/${idCliente}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [campoVacio]: valor }),
+        });
+      } catch (e) {
+        console.error(`[autoresolverCliente] no se pudo completar ${campoVacio}:`, e);
+      }
+      return campoVacio;
+    };
+
     const timer = setTimeout(async () => {
       setResolviendoCliente(true);
       try {
-        // 1) Buscar por nombre exacto
         let encontrado = null;
+        let viaNombre = false;
+
+        // 1) Buscar coincidencia en nombre / nombre1 / nombre2
         try {
           const rNombre = await authFetch(
             `${API}/clientes/buscar-nombre?q=${encodeURIComponent(nombreVal)}`,
           );
           const dNombre = await rNombre.json();
           if (Array.isArray(dNombre)) {
-            encontrado = dNombre.find(
-              (c) =>
-                (c.nombre ?? c.NOMBRE ?? "").trim().toLowerCase() ===
-                nombreVal.toLowerCase(),
+            encontrado = dNombre.find((c) =>
+              nombresDe(c).some((n) => n && norm(n) === norm(nombreVal)),
             );
           }
         } catch (e) {
           console.error("[autoresolverCliente] error buscando por nombre:", e);
         }
+        if (encontrado) viaNombre = true;
 
-        // 2) Si no hay match exacto por nombre, buscar por teléfono
+        // 2) Si no hay match por nombre, buscar coincidencia de teléfono
         if (!encontrado) {
           try {
             const rTel = await authFetch(
               `${API}/clientes/buscar-telefono?q=${encodeURIComponent(telVal)}`,
             );
             const dTel = await rTel.json();
-            if (Array.isArray(dTel) && dTel.length > 0) {
-              encontrado = dTel[0];
+            if (Array.isArray(dTel)) {
+              encontrado =
+                dTel.find((c) =>
+                  telefonosDe(c).some((t) => t && norm(t) === norm(telVal)),
+                ) ?? dTel[0] ?? null;
             }
           } catch (e) {
             console.error("[autoresolverCliente] error buscando por teléfono:", e);
@@ -1355,7 +1413,35 @@ export default function PresupuestoNuevo({
         }
 
         if (encontrado) {
-          // Cliente existente: lo vinculamos sin pisar lo que el usuario ya escribió
+          if (viaNombre) {
+            // Encontrado por nombre → si el teléfono no está en ninguna de
+            // sus 3 casillas, lo agregamos en la primera vacía.
+            const telCoincide = telefonosDe(encontrado).some(
+              (t) => t && norm(t) === norm(telVal),
+            );
+            if (!telCoincide) {
+              await completarCasillaVacia(
+                encontrado,
+                ["telefono1", "telefono2", "wapp"],
+                telVal,
+              );
+            }
+          } else {
+            // Encontrado por teléfono → si el nombre no está en ninguna de
+            // sus 3 casillas, lo agregamos en nombre1/nombre2 (no tocamos "nombre").
+            const nombreCoincide = nombresDe(encontrado).some(
+              (n) => n && norm(n) === norm(nombreVal),
+            );
+            if (!nombreCoincide) {
+              await completarCasillaVacia(
+                encontrado,
+                ["nombre1", "nombre2"],
+                nombreVal,
+              );
+            }
+          }
+
+          // Vinculamos el cliente encontrado sin pisar lo que el usuario ya escribió
           setCodcliente(encontrado.codcliente ?? encontrado.CODCLIENTE ?? null);
           setTelefono1(encontrado.telefono1 ?? encontrado.TELEFONO1 ?? telVal);
           setTelefono2(encontrado.telefono2 ?? encontrado.TELEFONO2 ?? "");
