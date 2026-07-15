@@ -1025,7 +1025,9 @@ export default function PresupuestoNuevo({
       setCodcliente(pres.codcliente ?? pres.CODCLIENTE ?? null);
       setFecha((pres.fecha ?? pres.FECHA ?? "").slice(0, 10));
       setRevision(Number(pres.revision ?? pres.REVISION ?? 1));
-      const listaGuardada = pres.lista ?? pres.LISTA ?? null;
+      const itemConLista = items.find((it) => it.lista ?? it.LISTA);
+      const listaGuardada =
+        pres.lista ?? pres.LISTA ?? itemConLista?.lista ?? itemConLista?.LISTA ?? null;
       if (listaGuardada) {
         listaPendienteRef.current = listaGuardada;
         setListaPrecio(listaGuardada);
