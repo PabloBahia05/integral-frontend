@@ -5106,7 +5106,7 @@ export default function PresupuestoNuevo({
                             style={{ background: "#e8f4ee" }}
                           >
                             <td
-                              colSpan={4}
+                              colSpan={6}
                               style={{
                                 padding: "6px 14px",
                                 textAlign: "right",
@@ -5159,7 +5159,7 @@ export default function PresupuestoNuevo({
                     {/* TOTAL GENERAL */}
                     <tr style={{ background: "#0a3a5c" }}>
                       <td
-                        colSpan={4}
+                        colSpan={6}
                         style={{
                           padding: "10px 14px",
                           textAlign: "right",
