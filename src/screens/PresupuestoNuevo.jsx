@@ -1834,6 +1834,17 @@ export default function PresupuestoNuevo({
       0,
     );
 
+    // Total por cada línea presupuestada (1, 2 o 3), igual que el TOTAL GENERAL en pantalla
+    const totalesPorLinea = mostrarLineas
+      ? lineasActivas.map((l, li) =>
+          presupuestoItems.reduce((s, it) => {
+            const pr =
+              parseFloat(it.precios?.[li]?.precio ?? it.precio ?? 0) || 0;
+            return s + pr * (parseFloat(it.cantidad) || 1);
+          }, 0),
+        )
+      : [];
+
     const styleCSS = `
     @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1871,6 +1882,7 @@ export default function PresupuestoNuevo({
     .totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 24px; }
     .totals-box { width: 300px; }
     .totals-total { display: flex; justify-content: space-between; padding: 13px 16px; background: #0f2944; border-radius: 4px; }
+    .totals-total + .totals-total { margin-top: 8px; }
     .totals-total .t-label { color: #a8c4d8; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; }
     .totals-total .t-value { color: #fff; font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; }
     .iva-note { font-size: 10px; color: #6a8aa0; text-align: right; margin-top: 6px; }
@@ -1949,7 +1961,16 @@ export default function PresupuestoNuevo({
       incluirTotal
         ? `<div class="totals-wrap">
       <div class="totals-box">
-        <div class="totals-total"><span class="t-label">TOTAL</span><span class="t-value">${formatPeso(totalGeneral)}</span></div>
+        ${
+          mostrarLineas
+            ? totalesPorLinea
+                .map(
+                  (t, li) =>
+                    `<div class="totals-total"><span class="t-label">TOTAL LÍNEA ${lineasActivas[li].linea}</span><span class="t-value">${formatPeso(t)}</span></div>`,
+                )
+                .join("")
+            : `<div class="totals-total"><span class="t-label">TOTAL</span><span class="t-value">${formatPeso(totalGeneral)}</span></div>`
+        }
         ${agregarIVA ? `<div class="iva-note">Precios con IVA incluido</div>` : ""}
       </div>
     </div>`
