@@ -4535,6 +4535,19 @@ export default function PresupuestoNuevo({
                   </span>
                 )}
                 <span
+                  style={{
+                    fontSize: 11,
+                    color: "#0a3a5c",
+                    background: "#eaf2fa",
+                    border: "1px solid #c8dae8",
+                    borderRadius: 2,
+                    padding: "2px 8px",
+                    fontWeight: 700,
+                  }}
+                >
+                  Lista vigente: {listaPrecio || "—"}
+                </span>
+                <span
                   style={{ marginLeft: "auto", fontSize: 11, color: "#6699bb" }}
                 >
                   N° {numero} — Rev. {revision}
