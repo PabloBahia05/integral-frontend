@@ -27,6 +27,9 @@ const formatFecha = (f) => {
   return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
 };
 
+const formatLineas = (row) =>
+  [row.linea1, row.linea2, row.linea3].filter((v) => v != null && v !== "").join(", ") || "—";
+
 // ── Columnas encabezados ──────────────────────────────────────────────────────
 
 const COLS_ENCABEZADO = [
@@ -58,7 +61,7 @@ const COLS_ENCABEZADO = [
   },
   { key: "nombre", label: "Cliente" },
   { key: "fecha", label: "Fecha", render: (v) => formatFecha(v) },
-  { key: "linea1", label: "Lista" },
+  { key: "linea1", label: "Lista", render: (_, row) => formatLineas(row) },
   { key: "total1", label: "Total", render: (v) => formatPeso(v) },
 ];
 
@@ -96,7 +99,7 @@ const COLS_HISTORIAL = [
   },
   { key: "fecha", label: "Fecha", render: (v) => formatFecha(v) },
   { key: "nombre", label: "Cliente" },
-  { key: "linea1", label: "Lista" },
+  { key: "linea1", label: "Lista", render: (_, row) => formatLineas(row) },
   { key: "total1", label: "Total", render: (v) => formatPeso(v) },
 ];
 
@@ -197,7 +200,7 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto, authFetch }
       (e.nombre ?? "").toLowerCase().includes(q) ||
       String(e.numeropres ?? "").includes(q) ||
       (e.fecha ?? "").includes(q) ||
-      (e.linea1 ?? "").toLowerCase().includes(q),
+      formatLineas(e).toLowerCase().includes(q),
   );
 
   const totalGeneral = encabezados.reduce(
