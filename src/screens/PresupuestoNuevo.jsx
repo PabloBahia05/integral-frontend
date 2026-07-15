@@ -1018,6 +1018,33 @@ export default function PresupuestoNuevo({
       const items = await r.json();
       if (!Array.isArray(items)) return;
 
+      // 1.b Restaurar ajuste general (%/monto) si se guardó aplicado
+      const itemConAjuste = items.find(
+        (it) => it.ajuste_valor ?? it.AJUSTE_VALOR,
+      );
+      if (itemConAjuste) {
+        const valGuardado = parseFloat(
+          itemConAjuste.ajuste_valor ?? itemConAjuste.AJUSTE_VALOR,
+        );
+        const modoGuardado =
+          itemConAjuste.ajuste_modo ?? itemConAjuste.AJUSTE_MODO ?? "porcentaje";
+        setAjusteValor(String(valGuardado));
+        setAjusteModo(modoGuardado);
+        setAjusteAplicado(true);
+        // NOTA: no reconstruimos preciosOriginales acá porque los ids de
+        // presupuestoItems para cocina/placard se regeneran en cada carga
+        // (no son el id de la fila en BD) y no matchean de forma confiable.
+        // Consecuencia: el botón "Revertir" no va a funcionar después de
+        // reabrir un presupuesto — solo funciona en la misma sesión en que
+        // se aplicó el ajuste. Si hace falta revertir, hay que aplicar un
+        // ajuste inverso manual (ej: -2.91% para deshacer un +3%).
+        setPreciosOriginales({});
+      } else {
+        setAjusteValor("");
+        setAjusteAplicado(false);
+        setPreciosOriginales({});
+      }
+
       // 2. Restaurar encabezado
       setNumeroPres(num);
       setNumero(String(num).padStart(4, "0"));
@@ -1645,6 +1672,8 @@ export default function PresupuestoNuevo({
       // Si ya existe numeroPres, SIEMPRE nueva revisión (nunca pisar la anterior)
       nuevaRevision: esEdicion || esNuevaRev,
       presmv: presmv ?? null,
+      ajusteValor: ajusteAplicado ? parseFloat(ajusteValor) || null : null,
+      ajusteModo: ajusteAplicado ? ajusteModo : null,
       items: presupuestoItems.map((it) => {
         const v1 =
           parseFloat(it.precios?.[0]?.precio ?? it.valor1 ?? it.precio) || null;
@@ -4660,7 +4689,15 @@ export default function PresupuestoNuevo({
                     {/* Botón revertir */}
                     {ajusteAplicado && (
                       <button
-                        onClick={revertirAjuste}
+                        onClick={() => {
+                          if (Object.keys(preciosOriginales).length === 0) {
+                            alert(
+                              "Este ajuste viene de un presupuesto ya guardado: no se puede revertir automáticamente (los precios base no quedaron en memoria). Para deshacerlo, aplicá un ajuste manual inverso.",
+                            );
+                            return;
+                          }
+                          revertirAjuste();
+                        }}
                         style={{
                           padding: "5px 14px",
                           background: "#fff",
@@ -4690,7 +4727,8 @@ export default function PresupuestoNuevo({
                           fontWeight: 700,
                         }}
                       >
-                        AJUSTE ACTIVO
+                        AJUSTE ACTIVO: {ajusteValor}
+                        {ajusteModo === "porcentaje" ? "%" : "$"}
                       </span>
                     )}
                   </div>
