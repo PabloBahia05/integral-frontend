@@ -1257,19 +1257,33 @@ export default function PresupuestoNuevo({
   }, [familiaActivaActual]);
 
   // Recalcula una fila aplicando el porcentaje de la lista activa
+  // + el porcentaje extra propio del ítem (si lo tiene), compuestos.
   const recalcFila = (fila) => {
+    const PCT_POR_IDX = ["porcentaje1", "porcentaje2", "porcentaje3"];
+    const conExtra = (precioConLista, pctExtra) => {
+      if (pctExtra == null || pctExtra === "") return precioConLista;
+      const p = parseFloat(precioConLista) || 0;
+      const extra = parseFloat(pctExtra) || 0;
+      return String(Math.round(p * (1 + extra / 100) * 100) / 100);
+    };
+
     if (fila.preciosBase && fila.preciosBase.length > 0) {
-      const nuevosPrecios = fila.preciosBase.map((pb) => ({
-        linea: pb.linea,
-        precioBase: pb.precioBase,
-        precio: aplicarPorcentaje(pb.precioBase),
-      }));
+      const nuevosPrecios = fila.preciosBase.map((pb, li) => {
+        const conLista = aplicarPorcentaje(pb.precioBase);
+        const pctExtra = fila[PCT_POR_IDX[li]];
+        return {
+          linea: pb.linea,
+          precioBase: pb.precioBase,
+          precio: conExtra(conLista, pctExtra),
+        };
+      });
       const nuevoPrecio =
         nuevosPrecios[0]?.precio ?? fila.precioBase ?? fila.precio;
       return { ...fila, precios: nuevosPrecios, precio: String(nuevoPrecio) };
     }
     if (fila.precioBase != null && fila.precioBase !== "") {
-      return { ...fila, precio: aplicarPorcentaje(fila.precioBase) };
+      const conLista = aplicarPorcentaje(fila.precioBase);
+      return { ...fila, precio: conExtra(conLista, fila.porcentaje1) };
     }
     return fila;
   };
@@ -5056,17 +5070,55 @@ export default function PresupuestoNuevo({
                                             minimumFractionDigits: 2,
                                           })}
                                         </span>
-                                        {listaPorcentaje !== 0 && (
+                                        {item.porcentaje1 != null ? (
                                           <span
                                             style={{
                                               marginLeft: 5,
                                               fontSize: 9,
-                                              color: "#2277bb",
                                               fontWeight: 700,
                                             }}
                                           >
-                                            +{listaPorcentaje}%
+                                            {listaPorcentaje !== 0 && (
+                                              <span
+                                                style={{
+                                                  color: "#2277bb",
+                                                  marginRight: 2,
+                                                }}
+                                              >
+                                                +{listaPorcentaje}%
+                                              </span>
+                                            )}
+                                            <span
+                                              style={{
+                                                color:
+                                                  item.porcentaje1 >= 0
+                                                    ? "#0a7a3a"
+                                                    : "#c0392b",
+                                                background:
+                                                  item.porcentaje1 >= 0
+                                                    ? "#e6f5eb"
+                                                    : "#fdecea",
+                                                borderRadius: 3,
+                                                padding: "1px 4px",
+                                              }}
+                                            >
+                                              {item.porcentaje1 > 0 ? "+" : ""}
+                                              {item.porcentaje1}%
+                                            </span>
                                           </span>
+                                        ) : (
+                                          listaPorcentaje !== 0 && (
+                                            <span
+                                              style={{
+                                                marginLeft: 5,
+                                                fontSize: 9,
+                                                color: "#2277bb",
+                                                fontWeight: 700,
+                                              }}
+                                            >
+                                              +{listaPorcentaje}%
+                                            </span>
+                                          )
                                         )}
                                       </td>
                                     );
@@ -5096,6 +5148,56 @@ export default function PresupuestoNuevo({
                                         { minimumFractionDigits: 2 },
                                       )}
                                     </span>
+                                    {item.porcentaje1 != null ? (
+                                      <span
+                                        style={{
+                                          marginLeft: 5,
+                                          fontSize: 9,
+                                          fontWeight: 700,
+                                        }}
+                                      >
+                                        {listaPorcentaje !== 0 && (
+                                          <span
+                                            style={{
+                                              color: "#2277bb",
+                                              marginRight: 2,
+                                            }}
+                                          >
+                                            +{listaPorcentaje}%
+                                          </span>
+                                        )}
+                                        <span
+                                          style={{
+                                            color:
+                                              item.porcentaje1 >= 0
+                                                ? "#0a7a3a"
+                                                : "#c0392b",
+                                            background:
+                                              item.porcentaje1 >= 0
+                                                ? "#e6f5eb"
+                                                : "#fdecea",
+                                            borderRadius: 3,
+                                            padding: "1px 4px",
+                                          }}
+                                        >
+                                          {item.porcentaje1 > 0 ? "+" : ""}
+                                          {item.porcentaje1}%
+                                        </span>
+                                      </span>
+                                    ) : (
+                                      listaPorcentaje !== 0 && (
+                                        <span
+                                          style={{
+                                            marginLeft: 5,
+                                            fontSize: 9,
+                                            color: "#2277bb",
+                                            fontWeight: 700,
+                                          }}
+                                        >
+                                          +{listaPorcentaje}%
+                                        </span>
+                                      )
+                                    )}
                                   </td>
                                 )}
                                 <td
