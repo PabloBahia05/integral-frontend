@@ -1377,6 +1377,12 @@ export default function PresupuestoNuevo({
 
   // Recalcular precios cuando cambia la lista de precios
   useEffect(() => {
+    // No recalcular mientras se está cargando un presupuesto existente:
+    // los precios que trae la BD (valor1/2/3) ya incluyen cualquier ajuste
+    // manual (panel "AJUSTE DE PRECIOS") aplicado antes de guardar. Si
+    // dejamos correr recalcFila acá, lo pisa con precioBase × %lista,
+    // perdiendo el ajuste porque este no vive en porcentaje1/2/3.
+    if (cargandoPresupuestoRef.current) return;
     setCocinaItems((prev) => {
       const next = {};
       for (const [familia, filas] of Object.entries(prev)) {
