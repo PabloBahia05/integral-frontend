@@ -878,7 +878,7 @@ export default function PresupuestoNuevo({
   const [ajusteModo, setAjusteModo] = useState("porcentaje"); // "porcentaje" | "monto"
   const [ajusteValor, setAjusteValor] = useState("");
   const [ajusteScope, setAjusteScope] = useState("todos"); // "todos" | id de item
-  const [preciosOriginales, setPreciosOriginales] = useState({}); // { [id]: precio }
+  const [preciosOriginales, setPreciosOriginales] = useState({}); // { [id]: { precio, precios } }
   const [ajusteAplicado, setAjusteAplicado] = useState(false);
 
   const aplicarAjuste = () => {
@@ -886,32 +886,41 @@ export default function PresupuestoNuevo({
     if (!val || isNaN(val)) return;
 
     setPresupuestoItems((prev) => {
-      // Guardar originales antes del primer ajuste
+      // Guardar originales antes del primer ajuste (precio + precios[] por línea)
       if (!ajusteAplicado) {
         const orig = {};
         prev.forEach((it) => {
-          orig[it.id] = it.precio;
+          orig[it.id] = {
+            precio: it.precio,
+            precios: (it.precios ?? []).map((p) => ({ ...p })),
+          };
         });
         setPreciosOriginales(orig);
       }
       return prev.map((it) => {
         if (ajusteScope !== "todos" && it.id !== ajusteScope) return it;
         // Usar precio ORIGINAL si ya hay ajuste aplicado (evita acumulación)
-        const base = ajusteAplicado
-          ? (preciosOriginales[it.id] ?? it.precio)
-          : it.precio;
-        const precioBase = parseFloat(base) || 0;
-        let nuevoPrecio;
-        if (ajusteModo === "porcentaje") {
-          nuevoPrecio = Math.round(precioBase * (1 + val / 100) * 100) / 100;
-        } else {
-          nuevoPrecio = Math.round((precioBase + val) * 100) / 100;
-        }
-        if (nuevoPrecio < 0) nuevoPrecio = 0;
+        const origItem = ajusteAplicado
+          ? preciosOriginales[it.id]
+          : { precio: it.precio, precios: it.precios };
+        const precioBase = parseFloat(origItem?.precio ?? it.precio) || 0;
+        const calc = (base) => {
+          const b = parseFloat(base) || 0;
+          let n =
+            ajusteModo === "porcentaje"
+              ? Math.round(b * (1 + val / 100) * 100) / 100
+              : Math.round((b + val) * 100) / 100;
+          return n < 0 ? 0 : n;
+        };
+        const nuevoPrecio = calc(precioBase);
+        const nuevosPrecios = (origItem?.precios ?? it.precios ?? []).map(
+          (p) => ({ ...p, precio: String(calc(p.precio)) }),
+        );
         const nuevaCantidad = parseFloat(it.cantidad) || 1;
         return {
           ...it,
           precio: nuevoPrecio,
+          precios: nuevosPrecios.length ? nuevosPrecios : it.precios,
           subtotal: nuevoPrecio * nuevaCantidad,
         };
       });
@@ -923,11 +932,13 @@ export default function PresupuestoNuevo({
     if (!ajusteAplicado) return;
     setPresupuestoItems((prev) =>
       prev.map((it) => {
-        if (preciosOriginales[it.id] == null) return it;
-        const p = parseFloat(preciosOriginales[it.id]) || 0;
+        const orig = preciosOriginales[it.id];
+        if (orig == null) return it;
+        const p = parseFloat(orig.precio) || 0;
         return {
           ...it,
           precio: p,
+          precios: orig.precios?.length ? orig.precios : it.precios,
           subtotal: p * (parseFloat(it.cantidad) || 1),
         };
       }),
@@ -1839,12 +1850,16 @@ export default function PresupuestoNuevo({
           })
           .join("");
 
-        const labelColspan =
-          totalCols - (mostrarLineas ? lineasActivas.length : 0) - 1;
+        const labelColspan = 3 + (mostrarCosto ? 1 : 0);
         const celdasSubtotalLinea = mostrarLineas
           ? subtotalesLineaSec
               .map((st) => `<td class="right">${formatPeso(st)}</td>`)
               .join("")
+          : incluirPrecio
+            ? `<td class="right">${formatPeso(subtotalSec)}</td>`
+            : "";
+        const celdaSubtotalItem = incluirSubtotalItem
+          ? `<td class="right">${formatPeso(subtotalSec)}</td>`
           : "";
 
         return `
@@ -1853,7 +1868,7 @@ export default function PresupuestoNuevo({
       <tr class="subtotal-row">
         <td colspan="${labelColspan}">Subtotal ${sec}</td>
         ${celdasSubtotalLinea}
-        <td class="right">${formatPeso(subtotalSec)}</td>
+        ${celdaSubtotalItem}
       </tr>`;
       })
       .join("");
