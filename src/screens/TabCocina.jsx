@@ -767,37 +767,53 @@ export default function TabCocina({
                               minimumFractionDigits: 2,
                             })}
                           </span>
-                          {pctAplicado != null && (
+                          {pctAplicado != null ? (
                             <span
                               style={{
                                 marginLeft: 5,
                                 fontSize: 9,
-                                color:
-                                  pctAplicado >= 0 ? "#0a7a3a" : "#c0392b",
-                                fontWeight: 700,
-                                verticalAlign: "middle",
-                                background:
-                                  pctAplicado >= 0 ? "#e6f5eb" : "#fdecea",
-                                borderRadius: 3,
-                                padding: "1px 4px",
-                              }}
-                            >
-                              {pctAplicado > 0 ? "+" : ""}
-                              {pctAplicado}%
-                            </span>
-                          )}
-                          {listaPorcentaje !== 0 && pctAplicado == null && (
-                            <span
-                              style={{
-                                marginLeft: 5,
-                                fontSize: 9,
-                                color: "#2277bb",
                                 fontWeight: 700,
                                 verticalAlign: "middle",
                               }}
                             >
-                              +{listaPorcentaje}%
+                              {listaPorcentaje !== 0 && (
+                                <span
+                                  style={{
+                                    color: "#2277bb",
+                                    marginRight: 2,
+                                  }}
+                                >
+                                  +{listaPorcentaje}%
+                                </span>
+                              )}
+                              <span
+                                style={{
+                                  color:
+                                    pctAplicado >= 0 ? "#0a7a3a" : "#c0392b",
+                                  background:
+                                    pctAplicado >= 0 ? "#e6f5eb" : "#fdecea",
+                                  borderRadius: 3,
+                                  padding: "1px 4px",
+                                }}
+                              >
+                                {pctAplicado > 0 ? "+" : ""}
+                                {pctAplicado}%
+                              </span>
                             </span>
+                          ) : (
+                            listaPorcentaje !== 0 && (
+                              <span
+                                style={{
+                                  marginLeft: 5,
+                                  fontSize: 9,
+                                  color: "#2277bb",
+                                  fontWeight: 700,
+                                  verticalAlign: "middle",
+                                }}
+                              >
+                                +{listaPorcentaje}%
+                              </span>
+                            )
                           )}
                         </td>
                       );
@@ -828,37 +844,48 @@ export default function TabCocina({
                           minimumFractionDigits: 2,
                         })}
                       </span>
-                      {fila.porcentaje1 != null && (
+                      {fila.porcentaje1 != null ? (
                         <span
                           style={{
                             marginLeft: 5,
                             fontSize: 9,
-                            color:
-                              fila.porcentaje1 >= 0 ? "#0a7a3a" : "#c0392b",
-                            fontWeight: 700,
-                            verticalAlign: "middle",
-                            background:
-                              fila.porcentaje1 >= 0 ? "#e6f5eb" : "#fdecea",
-                            borderRadius: 3,
-                            padding: "1px 4px",
-                          }}
-                        >
-                          {fila.porcentaje1 > 0 ? "+" : ""}
-                          {fila.porcentaje1}%
-                        </span>
-                      )}
-                      {listaPorcentaje !== 0 && fila.porcentaje1 == null && (
-                        <span
-                          style={{
-                            marginLeft: 5,
-                            fontSize: 9,
-                            color: "#2277bb",
                             fontWeight: 700,
                             verticalAlign: "middle",
                           }}
                         >
-                          +{listaPorcentaje}%
+                          {listaPorcentaje !== 0 && (
+                            <span style={{ color: "#2277bb", marginRight: 2 }}>
+                              +{listaPorcentaje}%
+                            </span>
+                          )}
+                          <span
+                            style={{
+                              color:
+                                fila.porcentaje1 >= 0 ? "#0a7a3a" : "#c0392b",
+                              background:
+                                fila.porcentaje1 >= 0 ? "#e6f5eb" : "#fdecea",
+                              borderRadius: 3,
+                              padding: "1px 4px",
+                            }}
+                          >
+                            {fila.porcentaje1 > 0 ? "+" : ""}
+                            {fila.porcentaje1}%
+                          </span>
                         </span>
+                      ) : (
+                        listaPorcentaje !== 0 && (
+                          <span
+                            style={{
+                              marginLeft: 5,
+                              fontSize: 9,
+                              color: "#2277bb",
+                              fontWeight: 700,
+                              verticalAlign: "middle",
+                            }}
+                          >
+                            +{listaPorcentaje}%
+                          </span>
+                        )
                       )}
                     </td>
                   )}
