@@ -837,7 +837,7 @@ export default function PresupuestoNuevo({
       cerrarPresItemPopover();
       return;
     }
-    const { id, lineaIdx, precioActual } = presItemPopover;
+    const { id, lineaIdx } = presItemPopover;
 
     const calcNuevo = (base) => {
       const b = parseFloat(base) || 0;
@@ -845,11 +845,70 @@ export default function PresupuestoNuevo({
       return Math.round(b * (1 + val / 100) * 100) / 100;
     };
 
+    // Si el ítem viene de Cocina o Placard, escribimos el cambio en el
+    // estado fuente (cocinaItems/placardItems) para que el % quede
+    // asociado al ítem real: sobrevive a "Actualizar"/cambio de lista y
+    // se puede mostrar combinado con el % de la lista (badge "21+10").
+    const match = id.match(/^(cocina|placard)-(.+)-(\d+)$/);
+    if (match) {
+      const [, seccionTipo, familia, idxStr] = match;
+      const idx = parseInt(idxStr, 10);
+      const PCT_POR_IDX = ["porcentaje1", "porcentaje2", "porcentaje3"];
+
+      const actualizar = (prev) => {
+        const filas = prev[familia] ?? [];
+        const fila = filas[idx];
+        if (!fila) return prev;
+
+        let nuevaFila;
+        if (lineaIdx == null) {
+          const nuevo = calcNuevo(fila.precio);
+          nuevaFila = {
+            ...fila,
+            precio: String(nuevo),
+            porcentaje1:
+              presItemModo === "porcentaje" ? val : fila.porcentaje1,
+          };
+        } else {
+          const precios = (fila.precios ?? []).map((p, li) => {
+            if (li !== lineaIdx) return p;
+            return { ...p, precio: String(calcNuevo(p.precio)) };
+          });
+          const nuevoPrecio = precios[0]?.precio ?? fila.precio;
+          const slot = PCT_POR_IDX[lineaIdx];
+          const extra = slot
+            ? {
+                [slot]: presItemModo === "porcentaje" ? val : fila[slot],
+              }
+            : {};
+          nuevaFila = {
+            ...fila,
+            precios,
+            precio: String(nuevoPrecio),
+            ...extra,
+          };
+        }
+        return {
+          ...prev,
+          [familia]: filas.map((f, i) => (i === idx ? nuevaFila : f)),
+        };
+      };
+
+      if (seccionTipo === "cocina") {
+        setCocinaItems(actualizar);
+      } else {
+        setPlacardItems(actualizar);
+      }
+      cerrarPresItemPopover();
+      return;
+    }
+
+    // Ítems "otros" (mampara/vanitory/especiales): no tienen estado fuente
+    // aparte, se editan directo en presupuestoItems.
     setPresupuestoItems((prev) =>
       prev.map((it) => {
         if (it.id !== id) return it;
         if (lineaIdx == null) {
-          // Sin líneas activas → precio único
           const nuevo = calcNuevo(it.precio);
           return {
             ...it,
@@ -857,7 +916,6 @@ export default function PresupuestoNuevo({
             subtotal: nuevo * (parseFloat(it.cantidad) || 1),
           };
         }
-        // Con líneas activas → actualizar precio de esa línea
         const precios = (it.precios ?? []).map((p, li) => {
           if (li !== lineaIdx) return p;
           return { ...p, precio: String(calcNuevo(p.precio)) };
