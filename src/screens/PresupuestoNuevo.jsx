@@ -1159,15 +1159,26 @@ export default function PresupuestoNuevo({
         const v1 = parseFloat(it.valor1 ?? it.VALOR1) || null;
         const v2 = parseFloat(it.valor2 ?? it.VALOR2) || null;
         const v3 = parseFloat(it.valor3 ?? it.VALOR3) || null;
+        // Costo puro (sin % de lista ni % de ítem) guardado en base1/2/3.
+        // Fallback a valorN para presupuestos guardados ANTES de este cambio
+        // (no van a ser 100% exactos si tenían % aplicado, pero es lo mejor
+        // disponible sin ese dato — "Actualizar" ya no va a duplicar % de
+        // acá en adelante).
+        const b1raw = parseFloat(it.base1 ?? it.BASE1);
+        const b2raw = parseFloat(it.base2 ?? it.BASE2);
+        const b3raw = parseFloat(it.base3 ?? it.BASE3);
+        const b1 = !isNaN(b1raw) ? b1raw : v1;
+        const b2 = !isNaN(b2raw) ? b2raw : v2;
+        const b3 = !isNaN(b3raw) ? b3raw : v3;
         const precios = [
           ...(l1 && v1 != null
-            ? [{ linea: l1, precioBase: String(v1), precio: String(v1) }]
+            ? [{ linea: l1, precioBase: String(b1 ?? v1), precio: String(v1) }]
             : []),
           ...(l2 && v2 != null
-            ? [{ linea: l2, precioBase: String(v2), precio: String(v2) }]
+            ? [{ linea: l2, precioBase: String(b2 ?? v2), precio: String(v2) }]
             : []),
           ...(l3 && v3 != null
-            ? [{ linea: l3, precioBase: String(v3), precio: String(v3) }]
+            ? [{ linea: l3, precioBase: String(b3 ?? v3), precio: String(v3) }]
             : []),
         ];
         const fila = {
@@ -1175,7 +1186,7 @@ export default function PresupuestoNuevo({
           nombreart,
           cantidad: parseFloat(it.cantidad ?? it.CANTIDAD) || 1,
           precio: String(v1 ?? 0),
-          precioBase: String(v1 ?? 0),
+          precioBase: String(b1 ?? v1 ?? 0),
           precios,
           preciosBase: precios.map((p) => ({
             linea: p.linea,
@@ -1183,11 +1194,11 @@ export default function PresupuestoNuevo({
           })),
           margen: it.margen ?? null,
           valor1: v1,
-          porcentaje1: parseFloat(it.margen1 ?? it.MARGEN1) || null,
+          porcentaje1: parseFloat(it.porcentaje1 ?? it.PORCENTAJE1) || null,
           valor2: v2,
-          porcentaje2: parseFloat(it.margen2 ?? it.MARGEN2) || null,
+          porcentaje2: parseFloat(it.porcentaje2 ?? it.PORCENTAJE2) || null,
           valor3: v3,
-          porcentaje3: parseFloat(it.margen3 ?? it.MARGEN3) || null,
+          porcentaje3: parseFloat(it.porcentaje3 ?? it.PORCENTAJE3) || null,
         };
         if (tipo.includes("cocina") && tipo.includes("bajomesada"))
           nuevaCocina.bajomesadas.push(fila);
@@ -1243,11 +1254,11 @@ export default function PresupuestoNuevo({
             precios,
             margen: it.margen ?? null,
             valor1: v1,
-            porcentaje1: parseFloat(it.margen1 ?? it.MARGEN1) || null,
+            porcentaje1: parseFloat(it.porcentaje1 ?? it.PORCENTAJE1) || null,
             valor2: v2,
-            porcentaje2: parseFloat(it.margen2 ?? it.MARGEN2) || null,
+            porcentaje2: parseFloat(it.porcentaje2 ?? it.PORCENTAJE2) || null,
             valor3: v3,
-            porcentaje3: parseFloat(it.margen3 ?? it.MARGEN3) || null,
+            porcentaje3: parseFloat(it.porcentaje3 ?? it.PORCENTAJE3) || null,
             // Vinculación vanitory
             ...(esVanitory && presvRestaurado
               ? { presv: presvRestaurado }
@@ -1399,6 +1410,8 @@ export default function PresupuestoNuevo({
           precio: parseFloat(f.precio) || 0,
           subtotal: (parseFloat(f.precio) || 0) * (parseFloat(f.cantidad) || 1),
           precios: f.precios ?? [],
+          precioBase: f.precioBase ?? null,
+          preciosBase: f.preciosBase ?? [],
           margen: f.margen ?? null,
           valor1: f.valor1 ?? null,
           porcentaje1: f.porcentaje1 ?? null,
@@ -1772,10 +1785,13 @@ export default function PresupuestoNuevo({
           margen: it.margen ?? null,
           valor1: v1,
           porcentaje1: it.porcentaje1 ?? null,
+          base1: parseFloat(it.preciosBase?.[0]?.precioBase ?? it.precioBase) || null,
           valor2: v2,
           porcentaje2: it.porcentaje2 ?? null,
+          base2: parseFloat(it.preciosBase?.[1]?.precioBase) || null,
           valor3: v3,
           porcentaje3: it.porcentaje3 ?? null,
+          base3: parseFloat(it.preciosBase?.[2]?.precioBase) || null,
           precios: it.precios ?? [],
           ancho: it.ancho ?? null,
           alto: it.alto ?? null,
