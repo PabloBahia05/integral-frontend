@@ -4034,18 +4034,9 @@ export default function PresupuestoNuevo({
                                           );
                                           const precioPlacard =
                                             p.precio_un ?? p.PRECIO_UN ?? "";
-                                          const precioUsarLineas =
-                                            precios[0]?.precio &&
-                                            precios[0].precio !== ""
-                                              ? precios[0].precio
-                                              : aplicarPorcentaje(
-                                                  precioBaseUsar,
-                                                );
-                                          const precioUsar =
-                                            precioUsarLineas &&
-                                            precioUsarLineas !== ""
-                                              ? precioUsarLineas
-                                              : precioPlacard || "";
+                                          // El precio usado en el presupuesto siempre es precio_un
+                                          // (se ignora el cálculo por línea/porcentaje)
+                                          const precioUsar = precioPlacard || "";
                                           const nombreart =
                                             p.nombreart ?? p.NOMBREART ?? base;
                                           setPlacardFila((f) => ({
@@ -4506,15 +4497,9 @@ export default function PresupuestoNuevo({
                                   }));
                                   const precioPlacard =
                                     p.precio_un ?? p.PRECIO_UN ?? "";
-                                  const precioUsarLineas =
-                                    precios[0]?.precio &&
-                                    precios[0].precio !== ""
-                                      ? precios[0].precio
-                                      : aplicarPorcentaje(precioBaseUsar);
-                                  const precioUsar =
-                                    precioUsarLineas && precioUsarLineas !== ""
-                                      ? precioUsarLineas
-                                      : precioPlacard || "";
+                                  // El precio usado en el presupuesto siempre es precio_un
+                                  // (se ignora el cálculo por línea/porcentaje)
+                                  const precioUsar = precioPlacard || "";
                                   const nombreart =
                                     p.nombreart ?? p.NOMBREART ?? base;
                                   setPlacardFila((f) => ({
