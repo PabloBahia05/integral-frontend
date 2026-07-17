@@ -2193,10 +2193,10 @@ export default function PresupuestoNuevo({
     .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 0; display: flex; flex-direction: column; background: #fff; }
     .membrete-banner { width: 100%; padding: 16px 48px; text-align: center; background: #fff; }
     .membrete-banner img { max-width: 100%; height: auto; }
-    .header { background: #fff; color: #0f2944; padding: 24px 48px 20px; display: flex; justify-content: flex-start; align-items: flex-start; }
-    .header-right { text-align: left; }
-    .doc-title { font-family: 'Rajdhani', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: ${accent}; }
-    .doc-nro { font-family: 'Rajdhani', sans-serif; font-size: 42px; font-weight: 700; color: #0f2944; line-height: 1; }
+    .header { background: #fff; color: #0f2944; padding: 24px 48px 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+    .header-right { text-align: right; }
+    .doc-title { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: ${accent}; }
+    .doc-nro { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; color: #0f2944; line-height: 1.4; }
     .doc-fecha { font-size: 11px; color: #4a6a8c; margin-top: 6px; }
     .accent-bar { height: 4px; background: linear-gradient(90deg, ${accent} 0%, ${accentLight} 50%, ${accent} 100%); }
     .body { padding: 36px 48px; flex: 1; }
@@ -2240,9 +2240,11 @@ export default function PresupuestoNuevo({
     <img src="${MEMBRETE_DANIEL_ROQUE_B64}" alt="Daniel Roque S.R.L." />
   </div>
   <div class="header">
-    <div class="header-right">
+    <div class="header-left">
       <div class="doc-title">Presupuesto</div>
       <div class="doc-nro">N° ${nro}</div>
+    </div>
+    <div class="header-right">
       <div class="doc-fecha">Fecha: ${fechaFmt}</div>
       <div class="doc-fecha" style="margin-top:4px;">Revisión: ${revision}</div>
     </div>
@@ -2251,14 +2253,12 @@ export default function PresupuestoNuevo({
   <div class="body">
     <div class="client-block">
       <div class="info-box">
-        <div class="info-box-title">Datos del cliente</div>
         <div class="info-row"><span class="info-label">Cliente</span><span class="info-value">${cliente || "Consumidor final"}</span></div>
         ${telefono1 ? `<div class="info-row"><span class="info-label">Teléfono</span><span class="info-value">${telefono1}</span></div>` : ""}
         ${telefono2 ? `<div class="info-row"><span class="info-label">Teléfono 2</span><span class="info-value">${telefono2}</span></div>` : ""}
         ${wapp ? `<div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value">${wapp}</span></div>` : ""}
       </div>
       <div class="info-box">
-        <div class="info-box-title">Domicilio</div>
         <div class="info-row"><span class="info-label">Domicilio</span><span class="info-value">${domicilio || "—"}</span></div>
         ${domicilioFiscal ? `<div class="info-row"><span class="info-label">Dom. fiscal</span><span class="info-value">${domicilioFiscal}</span></div>` : ""}
         <div class="info-row"><span class="info-label">Localidad</span><span class="info-value">${localidad || "—"}</span></div>
