@@ -1511,94 +1511,6 @@ export default function PresupuestoNuevo({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listaPrecio]);
 
-  // Completar preciosBase/precios de ítems YA cargados cuando se agrega
-  // (o se saca) una línea en el Encabezado. Sin esto, un ítem cargado antes
-  // de activar "Línea 1" nunca tiene precios[1], y la tabla cae al fallback
-  // item.precio (el de la primera línea) para las columnas nuevas.
-  useEffect(() => {
-    if (cargandoPresupuestoRef.current) return;
-    const clave = lineasActivas.map((l) => l.linea).join("|");
-    if (clave === lineasActivasClaveRef.current) return;
-    lineasActivasClaveRef.current = clave;
-    if (lineasActivas.length === 0) return;
-
-    const familiaMapCocina = { bajomesadas: "Bajomesada", alacenas: "Alacena" };
-    const familiaMapPlacard = {
-      bajomesadas: "Bajomesada",
-      alacenas: "Alacena",
-      placard: "PLACARD",
-      frente: "FRENTE DE PLACARD",
-      auxiliares: "Auxiliares",
-      accesorios: "Accesorios",
-    };
-
-    // Alinea preciosBase de una fila con lineasActivas, completando solo
-    // las líneas que le falten (no toca las que ya tenía).
-    const alinearPreciosBaseConLineas = (fila, mapaArticulos) => {
-      const actuales = fila.preciosBase ?? [];
-      const tieneTodas = lineasActivas.every((l) =>
-        actuales.some((pb) => pb.linea === l.linea),
-      );
-      if (tieneTodas) return fila;
-
-      const art = mapaArticulos.get(fila.articulo);
-      const combinado = lineasActivas.map((l) => {
-        const existente = actuales.find((pb) => pb.linea === l.linea);
-        if (existente) return existente;
-        return {
-          linea: l.linea,
-          precioBase: art?.precios?.[String(l.linea)] ?? "",
-        };
-      });
-      return recalcFila({ ...fila, preciosBase: combinado });
-    };
-
-    const familiasConItems = (itemsObj, familiaMap) =>
-      Object.entries(itemsObj)
-        .filter(([, filas]) => filas?.length)
-        .map(([familia]) => familiaMap[familia] ?? familia);
-
-    const familiasBDNecesarias = new Set([
-      ...familiasConItems(cocinaItemsRef.current, familiaMapCocina),
-      ...familiasConItems(placardItemsRef.current, familiaMapPlacard),
-    ]);
-    if (familiasBDNecesarias.size === 0) return;
-
-    Promise.all(
-      [...familiasBDNecesarias].map((familiaBD) =>
-        authFetch(`${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`)
-          .then((r) => r.json())
-          .then((data) => [familiaBD, Array.isArray(data) ? data : []])
-          .catch(() => [familiaBD, []]),
-      ),
-    ).then((resultados) => {
-      const mapaPorFamiliaBD = new Map(resultados);
-      const mapaArticulosDe = (familiaInterna, familiaMap) => {
-        const familiaBD = familiaMap[familiaInterna] ?? familiaInterna;
-        const lista = mapaPorFamiliaBD.get(familiaBD) ?? [];
-        return new Map(lista.map((a) => [a.articulo, a]));
-      };
-
-      setCocinaItems((prev) => {
-        const next = {};
-        for (const [familia, filas] of Object.entries(prev)) {
-          const mapa = mapaArticulosDe(familia, familiaMapCocina);
-          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa));
-        }
-        return next;
-      });
-      setPlacardItems((prev) => {
-        const next = {};
-        for (const [familia, filas] of Object.entries(prev)) {
-          const mapa = mapaArticulosDe(familia, familiaMapPlacard);
-          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa));
-        }
-        return next;
-      });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lineasActivas]);
-
   // Sincronizar cocina y placard con la tabla de presupuesto
   useEffect(() => {
     const toItems = (seccion, itemsObj) =>
@@ -1849,6 +1761,95 @@ export default function PresupuestoNuevo({
   const lineasActivas = lineas.filter(
     (l) => l.linea && l.linea !== "[Sin líneas]",
   );
+
+  // Completar preciosBase/precios de ítems YA cargados cuando se agrega
+  // (o se saca) una línea en el Encabezado. Sin esto, un ítem cargado antes
+  // de activar "Línea 1" nunca tiene precios[1], y la tabla cae al fallback
+  // item.precio (el de la primera línea) para las columnas nuevas.
+  useEffect(() => {
+    if (cargandoPresupuestoRef.current) return;
+    const clave = lineasActivas.map((l) => l.linea).join("|");
+    if (clave === lineasActivasClaveRef.current) return;
+    lineasActivasClaveRef.current = clave;
+    if (lineasActivas.length === 0) return;
+
+    const familiaMapCocina = { bajomesadas: "Bajomesada", alacenas: "Alacena" };
+    const familiaMapPlacard = {
+      bajomesadas: "Bajomesada",
+      alacenas: "Alacena",
+      placard: "PLACARD",
+      frente: "FRENTE DE PLACARD",
+      auxiliares: "Auxiliares",
+      accesorios: "Accesorios",
+    };
+
+    // Alinea preciosBase de una fila con lineasActivas, completando solo
+    // las líneas que le falten (no toca las que ya tenía).
+    const alinearPreciosBaseConLineas = (fila, mapaArticulos) => {
+      const actuales = fila.preciosBase ?? [];
+      const tieneTodas = lineasActivas.every((l) =>
+        actuales.some((pb) => pb.linea === l.linea),
+      );
+      if (tieneTodas) return fila;
+
+      const art = mapaArticulos.get(fila.articulo);
+      const combinado = lineasActivas.map((l) => {
+        const existente = actuales.find((pb) => pb.linea === l.linea);
+        if (existente) return existente;
+        return {
+          linea: l.linea,
+          precioBase: art?.precios?.[String(l.linea)] ?? "",
+        };
+      });
+      return recalcFila({ ...fila, preciosBase: combinado });
+    };
+
+    const familiasConItems = (itemsObj, familiaMap) =>
+      Object.entries(itemsObj)
+        .filter(([, filas]) => filas?.length)
+        .map(([familia]) => familiaMap[familia] ?? familia);
+
+    const familiasBDNecesarias = new Set([
+      ...familiasConItems(cocinaItemsRef.current, familiaMapCocina),
+      ...familiasConItems(placardItemsRef.current, familiaMapPlacard),
+    ]);
+    if (familiasBDNecesarias.size === 0) return;
+
+    Promise.all(
+      [...familiasBDNecesarias].map((familiaBD) =>
+        authFetch(`${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`)
+          .then((r) => r.json())
+          .then((data) => [familiaBD, Array.isArray(data) ? data : []])
+          .catch(() => [familiaBD, []]),
+      ),
+    ).then((resultados) => {
+      const mapaPorFamiliaBD = new Map(resultados);
+      const mapaArticulosDe = (familiaInterna, familiaMap) => {
+        const familiaBD = familiaMap[familiaInterna] ?? familiaInterna;
+        const lista = mapaPorFamiliaBD.get(familiaBD) ?? [];
+        return new Map(lista.map((a) => [a.articulo, a]));
+      };
+
+      setCocinaItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          const mapa = mapaArticulosDe(familia, familiaMapCocina);
+          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa));
+        }
+        return next;
+      });
+      setPlacardItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          const mapa = mapaArticulosDe(familia, familiaMapPlacard);
+          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa));
+        }
+        return next;
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineasActivas]);
+
 
   // Dado un nombre base, devuelve el precio para una línea específica (usa datos del nuevo endpoint)
   const getPrecioParaLinea = (base, lineaNombre) => {
