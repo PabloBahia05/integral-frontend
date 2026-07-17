@@ -527,6 +527,9 @@ export default function PresupuestoNuevo({
   const [cliente, setCliente] = useState("");
   const [codcliente, setCodcliente] = useState(null);
   const cargandoPresupuestoRef = useRef(false); // true mientras cargarPresupuesto está en curso
+  const lineasActivasClaveRef = useRef(""); // última combinación de líneas activas ya sincronizada con los ítems
+  const cocinaItemsRef = useRef({}); // espejo de cocinaItems para leer sin generar dependencia circular
+  const placardItemsRef = useRef({}); // espejo de placardItems, ídem
   const [clientesSugeridos, setClientesSugeridos] = useState([]);
   const [lineasBD, setLineasBD] = useState([]); // valores distintos de columna 'linea' en articulos
   const [telefonoSearch, setTelefonoSearch] = useState("");
@@ -679,6 +682,9 @@ export default function PresupuestoNuevo({
     auxiliares: [],
     accesorios: [],
   });
+
+  cocinaItemsRef.current = cocinaItems;
+  placardItemsRef.current = placardItems;
 
   // ── Tabla resumen presupuesto (solapa Presupuesto) ───────
   // Cada ítem: { id, seccion, descripcion, cantidad, precio, subtotal }
@@ -1504,6 +1510,94 @@ export default function PresupuestoNuevo({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listaPrecio]);
+
+  // Completar preciosBase/precios de ítems YA cargados cuando se agrega
+  // (o se saca) una línea en el Encabezado. Sin esto, un ítem cargado antes
+  // de activar "Línea 1" nunca tiene precios[1], y la tabla cae al fallback
+  // item.precio (el de la primera línea) para las columnas nuevas.
+  useEffect(() => {
+    if (cargandoPresupuestoRef.current) return;
+    const clave = lineasActivas.map((l) => l.linea).join("|");
+    if (clave === lineasActivasClaveRef.current) return;
+    lineasActivasClaveRef.current = clave;
+    if (lineasActivas.length === 0) return;
+
+    const familiaMapCocina = { bajomesadas: "Bajomesada", alacenas: "Alacena" };
+    const familiaMapPlacard = {
+      bajomesadas: "Bajomesada",
+      alacenas: "Alacena",
+      placard: "PLACARD",
+      frente: "FRENTE DE PLACARD",
+      auxiliares: "Auxiliares",
+      accesorios: "Accesorios",
+    };
+
+    // Alinea preciosBase de una fila con lineasActivas, completando solo
+    // las líneas que le falten (no toca las que ya tenía).
+    const alinearPreciosBaseConLineas = (fila, mapaArticulos) => {
+      const actuales = fila.preciosBase ?? [];
+      const tieneTodas = lineasActivas.every((l) =>
+        actuales.some((pb) => pb.linea === l.linea),
+      );
+      if (tieneTodas) return fila;
+
+      const art = mapaArticulos.get(fila.articulo);
+      const combinado = lineasActivas.map((l) => {
+        const existente = actuales.find((pb) => pb.linea === l.linea);
+        if (existente) return existente;
+        return {
+          linea: l.linea,
+          precioBase: art?.precios?.[String(l.linea)] ?? "",
+        };
+      });
+      return recalcFila({ ...fila, preciosBase: combinado });
+    };
+
+    const familiasConItems = (itemsObj, familiaMap) =>
+      Object.entries(itemsObj)
+        .filter(([, filas]) => filas?.length)
+        .map(([familia]) => familiaMap[familia] ?? familia);
+
+    const familiasBDNecesarias = new Set([
+      ...familiasConItems(cocinaItemsRef.current, familiaMapCocina),
+      ...familiasConItems(placardItemsRef.current, familiaMapPlacard),
+    ]);
+    if (familiasBDNecesarias.size === 0) return;
+
+    Promise.all(
+      [...familiasBDNecesarias].map((familiaBD) =>
+        authFetch(`${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`)
+          .then((r) => r.json())
+          .then((data) => [familiaBD, Array.isArray(data) ? data : []])
+          .catch(() => [familiaBD, []]),
+      ),
+    ).then((resultados) => {
+      const mapaPorFamiliaBD = new Map(resultados);
+      const mapaArticulosDe = (familiaInterna, familiaMap) => {
+        const familiaBD = familiaMap[familiaInterna] ?? familiaInterna;
+        const lista = mapaPorFamiliaBD.get(familiaBD) ?? [];
+        return new Map(lista.map((a) => [a.articulo, a]));
+      };
+
+      setCocinaItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          const mapa = mapaArticulosDe(familia, familiaMapCocina);
+          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa));
+        }
+        return next;
+      });
+      setPlacardItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          const mapa = mapaArticulosDe(familia, familiaMapPlacard);
+          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa));
+        }
+        return next;
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineasActivas]);
 
   // Sincronizar cocina y placard con la tabla de presupuesto
   useEffect(() => {
