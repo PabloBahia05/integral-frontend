@@ -1171,8 +1171,29 @@ export default function PresupuestoNuevo({
       const items = await r.json();
       if (!Array.isArray(items)) return;
 
+      // Defensa contra filas duplicadas: si el guardado se disparó más de
+      // una vez para la misma revisión (ej: varios clics en "Nueva
+      // Revisión" mientras el backend calculaba el próximo número de
+      // revisión sin bloqueo atómico), puede haber varias filas para el
+      // mismo ítem con la misma revisión. El backend las devuelve
+      // ordenadas por id ASC, así que nos quedamos con la ÚLTIMA (id más
+      // alto = el guardado más reciente) por cada ítem lógico.
+      const dedupKey = (it) =>
+        [
+          it.articulo ?? it.ARTICULO ?? "",
+          it.tipo ?? it.TIPO ?? "",
+          it.ancho ?? it.ANCHO ?? "",
+          it.alto ?? it.ALTO ?? "",
+          it.presmv ?? it.PRESMV ?? "",
+        ].join("||");
+      const itemsPorKey = new Map();
+      items.forEach((it) => {
+        itemsPorKey.set(dedupKey(it), it); // el de id más alto pisa a los anteriores (orden ASC)
+      });
+      const itemsDedup = Array.from(itemsPorKey.values());
+
       // 1.b Restaurar ajuste general (%/monto) si se guardó aplicado
-      const itemConAjuste = items.find(
+      const itemConAjuste = itemsDedup.find(
         (it) => it.ajuste_valor ?? it.AJUSTE_VALOR,
       );
       if (itemConAjuste) {
@@ -1205,7 +1226,7 @@ export default function PresupuestoNuevo({
       setCodcliente(pres.codcliente ?? pres.CODCLIENTE ?? null);
       setFecha((pres.fecha ?? pres.FECHA ?? "").slice(0, 10));
       setRevision(Number(pres.revision ?? pres.REVISION ?? 1));
-      const itemConLista = items.find((it) => it.lista ?? it.LISTA);
+      const itemConLista = itemsDedup.find((it) => it.lista ?? it.LISTA);
       const listaGuardada =
         pres.lista ?? pres.LISTA ?? itemConLista?.lista ?? itemConLista?.LISTA ?? null;
       if (listaGuardada) {
@@ -1214,7 +1235,7 @@ export default function PresupuestoNuevo({
       }
 
       const itemConLinea =
-        items.find((it) => it.linea1 ?? it.LINEA1) ?? items[0];
+        itemsDedup.find((it) => it.linea1 ?? it.LINEA1) ?? itemsDedup[0];
       const l1 =
         itemConLinea?.linea1 ?? itemConLinea?.LINEA1 ?? pres.linea1 ?? null;
       const l2 =
@@ -1236,7 +1257,7 @@ export default function PresupuestoNuevo({
       };
       const otrosItems = [];
 
-      items.forEach((it) => {
+      itemsDedup.forEach((it) => {
         const tipo = (it.tipo ?? it.TIPO ?? "").toLowerCase();
         const articulo = it.articulo ?? it.ARTICULO ?? "";
         const nombreart = it.nombreart ?? it.NOMBREART ?? "";
