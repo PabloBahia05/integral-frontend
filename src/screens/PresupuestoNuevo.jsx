@@ -939,57 +939,140 @@ export default function PresupuestoNuevo({
   const [preciosOriginales, setPreciosOriginales] = useState({}); // { [id]: { precio, precios } }
   const [ajusteAplicado, setAjusteAplicado] = useState(false);
 
+  // NOTA: presupuestoItems para las filas de cocina/placard se REGENERA
+  // automáticamente a partir de cocinaItems/placardItems (ver el useEffect
+  // "Sincronizar cocina y placard con la tabla de presupuesto" más abajo).
+  // Por eso el ajuste NO puede aplicarse solo sobre presupuestoItems: en
+  // cuanto cocinaItems/placardItems cambian por cualquier otro motivo, ese
+  // efecto pisa el precio ajustado con el precio "limpio" de origen. Hay
+  // que tocar la fuente de verdad (cocinaItems/placardItems) para los ids
+  // que empiezan con "cocina-"/"placard-", y presupuestoItems directo para
+  // el resto (mampara/especiales, que no tienen fuente propia).
+  const calcularAjuste = (base, val) => {
+    const b = parseFloat(base) || 0;
+    const n =
+      ajusteModo === "porcentaje"
+        ? Math.round(b * (1 + val / 100) * 100) / 100
+        : Math.round((b + val) * 100) / 100;
+    return n < 0 ? 0 : n;
+  };
+
   const aplicarAjuste = () => {
     const val = parseFloat(ajusteValor);
     if (!val || isNaN(val)) return;
 
-    setPresupuestoItems((prev) => {
-      // Guardar originales antes del primer ajuste (precio + precios[] por línea)
-      if (!ajusteAplicado) {
-        const orig = {};
-        prev.forEach((it) => {
-          orig[it.id] = {
-            precio: it.precio,
-            precios: (it.precios ?? []).map((p) => ({ ...p })),
-          };
-        });
-        setPreciosOriginales(orig);
-      }
-      return prev.map((it) => {
-        if (ajusteScope !== "todos" && it.id !== ajusteScope) return it;
-        // Usar precio ORIGINAL si ya hay ajuste aplicado (evita acumulación)
-        const origItem = ajusteAplicado
-          ? preciosOriginales[it.id]
-          : { precio: it.precio, precios: it.precios };
-        const precioBase = parseFloat(origItem?.precio ?? it.precio) || 0;
-        const calc = (base) => {
-          const b = parseFloat(base) || 0;
-          let n =
-            ajusteModo === "porcentaje"
-              ? Math.round(b * (1 + val / 100) * 100) / 100
-              : Math.round((b + val) * 100) / 100;
-          return n < 0 ? 0 : n;
-        };
-        const nuevoPrecio = calc(precioBase);
-        const nuevosPrecios = (origItem?.precios ?? it.precios ?? []).map(
-          (p) => ({ ...p, precio: String(calc(p.precio)) }),
-        );
-        const nuevaCantidad = parseFloat(it.cantidad) || 1;
-        return {
-          ...it,
-          precio: nuevoPrecio,
-          precios: nuevosPrecios.length ? nuevosPrecios : it.precios,
-          subtotal: nuevoPrecio * nuevaCantidad,
+    // Guardar originales antes del primer ajuste (precio + precios[] por línea)
+    if (!ajusteAplicado) {
+      const orig = {};
+      presupuestoItems.forEach((it) => {
+        orig[it.id] = {
+          precio: it.precio,
+          precios: (it.precios ?? []).map((p) => ({ ...p })),
         };
       });
+      setPreciosOriginales(orig);
+    }
+
+    const ajustarFila = (id, f, origenPreciosOriginales) => {
+      if (ajusteScope !== "todos" && id !== ajusteScope) return f;
+      const origItem = ajusteAplicado
+        ? origenPreciosOriginales[id]
+        : { precio: f.precio, precios: f.precios };
+      const precioBase = parseFloat(origItem?.precio ?? f.precio) || 0;
+      const nuevoPrecio = calcularAjuste(precioBase, val);
+      const nuevosPrecios = (origItem?.precios ?? f.precios ?? []).map((p) => ({
+        ...p,
+        precio: String(calcularAjuste(p.precio, val)),
+      }));
+      return {
+        ...f,
+        precio: nuevoPrecio,
+        precios: nuevosPrecios.length ? nuevosPrecios : f.precios,
+      };
+    };
+
+    // preciosOriginales puede no estar actualizado en este mismo tick si es
+    // el primer ajuste (setPreciosOriginales es async): armamos el mapa a
+    // usar de forma síncrona para no depender del timing de React.
+    const origenActual = ajusteAplicado
+      ? preciosOriginales
+      : Object.fromEntries(
+          presupuestoItems.map((it) => [
+            it.id,
+            { precio: it.precio, precios: (it.precios ?? []).map((p) => ({ ...p })) },
+          ]),
+        );
+
+    setCocinaItems((prev) => {
+      const next = {};
+      for (const [familia, filas] of Object.entries(prev)) {
+        next[familia] = filas.map((f, i) =>
+          ajustarFila(`cocina-${familia}-${i}`, f, origenActual),
+        );
+      }
+      return next;
     });
+    setPlacardItems((prev) => {
+      const next = {};
+      for (const [familia, filas] of Object.entries(prev)) {
+        next[familia] = filas.map((f, i) =>
+          ajustarFila(`placard-${familia}-${i}`, f, origenActual),
+        );
+      }
+      return next;
+    });
+    setPresupuestoItems((prev) =>
+      prev.map((it) => {
+        if (it.id.startsWith("cocina-") || it.id.startsWith("placard-")) {
+          // Estos se actualizan solos vía el efecto de sincronización
+          // cuando cocinaItems/placardItems cambien arriba.
+          return it;
+        }
+        const ajustado = ajustarFila(it.id, it, origenActual);
+        if (ajustado === it) return it;
+        const nuevaCantidad = parseFloat(it.cantidad) || 1;
+        return { ...ajustado, subtotal: ajustado.precio * nuevaCantidad };
+      }),
+    );
+
     setAjusteAplicado(true);
   };
 
   const revertirAjuste = () => {
     if (!ajusteAplicado) return;
+
+    const revertirFila = (id, f) => {
+      const orig = preciosOriginales[id];
+      if (orig == null) return f;
+      const p = parseFloat(orig.precio) || 0;
+      return {
+        ...f,
+        precio: p,
+        precios: orig.precios?.length ? orig.precios : f.precios,
+      };
+    };
+
+    setCocinaItems((prev) => {
+      const next = {};
+      for (const [familia, filas] of Object.entries(prev)) {
+        next[familia] = filas.map((f, i) =>
+          revertirFila(`cocina-${familia}-${i}`, f),
+        );
+      }
+      return next;
+    });
+    setPlacardItems((prev) => {
+      const next = {};
+      for (const [familia, filas] of Object.entries(prev)) {
+        next[familia] = filas.map((f, i) =>
+          revertirFila(`placard-${familia}-${i}`, f),
+        );
+      }
+      return next;
+    });
     setPresupuestoItems((prev) =>
       prev.map((it) => {
+        if (it.id.startsWith("cocina-") || it.id.startsWith("placard-")) return it;
         const orig = preciosOriginales[it.id];
         if (orig == null) return it;
         const p = parseFloat(orig.precio) || 0;
@@ -1001,6 +1084,7 @@ export default function PresupuestoNuevo({
         };
       }),
     );
+
     setAjusteAplicado(false);
     setAjusteValor("");
     setPreciosOriginales({});
