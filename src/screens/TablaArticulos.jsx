@@ -1,5 +1,8 @@
 import Totales from "./Totales";
 
+// Secciones cuyos ítems llevan medidas de ancho/alto.
+const TIENE_MEDIDAS = ["Mampara", "Puerta", "Vanitory"];
+
 // Contenido completo del tab "Presupuesto": resumen de cliente, panel de
 // ajuste de precios, y la tabla de ítems agrupados por sección con
 // subtotales y el total general.
@@ -29,11 +32,13 @@ export default function TablaArticulos({
   lineasActivas,
   listaPorcentaje,
   presmv,
+  prespv,
   abrirPresItemPopover,
   quitarDePresupuesto,
   authFetch,
   API,
   setMamparaAEditar,
+  setPuertaAEditar,
   setTab,
 }) {
   return (
@@ -485,6 +490,21 @@ export default function TablaArticulos({
                               presmv: {presmv ?? "null"}
                             </span>
                           )}
+                          {item.seccion === "Puerta" && (
+                            <span
+                              style={{
+                                marginLeft: 8,
+                                fontSize: 10,
+                                color:
+                                  (item.presp ?? prespv) != null
+                                    ? "#2277bb"
+                                    : "#c0392b",
+                                fontFamily: "monospace",
+                              }}
+                            >
+                              presp: {item.presp ?? prespv ?? "null"}
+                            </span>
+                          )}
                         </td>
                         <td
                           style={{
@@ -500,20 +520,28 @@ export default function TablaArticulos({
                             padding: "7px 10px",
                             border: "1px solid #e8f0f7",
                             textAlign: "center",
-                            color: item.seccion === "Mampara" ? "#0a3a5c" : "#aaa",
+                            color: TIENE_MEDIDAS.includes(item.seccion)
+                              ? "#0a3a5c"
+                              : "#aaa",
                           }}
                         >
-                          {item.seccion === "Mampara" ? (item.ancho ?? "—") : "—"}
+                          {TIENE_MEDIDAS.includes(item.seccion)
+                            ? (item.ancho ?? "—")
+                            : "—"}
                         </td>
                         <td
                           style={{
                             padding: "7px 10px",
                             border: "1px solid #e8f0f7",
                             textAlign: "center",
-                            color: item.seccion === "Mampara" ? "#0a3a5c" : "#aaa",
+                            color: TIENE_MEDIDAS.includes(item.seccion)
+                              ? "#0a3a5c"
+                              : "#aaa",
                           }}
                         >
-                          {item.seccion === "Mampara" ? (item.alto ?? "—") : "—"}
+                          {TIENE_MEDIDAS.includes(item.seccion)
+                            ? (item.alto ?? "—")
+                            : "—"}
                         </td>
                         {lineasActivas.length > 0 ? (
                           lineasActivas.map((l, li) => {
@@ -703,6 +731,34 @@ export default function TablaArticulos({
                               ✏️
                             </button>
                           )}
+                          {item.seccion === "Puerta" &&
+                            (item.presp ?? prespv) != null && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await authFetch(
+                                      `${API}/presupuestos-puertas/${item.presp ?? prespv}`,
+                                    );
+                                    const data = await res.json();
+                                    setPuertaAEditar(data);
+                                    setTab("puertas");
+                                  } catch {
+                                    alert("No se pudo cargar la puerta");
+                                  }
+                                }}
+                                title="Editar puerta"
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: 14,
+                                  color: "#2277bb",
+                                  marginRight: 4,
+                                }}
+                              >
+                                ✏️
+                              </button>
+                            )}
                           <button
                             onClick={() => quitarDePresupuesto(item.id)}
                             title="Quitar"
