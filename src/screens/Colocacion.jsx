@@ -63,18 +63,30 @@ export default function Colocacion({ token }) {
   /* ── cargar colocaciones al montar ── */
   useEffect(() => {
     authFetch(`${API}/colocacion`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`GET /colocacion -> ${r.status}`);
+        return r.json();
+      })
       .then((d) => setColocaciones(Array.isArray(d) ? d : []))
-      .catch(() => setColocaciones([]));
+      .catch((err) => {
+        console.error("[Colocacion] Error cargando /colocacion:", err);
+        setColocaciones([]);
+      });
   }, []);
 
   /* ── cargar rubros al montar ── */
   useEffect(() => {
     setLoadingRubros(true);
     authFetch(`${API}/articulos/rubros`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`GET /articulos/rubros -> ${r.status}`);
+        return r.json();
+      })
       .then((d) => setRubros(Array.isArray(d) ? d : []))
-      .catch(() => setRubros([]))
+      .catch((err) => {
+        console.error("[Colocacion] Error cargando /articulos/rubros:", err);
+        setRubros([]);
+      })
       .finally(() => setLoadingRubros(false));
   }, []);
 
@@ -86,7 +98,10 @@ export default function Colocacion({ token }) {
     }
     setLoadingArticulos(true);
     authFetch(`${API}/articulos/por-rubro?rubro=${encodeURIComponent(form.rubro)}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`GET /articulos/por-rubro -> ${r.status}`);
+        return r.json();
+      })
       .then((d) => {
         const arts = Array.isArray(d) ? d : [];
         setArtsPorRubro(arts);
@@ -103,7 +118,10 @@ export default function Colocacion({ token }) {
           pendingCodart.current = "";
         }
       })
-      .catch(() => setArtsPorRubro([]))
+      .catch((err) => {
+        console.error("[Colocacion] Error cargando /articulos/por-rubro:", err);
+        setArtsPorRubro([]);
+      })
       .finally(() => setLoadingArticulos(false));
   }, [form.rubro]);
 
