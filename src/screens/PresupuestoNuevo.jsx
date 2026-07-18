@@ -2196,19 +2196,20 @@ export default function PresupuestoNuevo({
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Source Sans 3', Arial, sans-serif; background: #fff; color: #1a2a3a; font-size: 13px; }
     .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 0; display: flex; flex-direction: column; background: #fff; }
-    .membrete-banner { width: 100%; padding: 16px 48px; text-align: center; background: #fff; }
-    .membrete-banner img { max-width: 100%; height: auto; }
-    .header { background: #fff; color: #0f2944; padding: 24px 48px 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+    .membrete-banner { width: 100%; padding: 8px 48px; text-align: center; background: #fff; }
+    .membrete-banner img { max-width: 100%; max-height: 70px; height: auto; }
+    .header { background: #fff; color: #0f2944; padding: 10px 48px 8px; display: flex; justify-content: space-between; align-items: baseline; }
+    .header-left { display: flex; align-items: baseline; gap: 10px; }
     .header-right { text-align: right; }
-    .doc-title { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: ${accent}; }
-    .doc-nro { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; color: #0f2944; line-height: 1.4; }
-    .doc-fecha { font-size: 11px; color: #4a6a8c; margin-top: 6px; }
-    .accent-bar { height: 4px; background: linear-gradient(90deg, ${accent} 0%, ${accentLight} 50%, ${accent} 100%); }
-    .body { padding: 36px 48px; flex: 1; }
-    .client-block { display: flex; gap: 24px; margin-bottom: 28px; }
-    .info-box { flex: 1; border: 1px solid #d0dde8; border-radius: 6px; padding: 16px 20px; }
+    .doc-title { font-family: 'Rajdhani', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: ${accent}; }
+    .doc-nro { font-family: 'Rajdhani', sans-serif; font-size: 17px; font-weight: 700; color: #0f2944; line-height: 1; }
+    .doc-fecha { font-size: 10px; color: #4a6a8c; margin-top: 2px; }
+    .accent-bar { height: 3px; background: linear-gradient(90deg, ${accent} 0%, ${accentLight} 50%, ${accent} 100%); }
+    .body { padding: 18px 48px 36px; flex: 1; }
+    .client-block { display: flex; gap: 24px; margin-bottom: 14px; }
+    .info-box { flex: 1; border: 1px solid #d0dde8; border-radius: 6px; padding: 8px 20px; }
     .info-box-title { font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: ${accent}; margin-bottom: 10px; border-bottom: 1px solid #e8f0f7; padding-bottom: 6px; }
-    .info-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+    .info-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 13px; }
     .info-label { color: #6a8aa0; }
     .info-value { font-weight: 600; color: #0f2944; text-align: right; }
     .leyenda { font-size: 12px; font-style: italic; color: #4a6a8c; background: #f5f9fc; border-left: 3px solid ${accent}; padding: 10px 14px; margin-bottom: 24px; border-radius: 0 4px 4px 0; }
