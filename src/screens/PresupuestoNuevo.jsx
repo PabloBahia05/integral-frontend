@@ -9,6 +9,7 @@ import PresupuestoWallPanel from "./PresupuestoWallPanel";
 import TiposDespensero from "./TiposDespensero";
 import PresupuestoDespensero from "./PresupuestoDespensero";
 import TabMampara from "./TabMampara";
+import TabPuertas from "./TabPuertas";
 import TabEspeciales from "./TabEspeciales";
 import TabCocina from "./TabCocina";
 import TablaArticulos from "./TablaArticulos";
@@ -531,6 +532,8 @@ export default function PresupuestoNuevo({
   const [numeroPres, setNumeroPres] = useState(null); // número real asignado tras primer guardado
   const [presmv, setPresmv] = useState(null); // id de presupuesto_mampara vinculado
   const [mamparaAEditar, setMamparaAEditar] = useState(null); // datos para editar mampara existente
+  const [prespv, setPrespv] = useState(null); // id de presupuesto_puerta vinculado
+  const [puertaAEditar, setPuertaAEditar] = useState(null); // datos para editar puerta existente
   const [revision, setRevision] = useState(1);
   const [cliente, setCliente] = useState("");
   const [codcliente, setCodcliente] = useState(null);
@@ -592,7 +595,7 @@ export default function PresupuestoNuevo({
   ]);
 
   // Pestañas
-  const [tab, setTab] = useState("encabezado"); // "encabezado" | "cocina" | "placard" | "mampara" | "especiales" | "presupuesto"
+  const [tab, setTab] = useState("encabezado"); // "encabezado" | "cocina" | "placard" | "mampara" | "puertas" | "especiales" | "presupuesto"
 
   // Sub-navegación Especiales
   const [especialesVista, setEspecialesVista] = useState("selector"); // "selector" | "vanitory" | "escritorio" | "despensero"
@@ -1199,6 +1202,7 @@ export default function PresupuestoNuevo({
           it.ancho ?? it.ANCHO ?? "",
           it.alto ?? it.ALTO ?? "",
           it.presmv ?? it.PRESMV ?? "",
+          it.presp ?? it.PRESP ?? "",
         ].join("||");
       const itemsPorKey = new Map();
       items.forEach((it) => {
@@ -1347,6 +1351,12 @@ export default function PresupuestoNuevo({
             console.log("[cargar] mampara encontrada, pmv:", pmv);
             if (pmv != null) setPresmv(pmv);
           }
+          // Si es puerta, restaurar prespv desde la BD
+          if (seccion.toLowerCase() === "puerta") {
+            const ppv = it.presp ?? it.PRESP ?? null;
+            console.log("[cargar] puerta encontrada, ppv:", ppv);
+            if (ppv != null) setPrespv(ppv);
+          }
           // Si es vanitory, restaurar presv desde presmv guardado en BD
           const esVanitory = seccion.toLowerCase() === "vanitory";
           const presvRestaurado = esVanitory
@@ -1361,6 +1371,10 @@ export default function PresupuestoNuevo({
           const esMampara = seccion.toLowerCase() === "mampara";
           const presmvRestaurado = esMampara
             ? (it.presmv ?? it.PRESMV ?? null)
+            : null;
+          const esPuerta = seccion.toLowerCase() === "puerta";
+          const prespRestaurado = esPuerta
+            ? (it.presp ?? it.PRESP ?? null)
             : null;
           otrosItems.push({
             id: `otros-${it.id}`,
@@ -1386,7 +1400,11 @@ export default function PresupuestoNuevo({
             ...(esMampara && presmvRestaurado
               ? { presmv: presmvRestaurado }
               : {}),
-            // Medidas (mampara y vanitory)
+            // Vinculación puerta
+            ...(esPuerta && prespRestaurado
+              ? { presp: prespRestaurado }
+              : {}),
+            // Medidas (mampara, puerta y vanitory)
             ancho: it.ancho ?? it.ANCHO ?? null,
             alto: it.alto ?? it.ALTO ?? null,
           });
@@ -1982,6 +2000,7 @@ export default function PresupuestoNuevo({
       // Si ya existe numeroPres, SIEMPRE nueva revisión (nunca pisar la anterior)
       nuevaRevision: esEdicion || esNuevaRev,
       presmv: presmv ?? null,
+      prespv: prespv ?? null,
       ajusteValor: ajusteAplicado ? parseFloat(ajusteValor) || null : null,
       ajusteModo: ajusteAplicado ? ajusteModo : null,
       items: presupuestoItems.map((it) => {
@@ -2015,6 +2034,8 @@ export default function PresupuestoNuevo({
           presv: it.presv ?? null,
           // Vinculación mampara
           presmv: it.presmv ?? null,
+          // Vinculación puerta
+          presp: it.presp ?? null,
         };
       }),
     };
@@ -2127,7 +2148,9 @@ export default function PresupuestoNuevo({
         const filasItems = items
           .map((item) => {
             const medida =
-              item.seccion === "Mampara" && item.ancho && item.alto
+              (item.seccion === "Mampara" || item.seccion === "Puerta") &&
+              item.ancho &&
+              item.alto
                 ? ` <span class="medida">(${item.ancho} × ${item.alto} cm)</span>`
                 : "";
             const celdasPrecio = mostrarLineas
@@ -2689,6 +2712,12 @@ export default function PresupuestoNuevo({
             Mampara
           </button>
           <button
+            className={`pn-tab${tab === "puertas" ? " active" : ""}`}
+            onClick={() => setTab("puertas")}
+          >
+            Puertas
+          </button>
+          <button
             className={`pn-tab${tab === "especiales" ? " active" : ""}`}
             onClick={() => setTab("especiales")}
           >
@@ -2829,6 +2858,19 @@ export default function PresupuestoNuevo({
             />
           )}
 
+          {tab === "puertas" && (
+            <TabPuertas
+              cliente={cliente}
+              codcliente={codcliente}
+              telefono1={telefono1}
+              wapp={wapp}
+              numeroPres={numeroPres}
+              puertaAEditar={puertaAEditar}
+              setPrespv={setPrespv}
+              setPresupuestoItems={setPresupuestoItems}
+            />
+          )}
+
           {tab === "especiales" && (
             <TabEspeciales
               token={token}
@@ -2868,11 +2910,13 @@ export default function PresupuestoNuevo({
               lineasActivas={lineasActivas}
               listaPorcentaje={listaPorcentaje}
               presmv={presmv}
+              prespv={prespv}
               abrirPresItemPopover={abrirPresItemPopover}
               quitarDePresupuesto={quitarDePresupuesto}
               authFetch={authFetch}
               API={API}
               setMamparaAEditar={setMamparaAEditar}
+              setPuertaAEditar={setPuertaAEditar}
               setTab={setTab}
             />
           )}
