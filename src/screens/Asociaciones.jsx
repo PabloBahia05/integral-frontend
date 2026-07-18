@@ -362,7 +362,12 @@ export default function Asociaciones({
   onSelect,
   onOpenModal,
   onCloseModal,
+  authFetch,
 }) {
+  // Usa el fetch autenticado si el padre lo pasa; si no, cae a fetch normal
+  // (y entonces /productos y /formulas van a seguir dando 401).
+  const doFetch = authFetch || fetch;
+
   const [search, setSearch] = useState("");
   const [articulosList, setArticulosList] = useState([]);
   const [formulasList, setFormulasList] = useState([]);
@@ -385,7 +390,7 @@ export default function Asociaciones({
   );
 
   useEffect(() => {
-    fetch(`${API}/productos?limit=99999`)
+    doFetch(`${API}/productos?limit=99999`)
       .then((r) => {
         if (!r.ok) throw new Error(`GET /productos -> ${r.status}`);
         return r.json();
@@ -419,10 +424,15 @@ export default function Asociaciones({
   }, []);
 
   useEffect(() => {
-    fetch(`${API}/formulas`)
-      .then((r) => r.json())
+    doFetch(`${API}/formulas`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`GET /formulas -> ${r.status}`);
+        return r.json();
+      })
       .then((data) => setFormulasList(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .catch((err) => {
+        console.error("[Asociaciones] Error cargando /formulas:", err);
+      });
   }, []);
 
   const listaPadreEdit = useMemo(
