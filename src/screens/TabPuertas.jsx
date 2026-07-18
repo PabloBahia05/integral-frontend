@@ -87,7 +87,7 @@ export default function TabPuertas({
             subtotal: Number(data.PRECIO ?? 0),
             ancho: Number(data.ANCHO ?? 0),
             alto: Number(data.ALTO ?? 0),
-            prespv: presp ?? null,
+            presp: presp ?? null,
           };
 
           // Si ya existe un ítem de puerta, actualizarlo; si no, agregarlo
