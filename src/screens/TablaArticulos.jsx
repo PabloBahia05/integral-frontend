@@ -505,6 +505,19 @@ export default function TablaArticulos({
                               presp: {item.presp ?? prespv ?? "null"}
                             </span>
                           )}
+                          {item.seccion === "Puerta" && item.codherraje && (
+                            <span
+                              style={{
+                                marginLeft: 8,
+                                fontSize: 10,
+                                color: "#0a7a3a",
+                                fontFamily: "monospace",
+                              }}
+                              title={item.nombreherraje ?? ""}
+                            >
+                              herraje: {item.codherraje}
+                            </span>
+                          )}
                         </td>
                         <td
                           style={{

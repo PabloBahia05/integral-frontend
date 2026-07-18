@@ -81,6 +81,7 @@ export default function TabPuertas({
           const nuevoItem = {
             id: itemId,
             seccion: "Puerta",
+            nombreart: data.CODPUERTA ?? "",
             descripcion: data.MODELO ?? "Puerta",
             cantidad: Number(data.CANTIDAD ?? 1),
             precio: Number(data.PRECIO ?? 0),
@@ -88,6 +89,8 @@ export default function TabPuertas({
             ancho: Number(data.ANCHO ?? 0),
             alto: Number(data.ALTO ?? 0),
             presp: presp ?? null,
+            codherraje: data.CODHERRAJE ?? null,
+            nombreherraje: data.NOMBREHERRAJE ?? null,
           };
 
           // Si ya existe un ítem de puerta, actualizarlo; si no, agregarlo

@@ -1381,6 +1381,8 @@ export default function PresupuestoNuevo({
             seccion,
             descripcion: articulo,
             nombreart,
+            codherraje: it.codherraje ?? it.CODHERRAJE ?? null,
+            nombreherraje: it.nombreherraje ?? it.NOMBREHERRAJE ?? null,
             cantidad: parseFloat(it.cantidad ?? it.CANTIDAD) || 1,
             precio: precio0,
             subtotal: precio0 * (parseFloat(it.cantidad ?? it.CANTIDAD) || 1),
@@ -2011,6 +2013,8 @@ export default function PresupuestoNuevo({
         return {
           descripcion: it.descripcion,
           nombreart: it.nombreart ?? "",
+          codherraje: it.codherraje ?? null,
+          nombreherraje: it.nombreherraje ?? null,
           seccion: it.seccion,
           cantidad: it.cantidad,
           precio: it.precio,

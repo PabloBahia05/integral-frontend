@@ -560,6 +560,29 @@ export default function PresupuestoPuertas({
 
     const nuevaRevision = modoEdicion ? revision + 1 : 0;
 
+    // Código de la puerta presupuestada (codartint del artículo seleccionado)
+    const codPuerta =
+      articuloSeleccionado?.codartint ?? articuloSeleccionado?.codart ?? null;
+
+    // Artículo asociado cuya familia es "herraje" (ej: "Herraje Puerta")
+    const asociadoHerraje = asociados
+      .map((a) => {
+        const codLower = (a.cod ?? "").toLowerCase().trim();
+        const producto = articulos.find(
+          (p) => (p.codart ?? "").toLowerCase().trim() === codLower,
+        );
+        return { asociado: a, producto };
+      })
+      .find(({ producto }) =>
+        (producto?.familia ?? "").toLowerCase().includes("herraje"),
+      );
+    const codHerraje =
+      asociadoHerraje?.producto?.codartint ??
+      asociadoHerraje?.producto?.codart ??
+      asociadoHerraje?.asociado?.cod ??
+      null;
+    const nombreHerraje = asociadoHerraje?.asociado?.art ?? null;
+
     const payload = {
       CODCLIENTE: form.codcliente ?? null,
       FECHA: new Date().toISOString().slice(0, 10),
@@ -617,6 +640,9 @@ export default function PresupuestoPuertas({
         ALTO: Number(form.alto),
         VIDRIO: form.vidrio,
         COLOCACION: Number(form.colocacion),
+        CODPUERTA: codPuerta,
+        CODHERRAJE: codHerraje,
+        NOMBREHERRAJE: nombreHerraje,
       });
 
       setTimeout(() => setGuardadoOk(false), 3000);
