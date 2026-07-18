@@ -87,6 +87,7 @@ const CSS = `
 
   .b-id   { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; background:#eff4ff; color:#2563eb; border-radius:7px; font-family:'Syne',sans-serif; font-size:12px; font-weight:700; }
   .b-cod  { display:inline-block; padding:2px 7px; background:#f1f5f9; color:#475569; border-radius:5px; font-size:12px; font-family:monospace; }
+  .b-rubro { display:inline-block; padding:2px 7px; background:#eff4ff; color:#2563eb; border-radius:5px; font-size:11px; font-weight:600; }
   .b-form { display:inline-block; padding:2px 6px; background:#fef3c7; color:#92400e; border-radius:4px; font-size:11px; font-weight:700; font-family:monospace; margin-top:2px; }
   .b-mg   { display:inline-flex; align-items:center; padding:1px 6px; background:#ecfdf5; color:#059669; border-radius:4px; font-size:11px; font-weight:600; margin-top:2px; }
   .sv  { display:flex; flex-direction:column; gap:2px; min-width:90px; }
@@ -365,6 +366,7 @@ export default function Asociaciones({
   onCloseModal,
 }) {
   const [search, setSearch] = useState("");
+  const [rubroFiltro, setRubroFiltro] = useState("");
 
   // Normaliza el campo rubro por si el backend lo devuelve con otra
   // capitalización (rubro / RUBRO / Rubro) según el endpoint.
@@ -381,6 +383,20 @@ export default function Asociaciones({
     () => [...new Set(articulosList.map((a) => a.rubro).filter(Boolean))].sort(),
     [articulosList],
   );
+
+  // El rubro no está guardado en la fila de "asociaciones": se resuelve
+  // buscando el artículo padre por código o, si no matchea, por nombre.
+  const rubroDeArticulo = useMemo(() => {
+    const porCodigo = new Map();
+    const porNombre = new Map();
+    articulosList.forEach((a) => {
+      if (a.codartint) porCodigo.set(a.codartint, a.rubro);
+      if (a.codart) porCodigo.set(a.codart, a.rubro);
+      if (a.articulo) porNombre.set(a.articulo, a.rubro);
+    });
+    return (row) =>
+      porCodigo.get(row.codart) || porNombre.get(row.articulo) || "";
+  }, [articulosList]);
 
   const formulasList = formulas;
 
@@ -515,12 +531,14 @@ export default function Asociaciones({
     onOpenModal?.("form");
   };
 
-  const filtered = asociaciones.filter(
-    (a) =>
+  const filtered = asociaciones.filter((a) => {
+    const matchTexto =
       !search ||
       (a.articulo ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (a.codart ?? "").toLowerCase().includes(search.toLowerCase()),
-  );
+      (a.codart ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchRubro = !rubroFiltro || rubroDeArticulo(a) === rubroFiltro;
+    return matchTexto && matchRubro;
+  });
 
   const sharedSlotProps = (isEdit) => ({
     rubros,
@@ -550,11 +568,24 @@ export default function Asociaciones({
             <span className="ar-si">🔍</span>
             <input
               className="ar-s"
-              placeholder="Buscar…"
+              placeholder="Buscar por artículo o código…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <select
+            className="ep-sel"
+            style={{ maxWidth: 220 }}
+            value={rubroFiltro}
+            onChange={(e) => setRubroFiltro(e.target.value)}
+          >
+            <option value="">— Todos los rubros —</option>
+            {rubros.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
           <button className="btn-add" onClick={openNew}>
             <span>＋</span> Agregar
           </button>
@@ -570,6 +601,7 @@ export default function Asociaciones({
                 <tr>
                   <th>ID</th>
                   <th>Código</th>
+                  <th>Rubro</th>
                   <th>Artículo Padre</th>
                   {SLOTS.map((n) => (
                     <th key={n}>Art {n}</th>
@@ -580,7 +612,7 @@ export default function Asociaciones({
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={3 + SLOTS.length + 1}>
+                    <td colSpan={4 + SLOTS.length + 1}>
                       <div className="ar-empty">
                         <div style={{ fontSize: 36, opacity: 0.4 }}>🔗</div>
                         <div>Sin registros</div>
@@ -610,6 +642,13 @@ export default function Asociaciones({
                         </td>
                         <td>
                           <span className="b-cod">{row.codart}</span>
+                        </td>
+                        <td>
+                          {rubroDeArticulo(row) ? (
+                            <span className="b-rubro">{rubroDeArticulo(row)}</span>
+                          ) : (
+                            <span className="sv-mt">—</span>
+                          )}
                         </td>
                         <td style={{ fontWeight: 500 }}>{row.articulo}</td>
                         {SLOTS.map((n) => (
@@ -699,7 +738,7 @@ export default function Asociaciones({
                       rows.push(
                         <tr key={`e-${row.id}`} className="row-edit-body">
                           <td
-                            colSpan={3 + SLOTS.length + 1}
+                            colSpan={4 + SLOTS.length + 1}
                             style={{ padding: 0 }}
                           >
                             <div className="ep">
