@@ -1,0 +1,269 @@
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap');
+
+        .pn-root {
+          font-family: 'Space Mono', monospace;
+          background: #f0f4f8;
+          min-height: 100vh;
+          color: #1a2332;
+        }
+
+        /* ── Barra superior ── */
+        .pn-topbar {
+          background: #e8f0f7;
+          border-bottom: 1px solid #b8cfe0;
+          padding: 0 16px;
+          display: flex;
+          align-items: center;
+          gap: 0;
+          height: 36px;
+        }
+        .pn-topbar-title {
+          font-size: 12px;
+          color: #0a3a5c;
+          font-weight: 700;
+          margin-right: 16px;
+          letter-spacing: 0.04em;
+        }
+        .pn-menu-item {
+          font-size: 12px;
+          color: #0a3a5c;
+          padding: 0 14px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          cursor: pointer;
+          border-right: 1px solid #c8dae8;
+          transition: background 0.12s;
+        }
+        .pn-menu-item:first-of-type { border-left: 1px solid #c8dae8; }
+        .pn-menu-item:hover { background: #d0e4f0; }
+
+        /* ── Toolbar ── */
+        .pn-toolbar {
+          background: #f5f8fb;
+          border-bottom: 1px solid #c8dae8;
+          padding: 6px 16px;
+          display: flex;
+          gap: 4px;
+          align-items: center;
+        }
+        .pn-tool-btn {
+          display: flex; align-items: center; gap: 6px;
+          padding: 5px 14px;
+          background: #fff;
+          border: 1px solid #b8cfe0;
+          border-radius: 2px;
+          font-family: 'Space Mono', monospace;
+          font-size: 12px;
+          color: #0a3a5c;
+          cursor: pointer;
+          transition: all 0.12s;
+        }
+        .pn-tool-btn:hover { background: #ddeefa; border-color: #7aaac8; }
+        .pn-tool-btn:active { background: #c8e0f0; }
+        .pn-tool-btn.save { background: #fff; }
+
+        /* ── Tabs ── */
+        .pn-tabs {
+          background: #f0f4f8;
+          border-bottom: 1px solid #c8dae8;
+          padding: 0 16px;
+          display: flex;
+          gap: 2px;
+          padding-top: 6px;
+        }
+        .pn-tab {
+          padding: 6px 18px;
+          font-family: 'Space Mono', monospace;
+          font-size: 12px;
+          cursor: pointer;
+          border: 1px solid transparent;
+          border-bottom: none;
+          border-radius: 3px 3px 0 0;
+          color: #6699bb;
+          background: transparent;
+          transition: all 0.12s;
+        }
+        .pn-tab:hover { background: #ddeefa; color: #0a3a5c; }
+        .pn-tab.active {
+          background: #fff;
+          border-color: #b8cfe0;
+          color: #0a3a5c;
+          font-weight: 700;
+          position: relative;
+          bottom: -1px;
+        }
+
+        /* ── Cuerpo ── */
+        .pn-body {
+          background: #fff;
+          border: 1px solid #c8dae8;
+          margin: 0 16px 16px;
+          padding: 24px 32px;
+        }
+
+        /* ── Encabezado del presupuesto ── */
+        .pn-header-row {
+          display: flex;
+          align-items: center;
+          gap: 24px;
+          margin-bottom: 18px;
+          flex-wrap: wrap;
+        }
+        .pn-numero-label {
+          font-size: 16px;
+          font-weight: 700;
+          color: #0a3a5c;
+          letter-spacing: 0.04em;
+        }
+        .pn-numero-val {
+          font-size: 16px;
+          color: #2277bb;
+          font-weight: 700;
+        }
+        .pn-rev-group {
+          display: flex; align-items: center; gap: 8px;
+          font-size: 13px; color: #0a3a5c;
+        }
+        .pn-rev-input {
+          width: 56px; padding: 3px 7px;
+          border: 1px solid #b8cfe0; border-radius: 2px;
+          font-family: 'Space Mono', monospace; font-size: 13px;
+          text-align: center; color: #0a3a5c;
+        }
+
+        .pn-field-row {
+          display: flex; align-items: center; gap: 10px;
+          margin-bottom: 12px; flex-wrap: wrap;
+        }
+        .pn-field-label {
+          font-size: 12px; color: #0a3a5c; font-weight: 700;
+          min-width: 70px;
+        }
+        .pn-field-input {
+          flex: 1; max-width: 460px;
+          padding: 5px 10px;
+          border: 1px solid #b8cfe0; border-radius: 2px;
+          font-family: 'Space Mono', monospace; font-size: 12px;
+          color: #0a3a5c; background: #fff;
+          outline: none;
+        }
+        .pn-field-input:focus { border-color: #4a8ab5; box-shadow: 0 0 0 2px #4a8ab520; }
+        .pn-field-select {
+          padding: 5px 10px;
+          border: 1px solid #b8cfe0; border-radius: 2px;
+          font-family: 'Space Mono', monospace; font-size: 12px;
+          color: #0a3a5c; background: #fff;
+          outline: none; cursor: pointer;
+        }
+        .pn-field-select:focus { border-color: #4a8ab5; }
+
+        /* ── Fecha ── */
+        .pn-fecha-group { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+        .pn-fecha-label { font-size: 12px; color: #0a3a5c; font-weight: 700; }
+        .pn-fecha-text { font-size: 12px; color: #334155; }
+
+        /* ── Sección líneas ── */
+        .pn-section-label {
+          font-size: 11px; font-weight: 700; color: #0a3a5c;
+          letter-spacing: 0.08em; text-transform: uppercase;
+          margin: 18px 0 8px;
+        }
+        .pn-lineas-grid {
+          display: grid;
+          grid-template-columns: 200px 1fr 1fr;
+          gap: 6px;
+          margin-bottom: 4px;
+        }
+        .pn-linea-row { display: contents; }
+
+        /* ── Sección precios ── */
+        .pn-precios-wrap {
+          border: 1px solid #c8dae8;
+          border-radius: 3px;
+          padding: 14px 18px;
+          margin-bottom: 14px;
+          background: #f8fbfd;
+          display: flex;
+          gap: 32px;
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+        .pn-lista-group { display: flex; align-items: center; gap: 8px; }
+        .pn-check-group { display: flex; flex-direction: column; gap: 5px; }
+        .pn-check-row { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #334155; cursor: pointer; }
+        .pn-check-row input[type="checkbox"] { cursor: pointer; accent-color: #2277bb; }
+        .pn-color-group { display: flex; align-items: center; gap: 8px; }
+        .pn-color-label { font-size: 12px; color: #0a3a5c; }
+        .pn-color-input {
+          padding: 4px 8px; width: 120px;
+          border: 1px solid #b8cfe0; border-radius: 2px;
+          font-family: 'Space Mono', monospace; font-size: 12px;
+        }
+        .pn-right-checks { display: flex; flex-direction: column; gap: 5px; margin-left: auto; }
+
+        /* ── Textarea ── */
+        .pn-textarea {
+          width: 100%; padding: 8px 10px;
+          border: 1px solid #b8cfe0; border-radius: 2px;
+          font-family: 'Space Mono', monospace; font-size: 12px;
+          color: #0a3a5c; resize: vertical; outline: none;
+          background: #fff; box-sizing: border-box;
+        }
+        .pn-textarea:focus { border-color: #4a8ab5; box-shadow: 0 0 0 2px #4a8ab520; }
+
+        /* ── Feedback ── */
+        .pn-error { font-size: 12px; color: #dc2626; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 3px; padding: 6px 12px; margin-bottom: 10px; }
+        .pn-ok    { font-size: 12px; color: #16a34a; background: #f0fdf4; border: 1px solid #86efac; border-radius: 3px; padding: 6px 12px; margin-bottom: 10px; }
+
+        /* ── Tab módulos placeholder ── */
+        .pn-modulos-empty {
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          padding: 60px 20px; gap: 10px; color: #94a3b8;
+        }
+
+        /* ── Precio editable inline ── */
+        .pn-precio-cell {
+          cursor: pointer;
+          border-radius: 2px;
+          padding: 2px 4px;
+          transition: background 0.1s;
+          display: inline-flex; align-items: center; gap: 4px;
+        }
+        .pn-precio-cell:hover { background: #ddeefa; }
+        .pn-precio-cell::after {
+          content: "✏️";
+          font-size: 10px;
+          opacity: 0;
+          transition: opacity 0.12s;
+        }
+        .pn-precio-cell:hover::after { opacity: 1; }
+
+        /* ── Popover de precio ── */
+        .pn-popover-backdrop {
+          position: fixed; inset: 0; z-index: 200;
+        }
+        .pn-popover {
+          position: fixed; z-index: 201;
+          background: #fff; border: 1px solid #7aaac8;
+          border-radius: 4px; box-shadow: 0 8px 24px #0a3a5c22;
+          padding: 12px 14px; min-width: 240px;
+          font-family: 'Space Mono', monospace; font-size: 12px;
+        }
+        .pn-popover-title { font-size: 10px; color: #6699bb; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+        .pn-pop-toggle { display: flex; border: 1px solid #b8cfe0; border-radius: 2px; overflow: hidden; margin-bottom: 8px; }
+        .pn-pop-toggle button {
+          flex: 1; padding: 4px 0; border: none; cursor: pointer;
+          font-family: 'Space Mono', monospace; font-size: 11px;
+          background: #fff; color: #0a3a5c; transition: all 0.1s;
+        }
+        .pn-pop-toggle button.active { background: #0a3a5c; color: #fff; font-weight: 700; }
+        .pn-pop-input-row { display: flex; gap: 6px; align-items: center; }
+        .pn-pop-input {
+          flex: 1; padding: 5px 8px; border: 1px solid #b8cfe0; border-radius: 2px;
+          font-family: 'Space Mono', monospace; font-size: 12px; color: #0a3a5c; outline: none;
+        }
+        .pn-pop-input:focus { border-color: #4a8ab5; }
+        .pn-pop-confirm { padding: 5px 12px; background: #0a3a5c; color: #fff; border: none; border-radius: 2px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; }
+        .pn-pop-cancel  { padding: 5px 10px; background: #fff; color: #6699bb; border: 1px solid #c8dae8; border-radius: 2px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 12px; }
+        .pn-pop-hint { font-size: 10px; color: #99aabb; margin-top: 6px; }
