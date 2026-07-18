@@ -731,6 +731,62 @@ export default function Formulas({
     }
   };
 
+  const openDuplicate = async () => {
+    if (!selected) return;
+    setForm({
+      codform: "", // único — el usuario tiene que poner un código nuevo
+      codartint: selected.codart ?? "",
+      descripcion: selected.descripcion ?? "",
+      formula: selected.formula ?? "",
+      rubro: selected.rubro ?? "",
+      familia: selected.familia ?? "",
+    });
+    setError("");
+    setFamiliaElegida("");
+    setRubroElegido("");
+    setArtsPorRubro([]);
+    onOpenModal("nuevo");
+
+    // Precargar cascada del artículo vinculado (igual que en openEdit)
+    const codVinculado = selected.codart ?? "";
+    if (codVinculado) {
+      try {
+        const res = await authFetch(
+          `https://integral-backend-production.up.railway.app/articulos/rubro-de?codart=${encodeURIComponent(codVinculado)}`,
+        );
+        const data = await res.json();
+        if (data.rubro) {
+          setRubroElegido(data.rubro);
+          const resFam = await authFetch(
+            `https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(data.rubro)}`,
+          );
+          const fams = await resFam.json();
+          if (Array.isArray(fams) && fams.length > 0) setFamilias(fams);
+          const resArts = await authFetch(
+            `https://integral-backend-production.up.railway.app/articulos/por-rubro?rubro=${encodeURIComponent(data.rubro)}`,
+          );
+          const arts = await resArts.json();
+          setArtsPorRubro(Array.isArray(arts) ? arts : []);
+        }
+        if (data.familia) {
+          setFamiliaElegida(data.familia);
+        }
+      } catch {
+        /* silencioso */
+      }
+    } else if (selected.rubro) {
+      try {
+        const resFam = await authFetch(
+          `https://integral-backend-production.up.railway.app/articulos/familias-por-rubro?rubro=${encodeURIComponent(selected.rubro)}`,
+        );
+        const fams = await resFam.json();
+        if (Array.isArray(fams) && fams.length > 0) setFamilias(fams);
+      } catch {
+        /* silencioso */
+      }
+    }
+  };
+
   const handleSubmit = async () => {
     if (!form.codform.trim()) {
       setError("El código es obligatorio.");
@@ -791,6 +847,7 @@ export default function Formulas({
         onNew={openNew}
         onEdit={openEdit}
         onDelete={() => selected && onOpenModal("eliminar")}
+        onDuplicate={openDuplicate}
         search={search}
         onSearch={setSearch}
       />
