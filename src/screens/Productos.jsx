@@ -616,45 +616,58 @@ export default function Productos({
     onOpenModal("nuevo");
   };
 
-  const openEdit = () => {
+  const openEdit = async () => {
     if (!selected) return;
     const s = (v) => (v != null && v !== "null" ? String(v) : "");
+
+    // Traer el dato fresco de la BD por id, en vez de confiar en "selected"
+    // (que puede haber quedado desactualizado tras un guardado previo, ej:
+    // no reflejaba la "familia" recién asignada). Si el fetch falla, se usa
+    // "selected" como respaldo para no romper el flujo.
+    let art = selected;
+    try {
+      const res = await authFetch(`${API}/productos/${selected.id}`);
+      if (res.ok) art = await res.json();
+    } catch (e) {
+      console.error("[openEdit] no se pudo refrescar el artículo, uso selected:", e);
+    }
+
     setForm({
-      codartint: s(selected.codartint),
-      articulo: s(selected.articulo),
-      area: s(selected.area),
-      unidad: s(selected.unidad),
+      codartint: s(art.codartint),
+      articulo: s(art.articulo),
+      area: s(art.area),
+      unidad: s(art.unidad),
       artfoto:
-        selected.artfoto && selected.artfoto !== "null" ? selected.artfoto : "",
-      precio: s(selected.precio),
-      proveedor: s(selected.proveedor),
-      cantidad: s(selected.cantidad),
-      ancho: s(selected.ancho),
-      alto: s(selected.alto),
-      prof: s(selected.prof),
-      linea: s(selected.linea),
-      color: s(selected.color),
-      familia: s(selected.familia),
-      rubro: s(selected.rubro),
-      costosi: s(selected.costosi),
-      costosicf: s(selected.costosicf),
-      costocicf: s(selected.costocicf),
-      costo_placa: s(selected.costo_placa),
-      descuento: s(selected.descuento),
-      flete: s(selected.flete),
-      valorlista: s(selected.valorlista),
-      fecha_precio: selected.fecha_precio
-        ? String(selected.fecha_precio).slice(0, 10)
+        art.artfoto && art.artfoto !== "null" ? art.artfoto : "",
+      precio: s(art.precio),
+      proveedor: s(art.proveedor),
+      cantidad: s(art.cantidad),
+      ancho: s(art.ancho),
+      alto: s(art.alto),
+      prof: s(art.prof),
+      linea: s(art.linea),
+      color: s(art.color),
+      familia: s(art.familia),
+      rubro: s(art.rubro),
+      costosi: s(art.costosi),
+      costosicf: s(art.costosicf),
+      costocicf: s(art.costocicf),
+      costo_placa: s(art.costo_placa),
+      descuento: s(art.descuento),
+      flete: s(art.flete),
+      valorlista: s(art.valorlista),
+      fecha_precio: art.fecha_precio
+        ? String(art.fecha_precio).slice(0, 10)
         : "",
-      margen: s(selected.margen),
-      codartprov: s(selected.codartprov),
-      prod_prov: s(selected.prod_prov),
+      margen: s(art.margen),
+      codartprov: s(art.codartprov),
+      prod_prov: s(art.prod_prov),
     });
     setError("");
     setFamiliaEsNueva(false);
     setRubroEsNuevo(false);
     setNuevoRubro("");
-    setProvSearch(s(selected.proveedor));
+    setProvSearch(s(art.proveedor));
     setProvFocus(false);
     onOpenModal("editar");
   };
