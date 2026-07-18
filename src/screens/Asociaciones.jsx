@@ -386,15 +386,36 @@ export default function Asociaciones({
 
   useEffect(() => {
     fetch(`${API}/productos?limit=99999`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!Array.isArray(data)) return;
-        setArticulosList(data);
-        setRubros(
-          [...new Set(data.map((a) => a.rubro).filter(Boolean))].sort(),
-        );
+      .then((r) => {
+        if (!r.ok) throw new Error(`GET /productos -> ${r.status}`);
+        return r.json();
       })
-      .catch(() => {});
+      .then((data) => {
+        if (!Array.isArray(data)) {
+          console.warn("[Asociaciones] /productos no devolvió un array:", data);
+          return;
+        }
+        // Tolera distintas variantes del nombre de columna que puede
+        // devolver el backend (rubro / RUBRO / Rubro).
+        const normalizado = data.map((a) => ({
+          ...a,
+          rubro: a.rubro ?? a.RUBRO ?? a.Rubro ?? "",
+        }));
+        setArticulosList(normalizado);
+        const listaRubros = [
+          ...new Set(normalizado.map((a) => a.rubro).filter(Boolean)),
+        ].sort();
+        setRubros(listaRubros);
+        if (listaRubros.length === 0 && normalizado.length > 0) {
+          console.warn(
+            "[Asociaciones] No se encontró el campo 'rubro' en los productos. Claves disponibles:",
+            Object.keys(data[0]),
+          );
+        }
+      })
+      .catch((err) => {
+        console.error("[Asociaciones] Error cargando /productos:", err);
+      });
   }, []);
 
   useEffect(() => {
