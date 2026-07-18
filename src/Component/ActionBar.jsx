@@ -1,8 +1,11 @@
-export default function ActionBar({ selected, onNew, onEdit, onDelete, search, onSearch }) {
+export default function ActionBar({ selected, onNew, onEdit, onDelete, onDuplicate, search, onSearch }) {
   return (
     <div className="action-bar">
       <button className="btn-action btn-nuevo" onClick={onNew}>＋ Nuevo</button>
       <button className="btn-action btn-editar" onClick={onEdit} disabled={!selected}>✏️ Editar</button>
+      {onDuplicate && (
+        <button className="btn-action btn-duplicar" onClick={onDuplicate} disabled={!selected}>📋 Duplicar</button>
+      )}
       <button className="btn-action btn-eliminar" onClick={onDelete} disabled={!selected}>🗑 Eliminar</button>
 
       <div className="search-wrap">
