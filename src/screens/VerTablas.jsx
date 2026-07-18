@@ -9,6 +9,7 @@ import TiposDespensero from "./TiposDespensero";
 import Formulas from "./Formulas";
 import Margen from "./Margen";
 import PresupuestosMamparasTabla from "./PresupuestosMamparasTabla";
+import PresupuestosPuertasTabla from "./PresupuestosPuertasTabla";
 import Colocacion from "./Colocacion";
 import Asociaciones from "./Asociaciones";
 import AsociacionesForm from "./AsociacionesForm";
@@ -260,6 +261,12 @@ const TABLAS = [
     icon: "📋",
     color: "#4361ee",
   },
+  {
+    id: "presupuestos-puertas-tabla",
+    label: "Presupuestos Puertas",
+    icon: "🚪",
+    color: "#9d4edd",
+  },
   { id: "colocacion", label: "Colocación", icon: "📐", color: "#f77f00" },
   { id: "asociaciones", label: "Asociaciones", icon: "🔗", color: "#6a994e" },
   {
@@ -312,6 +319,9 @@ export default function VerTablas({
   presupuestosMamparas,
   presupuestosMamparasCRUD,
   selectedPresupuestoMampara,
+  presupuestosPuertas,
+  presupuestosPuertasCRUD,
+  selectedPresupuestoPuerta,
   colocaciones,
   colocacionesCRUD,
   selectedColocacion,
@@ -471,6 +481,20 @@ export default function VerTablas({
           modal={modal}
           {...localCRUD(presupuestosMamparasCRUD ?? {})}
           onSelect={(row) => presupuestosMamparasCRUD?.onSelect?.(row)}
+        />
+      </div>
+    );
+  if (tablaActiva === "presupuestos-puertas-tabla")
+    return (
+      <div>
+        {back}
+        <PresupuestosPuertasTabla
+          presupuestos={presupuestosPuertas ?? []}
+          selected={selectedPresupuestoPuerta}
+          modal={modal}
+          {...localCRUD(presupuestosPuertasCRUD ?? {})}
+          onSelect={(row) => presupuestosPuertasCRUD?.onSelect?.(row)}
+          token={token}
         />
       </div>
     );
