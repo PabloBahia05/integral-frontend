@@ -496,6 +496,7 @@ export default function VerTablas({
         <Asociaciones
           asociaciones={asociaciones ?? []}
           productos={productos ?? []}
+          formulas={formulas ?? []}
           selected={selectedAsociacion}
           modal={modal}
           {...localCRUD(asociacionesCRUD ?? {})}

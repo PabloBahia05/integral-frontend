@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 
-const API = "https://integral-backend-production.up.railway.app";
 const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 const EMPTY = () => ({
@@ -355,6 +354,8 @@ function SlotView({ row, n }) {
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function Asociaciones({
   asociaciones = [],
+  productos = [],
+  formulas = [],
   selected,
   modal,
   onSave,
@@ -362,16 +363,26 @@ export default function Asociaciones({
   onSelect,
   onOpenModal,
   onCloseModal,
-  authFetch,
 }) {
-  // Usa el fetch autenticado si el padre lo pasa; si no, cae a fetch normal
-  // (y entonces /productos y /formulas van a seguir dando 401).
-  const doFetch = authFetch || fetch;
-
   const [search, setSearch] = useState("");
-  const [articulosList, setArticulosList] = useState([]);
-  const [formulasList, setFormulasList] = useState([]);
-  const [rubros, setRubros] = useState([]);
+
+  // Normaliza el campo rubro por si el backend lo devuelve con otra
+  // capitalización (rubro / RUBRO / Rubro) según el endpoint.
+  const articulosList = useMemo(
+    () =>
+      productos.map((a) => ({
+        ...a,
+        rubro: a.rubro ?? a.RUBRO ?? a.Rubro ?? "",
+      })),
+    [productos],
+  );
+
+  const rubros = useMemo(
+    () => [...new Set(articulosList.map((a) => a.rubro).filter(Boolean))].sort(),
+    [articulosList],
+  );
+
+  const formulasList = formulas;
 
   // edición inline
   const [editId, setEditId] = useState(null);
@@ -388,52 +399,6 @@ export default function Asociaciones({
   const [newRubroSlots, setNewRubroSlots] = useState(() =>
     Object.fromEntries(SLOTS.map((n) => [n, ""])),
   );
-
-  useEffect(() => {
-    doFetch(`${API}/productos?limit=99999`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`GET /productos -> ${r.status}`);
-        return r.json();
-      })
-      .then((data) => {
-        if (!Array.isArray(data)) {
-          console.warn("[Asociaciones] /productos no devolvió un array:", data);
-          return;
-        }
-        // Tolera distintas variantes del nombre de columna que puede
-        // devolver el backend (rubro / RUBRO / Rubro).
-        const normalizado = data.map((a) => ({
-          ...a,
-          rubro: a.rubro ?? a.RUBRO ?? a.Rubro ?? "",
-        }));
-        setArticulosList(normalizado);
-        const listaRubros = [
-          ...new Set(normalizado.map((a) => a.rubro).filter(Boolean)),
-        ].sort();
-        setRubros(listaRubros);
-        if (listaRubros.length === 0 && normalizado.length > 0) {
-          console.warn(
-            "[Asociaciones] No se encontró el campo 'rubro' en los productos. Claves disponibles:",
-            Object.keys(data[0]),
-          );
-        }
-      })
-      .catch((err) => {
-        console.error("[Asociaciones] Error cargando /productos:", err);
-      });
-  }, []);
-
-  useEffect(() => {
-    doFetch(`${API}/formulas`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`GET /formulas -> ${r.status}`);
-        return r.json();
-      })
-      .then((data) => setFormulasList(Array.isArray(data) ? data : []))
-      .catch((err) => {
-        console.error("[Asociaciones] Error cargando /formulas:", err);
-      });
-  }, []);
 
   const listaPadreEdit = useMemo(
     () =>
