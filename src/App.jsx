@@ -148,6 +148,9 @@ function App() {
   const [presupuestosMamparas, setPresupuestosMamparas] = useState([]);
   const [selectedPresupuestoMampara, setSelectedPresupuestoMampara] =
     useState(null);
+  const [presupuestosPuertas, setPresupuestosPuertas] = useState([]);
+  const [selectedPresupuestoPuerta, setSelectedPresupuestoPuerta] =
+    useState(null);
   const [presupuestosVanitory, setPresupuestosVanitory] = useState([]);
   const [selectedPresupuestoVanitory, setSelectedPresupuestoVanitory] =
     useState(null);
@@ -270,6 +273,12 @@ function App() {
       .then(setPresupuestosMamparas)
       .catch(console.error);
 
+  const fetchPresupuestosPuertas = () =>
+    authFetch(`${API}/presupuestos-puertas`)
+      .then((r) => r.json())
+      .then(setPresupuestosPuertas)
+      .catch(console.error);
+
   const fetchPresupuestosVanitory = () =>
     authFetch(`${API}/presupuestos-vanitory`)
       .then((r) => r.json())
@@ -356,6 +365,7 @@ function App() {
     if (puedeVer("ver-tablas"))              fetchFormulas();
     if (puedeVer("lista-margenes"))          fetchMargen();
     if (puedeVer("presupuestos-tabla"))      fetchPresupuestosMamparas();
+    if (puedeVer("ver-tablas"))              fetchPresupuestosPuertas();
     if (puedeVer("presupuestos-vanitory-tabla")) fetchPresupuestosVanitory();
     if (puedeVer("ver-tablas"))              fetchAsociaciones();
     if (puedeVer("ver-tablas"))              fetchAsociacionesForm();
@@ -555,6 +565,14 @@ function App() {
     setSelectedPresupuestoMampara,
     fetchPresupuestosMamparas,
     "Presupuesto Mampara",
+  );
+  const presupuestosPuertasCRUD = makeCRUD(
+    "presupuestos-puertas",
+    presupuestosPuertas,
+    setPresupuestosPuertas,
+    setSelectedPresupuestoPuerta,
+    fetchPresupuestosPuertas,
+    "Presupuesto Puerta",
   );
   const presupuestosVanitoryCRUD = makeCRUD(
     "presupuestos-vanitory",
@@ -1044,6 +1062,9 @@ function App() {
                 presupuestosMamparas={presupuestosMamparas}
                 presupuestosMamparasCRUD={presupuestosMamparasCRUD}
                 selectedPresupuestoMampara={selectedPresupuestoMampara}
+                presupuestosPuertas={presupuestosPuertas}
+                presupuestosPuertasCRUD={presupuestosPuertasCRUD}
+                selectedPresupuestoPuerta={selectedPresupuestoPuerta}
                 asociaciones={asociaciones}
                 asociacionesCRUD={asociacionesCRUD}
                 selectedAsociacion={selectedAsociacion}
