@@ -188,6 +188,28 @@ const FIELDS_RIGHT = [
   { field: "mca", label: "MCA", placeholder: "Ej: MCA-001" },
 ];
 
+// Recalcula costosi -> costosicf -> costocicf -> precio a partir de
+// valorlista, descuento y margen. Función pura para poder reutilizarla
+// tanto al tipear en el formulario como al abrir "Editar" (para que el
+// precio mostrado nunca quede desincronizado del costo/margen guardado).
+const recalcularCostosYPrecio = (valorlista, descuento, margen) => {
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const vl = parseFloat(valorlista) || 0;
+  const dto = parseFloat(descuento) || 0;
+  const mg = parseFloat(margen) || 0;
+  if (!vl) return { costosi: "", costosicf: "", costocicf: "", precio: "" };
+  const costosi = r2(vl * (1 - dto / 100));
+  const costosicf = r2(costosi * 1.1);
+  const costocicf = r2(costosicf * 1.21);
+  const precio = r2(costocicf * (1 + mg / 100));
+  return {
+    costosi: String(costosi),
+    costosicf: String(costosicf),
+    costocicf: String(costocicf),
+    precio: String(precio),
+  };
+};
+
 const toDecimal = (v) =>
   v !== "" && v !== null && v !== undefined ? parseFloat(v) || null : null;
 const toInt = (v) =>
@@ -632,6 +654,24 @@ export default function Productos({
       console.error("[openEdit] no se pudo refrescar el artículo, uso selected:", e);
     }
 
+    // Recalcular costos/precio con la fórmula vigente al abrir el modal,
+    // en vez de confiar en lo que haya guardado la base (puede haber
+    // quedado desincronizado: cambios de margen sin resave, cargas por
+    // Excel que solo tocaron `precio`, etc). Usa el descuento del
+    // proveedor como fallback si el artículo no tiene uno propio guardado.
+    const provDelArticulo = proveedores.find(
+      (p) => (p.fantasia || p.provnombre) === art.proveedor || p.provnombre === art.proveedor,
+    );
+    const descuentoEfectivo =
+      art.descuento != null && art.descuento !== ""
+        ? art.descuento
+        : provDelArticulo?.descuento ?? "";
+    const recalculado = recalcularCostosYPrecio(
+      art.valorlista,
+      descuentoEfectivo,
+      art.margen,
+    );
+
     setForm({
       codartint: s(art.codartint),
       articulo: s(art.articulo),
@@ -639,7 +679,7 @@ export default function Productos({
       unidad: s(art.unidad),
       artfoto:
         art.artfoto && art.artfoto !== "null" ? art.artfoto : "",
-      precio: s(art.precio),
+      precio: recalculado.precio || s(art.precio),
       proveedor: s(art.proveedor),
       cantidad: s(art.cantidad),
       ancho: s(art.ancho),
@@ -649,9 +689,9 @@ export default function Productos({
       color: s(art.color),
       familia: s(art.familia),
       rubro: s(art.rubro),
-      costosi: s(art.costosi),
-      costosicf: s(art.costosicf),
-      costocicf: s(art.costocicf),
+      costosi: recalculado.costosi || s(art.costosi),
+      costosicf: recalculado.costosicf || s(art.costosicf),
+      costocicf: recalculado.costocicf || s(art.costocicf),
       costo_placa: s(art.costo_placa),
       descuento: s(art.descuento),
       flete: s(art.flete),
@@ -1143,30 +1183,7 @@ export default function Productos({
 
               {/* ── Costos con auto-cálculo ── */}
               {(() => {
-                const r2 = (v) => Math.round(v * 100) / 100;
-
-                const recalcular = (valorlista, descuento, margen) => {
-                  const vl = parseFloat(valorlista) || 0;
-                  const dto = parseFloat(descuento) || 0;
-                  const mg = parseFloat(margen) || 0;
-                  if (!vl)
-                    return {
-                      costosi: "",
-                      costosicf: "",
-                      costocicf: "",
-                      precio: "",
-                    };
-                  const costosi = r2(vl * (1 - dto / 100));
-                  const costosicf = r2(costosi * 1.1);
-                  const costocicf = r2(costosicf * 1.21);
-                  const precio = r2(costocicf * (1 + mg / 100));
-                  return {
-                    costosi: String(costosi),
-                    costosicf: String(costosicf),
-                    costocicf: String(costocicf),
-                    precio: String(precio),
-                  };
-                };
+                const recalcular = recalcularCostosYPrecio;
 
                 // Descuento del proveedor seleccionado
                 const provSeleccionado = proveedores.find(
