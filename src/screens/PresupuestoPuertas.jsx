@@ -14,6 +14,7 @@ export default function PresupuestoPuertas({
   const [revision, setRevision] = useState(0);
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
   const [articulos, setArticulos] = useState([]);
+  const [catalogoGeneral, setCatalogoGeneral] = useState([]);
   const [familias, setFamilias] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
@@ -157,6 +158,18 @@ export default function PresupuestoPuertas({
           ...new Set(normalized.map((a) => a.familia).filter(Boolean)),
         ].sort();
         setFamilias(fams);
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Cargar catálogo GENERAL de artículos (herrajes, vidrios, etc.) ─────────
+  // Se usa para identificar la familia de los artículos asociados a la puerta.
+  useEffect(() => {
+    authFetch("https://integral-backend-production.up.railway.app/productos")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data)) return;
+        setCatalogoGeneral(data);
       })
       .catch(() => {});
   }, []);
@@ -568,27 +581,29 @@ export default function PresupuestoPuertas({
     const asociadoHerraje = asociados
       .map((a) => {
         const codLower = (a.cod ?? "").toLowerCase().trim();
-        const producto = articulos.find(
-          (p) => (p.codart ?? "").toLowerCase().trim() === codLower,
+        const producto = catalogoGeneral.find(
+          (p) => (p.codartint ?? "").toLowerCase().trim() === codLower,
         );
         return { asociado: a, producto };
       })
       .find(({ producto }) =>
         (producto?.familia ?? "").toLowerCase().includes("herraje"),
       );
-    const codHerraje =
-      asociadoHerraje?.producto?.codartint ??
-      asociadoHerraje?.producto?.codart ??
-      asociadoHerraje?.asociado?.cod ??
-      null;
+    const codHerraje = asociadoHerraje?.producto?.codartint ?? null;
     const nombreHerraje = asociadoHerraje?.asociado?.art ?? null;
 
     // TEMP DEBUG — sacar después de confirmar que funciona
     console.log("[DEBUG herraje] articuloSeleccionado:", articuloSeleccionado);
     console.log("[DEBUG herraje] asociados:", asociados);
     console.log(
-      "[DEBUG herraje] familias en articulos:",
-      [...new Set(articulos.map((p) => p.familia))],
+      "[DEBUG herraje] asociados detalle (art/cod/codform):",
+      asociados.map((a) => ({ art: a.art, cod: a.cod, codform: a.codform })),
+    );
+    console.log(
+      "[DEBUG herraje] familias en catalogoGeneral:",
+      [...new Set(catalogoGeneral.map((p) => p.familia))].filter((f) =>
+        (f ?? "").toLowerCase().includes("herraje"),
+      ),
     );
     console.log("[DEBUG herraje] asociadoHerraje encontrado:", asociadoHerraje);
     console.log("[DEBUG herraje] codPuerta:", codPuerta, "| codHerraje:", codHerraje);
