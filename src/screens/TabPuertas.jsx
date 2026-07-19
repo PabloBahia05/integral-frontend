@@ -93,9 +93,10 @@ export default function TabPuertas({
             nombreherraje: data.NOMBREHERRAJE ?? null,
           };
 
-          // Si ya existe un ítem de puerta, actualizarlo; si no, agregarlo
+          // Actualiza esta puerta puntual si ya existe (mismo id); si no, la agrega
+          // como una puerta nueva — permite varias puertas en el mismo presupuesto.
           setPresupuestoItems((prev) => {
-            const idx = prev.findIndex((it) => it.seccion === "Puerta");
+            const idx = prev.findIndex((it) => it.id === itemId);
             if (idx >= 0) {
               const updated = [...prev];
               updated[idx] = {
