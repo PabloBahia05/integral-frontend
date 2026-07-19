@@ -407,6 +407,22 @@ export default function PresupuestoPuertas({
 
         for (const idx of idxs) {
           const asoc = nuevos[idx];
+
+          // Si no tenemos el código del artículo asociado, no tiene sentido
+          // pegarle al backend (siempre va a devolver 400). Lo marcamos como
+          // error legible y seguimos con el resto de los slots.
+          if (!asoc.cod) {
+            nuevos[idx] = {
+              ...asoc,
+              resultadoBase: 0,
+              resultado: 0,
+              parciales: {},
+              error:
+                "Falta el código de artículo asociado (revisar tabla de Asociaciones)",
+            };
+            continue;
+          }
+
           const variables = {
             ancho: Number(form.ancho),
             alto: Number(form.alto),
