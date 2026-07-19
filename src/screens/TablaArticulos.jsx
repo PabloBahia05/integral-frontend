@@ -468,7 +468,20 @@ export default function TablaArticulos({
                             fontSize: 11,
                           }}
                         >
-                          {item.nombreart}
+                          <div>{item.nombreart}</div>
+                          {item.seccion === "Puerta" && item.codherraje && (
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: "#0a7a3a",
+                                marginTop: 2,
+                              }}
+                              title={item.nombreherraje ?? ""}
+                            >
+                              {item.codherraje}
+                            </div>
+                          )}
                         </td>
                         <td
                           style={{
@@ -503,19 +516,6 @@ export default function TablaArticulos({
                               }}
                             >
                               presp: {item.presp ?? prespv ?? "null"}
-                            </span>
-                          )}
-                          {item.seccion === "Puerta" && item.codherraje && (
-                            <span
-                              style={{
-                                marginLeft: 8,
-                                fontSize: 10,
-                                color: "#0a7a3a",
-                                fontFamily: "monospace",
-                              }}
-                              title={item.nombreherraje ?? ""}
-                            >
-                              herraje: {item.codherraje}
                             </span>
                           )}
                         </td>
