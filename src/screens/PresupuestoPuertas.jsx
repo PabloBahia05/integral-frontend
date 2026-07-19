@@ -233,7 +233,7 @@ export default function PresupuestoPuertas({
   //   La fórmula viene directamente del campo form1..form10 de la tabla asociaciones.
   //   El margen viene de margen1..margen10 y es editable en el front.
   useEffect(() => {
-    if (!articuloSeleccionado?.codart) {
+    if (!articuloSeleccionado?.codartint && !articuloSeleccionado?.codart) {
       setAsociados([]);
       setCalculated(false);
       return;
@@ -270,19 +270,26 @@ export default function PresupuestoPuertas({
           });
         }
 
-        const codartLower = articuloSeleccionado.codart.toLowerCase().trim();
-        const artLower = (articuloSeleccionado.articulo ?? "")
+        const codartLower = (
+          articuloSeleccionado.codartint ??
+          articuloSeleccionado.codart ??
+          ""
+        )
           .toLowerCase()
           .trim();
 
         const fila = dataAsoc.find(
           (a) =>
-            (a.codart ?? "").toLowerCase().trim() === codartLower ||
-            (a.articulo ?? "").toLowerCase().trim() === artLower,
+            (a.codartint ?? a.codart ?? "").toLowerCase().trim() ===
+            codartLower,
         );
 
         if (!fila) {
           setCargandoAsociados(false);
+          setAsociados([]);
+          setErrorCalc(
+            `No se encontraron artículos asociados para el código "${codartLower}" en la tabla de asociaciones.`,
+          );
           return;
         }
 
@@ -337,7 +344,12 @@ export default function PresupuestoPuertas({
       .finally(() => setCargandoAsociados(false));
 
     // Re-ejecutar cuando cambia el artículo o el catálogo
-  }, [articuloSeleccionado?.id, articuloSeleccionado?.codart, articulos]);
+  }, [
+    articuloSeleccionado?.id,
+    articuloSeleccionado?.codartint,
+    articuloSeleccionado?.codart,
+    articulos,
+  ]);
 
   // ── Calcular bases: llama al backend por cada artículo asociado ─────────────
   // Calcula resultadoBase (valor puro de la fórmula, sin margen).
