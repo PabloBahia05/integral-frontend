@@ -663,6 +663,7 @@ export default function Productos({
       codartprov: s(art.codartprov),
       prod_prov: s(art.prod_prov),
       mca: s(art.mca),
+      precio_un: s(art.precio_un),
     });
     setError("");
     setFamiliaEsNueva(false);
