@@ -583,6 +583,16 @@ export default function PresupuestoPuertas({
       null;
     const nombreHerraje = asociadoHerraje?.asociado?.art ?? null;
 
+    // TEMP DEBUG — sacar después de confirmar que funciona
+    console.log("[DEBUG herraje] articuloSeleccionado:", articuloSeleccionado);
+    console.log("[DEBUG herraje] asociados:", asociados);
+    console.log(
+      "[DEBUG herraje] familias en articulos:",
+      [...new Set(articulos.map((p) => p.familia))],
+    );
+    console.log("[DEBUG herraje] asociadoHerraje encontrado:", asociadoHerraje);
+    console.log("[DEBUG herraje] codPuerta:", codPuerta, "| codHerraje:", codHerraje);
+
     const payload = {
       CODCLIENTE: form.codcliente ?? null,
       FECHA: new Date().toISOString().slice(0, 10),
@@ -594,6 +604,9 @@ export default function PresupuestoPuertas({
       COLOCACION: Number(form.colocacion),
       PRECIO: Number(total),
       REVISION: nuevaRevision,
+      CODPUERTA: codPuerta,
+      CODHERRAJE: codHerraje,
+      NOMBREHERRAJE: nombreHerraje,
       // Vinculación con el presupuesto principal de tabla_presupuestos
       NUMEROPRES: numeroPres ?? null,
       // Si es revisión, mandar PRESP para mantener el mismo número de puerta
@@ -640,9 +653,9 @@ export default function PresupuestoPuertas({
         ALTO: Number(form.alto),
         VIDRIO: form.vidrio,
         COLOCACION: Number(form.colocacion),
-        CODPUERTA: codPuerta,
-        CODHERRAJE: codHerraje,
-        NOMBREHERRAJE: nombreHerraje,
+        CODPUERTA: data.CODPUERTA ?? data.codpuerta ?? codPuerta,
+        CODHERRAJE: data.CODHERRAJE ?? data.codherraje ?? codHerraje,
+        NOMBREHERRAJE: data.NOMBREHERRAJE ?? data.nombreherraje ?? nombreHerraje,
       });
 
       setTimeout(() => setGuardadoOk(false), 3000);
