@@ -7,42 +7,52 @@ const EMPTY = () => ({
   articulo: "",
   cod1: "",
   art1: "",
+  cant1: 1,
   margen1: "",
   form1: "",
   cod2: "",
   art2: "",
+  cant2: 1,
   margen2: "",
   form2: "",
   cod3: "",
   art3: "",
+  cant3: 1,
   margen3: "",
   form3: "",
   cod4: "",
   art4: "",
+  cant4: 1,
   margen4: "",
   form4: "",
   cod5: "",
   art5: "",
+  cant5: 1,
   margen5: "",
   form5: "",
   cod6: "",
   art6: "",
+  cant6: 1,
   margen6: "",
   form6: "",
   cod7: "",
   art7: "",
+  cant7: 1,
   margen7: "",
   form7: "",
   cod8: "",
   art8: "",
+  cant8: 1,
   margen8: "",
   form8: "",
   cod9: "",
   art9: "",
+  cant9: 1,
   margen9: "",
   form9: "",
   cod10: "",
   art10: "",
+  cant10: 1,
   margen10: "",
   form10: "",
 });
@@ -127,6 +137,11 @@ const CSS = `
   .sc-mg { width:100%; padding:6px 8px; border:1.5px solid #dde4ef; border-radius:6px; background:#fff; font-family:'DM Sans',sans-serif; font-size:11px; color:#059669; font-weight:600; outline:none; box-sizing:border-box; }
   .sc-mg::placeholder { color:#94a3b8; font-weight:400; }
   .sc-mg:focus { border-color:#059669; }
+  .sc-cant-row { display:flex; align-items:center; gap:6px; }
+  .sc-cant-lbl { font-size:9px; font-weight:700; color:#7a92b0; text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; }
+  .sc-cant { width:100%; padding:6px 8px; border:1.5px solid #bfdbfe; border-radius:6px; background:#f0f6ff; font-family:'Syne',sans-serif; font-size:12px; font-weight:700; color:#2563eb; outline:none; box-sizing:border-box; text-align:center; }
+  .sc-cant:focus { border-color:#2563eb; }
+  .b-cant { display:inline-flex; align-items:center; padding:1px 6px; background:#eff4ff; color:#2563eb; border-radius:4px; font-size:11px; font-weight:700; margin-top:2px; font-family:'Syne',sans-serif; }
   .sc-fl { font-size:9px; font-weight:700; color:#92400e; text-transform:uppercase; letter-spacing:.06em; }
   .sc-fs { width:100%; padding:6px 8px; border:1.5px solid #fde68a; border-radius:6px; background:#fffbeb; font-family:monospace; font-size:10px; color:#92400e; font-weight:700; outline:none; box-sizing:border-box; cursor:pointer; }
   .sc-fs:focus { border-color:#f59e0b; }
@@ -307,6 +322,23 @@ function SlotEdit({
         readOnly
         placeholder="Código"
       />
+      <div className="sc-cant-row">
+        <span className="sc-cant-lbl">✕ Cant.</span>
+        <input
+          className="sc-cant"
+          type="number"
+          min="0"
+          step="1"
+          value={form[`cant${n}`] ?? 1}
+          onChange={(e) =>
+            setForm((f) => ({
+              ...f,
+              [`cant${n}`]: e.target.value === "" ? "" : Number(e.target.value),
+            }))
+          }
+          placeholder="1"
+        />
+      </div>
       <input
         className="sc-mg"
         value={form[`margen${n}`] ?? ""}
@@ -339,6 +371,7 @@ function SlotEdit({
 function SlotView({ row, n }) {
   const art = row[`art${n}`];
   const cod = row[`cod${n}`];
+  const cant = row[`cant${n}`];
   const margen = row[`margen${n}`];
   const form = row[`form${n}`];
   if (!art) return <span className="sv-mt">—</span>;
@@ -346,6 +379,9 @@ function SlotView({ row, n }) {
     <div className="sv">
       <span className="sv-art">{art}</span>
       {cod && <span className="sv-sub">{cod}</span>}
+      {cant != null && Number(cant) !== 1 && (
+        <span className="b-cant">✕ {cant}</span>
+      )}
       {margen && <span className="b-mg">↑ {margen}%</span>}
       {form && <span className="b-form">🧮 {form}</span>}
     </div>
