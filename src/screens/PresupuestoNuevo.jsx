@@ -1433,7 +1433,26 @@ export default function PresupuestoNuevo({
 
   // Cargar si viene presupuestoInicial como prop (desde la tabla)
   useEffect(() => {
-    if (presupuestoInicial) cargarPresupuesto(presupuestoInicial);
+    if (presupuestoInicial) {
+      cargarPresupuesto(presupuestoInicial);
+      return;
+    }
+    // presupuestoInicial === null → "presupuesto nuevo". El componente no
+    // siempre se remonta al alternar entre editar y nuevo, así que sin este
+    // reset el encabezado (cliente, teléfono, etc.) queda con los datos del
+    // presupuesto anterior y permite guardar uno nuevo sin cargarlos.
+    setNumeroPres(null);
+    setNumero("Nuevo");
+    setRevision(1);
+    setCliente("");
+    setCodcliente(null);
+    setTelefonoSearch("");
+    setTelefono1("");
+    setTelefono2("");
+    setWapp("");
+    setDomicilio("");
+    setDomicilioFiscal("");
+    setClienteAutoResuelto(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presupuestoInicial]);
 
