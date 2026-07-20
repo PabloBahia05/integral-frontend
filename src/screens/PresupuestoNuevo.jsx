@@ -504,6 +504,147 @@ function EspecialesMedidasForm({
   );
 }
 
+// ── Panel de grupos personalizados ─────────────────────────────────────────
+// Permite subdividir manualmente los ítems del presupuesto en grupos propios
+// (más allá de la sección automática por tipo de producto), para que el PDF
+// los liste en secciones separadas con su propio subtotal. Ej: separar
+// "Cocina / Bajomesadas" en "Bajomesadas 76 Alto" y "Bajomesadas Isla".
+function GruposPersonalizados({
+  presupuestoItems,
+  gruposCustom,
+  setGruposCustom,
+  nombresGruposUsados,
+}) {
+  const [abierto, setAbierto] = useState(false);
+
+  if (presupuestoItems.length === 0) return null;
+
+  const asignar = (itemId, valor) => {
+    setGruposCustom((prev) => {
+      const next = { ...prev };
+      if (!valor || !valor.trim()) {
+        delete next[itemId];
+      } else {
+        next[itemId] = valor;
+      }
+      return next;
+    });
+  };
+
+  const limpiarTodo = () => setGruposCustom({});
+
+  return (
+    <div
+      style={{
+        border: "1px solid #d0dde8",
+        borderRadius: 6,
+        marginBottom: 16,
+        background: "#fff",
+      }}
+    >
+      <div
+        onClick={() => setAbierto((v) => !v)}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "10px 16px",
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+      >
+        <strong style={{ fontSize: 13, color: "#0f2944" }}>
+          🗂️ Grupos personalizados para el PDF{" "}
+          {Object.keys(gruposCustom).length > 0 && (
+            <span style={{ fontWeight: 400, color: "#6a8aa0" }}>
+              ({Object.keys(gruposCustom).length} ítem
+              {Object.keys(gruposCustom).length !== 1 ? "s" : ""} agrupado
+              {Object.keys(gruposCustom).length !== 1 ? "s" : ""})
+            </span>
+          )}
+        </strong>
+        <span style={{ fontSize: 12, color: "#6a8aa0" }}>
+          {abierto ? "▲ ocultar" : "▼ mostrar"}
+        </span>
+      </div>
+
+      {abierto && (
+        <div style={{ padding: "0 16px 16px" }}>
+          <p style={{ fontSize: 12, color: "#6a8aa0", marginBottom: 10 }}>
+            Escribí un nombre de grupo para el o los ítems que quieras separar
+            (ej: "Bajomesadas 76 Alto"). Los ítems sin grupo asignado se
+            siguen agrupando automáticamente por su sección de siempre.
+          </p>
+
+          <datalist id="grupos-existentes">
+            {nombresGruposUsados.map((g) => (
+              <option key={g} value={g} />
+            ))}
+          </datalist>
+
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ textAlign: "left", fontSize: 11, color: "#6a8aa0" }}>
+                <th style={{ padding: "4px 8px" }}>Ítem</th>
+                <th style={{ padding: "4px 8px" }}>Sección automática</th>
+                <th style={{ padding: "4px 8px" }}>Grupo personalizado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {presupuestoItems.map((it) => (
+                <tr key={it.id} style={{ borderTop: "1px solid #eef3f7" }}>
+                  <td style={{ padding: "4px 8px", fontSize: 12 }}>
+                    {it.nombreart || it.descripcion || "(sin nombre)"}
+                  </td>
+                  <td
+                    style={{ padding: "4px 8px", fontSize: 12, color: "#8aabb8" }}
+                  >
+                    {it.seccion}
+                  </td>
+                  <td style={{ padding: "4px 8px" }}>
+                    <input
+                      type="text"
+                      list="grupos-existentes"
+                      placeholder="(automático)"
+                      value={gruposCustom[it.id] ?? ""}
+                      onChange={(e) => asignar(it.id, e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "4px 8px",
+                        fontSize: 12,
+                        border: "1px solid #d0dde8",
+                        borderRadius: 4,
+                      }}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {Object.keys(gruposCustom).length > 0 && (
+            <button
+              type="button"
+              onClick={limpiarTodo}
+              style={{
+                marginTop: 10,
+                background: "none",
+                border: "none",
+                color: "#c0392b",
+                fontSize: 12,
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              Quitar todos los grupos personalizados
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PresupuestoNuevo({
   onVolver,
   onGuardado,
@@ -700,6 +841,25 @@ export default function PresupuestoNuevo({
   // ── Tabla resumen presupuesto (solapa Presupuesto) ───────
   // Cada ítem: { id, seccion, descripcion, cantidad, precio, subtotal }
   const [presupuestoItems, setPresupuestoItems] = useState([]);
+
+  // ── Grupos personalizados ─────────────────────────────────
+  // Permite subdividir manualmente los ítems en grupos propios dentro del
+  // PDF (ej: separar "Cocina / Bajomesadas" en "Bajomesadas 76 Alto" y
+  // "Bajomesadas Isla 76 Alto"). Se guarda por id de ítem; si un ítem no
+  // tiene grupo asignado, se sigue usando la sección automática de siempre.
+  // { [itemId]: "Nombre de grupo elegido por el usuario" }
+  const [gruposCustom, setGruposCustom] = useState({});
+
+  const grupoDe = (it) => {
+    const g = gruposCustom[it.id];
+    return g && g.trim() ? g.trim() : it.seccion;
+  };
+
+  const nombresGruposUsados = [
+    ...new Set(
+      presupuestoItems.map((it) => grupoDe(it)).filter((g) => g && g.trim()),
+    ),
+  ];
 
   // ── Popover de ajuste inline por fila ───────────────────
   // { tipo: "cocina"|"placard", familia, idx, campo: "precio"|linea_idx, anchorRect }
@@ -2155,14 +2315,16 @@ export default function PresupuestoNuevo({
     const colsExtra =
       (mostrarCosto ? 1 : 0) +
       (mostrarLineas ? lineasActivas.length : incluirPrecio ? 1 : 0);
-    const totalCols = 3 + colsExtra + (incluirSubtotalItem ? 1 : 0); // producto+desc+cant + (costo/líneas) + (subtotal por ítem, opcional)
+    const totalCols = 2 + colsExtra + (incluirSubtotalItem ? 1 : 0); // producto+cant (sin descripción) + (costo/líneas) + (subtotal por ítem, opcional)
 
-    // Agrupa los ítems por sección, respetando el orden en que fueron agregados
-    const secciones = [...new Set(presupuestoItems.map((p) => p.seccion))];
+    // Agrupa los ítems por grupo personalizado (si el usuario le asignó uno)
+    // o, en su defecto, por la sección automática de siempre. Respeta el
+    // orden en que aparecen los ítems.
+    const secciones = [...new Set(presupuestoItems.map((p) => grupoDe(p)))];
 
     const filasHTML = secciones
       .map((sec) => {
-        const items = presupuestoItems.filter((p) => p.seccion === sec);
+        const items = presupuestoItems.filter((p) => grupoDe(p) === sec);
         const subtotalSec = items.reduce((s, it) => s + (it.subtotal || 0), 0);
         const subtotalesLineaSec = mostrarLineas
           ? lineasActivas.map((l, li) =>
@@ -2194,8 +2356,7 @@ export default function PresupuestoNuevo({
                 : "";
             return `
         <tr>
-          <td>${item.nombreart ?? ""}</td>
-          <td>${item.descripcion ?? ""}${medida}</td>
+          <td>${item.nombreart ?? ""}${medida}</td>
           <td class="center">${item.cantidad ?? 1}</td>
           ${mostrarCosto ? `<td class="right">${item.costo != null ? formatPeso(item.costo) : "—"}</td>` : ""}
           ${celdasPrecio}
@@ -2204,7 +2365,7 @@ export default function PresupuestoNuevo({
           })
           .join("");
 
-        const labelColspan = 3 + (mostrarCosto ? 1 : 0);
+        const labelColspan = 2 + (mostrarCosto ? 1 : 0);
         const celdasSubtotalLinea = mostrarLineas
           ? subtotalesLineaSec
               .map((st) => `<td class="right">${formatPeso(st)}</td>`)
@@ -2330,7 +2491,6 @@ export default function PresupuestoNuevo({
       <thead>
         <tr>
           <th>Producto</th>
-          <th>Descripción</th>
           <th class="center">Cant.</th>
           ${mostrarCosto ? `<th class="right">Costo</th>` : ""}
           ${
@@ -2917,37 +3077,45 @@ export default function PresupuestoNuevo({
           )}
 
           {tab === "presupuesto" && (
-            <TablaArticulos
-              cliente={cliente}
-              telefono1={telefono1}
-              telefono2={telefono2}
-              wapp={wapp}
-              listaPrecio={listaPrecio}
-              numero={numero}
-              revision={revision}
-              presupuestoItems={presupuestoItems}
-              ajusteModo={ajusteModo}
-              setAjusteModo={setAjusteModo}
-              ajusteValor={ajusteValor}
-              setAjusteValor={setAjusteValor}
-              ajusteScope={ajusteScope}
-              setAjusteScope={setAjusteScope}
-              aplicarAjuste={aplicarAjuste}
-              ajusteAplicado={ajusteAplicado}
-              preciosOriginales={preciosOriginales}
-              revertirAjuste={revertirAjuste}
-              lineasActivas={lineasActivas}
-              listaPorcentaje={listaPorcentaje}
-              presmv={presmv}
-              prespv={prespv}
-              abrirPresItemPopover={abrirPresItemPopover}
-              quitarDePresupuesto={quitarDePresupuesto}
-              authFetch={authFetch}
-              API={API}
-              setMamparaAEditar={setMamparaAEditar}
-              setPuertaAEditar={setPuertaAEditar}
-              setTab={setTab}
-            />
+            <>
+              <GruposPersonalizados
+                presupuestoItems={presupuestoItems}
+                gruposCustom={gruposCustom}
+                setGruposCustom={setGruposCustom}
+                nombresGruposUsados={nombresGruposUsados}
+              />
+              <TablaArticulos
+                cliente={cliente}
+                telefono1={telefono1}
+                telefono2={telefono2}
+                wapp={wapp}
+                listaPrecio={listaPrecio}
+                numero={numero}
+                revision={revision}
+                presupuestoItems={presupuestoItems}
+                ajusteModo={ajusteModo}
+                setAjusteModo={setAjusteModo}
+                ajusteValor={ajusteValor}
+                setAjusteValor={setAjusteValor}
+                ajusteScope={ajusteScope}
+                setAjusteScope={setAjusteScope}
+                aplicarAjuste={aplicarAjuste}
+                ajusteAplicado={ajusteAplicado}
+                preciosOriginales={preciosOriginales}
+                revertirAjuste={revertirAjuste}
+                lineasActivas={lineasActivas}
+                listaPorcentaje={listaPorcentaje}
+                presmv={presmv}
+                prespv={prespv}
+                abrirPresItemPopover={abrirPresItemPopover}
+                quitarDePresupuesto={quitarDePresupuesto}
+                authFetch={authFetch}
+                API={API}
+                setMamparaAEditar={setMamparaAEditar}
+                setPuertaAEditar={setPuertaAEditar}
+                setTab={setTab}
+              />
+            </>
           )}
         </div>
       </div>
