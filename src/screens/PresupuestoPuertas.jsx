@@ -571,6 +571,47 @@ export default function PresupuestoPuertas({
     setShowDropdown(false);
   };
 
+  // ── Artículos manuales (agregados a mano, con precio libre) ──────────────────
+  // Se agregan como un slot más de `asociados`, marcado con `manual: true`,
+  // así reutilizan automáticamente el subtotal, el guardado (art/valor N) y el PDF.
+  const agregarArticuloManual = () => {
+    if (asociados.length >= 10) {
+      setErrorCalc("No se pueden agregar más de 10 artículos por presupuesto.");
+      return;
+    }
+    setAsociados((prev) => [
+      ...prev,
+      {
+        slot: prev.length + 1,
+        art: "",
+        cod: "",
+        precio: 0,
+        codform: null,
+        margen: 1,
+        margenBD: 1,
+        resultadoBase: 0,
+        resultado: 0,
+        parciales: {},
+        error: "",
+        manual: true,
+      },
+    ]);
+  };
+
+  const actualizarArticuloManual = (index, campo, valor) => {
+    setAsociados((prev) =>
+      prev.map((x, j) =>
+        j === index
+          ? { ...x, [campo]: campo === "resultado" ? Number(valor) || 0 : valor }
+          : x,
+      ),
+    );
+  };
+
+  const eliminarAsociado = (index) => {
+    setAsociados((prev) => prev.filter((_, j) => j !== index));
+  };
+
   // ── Guardar ──────────────────────────────────────────────────────────────────
   // - Nuevo presupuesto  → POST /presupuestos-puertas (REVISION = 0)
   // - Reabierto/editado  → POST /presupuestos-puertas (mismo número, REVISION + 1)
@@ -957,6 +998,13 @@ export default function PresupuestoPuertas({
         .asociado-resultado { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; color: #2d7fc1; text-align: right; white-space: nowrap; }
         .asociado-error { font-size: 11px; color: #c0392b; font-style: italic; }
         .asociado-empty { padding: 14px 16px; text-align: center; color: #9ab0c0; font-size: 12px; font-style: italic; }
+        .asociado-manual-add { background: #eaf3fb; color: #2d7fc1; border: 1px solid #7ab2d4; border-radius: 5px; font-size: 11px; font-weight: 700; padding: 4px 10px; cursor: pointer; }
+        .asociado-manual-add:hover { background: #d8ecf7; }
+        .asociado-row-manual { display: grid; grid-template-columns: 1fr 110px auto; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #e8f0f7; background: #fffdf5; }
+        .asociado-row-manual:last-child { border-bottom: none; }
+        .asociado-manual-input { padding: 6px 8px; border: 1.5px solid #f0d99b; border-radius: 5px; font-size: 12px; color: #0f2944; outline: none; }
+        .asociado-manual-precio { text-align: right; font-family: monospace; font-weight: 700; color: #2d7fc1; }
+        .asociado-manual-del { background: none; border: none; cursor: pointer; font-size: 14px; padding: 4px; }
         #presupuesto-print { display: none; }
         @media print { .sidebar, .actions { display: none !important; } .card { box-shadow: none; } #presupuesto-print { display: block !important; } }
         @media (max-width: 768px) { .presup-layout { flex-direction: column; } .foto-panel { max-width: 100%; width: 100%; position: static; min-width: unset; } }
@@ -1082,6 +1130,14 @@ export default function PresupuestoPuertas({
                       <span className="asociados-header-title">
                         🔗 Artículos asociados
                       </span>
+                      <button
+                        type="button"
+                        onClick={agregarArticuloManual}
+                        className="asociado-manual-add"
+                        title="Agregar artículo manual"
+                      >
+                        + Manual
+                      </button>
                       {cargandoAsociados && (
                         <span
                           style={{
@@ -1113,6 +1169,48 @@ export default function PresupuestoPuertas({
                     )}
 
                     {asociados.map((a, i) => {
+                      if (a.manual) {
+                        return (
+                          <div key={i} className="asociado-row-manual">
+                            <input
+                              type="text"
+                              placeholder="Nombre del artículo"
+                              value={a.art}
+                              onChange={(e) =>
+                                actualizarArticuloManual(
+                                  i,
+                                  "art",
+                                  e.target.value,
+                                )
+                              }
+                              className="asociado-manual-input"
+                            />
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              placeholder="Precio"
+                              value={a.resultado || ""}
+                              onChange={(e) =>
+                                actualizarArticuloManual(
+                                  i,
+                                  "resultado",
+                                  e.target.value,
+                                )
+                              }
+                              className="asociado-manual-input asociado-manual-precio"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => eliminarAsociado(i)}
+                              className="asociado-manual-del"
+                              title="Eliminar artículo manual"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        );
+                      }
                       const tieneParciales =
                         a.parciales && Object.keys(a.parciales).length > 0;
                       const expandido = parcialesExpandidos[`${a.slot}`];
