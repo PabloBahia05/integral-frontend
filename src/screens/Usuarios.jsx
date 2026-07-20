@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -36,6 +37,9 @@ const STYLE = `
 const emptyForm = { id: "", nombre: "", apellido: "", activo: 1 };
 
 export default function Usuarios({ onBack }) {
+  const { token } = useAuth();
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
@@ -45,7 +49,7 @@ export default function Usuarios({ onBack }) {
 
   const fetchUsuarios = () => {
     setLoading(true);
-    fetch(`${API}/empleados`)
+    fetch(`${API}/empleados`, { headers: authHeaders })
       .then((r) => r.json())
       .then((d) => {
         setUsuarios(Array.isArray(d) ? d : []);
@@ -89,7 +93,7 @@ export default function Usuarios({ onBack }) {
 
     fetch(url, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({
         ...form,
         id: Number(form.id),
@@ -110,9 +114,10 @@ export default function Usuarios({ onBack }) {
 
   const handleDelete = (u) => {
     if (!confirm(`¿Eliminar a ${u.apellido} ${u.nombre}?`)) return;
-    fetch(`${API}/empleados/${u.id}`, { method: "DELETE" }).then(() =>
-      fetchUsuarios(),
-    );
+    fetch(`${API}/empleados/${u.id}`, {
+      method: "DELETE",
+      headers: authHeaders,
+    }).then(() => fetchUsuarios());
   };
 
   return (
