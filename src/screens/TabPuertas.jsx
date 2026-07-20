@@ -78,14 +78,22 @@ export default function TabPuertas({
           if (presp != null) setPrespv(presp);
 
           const itemId = `puerta-${presp ?? Date.now()}`;
+          const cantidadPuerta = Number(data.CANTIDAD ?? 1) || 1;
+          const precioTotalPuerta = Number(data.PRECIO ?? 0);
+          // data.PRECIO viene como el total ya calculado para "cantidadPuerta"
+          // unidades. El resto de la app (tabla y PDF de presupuesto) trata
+          // item.precio como precio UNITARIO y recalcula subtotal = precio *
+          // cantidad, así que acá hay que guardar el unitario en "precio" y
+          // dejar el total real en "subtotal" para no multiplicar dos veces.
+          const precioUnitarioPuerta = precioTotalPuerta / cantidadPuerta;
           const nuevoItem = {
             id: itemId,
             seccion: "Puerta",
             nombreart: data.CODPUERTA ?? "",
             descripcion: data.MODELO ?? "Puerta",
-            cantidad: Number(data.CANTIDAD ?? 1),
-            precio: Number(data.PRECIO ?? 0),
-            subtotal: Number(data.PRECIO ?? 0),
+            cantidad: cantidadPuerta,
+            precio: precioUnitarioPuerta,
+            subtotal: precioTotalPuerta,
             ancho: Number(data.ANCHO ?? 0),
             alto: Number(data.ALTO ?? 0),
             presp: presp ?? null,
