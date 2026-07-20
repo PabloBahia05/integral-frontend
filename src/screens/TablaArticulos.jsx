@@ -40,7 +40,30 @@ export default function TablaArticulos({
   setMamparaAEditar,
   setPuertaAEditar,
   setTab,
+  // Grupos personalizados (subdivisión manual dentro de una misma sección)
+  gruposCustom,
+  setGruposCustom,
+  nombresGruposUsados,
 }) {
+  // Grupo efectivo de un ítem: el personalizado si el usuario le asignó uno,
+  // si no la sección automática de siempre.
+  const grupoDe = (it) => {
+    const g = gruposCustom?.[it.id];
+    return g && g.trim() ? g.trim() : it.seccion;
+  };
+
+  const asignarGrupo = (itemId, valor) => {
+    setGruposCustom((prev) => {
+      const next = { ...prev };
+      if (!valor || !valor.trim()) {
+        delete next[itemId];
+      } else {
+        next[itemId] = valor;
+      }
+      return next;
+    });
+  };
+
   return (
     <div>
       {/* Encabezado cliente */}
@@ -301,7 +324,13 @@ export default function TablaArticulos({
           </span>
         </div>
       ) : (
-        <table
+        <>
+          <datalist id="pn-grupos-existentes">
+            {(nombresGruposUsados ?? []).map((g) => (
+              <option key={g} value={g} />
+            ))}
+          </datalist>
+          <table
           style={{
             width: "100%",
             borderCollapse: "collapse",
@@ -317,9 +346,10 @@ export default function TablaArticulos({
                   textAlign: "left",
                   fontWeight: 700,
                   letterSpacing: "0.06em",
+                  width: 150,
                 }}
               >
-                Sección
+                Grupo
               </th>
               <th
                 style={{ padding: "9px 14px", textAlign: "left", fontWeight: 700 }}
@@ -403,12 +433,12 @@ export default function TablaArticulos({
           <tbody>
             {(() => {
               const secciones = [
-                ...new Set(presupuestoItems.map((p) => p.seccion)),
+                ...new Set(presupuestoItems.map((p) => grupoDe(p))),
               ];
               let rowIdx = 0;
               return secciones.flatMap((sec) => {
                 const items = presupuestoItems.filter(
-                  (p) => p.seccion === sec,
+                  (p) => grupoDe(p) === sec,
                 );
                 // Subtotal por línea para la sección
                 const subtotalesSec =
@@ -454,12 +484,31 @@ export default function TablaArticulos({
                       <tr key={item.id} style={{ background: bg }}>
                         <td
                           style={{
-                            padding: "7px 14px",
+                            padding: "4px 6px",
                             border: "1px solid #e8f0f7",
-                            color: "#6699bb",
-                            fontSize: 11,
                           }}
-                        ></td>
+                        >
+                          <input
+                            type="text"
+                            list="pn-grupos-existentes"
+                            placeholder={item.seccion}
+                            value={gruposCustom?.[item.id] ?? ""}
+                            onChange={(e) =>
+                              asignarGrupo(item.id, e.target.value)
+                            }
+                            title="Grupo personalizado para el PDF (vacío = automático por sección)"
+                            style={{
+                              width: "100%",
+                              padding: "4px 6px",
+                              fontFamily: "'Space Mono',monospace",
+                              fontSize: 10,
+                              border: "1px solid #d0dde8",
+                              borderRadius: 2,
+                              color: "#0a3a5c",
+                              outline: "none",
+                            }}
+                          />
+                        </td>
                         <td
                           style={{
                             padding: "7px 14px",
@@ -849,6 +898,7 @@ export default function TablaArticulos({
             />
           </tbody>
         </table>
+        </>
       )}
     </div>
   );

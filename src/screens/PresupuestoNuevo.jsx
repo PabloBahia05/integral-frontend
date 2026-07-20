@@ -504,147 +504,6 @@ function EspecialesMedidasForm({
   );
 }
 
-// ── Panel de grupos personalizados ─────────────────────────────────────────
-// Permite subdividir manualmente los ítems del presupuesto en grupos propios
-// (más allá de la sección automática por tipo de producto), para que el PDF
-// los liste en secciones separadas con su propio subtotal. Ej: separar
-// "Cocina / Bajomesadas" en "Bajomesadas 76 Alto" y "Bajomesadas Isla".
-function GruposPersonalizados({
-  presupuestoItems,
-  gruposCustom,
-  setGruposCustom,
-  nombresGruposUsados,
-}) {
-  const [abierto, setAbierto] = useState(false);
-
-  if (presupuestoItems.length === 0) return null;
-
-  const asignar = (itemId, valor) => {
-    setGruposCustom((prev) => {
-      const next = { ...prev };
-      if (!valor || !valor.trim()) {
-        delete next[itemId];
-      } else {
-        next[itemId] = valor;
-      }
-      return next;
-    });
-  };
-
-  const limpiarTodo = () => setGruposCustom({});
-
-  return (
-    <div
-      style={{
-        border: "1px solid #d0dde8",
-        borderRadius: 6,
-        marginBottom: 16,
-        background: "#fff",
-      }}
-    >
-      <div
-        onClick={() => setAbierto((v) => !v)}
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "10px 16px",
-          cursor: "pointer",
-          userSelect: "none",
-        }}
-      >
-        <strong style={{ fontSize: 13, color: "#0f2944" }}>
-          🗂️ Grupos personalizados para el PDF{" "}
-          {Object.keys(gruposCustom).length > 0 && (
-            <span style={{ fontWeight: 400, color: "#6a8aa0" }}>
-              ({Object.keys(gruposCustom).length} ítem
-              {Object.keys(gruposCustom).length !== 1 ? "s" : ""} agrupado
-              {Object.keys(gruposCustom).length !== 1 ? "s" : ""})
-            </span>
-          )}
-        </strong>
-        <span style={{ fontSize: 12, color: "#6a8aa0" }}>
-          {abierto ? "▲ ocultar" : "▼ mostrar"}
-        </span>
-      </div>
-
-      {abierto && (
-        <div style={{ padding: "0 16px 16px" }}>
-          <p style={{ fontSize: 12, color: "#6a8aa0", marginBottom: 10 }}>
-            Escribí un nombre de grupo para el o los ítems que quieras separar
-            (ej: "Bajomesadas 76 Alto"). Los ítems sin grupo asignado se
-            siguen agrupando automáticamente por su sección de siempre.
-          </p>
-
-          <datalist id="grupos-existentes">
-            {nombresGruposUsados.map((g) => (
-              <option key={g} value={g} />
-            ))}
-          </datalist>
-
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left", fontSize: 11, color: "#6a8aa0" }}>
-                <th style={{ padding: "4px 8px" }}>Ítem</th>
-                <th style={{ padding: "4px 8px" }}>Sección automática</th>
-                <th style={{ padding: "4px 8px" }}>Grupo personalizado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {presupuestoItems.map((it) => (
-                <tr key={it.id} style={{ borderTop: "1px solid #eef3f7" }}>
-                  <td style={{ padding: "4px 8px", fontSize: 12 }}>
-                    {it.nombreart || it.descripcion || "(sin nombre)"}
-                  </td>
-                  <td
-                    style={{ padding: "4px 8px", fontSize: 12, color: "#8aabb8" }}
-                  >
-                    {it.seccion}
-                  </td>
-                  <td style={{ padding: "4px 8px" }}>
-                    <input
-                      type="text"
-                      list="grupos-existentes"
-                      placeholder="(automático)"
-                      value={gruposCustom[it.id] ?? ""}
-                      onChange={(e) => asignar(it.id, e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "4px 8px",
-                        fontSize: 12,
-                        border: "1px solid #d0dde8",
-                        borderRadius: 4,
-                      }}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {Object.keys(gruposCustom).length > 0 && (
-            <button
-              type="button"
-              onClick={limpiarTodo}
-              style={{
-                marginTop: 10,
-                background: "none",
-                border: "none",
-                color: "#c0392b",
-                fontSize: 12,
-                cursor: "pointer",
-                padding: 0,
-              }}
-            >
-              Quitar todos los grupos personalizados
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function PresupuestoNuevo({
   onVolver,
   onGuardado,
@@ -3077,45 +2936,40 @@ export default function PresupuestoNuevo({
           )}
 
           {tab === "presupuesto" && (
-            <>
-              <GruposPersonalizados
-                presupuestoItems={presupuestoItems}
-                gruposCustom={gruposCustom}
-                setGruposCustom={setGruposCustom}
-                nombresGruposUsados={nombresGruposUsados}
-              />
-              <TablaArticulos
-                cliente={cliente}
-                telefono1={telefono1}
-                telefono2={telefono2}
-                wapp={wapp}
-                listaPrecio={listaPrecio}
-                numero={numero}
-                revision={revision}
-                presupuestoItems={presupuestoItems}
-                ajusteModo={ajusteModo}
-                setAjusteModo={setAjusteModo}
-                ajusteValor={ajusteValor}
-                setAjusteValor={setAjusteValor}
-                ajusteScope={ajusteScope}
-                setAjusteScope={setAjusteScope}
-                aplicarAjuste={aplicarAjuste}
-                ajusteAplicado={ajusteAplicado}
-                preciosOriginales={preciosOriginales}
-                revertirAjuste={revertirAjuste}
-                lineasActivas={lineasActivas}
-                listaPorcentaje={listaPorcentaje}
-                presmv={presmv}
-                prespv={prespv}
-                abrirPresItemPopover={abrirPresItemPopover}
-                quitarDePresupuesto={quitarDePresupuesto}
-                authFetch={authFetch}
-                API={API}
-                setMamparaAEditar={setMamparaAEditar}
-                setPuertaAEditar={setPuertaAEditar}
-                setTab={setTab}
-              />
-            </>
+            <TablaArticulos
+              cliente={cliente}
+              telefono1={telefono1}
+              telefono2={telefono2}
+              wapp={wapp}
+              listaPrecio={listaPrecio}
+              numero={numero}
+              revision={revision}
+              presupuestoItems={presupuestoItems}
+              ajusteModo={ajusteModo}
+              setAjusteModo={setAjusteModo}
+              ajusteValor={ajusteValor}
+              setAjusteValor={setAjusteValor}
+              ajusteScope={ajusteScope}
+              setAjusteScope={setAjusteScope}
+              aplicarAjuste={aplicarAjuste}
+              ajusteAplicado={ajusteAplicado}
+              preciosOriginales={preciosOriginales}
+              revertirAjuste={revertirAjuste}
+              lineasActivas={lineasActivas}
+              listaPorcentaje={listaPorcentaje}
+              presmv={presmv}
+              prespv={prespv}
+              abrirPresItemPopover={abrirPresItemPopover}
+              quitarDePresupuesto={quitarDePresupuesto}
+              authFetch={authFetch}
+              API={API}
+              setMamparaAEditar={setMamparaAEditar}
+              setPuertaAEditar={setPuertaAEditar}
+              setTab={setTab}
+              gruposCustom={gruposCustom}
+              setGruposCustom={setGruposCustom}
+              nombresGruposUsados={nombresGruposUsados}
+            />
           )}
         </div>
       </div>
