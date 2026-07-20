@@ -524,10 +524,15 @@ export default function PresupuestoPuertas({
   }, [JSON.stringify(asociados.map((a) => a.margen))]);
 
   // ── Totales ─────────────────────────────────────────────────────────────────
-  const subtotalArticulos = asociados.reduce(
+  // Cada a.resultado es el precio POR UNIDAD (Base × Margen). El total debe
+  // multiplicar esa suma por la CANTIDAD de puertas. La colocación es un
+  // costo fijo por presupuesto y NO se multiplica por cantidad.
+  const cantidadTotal = Number(form.cantidad) || 1;
+  const subtotalArticulosUnitario = asociados.reduce(
     (acc, a) => acc + (a.resultado ?? 0),
     0,
   );
+  const subtotalArticulos = subtotalArticulosUnitario * cantidadTotal;
   const total = subtotalArticulos + Number(form.colocacion);
 
   const formatPeso = (n) =>
@@ -793,7 +798,7 @@ export default function PresupuestoPuertas({
           <td>${i + 1}</td>
           <td><strong>${a.art}</strong></td>
           <td>${a.cod ?? ""}</td>
-          <td>${formatPeso(a.resultado)}</td>
+          <td>${formatPeso(a.resultado * cantidadTotal)}</td>
         </tr>`,
       )
       .join("");
@@ -1691,8 +1696,19 @@ export default function PresupuestoPuertas({
                                   ({a.codform})
                                 </span>
                               )}
+                              {cantidadTotal > 1 && (
+                                <span
+                                  style={{
+                                    marginLeft: 6,
+                                    fontSize: 11,
+                                    color: "#64748b",
+                                  }}
+                                >
+                                  ({formatPeso(a.resultado)} × {cantidadTotal})
+                                </span>
+                              )}
                             </span>
-                            <span>{formatPeso(a.resultado)}</span>
+                            <span>{formatPeso(a.resultado * cantidadTotal)}</span>
                           </div>
                           {tieneParciales &&
                             expandido &&
@@ -1915,7 +1931,7 @@ export default function PresupuestoPuertas({
                   .map((a) => (
                     <tr key={a.slot}>
                       <td>{a.art}</td>
-                      <td>{formatPeso(a.resultado)}</td>
+                      <td>{formatPeso(a.resultado * cantidadTotal)}</td>
                     </tr>
                   ))}
                 {Number(form.colocacion) > 0 && (
