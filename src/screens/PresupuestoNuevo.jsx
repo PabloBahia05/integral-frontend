@@ -1976,9 +1976,15 @@ export default function PresupuestoNuevo({
   };
 
   const handleGuardar = async (esNuevaRev = false) => {
-    const esEdicionExistente = numeroPres !== null;
-    if (!cliente.trim() && !esEdicionExistente) {
-      setError("El cliente es obligatorio.");
+    const nombreOk = cliente.trim().length > 0;
+    const telefonoOk = telefono1.trim().length > 0;
+    if (!nombreOk || !telefonoOk) {
+      const faltantes = [];
+      if (!nombreOk) faltantes.push("el nombre");
+      if (!telefonoOk) faltantes.push("el teléfono");
+      setError(
+        `Completá ${faltantes.join(" y ")} del cliente en el encabezado antes de guardar.`,
+      );
       return;
     }
     setError("");
