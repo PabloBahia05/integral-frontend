@@ -15,6 +15,7 @@ const FILA_VACIA = {
   porcentaje2: null,
   valor3: null,
   porcentaje3: null,
+  grupo: "",
 };
 
 export default function TabCocina({
@@ -34,6 +35,8 @@ export default function TabCocina({
   abrirPrecioPopover,
   // authFetch para llamadas autenticadas
   authFetch,
+  // grupos ya usados en el presupuesto (autocompletado)
+  nombresGruposUsados = [],
 }) {
   // ── Estado local del tab ──────────────────────────────────
   const [cocinaEditIdx, setCocinaEditIdx] = useState(null);
@@ -78,7 +81,9 @@ export default function TabCocina({
     .slice(0, 10);
 
   const resetFila = () => {
-    setCocinaFila({ ...FILA_VACIA });
+    // Conserva el grupo elegido para que el usuario pueda agregar varios
+    // artículos seguidos al mismo grupo sin tener que retipearlo.
+    setCocinaFila((f) => ({ ...FILA_VACIA, grupo: f.grupo ?? "" }));
     setCocinaSearch("");
   };
 
@@ -715,6 +720,21 @@ export default function TabCocina({
                     }}
                   >
                     {fila.nombreart}
+                    {fila.grupo && fila.grupo.trim() && (
+                      <div
+                        style={{
+                          marginTop: 2,
+                          fontSize: 9,
+                          color: "#2277bb",
+                          background: "#e0f0fc",
+                          borderRadius: 3,
+                          padding: "1px 5px",
+                          display: "inline-block",
+                        }}
+                      >
+                        🗂️ {fila.grupo}
+                      </div>
+                    )}
                   </td>
                   <td
                     style={{ padding: "8px 12px", border: "1px solid #c8dae8" }}
@@ -1050,6 +1070,42 @@ export default function TabCocina({
               flexWrap: "wrap",
             }}
           >
+            {/* Grupo (subdivisión manual para el presupuesto/PDF) */}
+            <div style={{ flex: "1 1 160px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "#6699bb",
+                  marginBottom: 4,
+                }}
+              >
+                Grupo
+              </label>
+              <input
+                list="tc-grupos-existentes"
+                value={cocinaFila.grupo ?? ""}
+                onChange={(e) =>
+                  setCocinaFila((f) => ({ ...f, grupo: e.target.value }))
+                }
+                placeholder="(automático)"
+                title="Los artículos que agregues quedan bajo este grupo en el presupuesto y el PDF. Dejalo vacío para usar el grupo automático."
+                style={{
+                  width: "100%",
+                  fontFamily: "'Space Mono',monospace",
+                  fontSize: 12,
+                  border: "1px solid #b8cfe0",
+                  padding: "6px 10px",
+                  borderRadius: 2,
+                }}
+              />
+              <datalist id="tc-grupos-existentes">
+                {nombresGruposUsados.map((g) => (
+                  <option key={g} value={g} />
+                ))}
+              </datalist>
+            </div>
+
             {/* Artículo con autocomplete */}
             <div style={{ position: "relative", flex: "2 1 220px" }}>
               <label

@@ -710,8 +710,10 @@ export default function PresupuestoNuevo({
   const [gruposCustom, setGruposCustom] = useState({});
 
   const grupoDe = (it) => {
-    const g = gruposCustom[it.id];
-    return g && g.trim() ? g.trim() : it.seccion;
+    const gManual = gruposCustom[it.id];
+    if (gManual && gManual.trim()) return gManual.trim();
+    if (it.grupo && it.grupo.trim()) return it.grupo.trim();
+    return it.seccion;
   };
 
   const nombresGruposUsados = [
@@ -1341,6 +1343,7 @@ export default function PresupuestoNuevo({
           porcentaje2: parseFloat(it.porcentaje2 ?? it.PORCENTAJE2) || null,
           valor3: v3,
           porcentaje3: parseFloat(it.porcentaje3 ?? it.PORCENTAJE3) || null,
+          grupo: it.grupo ?? it.GRUPO ?? "",
         };
         if (tipo.includes("cocina") && tipo.includes("bajomesada"))
           nuevaCocina.bajomesadas.push(fila);
@@ -1428,6 +1431,7 @@ export default function PresupuestoNuevo({
             // Medidas (mampara, puerta y vanitory)
             ancho: it.ancho ?? it.ANCHO ?? null,
             alto: it.alto ?? it.ALTO ?? null,
+            grupo: it.grupo ?? it.GRUPO ?? null,
           });
         }
       });
@@ -1602,6 +1606,7 @@ export default function PresupuestoNuevo({
           porcentaje2: f.porcentaje2 ?? null,
           valor3: f.valor3 ?? null,
           porcentaje3: f.porcentaje3 ?? null,
+          grupo: f.grupo && f.grupo.trim() ? f.grupo.trim() : null,
         })),
       );
 
@@ -2084,6 +2089,12 @@ export default function PresupuestoNuevo({
           presmv: it.presmv ?? null,
           // Vinculación puerta
           presp: it.presp ?? null,
+          // Grupo personalizado para el PDF/tabla — solo se guarda si es
+          // distinto del automático (sección); si no, se recalcula solo.
+          grupo: (() => {
+            const g = grupoDe(it);
+            return g && g !== it.seccion ? g : null;
+          })(),
         };
       }),
     };
@@ -2865,6 +2876,7 @@ export default function PresupuestoNuevo({
               authFetch={authFetch}
               onVerPresupuesto={() => setTab("presupuesto")}
               abrirPrecioPopover={abrirPrecioPopover}
+              nombresGruposUsados={nombresGruposUsados}
             />
           )}
           <PlacardSection

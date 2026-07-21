@@ -48,8 +48,10 @@ export default function TablaArticulos({
   // Grupo efectivo de un ítem: el personalizado si el usuario le asignó uno,
   // si no la sección automática de siempre.
   const grupoDe = (it) => {
-    const g = gruposCustom?.[it.id];
-    return g && g.trim() ? g.trim() : it.seccion;
+    const gManual = gruposCustom?.[it.id];
+    if (gManual && gManual.trim()) return gManual.trim();
+    if (it.grupo && it.grupo.trim()) return it.grupo.trim();
+    return it.seccion;
   };
 
   const asignarGrupo = (itemId, valor) => {
@@ -491,7 +493,11 @@ export default function TablaArticulos({
                           <input
                             type="text"
                             list="pn-grupos-existentes"
-                            placeholder={item.seccion}
+                            placeholder={
+                              item.grupo && item.grupo.trim()
+                                ? item.grupo
+                                : item.seccion
+                            }
                             value={gruposCustom?.[item.id] ?? ""}
                             onChange={(e) =>
                               asignarGrupo(item.id, e.target.value)
