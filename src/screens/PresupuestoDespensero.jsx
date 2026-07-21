@@ -473,18 +473,18 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
     });
 
     Promise.all([
-      // Materiales: todos los artículos con area = 2
-      fetch(`${API}/productos?area=2`)
+      // Materiales: mismo endpoint probado que usa MuebleEspecial
+      fetch(`${API}/productos/placas-muebles-esp`)
         .then((r) => r.json())
         .then((data) => (Array.isArray(data) ? data : []).map(normalizar))
         .catch(() => []),
       // Bisagras
-      fetch(`${API}/productos?articulo=BISAGRA`)
+      fetch(`${API}/productos/bisagras-muebles-esp`)
         .then((r) => r.json())
         .then((data) => (Array.isArray(data) ? data : []).map(normalizar))
         .catch(() => []),
       // Correderas / guías telescópicas
-      fetch(`${API}/productos?articulo=GUIA%20TELESCOPICA`)
+      fetch(`${API}/productos/guias-muebles-esp`)
         .then((r) => r.json())
         .then((data) => (Array.isArray(data) ? data : []).map(normalizar))
         .catch(() => []),
