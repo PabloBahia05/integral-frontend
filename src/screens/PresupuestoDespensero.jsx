@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import { useAuth } from "../context/AuthContext";
 
 const API = "https://integral-backend-production.up.railway.app";
 
 export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
+  const { authFetch } = useAuth();
   const modelo = modeloRaw
     ? {
         ...modeloRaw,
@@ -71,7 +73,7 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
   const [bisagras, setBisagras] = useState([]);
   // Próximo número de presupuesto
   useEffect(() => {
-    fetch(`${API}/presupuestos-despensero/proximo-numero`)
+    authFetch(`${API}/presupuestos-despensero/proximo-numero`)
       .then((r) => r.json())
       .then((d) => {
         const n = d?.proximo ?? null;
@@ -83,7 +85,7 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
   // Cargar colocación desde BD cuando hay modelo con codart
   useEffect(() => {
     if (!modelo?.codart) return;
-    fetch(
+    authFetch(
       `${API}/colocacion/buscar?codart=${encodeURIComponent(modelo.codart)}`,
     )
       .then((r) => r.json())
@@ -117,7 +119,7 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
     };
 
     // Ruta correcta del backend: /margen/por-codart?codart=...
-    fetch(
+    authFetch(
       `${API}/margen/por-codart?codart=${encodeURIComponent(modelo.codart)}`,
     )
       .then((r) => r.json())
@@ -209,12 +211,12 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
     };
 
     Promise.all([
-      fetch(
+      authFetch(
         `${API}/asociaciones-form?codart=${encodeURIComponent(modelo.codart)}`,
       )
         .then((r) => r.json())
         .catch(() => null),
-      fetch(`${API}/formulas`)
+      authFetch(`${API}/formulas`)
         .then((r) => r.json())
         .catch(() => []),
     ])
@@ -279,7 +281,7 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
         await Promise.all(
           codartsBD.map(async (cod) => {
             try {
-              const res = await fetch(
+              const res = await authFetch(
                 `${API}/articulos/${encodeURIComponent(cod)}`,
               );
               const data = await res.json();
@@ -473,7 +475,7 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
     });
 
     const fetchDebug = (url, label) =>
-      fetch(url)
+      authFetch(url)
         .then((r) => {
           console.log(`[Despensero] ${label} → status ${r.status}`, url);
           if (!r.ok) throw new Error(`HTTP ${r.status} en ${url}`);
@@ -562,7 +564,7 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
     };
 
     try {
-      const res = await fetch(`${API}/formulas/calcular`, {
+      const res = await authFetch(`${API}/formulas/calcular`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ codart_modelo: modelo.codart, variables }),
@@ -637,7 +639,7 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
     };
 
     try {
-      const res = await fetch(`${API}/presupuestos-despensero`, {
+      const res = await authFetch(`${API}/presupuestos-despensero`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -645,7 +647,7 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error al guardar");
       setGuardadoOk(true);
-      fetch(`${API}/presupuestos-despensero/proximo-numero`)
+      authFetch(`${API}/presupuestos-despensero/proximo-numero`)
         .then((r) => r.json())
         .then((d) => {
           const n = d?.proximo ?? null;
@@ -671,7 +673,7 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
           ? { numero: Number(data.NUMERO ?? data.id) }
           : {}),
       };
-      fetch(`${API}/tabla-presupuestos`, {
+      authFetch(`${API}/tabla-presupuestos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(filaTabla),
