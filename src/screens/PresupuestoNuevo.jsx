@@ -2033,11 +2033,10 @@ export default function PresupuestoNuevo({
     setError("");
     setGuardando(true);
 
-    // Si ya tiene número asignado (presupuesto existente), enviar NUMERO
-    // para que el backend cree una nueva revisión en tabla_indice.
-    // Si es nuevo, no enviar NUMERO y el backend genera el numeropres automáticamente.
-    const esEdicion = numeroPres !== null;
-
+    // esEdicion ya no fuerza nueva revisión: "Guardar" ahora sobrescribe la
+    // revisión actual (revisionActual) tanto si es la primera vez (rev 0)
+    // como si ya se guardó antes. "Nueva Revisión" (esNuevaRev=true) es la
+    // única acción que efectivamente crea una revisión nueva.
     const lineasElegidas = lineas
       .filter((l) => l.linea && l.linea !== "[Sin líneas]")
       .map((l) => l.linea);
@@ -2048,8 +2047,10 @@ export default function PresupuestoNuevo({
       fecha: new Date().toISOString().slice(0, 10),
       lista: listaPrecio,
       lineasElegidas,
-      // Si ya existe numeroPres, SIEMPRE nueva revisión (nunca pisar la anterior)
-      nuevaRevision: esEdicion || esNuevaRev,
+      // true → crea una revisión nueva (append, nunca borra las anteriores)
+      // false → sobrescribe la revisión actual (revisionActual)
+      nuevaRevision: esNuevaRev,
+      revisionActual: revision,
       presmv: presmv ?? null,
       prespv: prespv ?? null,
       ajusteValor: ajusteAplicado ? parseFloat(ajusteValor) || null : null,
@@ -2307,7 +2308,7 @@ export default function PresupuestoNuevo({
     body { font-family: 'Space Mono', 'Courier New', monospace; background: #fff; color: #111; font-size: 12px; }
     .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 30px 56px 40px; display: flex; flex-direction: column; background: #fff; }
     .membrete-banner { margin-bottom: 14px; }
-    .membrete-banner img { max-width: 100%; max-height: 90px; height: auto; }
+    .membrete-banner img { max-width: 100%; max-height: 108px; height: auto; }
     .doc-nro-corner { text-align: right; font-size: 10px; color: #555; margin-bottom: 6px; }
     .doc-title { text-align: center; font-weight: 700; font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 14px; }
     .info-line { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; }
@@ -2665,20 +2666,24 @@ export default function PresupuestoNuevo({
           >
             🔄 Actualizar
           </button>
-          {numeroPres === null && (
-            <button
-              className="pn-tool-btn save"
-              onClick={() => handleGuardar(false)}
-              disabled={guardando}
-            >
-              💾 {guardando ? "Guardando..." : "Guardar"}
-            </button>
-          )}
+          <button
+            className="pn-tool-btn save"
+            onClick={() => handleGuardar(false)}
+            disabled={guardando}
+            title={
+              numeroPres !== null
+                ? `Guarda los cambios sobrescribiendo la Rev. ${revision} actual`
+                : "Guarda el presupuesto nuevo (Rev. 0)"
+            }
+          >
+            💾 {guardando ? "Guardando..." : "Guardar"}
+          </button>
           {numeroPres !== null && (
             <button
               className="pn-tool-btn"
               onClick={() => handleGuardar(true)}
               disabled={guardando}
+              title="Crea una revisión nueva sin modificar las anteriores"
               style={{
                 background: "#fff3cd",
                 borderColor: "#ffc107",
