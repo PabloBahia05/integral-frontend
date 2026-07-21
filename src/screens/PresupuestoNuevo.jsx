@@ -586,30 +586,65 @@ export default function PresupuestoNuevo({
   const [color, setColor] = useState("");
   const [incluirTextoColoc, setIncluirTextoColoc] = useState(false);
   const [agregarIVA, setAgregarIVA] = useState(true);
-  // Imagen o PDF adjunto que se agrega al final del presupuesto generado
-  const [imagenFinal, setImagenFinal] = useState(null); // { tipo: "pdf" | "imagen", nombre, dataUrl }
+  // Imágenes y/o PDFs adjuntos. Cada uno puede asignarse a un grupo del
+  // presupuesto (se pega bajo el detalle de ese grupo) o quedar "sin grupo"
+  // (se agrega al final del presupuesto, como antes).
+  // { id, tipo: "pdf" | "imagen", nombre, dataUrl, grupo: string | null }
+  const [imagenesFinal, setImagenesFinal] = useState([]);
+  const [mostrarGestorImagenes, setMostrarGestorImagenes] = useState(false);
   const imagenInputRef = useRef(null);
+
   const handleImagenSeleccionada = (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const esPDF = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-    const esImagen =
-      file.type.startsWith("image/") || /\.(jpe?g|png)$/i.test(file.name);
-    if (!esPDF && !esImagen) {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (!files.length) return;
+
+    const validos = [];
+    for (const file of files) {
+      const esPDF =
+        file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      const esImagen =
+        file.type.startsWith("image/") || /\.(jpe?g|png)$/i.test(file.name);
+      if (!esPDF && !esImagen) continue;
+      validos.push({ file, esPDF });
+    }
+    if (!validos.length) {
       alert("Solo se permiten archivos PDF, JPG o PNG.");
       e.target.value = "";
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImagenFinal({
-        tipo: esPDF ? "pdf" : "imagen",
-        nombre: file.name,
-        dataUrl: reader.result,
-      });
-    };
-    reader.readAsDataURL(file);
+
+    Promise.all(
+      validos.map(
+        ({ file, esPDF }) =>
+          new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () =>
+              resolve({
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                tipo: esPDF ? "pdf" : "imagen",
+                nombre: file.name,
+                dataUrl: reader.result,
+                grupo: null, // null = se agrega al final del presupuesto
+              });
+            reader.readAsDataURL(file);
+          }),
+      ),
+    ).then((nuevas) => {
+      setImagenesFinal((prev) => [...prev, ...nuevas]);
+      setMostrarGestorImagenes(true);
+    });
+
     e.target.value = "";
+  };
+
+  const actualizarGrupoImagen = (id, grupo) => {
+    setImagenesFinal((prev) =>
+      prev.map((im) => (im.id === id ? { ...im, grupo: grupo || null } : im)),
+    );
+  };
+
+  const eliminarImagen = (id) => {
+    setImagenesFinal((prev) => prev.filter((im) => im.id !== id));
   };
 
   // Líneas (3 slots)
@@ -2273,6 +2308,20 @@ export default function PresupuestoNuevo({
           ? `<td class="right">${formatPeso(subtotalSec)}</td>`
           : "";
 
+        // Fotos asignadas manualmente a este grupo — se pegan justo debajo
+        // del detalle/tabla del grupo correspondiente.
+        const fotosSec = imagenesFinal.filter(
+          (im) => im.tipo === "imagen" && im.grupo === sec,
+        );
+        const fotosSecHTML = fotosSec.length
+          ? `<div class="sec-fotos" style="margin-top:10px;">${fotosSec
+              .map(
+                (im) =>
+                  `<img src="${im.dataUrl}" style="max-width:100%; display:block; margin-top:8px;" />`,
+              )
+              .join("")}</div>`
+          : "";
+
         return `
       <div class="sec-block">
         <div class="sec-title">${sec}:</div>
@@ -2303,6 +2352,7 @@ export default function PresupuestoNuevo({
             </tr>
           </tbody>
         </table>
+        ${fotosSecHTML}
       </div>`;
       })
       .join("");
@@ -2410,11 +2460,13 @@ export default function PresupuestoNuevo({
         : ""
     }
 
-    ${
-      imagenFinal && imagenFinal.tipo === "imagen"
-        ? `<div class="adjunto-imagen" style="margin-top:18px;"><img src="${imagenFinal.dataUrl}" style="max-width:100%; display:block;" /></div>`
-        : ""
-    }
+    ${imagenesFinal
+      .filter((im) => im.tipo === "imagen" && !im.grupo)
+      .map(
+        (im) =>
+          `<div class="adjunto-imagen" style="margin-top:18px;"><img src="${im.dataUrl}" style="max-width:100%; display:block;" /></div>`,
+      )
+      .join("")}
   </div>
   <div class="footer">
     <div>Daniel Roque S.R.L. — Bahía Blanca</div>
@@ -2445,7 +2497,8 @@ export default function PresupuestoNuevo({
           ? document.fonts.ready
           : Promise.resolve();
 
-      const necesitaFusionPDF = imagenFinal && imagenFinal.tipo === "pdf";
+      const pdfsAdjuntos = imagenesFinal.filter((im) => im.tipo === "pdf");
+      const necesitaFusionPDF = pdfsAdjuntos.length > 0;
 
       const cargarScript = (src) =>
         new Promise((resolve, reject) => {
@@ -2501,15 +2554,17 @@ export default function PresupuestoNuevo({
             );
             paginasBase.forEach((p) => docFinal.addPage(p));
 
-            const bytesAdjunto = await fetch(imagenFinal.dataUrl).then((r) =>
-              r.arrayBuffer(),
-            );
-            const docAdjunto = await PDFDocument.load(bytesAdjunto);
-            const paginasAdjunto = await docFinal.copyPages(
-              docAdjunto,
-              docAdjunto.getPageIndices(),
-            );
-            paginasAdjunto.forEach((p) => docFinal.addPage(p));
+            for (const pdfAdjunto of pdfsAdjuntos) {
+              const bytesAdjunto = await fetch(pdfAdjunto.dataUrl).then((r) =>
+                r.arrayBuffer(),
+              );
+              const docAdjunto = await PDFDocument.load(bytesAdjunto);
+              const paginasAdjunto = await docFinal.copyPages(
+                docAdjunto,
+                docAdjunto.getPageIndices(),
+              );
+              paginasAdjunto.forEach((p) => docFinal.addPage(p));
+            }
 
             const bytesFinal = await docFinal.save();
             const blob = new Blob([bytesFinal], { type: "application/pdf" });
@@ -2556,6 +2611,204 @@ export default function PresupuestoNuevo({
     <>
 
       <div className="pn-root">
+        {/* ── Gestor de fotos/PDF adjuntos ── */}
+        {mostrarGestorImagenes && (
+          <>
+            <div
+              className="pn-popover-backdrop"
+              onClick={() => setMostrarGestorImagenes(false)}
+            />
+            <div
+              style={{
+                position: "fixed",
+                top: "5%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: "min(560px, 92vw)",
+                maxHeight: "90vh",
+                overflowY: "auto",
+                background: "#fff",
+                borderRadius: 10,
+                boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
+                padding: 18,
+                zIndex: 1000,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <strong style={{ fontSize: 15 }}>Fotos y PDF adjuntos</strong>
+                <button
+                  className="pn-tool-btn"
+                  onClick={() => setMostrarGestorImagenes(false)}
+                  title="Cerrar"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {imagenesFinal.length === 0 && (
+                <div style={{ fontSize: 13, color: "#666", marginBottom: 12 }}>
+                  Todavía no agregaste ninguna foto o PDF.
+                </div>
+              )}
+
+              {imagenesFinal.map((im) => (
+                <div
+                  key={im.id}
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "center",
+                    padding: "8px 0",
+                    borderBottom: "1px solid #eee",
+                  }}
+                >
+                  {im.tipo === "imagen" ? (
+                    <img
+                      src={im.dataUrl}
+                      alt={im.nombre}
+                      style={{
+                        width: 56,
+                        height: 56,
+                        objectFit: "cover",
+                        borderRadius: 6,
+                        border: "1px solid #ddd",
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 56,
+                        height: 56,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 22,
+                        background: "#f5f5f5",
+                        borderRadius: 6,
+                        border: "1px solid #ddd",
+                        flexShrink: 0,
+                      }}
+                    >
+                      📄
+                    </div>
+                  )}
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "#333",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        marginBottom: 4,
+                      }}
+                      title={im.nombre}
+                    >
+                      {im.nombre}
+                    </div>
+
+                    {im.tipo === "imagen" ? (
+                      <>
+                        <select
+                          value={im.grupo ?? ""}
+                          onChange={(e) =>
+                            actualizarGrupoImagen(im.id, e.target.value)
+                          }
+                          style={{
+                            fontSize: 12,
+                            padding: "4px 6px",
+                            width: "100%",
+                            maxWidth: 260,
+                          }}
+                        >
+                          <option value="">
+                            Sin grupo (al final del presupuesto)
+                          </option>
+                          {nombresGruposUsados.map((g) => (
+                            <option key={g} value={g}>
+                              {g}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="...o escribí el grupo manualmente"
+                          defaultValue={
+                            im.grupo && !nombresGruposUsados.includes(im.grupo)
+                              ? im.grupo
+                              : ""
+                          }
+                          onBlur={(e) => {
+                            const val = e.target.value.trim();
+                            if (val) actualizarGrupoImagen(im.id, val);
+                          }}
+                          style={{
+                            fontSize: 12,
+                            padding: "4px 6px",
+                            width: "100%",
+                            maxWidth: 260,
+                            marginTop: 4,
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 11, color: "#888" }}>
+                        Los PDF se agregan siempre al final del presupuesto.
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    className="pn-tool-btn"
+                    onClick={() => eliminarImagen(im.id)}
+                    title="Quitar este adjunto"
+                    style={{ flexShrink: 0 }}
+                  >
+                    🗑️
+                  </button>
+                </div>
+              ))}
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginTop: 14,
+                }}
+              >
+                <button
+                  className="pn-tool-btn"
+                  onClick={() =>
+                    imagenInputRef.current && imagenInputRef.current.click()
+                  }
+                >
+                  ➕ Agregar más fotos/PDF
+                </button>
+                <button
+                  className="pn-tool-btn"
+                  onClick={() => setMostrarGestorImagenes(false)}
+                  style={{
+                    background: "#0a3a5c",
+                    color: "#60efff",
+                    fontWeight: 700,
+                  }}
+                >
+                  Listo
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* ── Popover de ajuste de precio ── */}
         {precioPopover &&
           (() => {
@@ -2735,25 +2988,32 @@ export default function PresupuestoNuevo({
             type="file"
             ref={imagenInputRef}
             accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/*"
+            multiple
             style={{ display: "none" }}
             onChange={handleImagenSeleccionada}
           />
           <button
             className="pn-tool-btn"
-            onClick={() => imagenInputRef.current && imagenInputRef.current.click()}
+            onClick={() => {
+              if (imagenesFinal.length) {
+                setMostrarGestorImagenes(true);
+              } else if (imagenInputRef.current) {
+                imagenInputRef.current.click();
+              }
+            }}
             title={
-              imagenFinal
-                ? `Adjunto: ${imagenFinal.nombre} (se agrega al final del PDF). Click para reemplazarlo.`
-                : "Adjuntar una imagen o PDF que se agregará al final del presupuesto"
+              imagenesFinal.length
+                ? `${imagenesFinal.length} adjunto(s). Click para gestionarlos y asignarlos a un grupo.`
+                : "Adjuntar una o más imágenes/PDF y asignarlas a un grupo del presupuesto"
             }
             style={{
-              background: imagenFinal ? "#e6f7ff" : "#fff",
-              borderColor: imagenFinal ? "#1890ff" : undefined,
-              color: imagenFinal ? "#0a3a5c" : undefined,
+              background: imagenesFinal.length ? "#e6f7ff" : "#fff",
+              borderColor: imagenesFinal.length ? "#1890ff" : undefined,
+              color: imagenesFinal.length ? "#0a3a5c" : undefined,
               fontWeight: 700,
             }}
           >
-            🖼️ {imagenFinal ? "Imagen ✓" : "Imagen"}
+            🖼️ {imagenesFinal.length ? `Imagen ✓ (${imagenesFinal.length})` : "Imagen"}
           </button>
           <button
             className="pn-tool-btn"
