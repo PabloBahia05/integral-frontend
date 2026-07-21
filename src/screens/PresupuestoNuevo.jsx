@@ -1330,7 +1330,17 @@ export default function PresupuestoNuevo({
         pres.lista ?? pres.LISTA ?? itemConLista?.lista ?? itemConLista?.LISTA ?? null;
       if (listaGuardada) {
         listaPendienteRef.current = listaGuardada;
-        setListaPrecio(listaGuardada);
+        // Solo setear acá si /lista ya resolvió (listasDB con datos). Si
+        // todavía no llegó, dejamos que lo aplique el efecto del fetch de
+        // /lista (línea ~1247) vía listaPendienteRef: si seteamos acá antes
+        // de tiempo, el useEffect que recalcula precios por listaPrecio
+        // (línea ~1620) puede dispararse con listasDB vacío -> listaPorcentaje
+        // da 0 -> recalcFila pisa el precio bueno que vino de la BD con uno
+        // mal calculado (sin el % de lista real), y como ese % nunca se
+        // vuelve a recalcular (el valor de listaPrecio no cambia de nuevo),
+        // el precio queda mal para siempre en esa sesión aunque el badge de
+        // % del ítem se vea correcto.
+        if (listasDB.length > 0) setListaPrecio(listaGuardada);
       }
 
       const itemConLinea =

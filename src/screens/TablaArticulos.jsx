@@ -614,6 +614,7 @@ export default function TablaArticulos({
                         {lineasActivas.length > 0 ? (
                           lineasActivas.map((l, li) => {
                             const pr = item.precios?.[li]?.precio ?? item.precio ?? 0;
+                            const pctItem = item[`porcentaje${li + 1}`];
                             return (
                               <td
                                 key={l.linea}
@@ -639,7 +640,7 @@ export default function TablaArticulos({
                                     minimumFractionDigits: 2,
                                   })}
                                 </span>
-                                {item.porcentaje1 != null ? (
+                                {pctItem != null ? (
                                   <span
                                     style={{
                                       marginLeft: 5,
@@ -657,19 +658,19 @@ export default function TablaArticulos({
                                     <span
                                       style={{
                                         color:
-                                          item.porcentaje1 >= 0
+                                          pctItem >= 0
                                             ? "#0a7a3a"
                                             : "#c0392b",
                                         background:
-                                          item.porcentaje1 >= 0
+                                          pctItem >= 0
                                             ? "#e6f5eb"
                                             : "#fdecea",
                                         borderRadius: 3,
                                         padding: "1px 4px",
                                       }}
                                     >
-                                      {item.porcentaje1 > 0 ? "+" : ""}
-                                      {item.porcentaje1}%
+                                      {pctItem > 0 ? "+" : ""}
+                                      {pctItem}%
                                     </span>
                                   </span>
                                 ) : (
