@@ -1606,12 +1606,6 @@ export default function PresupuestoNuevo({
     // ítem puntual se sigue manejando aparte en aplicarAjuste/revertirAjuste
     // porque no hay dónde persistir ese scope en tabla_presupuestos.
     const conAjusteGeneral = (precio) => {
-      console.log("[DEBUG conAjusteGeneral]", {
-        ajusteAplicado,
-        ajusteScope,
-        ajusteValor,
-        precioEntrada: precio,
-      });
       if (!ajusteAplicado || ajusteScope !== "todos") return precio;
       const val = parseFloat(ajusteValor);
       if (!val || isNaN(val)) return precio;
@@ -1670,17 +1664,16 @@ export default function PresupuestoNuevo({
     // datos que trae la BD (base1/2/3, porcentaje1/2/3, ajusteValor/Modo)
     // todavía se están restaurando y recalcular a mitad de camino podría
     // usar valores parciales.
-    if (cargandoPresupuestoRef.current) {
-      console.log("[DEBUG useEffect 1662] SKIP por cargandoPresupuestoRef");
-      return;
-    }
-    console.log("[DEBUG useEffect 1662] CORRIENDO", {
-      listaPrecio,
-      ajusteAplicado,
-      ajusteValor,
-      ajusteModo,
-      ajusteScope,
-    });
+    if (cargandoPresupuestoRef.current) return;
+    // No recalcular si todavía no se resolvió la lista de precios activa
+    // (fetch a /lista en curso, o listaPendienteRef.current sin aplicar
+    // todavía). Sin este guard, este efecto puede dispararse con
+    // listaPrecio === "" -> listaPorcentaje da 0 -> se pisa el precio bien
+    // cargado desde la BD (con %lista y/o %ajuste ya incluidos) con uno
+    // recalculado incompleto. Cuando listaPrecio finalmente se setea, el
+    // cambio de dependencia vuelve a disparar este mismo efecto, esta vez
+    // con datos completos.
+    if (!listaPrecio) return;
     // Ajuste con scope a un ítem puntual: no está cubierto por
     // conAjusteGeneral (no hay dónde persistir el scope en BD), lo maneja
     // aplicarAjuste/revertirAjuste mutando esa fila directamente. Si
