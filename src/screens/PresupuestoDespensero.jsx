@@ -472,22 +472,29 @@ export default function PresupuestoDespensero({ modelo: modeloRaw, onVolver }) {
       precio_un: parseFloat(p.precio_un ?? p.PRECIO_UN ?? p.precio ?? 0) || 0,
     });
 
+    const fetchDebug = (url, label) =>
+      fetch(url)
+        .then((r) => {
+          console.log(`[Despensero] ${label} → status ${r.status}`, url);
+          if (!r.ok) throw new Error(`HTTP ${r.status} en ${url}`);
+          return r.json();
+        })
+        .then((data) => {
+          if (!Array.isArray(data)) {
+            console.error(`[Despensero] ${label}: respuesta no es array:`, data);
+            return [];
+          }
+          return data.map(normalizar);
+        })
+        .catch((err) => {
+          console.error(`[Despensero] ${label} FALLÓ:`, err.message);
+          return [];
+        });
+
     Promise.all([
-      // Materiales: mismo endpoint probado que usa MuebleEspecial
-      fetch(`${API}/productos/placas-muebles-esp`)
-        .then((r) => r.json())
-        .then((data) => (Array.isArray(data) ? data : []).map(normalizar))
-        .catch(() => []),
-      // Bisagras
-      fetch(`${API}/productos/bisagras-muebles-esp`)
-        .then((r) => r.json())
-        .then((data) => (Array.isArray(data) ? data : []).map(normalizar))
-        .catch(() => []),
-      // Correderas / guías telescópicas
-      fetch(`${API}/productos/guias-muebles-esp`)
-        .then((r) => r.json())
-        .then((data) => (Array.isArray(data) ? data : []).map(normalizar))
-        .catch(() => []),
+      fetchDebug(`${API}/productos/placas-muebles-esp`, "Materiales"),
+      fetchDebug(`${API}/productos/bisagras-muebles-esp`, "Bisagras"),
+      fetchDebug(`${API}/productos/guias-muebles-esp`, "Guías"),
     ])
       .then(([mats, bis, her]) => {
         setInsumosMuebles(mats);
