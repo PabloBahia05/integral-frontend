@@ -586,6 +586,31 @@ export default function PresupuestoNuevo({
   const [color, setColor] = useState("");
   const [incluirTextoColoc, setIncluirTextoColoc] = useState(false);
   const [agregarIVA, setAgregarIVA] = useState(true);
+  // Imagen o PDF adjunto que se agrega al final del presupuesto generado
+  const [imagenFinal, setImagenFinal] = useState(null); // { tipo: "pdf" | "imagen", nombre, dataUrl }
+  const imagenInputRef = useRef(null);
+  const handleImagenSeleccionada = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const esPDF = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    const esImagen =
+      file.type.startsWith("image/") || /\.(jpe?g|png)$/i.test(file.name);
+    if (!esPDF && !esImagen) {
+      alert("Solo se permiten archivos PDF, JPG o PNG.");
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImagenFinal({
+        tipo: esPDF ? "pdf" : "imagen",
+        nombre: file.name,
+        dataUrl: reader.result,
+      });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   // Líneas (3 slots)
   const [lineas, setLineas] = useState([
@@ -2384,6 +2409,12 @@ export default function PresupuestoNuevo({
         ? `<div class="sec-title" style="margin-top:14px;">Observaciones</div><div class="observaciones">${observaciones.replace(/\n/g, "<br/>")}</div>`
         : ""
     }
+
+    ${
+      imagenFinal && imagenFinal.tipo === "imagen"
+        ? `<div class="adjunto-imagen" style="margin-top:18px;"><img src="${imagenFinal.dataUrl}" style="max-width:100%; display:block;" /></div>`
+        : ""
+    }
   </div>
   <div class="footer">
     <div>Daniel Roque S.R.L. — Bahía Blanca</div>
@@ -2414,29 +2445,90 @@ export default function PresupuestoNuevo({
           ? document.fonts.ready
           : Promise.resolve();
 
+      const necesitaFusionPDF = imagenFinal && imagenFinal.tipo === "pdf";
+
+      const cargarScript = (src) =>
+        new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = src;
+          s.onload = resolve;
+          s.onerror = () => reject(new Error("No se pudo cargar " + src));
+          document.head.appendChild(s);
+        });
+
+      const asegurarPDFLib = () =>
+        window.PDFLib
+          ? Promise.resolve()
+          : cargarScript(
+              "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js",
+            );
+
+      const opcionesPDF = {
+        margin: 0,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+        },
+        jsPDF: {
+          unit: "px",
+          format: [794, Math.max(paginaEl.scrollHeight, 1123)],
+          orientation: "portrait",
+        },
+      };
+
       esperarFuentes
         .then(() => new Promise((resolve) => setTimeout(resolve, 300)))
-        .then(() =>
-          window
-            .html2pdf()
-            .set({
-              margin: 0,
-              filename: `Presupuesto_${nro}.pdf`,
-              image: { type: "jpeg", quality: 0.98 },
-              html2canvas: {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: "#ffffff",
-              },
-              jsPDF: {
-                unit: "px",
-                format: [794, Math.max(paginaEl.scrollHeight, 1123)],
-                orientation: "portrait",
-              },
-            })
-            .from(paginaEl)
-            .save(),
-        )
+        .then(() => (necesitaFusionPDF ? asegurarPDFLib() : Promise.resolve()))
+        .then(async () => {
+          if (necesitaFusionPDF) {
+            // Genera el presupuesto como PDF en memoria y le agrega, al final,
+            // las páginas del PDF adjuntado por el usuario.
+            const pdfBase = await window
+              .html2pdf()
+              .set(opcionesPDF)
+              .from(paginaEl)
+              .outputPdf("arraybuffer");
+
+            const { PDFDocument } = window.PDFLib;
+            const docFinal = await PDFDocument.create();
+
+            const docBase = await PDFDocument.load(pdfBase);
+            const paginasBase = await docFinal.copyPages(
+              docBase,
+              docBase.getPageIndices(),
+            );
+            paginasBase.forEach((p) => docFinal.addPage(p));
+
+            const bytesAdjunto = await fetch(imagenFinal.dataUrl).then((r) =>
+              r.arrayBuffer(),
+            );
+            const docAdjunto = await PDFDocument.load(bytesAdjunto);
+            const paginasAdjunto = await docFinal.copyPages(
+              docAdjunto,
+              docAdjunto.getPageIndices(),
+            );
+            paginasAdjunto.forEach((p) => docFinal.addPage(p));
+
+            const bytesFinal = await docFinal.save();
+            const blob = new Blob([bytesFinal], { type: "application/pdf" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Presupuesto_${nro}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+          } else {
+            await window
+              .html2pdf()
+              .set({ ...opcionesPDF, filename: `Presupuesto_${nro}.pdf` })
+              .from(paginaEl)
+              .save();
+          }
+        })
         .catch((err) => {
           console.error("Error generando PDF:", err);
           alert("Ocurrió un error generando el PDF. Probá de nuevo.");
@@ -2624,20 +2716,6 @@ export default function PresupuestoNuevo({
             );
           })()}
 
-        {/* Barra de título */}
-        <div className="pn-topbar">
-          <span className="pn-topbar-title">Sistema de presupuestos</span>
-          <span className="pn-menu-item">Precios</span>
-          <span
-            className="pn-menu-item"
-            style={{ cursor: "pointer" }}
-            onClick={() => onVerTabla && onVerTabla()}
-          >
-            Presupuestos
-          </span>
-          <span className="pn-menu-item">Sistema</span>
-        </div>
-
         {/* Toolbar */}
         <div className="pn-toolbar">
           <button
@@ -2652,6 +2730,30 @@ export default function PresupuestoNuevo({
             title="Volver al inicio"
           >
             🏠 Inicio
+          </button>
+          <input
+            type="file"
+            ref={imagenInputRef}
+            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/*"
+            style={{ display: "none" }}
+            onChange={handleImagenSeleccionada}
+          />
+          <button
+            className="pn-tool-btn"
+            onClick={() => imagenInputRef.current && imagenInputRef.current.click()}
+            title={
+              imagenFinal
+                ? `Adjunto: ${imagenFinal.nombre} (se agrega al final del PDF). Click para reemplazarlo.`
+                : "Adjuntar una imagen o PDF que se agregará al final del presupuesto"
+            }
+            style={{
+              background: imagenFinal ? "#e6f7ff" : "#fff",
+              borderColor: imagenFinal ? "#1890ff" : undefined,
+              color: imagenFinal ? "#0a3a5c" : undefined,
+              fontWeight: 700,
+            }}
+          >
+            🖼️ {imagenFinal ? "Imagen ✓" : "Imagen"}
           </button>
           <button
             className="pn-tool-btn"
@@ -2712,6 +2814,19 @@ export default function PresupuestoNuevo({
             }}
           >
             🖨️ {generandoPDF ? "Generando..." : "Generar PDF"}
+          </button>
+          <button
+            className="pn-tool-btn"
+            onClick={() => onVerTabla && onVerTabla()}
+            title="Ver todos los presupuestos"
+            style={{
+              background: "#f3e8ff",
+              borderColor: "#8e44ad",
+              color: "#5b2c6f",
+              fontWeight: 700,
+            }}
+          >
+            📋 Presupuestos
           </button>
         </div>
 
