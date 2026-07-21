@@ -1101,24 +1101,31 @@ export default function PresupuestoNuevo({
           ]),
         );
 
-    setCocinaItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map((f, i) =>
-          ajustarFila(`cocina-${familia}-${i}`, f, origenActual),
-        );
-      }
-      return next;
-    });
-    setPlacardItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map((f, i) =>
-          ajustarFila(`placard-${familia}-${i}`, f, origenActual),
-        );
-      }
-      return next;
-    });
+    // Cocina/Placard con scope "todos": el efecto de recálculo (deps
+    // [listaPrecio, ajusteAplicado, ajusteValor, ajusteModo, ajusteScope])
+    // ya se encarga de recalcular esas filas de forma reproducible en
+    // cuanto seteamos ajusteAplicado(true) más abajo. Si mutáramos acá
+    // también, el ajuste se aplicaría dos veces.
+    if (ajusteScope !== "todos") {
+      setCocinaItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          next[familia] = filas.map((f, i) =>
+            ajustarFila(`cocina-${familia}-${i}`, f, origenActual),
+          );
+        }
+        return next;
+      });
+      setPlacardItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          next[familia] = filas.map((f, i) =>
+            ajustarFila(`placard-${familia}-${i}`, f, origenActual),
+          );
+        }
+        return next;
+      });
+    }
     setPresupuestoItems((prev) =>
       prev.map((it) => {
         if (it.id.startsWith("cocina-") || it.id.startsWith("placard-")) {
@@ -1150,24 +1157,31 @@ export default function PresupuestoNuevo({
       };
     };
 
-    setCocinaItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map((f, i) =>
-          revertirFila(`cocina-${familia}-${i}`, f),
-        );
-      }
-      return next;
-    });
-    setPlacardItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map((f, i) =>
-          revertirFila(`placard-${familia}-${i}`, f),
-        );
-      }
-      return next;
-    });
+    // Cocina/Placard con scope "todos": alcanza con apagar ajusteAplicado
+    // más abajo — el efecto de recálculo las vuelve a calcular sin el
+    // ajuste general (recalcFila ya no lo aplica). Esto además soluciona
+    // la limitación anterior de "no se puede revertir después de reabrir":
+    // ahora no depende de preciosOriginales en memoria para estas filas.
+    if (ajusteScope !== "todos") {
+      setCocinaItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          next[familia] = filas.map((f, i) =>
+            revertirFila(`cocina-${familia}-${i}`, f),
+          );
+        }
+        return next;
+      });
+      setPlacardItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          next[familia] = filas.map((f, i) =>
+            revertirFila(`placard-${familia}-${i}`, f),
+          );
+        }
+        return next;
+      });
+    }
     setPresupuestoItems((prev) =>
       prev.map((it) => {
         if (it.id.startsWith("cocina-") || it.id.startsWith("placard-")) return it;
@@ -1304,13 +1318,13 @@ export default function PresupuestoNuevo({
         setAjusteValor(String(valGuardado));
         setAjusteModo(modoGuardado);
         setAjusteAplicado(true);
-        // NOTA: no reconstruimos preciosOriginales acá porque los ids de
-        // presupuestoItems para cocina/placard se regeneran en cada carga
-        // (no son el id de la fila en BD) y no matchean de forma confiable.
-        // Consecuencia: el botón "Revertir" no va a funcionar después de
-        // reabrir un presupuesto — solo funciona en la misma sesión en que
-        // se aplicó el ajuste. Si hace falta revertir, hay que aplicar un
-        // ajuste inverso manual (ej: -2.91% para deshacer un +3%).
+        // ajusteScope queda en su default ("todos") al recargar — la BD no
+        // guarda el scope, así que un ajuste con scope puntual se restaura
+        // como si fuera global. Con scope "todos" (el caso normal), tanto
+        // el precio como el botón "Revertir" funcionan bien tras reabrir:
+        // recalcFila deriva el precio de base1/2/3 + porcentaje1/2/3 +
+        // %lista + ajusteValor/Modo, no depende de preciosOriginales en
+        // memoria.
         setPreciosOriginales({});
       } else {
         setAjusteValor("");
@@ -1586,6 +1600,17 @@ export default function PresupuestoNuevo({
       const extra = parseFloat(pctExtra) || 0;
       return String(Math.round(p * (1 + extra / 100) * 100) / 100);
     };
+    // Ajuste general (panel "AJUSTE DE PRECIOS"): mismo patrón que %lista y
+    // %item — se aplica como un factor más sobre el precio, nunca se
+    // "hornea" por separado. Solo cubre el scope "todos": el scope a un
+    // ítem puntual se sigue manejando aparte en aplicarAjuste/revertirAjuste
+    // porque no hay dónde persistir ese scope en tabla_presupuestos.
+    const conAjusteGeneral = (precio) => {
+      if (!ajusteAplicado || ajusteScope !== "todos") return precio;
+      const val = parseFloat(ajusteValor);
+      if (!val || isNaN(val)) return precio;
+      return String(calcularAjuste(precio, val));
+    };
 
     if (fila.preciosBase && fila.preciosBase.length > 0) {
       const nuevosPrecios = fila.preciosBase.map((pb, li) => {
@@ -1594,7 +1619,7 @@ export default function PresupuestoNuevo({
         return {
           linea: pb.linea,
           precioBase: pb.precioBase,
-          precio: conExtra(conLista, pctExtra),
+          precio: conAjusteGeneral(conExtra(conLista, pctExtra)),
         };
       });
       const nuevoPrecio =
@@ -1603,7 +1628,10 @@ export default function PresupuestoNuevo({
     }
     if (fila.precioBase != null && fila.precioBase !== "") {
       const conLista = aplicarPorcentaje(fila.precioBase);
-      return { ...fila, precio: conExtra(conLista, fila.porcentaje1) };
+      return {
+        ...fila,
+        precio: conAjusteGeneral(conExtra(conLista, fila.porcentaje1)),
+      };
     }
     return fila;
   };
@@ -1626,14 +1654,22 @@ export default function PresupuestoNuevo({
     });
   };
 
-  // Recalcular precios cuando cambia la lista de precios
+  // Recalcular precios cuando cambia la lista de precios o el ajuste general.
+  // recalcFila ahora es la única fuente de verdad para el precio final
+  // (base × %lista × %item × %ajusteGeneral), así que este efecto puede
+  // recalcular sin miedo a perder el ajuste general: si está aplicado
+  // (scope "todos"), recalcFila lo vuelve a incluir solo.
   useEffect(() => {
-    // No recalcular mientras se está cargando un presupuesto existente:
-    // los precios que trae la BD (valor1/2/3) ya incluyen cualquier ajuste
-    // manual (panel "AJUSTE DE PRECIOS") aplicado antes de guardar. Si
-    // dejamos correr recalcFila acá, lo pisa con precioBase × %lista,
-    // perdiendo el ajuste porque este no vive en porcentaje1/2/3.
+    // No recalcular mientras se está cargando un presupuesto existente: los
+    // datos que trae la BD (base1/2/3, porcentaje1/2/3, ajusteValor/Modo)
+    // todavía se están restaurando y recalcular a mitad de camino podría
+    // usar valores parciales.
     if (cargandoPresupuestoRef.current) return;
+    // Ajuste con scope a un ítem puntual: no está cubierto por
+    // conAjusteGeneral (no hay dónde persistir el scope en BD), lo maneja
+    // aplicarAjuste/revertirAjuste mutando esa fila directamente. Si
+    // recalculáramos acá igual, pisaríamos ese ajuste puntual.
+    if (ajusteAplicado && ajusteScope !== "todos") return;
     setCocinaItems((prev) => {
       const next = {};
       for (const [familia, filas] of Object.entries(prev)) {
@@ -1649,7 +1685,7 @@ export default function PresupuestoNuevo({
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listaPrecio]);
+  }, [listaPrecio, ajusteAplicado, ajusteValor, ajusteModo, ajusteScope]);
 
   // Sincronizar cocina y placard con la tabla de presupuesto
   useEffect(() => {
@@ -3321,7 +3357,6 @@ export default function PresupuestoNuevo({
               setAjusteScope={setAjusteScope}
               aplicarAjuste={aplicarAjuste}
               ajusteAplicado={ajusteAplicado}
-              preciosOriginales={preciosOriginales}
               revertirAjuste={revertirAjuste}
               lineasActivas={lineasActivas}
               listaPorcentaje={listaPorcentaje}

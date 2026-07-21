@@ -26,7 +26,6 @@ export default function TablaArticulos({
   setAjusteScope,
   aplicarAjuste,
   ajusteAplicado,
-  preciosOriginales,
   revertirAjuste,
   // Tabla
   lineasActivas,
@@ -269,15 +268,7 @@ export default function TablaArticulos({
             {/* Botón revertir */}
             {ajusteAplicado && (
               <button
-                onClick={() => {
-                  if (Object.keys(preciosOriginales).length === 0) {
-                    alert(
-                      "Este ajuste viene de un presupuesto ya guardado: no se puede revertir automáticamente (los precios base no quedaron en memoria). Para deshacerlo, aplicá un ajuste manual inverso.",
-                    );
-                    return;
-                  }
-                  revertirAjuste();
-                }}
+                onClick={revertirAjuste}
                 style={{
                   padding: "5px 14px",
                   background: "#fff",
