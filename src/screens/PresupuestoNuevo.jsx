@@ -2173,26 +2173,22 @@ export default function PresupuestoNuevo({
           ? numero
           : "----";
 
-    // Color de acento configurable desde el encabezado (si no se cargó, usa el azul de siempre)
-    const accent = color && color.trim() ? color.trim() : "#2d7fc1";
-    const accentLight = color && color.trim() ? color.trim() : "#60b4f0";
-
     // Cantidad de columnas de la tabla según qué se decida incluir
     // Si hay líneas cargadas, se muestra una columna de precio por cada línea
     // (igual que en la tabla "Presupuesto" en pantalla). Si no hay líneas, se
     // usa la columna única "Precio unit." controlada por incluirPrecio.
     const mostrarLineas = lineasActivas.length > 0;
-    const colsExtra =
-      (mostrarCosto ? 1 : 0) +
-      (mostrarLineas ? lineasActivas.length : incluirPrecio ? 1 : 0);
-    const totalCols = 2 + colsExtra + (incluirSubtotalItem ? 1 : 0); // producto+cant (sin descripción) + (costo/líneas) + (subtotal por ítem, opcional)
 
     // Agrupa los ítems por grupo personalizado (si el usuario le asignó uno)
     // o, en su defecto, por la sección automática de siempre. Respeta el
     // orden en que aparecen los ítems.
     const secciones = [...new Set(presupuestoItems.map((p) => grupoDe(p)))];
 
-    const filasHTML = secciones
+    // Genera un bloque <table> independiente por sección/grupo, con su propio
+    // encabezado "Cant / Detalle / Línea X" y su fila de total — igual que el
+    // formato clásico de presupuesto de Daniel Roque S.R.L. (una tabla por
+    // sección, sin precio por ítem, solo el total de cada grupo).
+    const seccionesHTML = secciones
       .map((sec) => {
         const items = presupuestoItems.filter((p) => grupoDe(p) === sec);
         const subtotalSec = items.reduce((s, it) => s + (it.subtotal || 0), 0);
@@ -2214,9 +2210,13 @@ export default function PresupuestoNuevo({
               item.alto
                 ? ` <span class="medida">(${item.ancho} × ${item.alto} cm)</span>`
                 : "";
+            // Precio por ítem: SOLO se muestra si incluirPrecio está activo.
+            // Por defecto queda oculto (igual que el formato clásico), y solo
+            // se ven los totales por sección/grupo al final de cada tabla.
             const celdasPrecio = mostrarLineas
               ? lineasActivas
                   .map((l, li) => {
+                    if (!incluirPrecio) return `<td class="right"></td>`;
                     const pr = item.precios?.[li]?.precio ?? item.precio ?? 0;
                     return `<td class="right">${formatPeso(pr)}</td>`;
                   })
@@ -2226,8 +2226,8 @@ export default function PresupuestoNuevo({
                 : "";
             return `
         <tr>
+          <td class="cant">${item.cantidad ?? 1}</td>
           <td>${item.nombreart ?? ""}${medida}</td>
-          <td class="center">${item.cantidad ?? 1}</td>
           ${mostrarCosto ? `<td class="right">${item.costo != null ? formatPeso(item.costo) : "—"}</td>` : ""}
           ${celdasPrecio}
           ${incluirSubtotalItem ? `<td class="right"><strong>${formatPeso(item.subtotal)}</strong></td>` : ""}
@@ -2248,13 +2248,36 @@ export default function PresupuestoNuevo({
           : "";
 
         return `
-      <tr class="seccion-row"><td colspan="${totalCols}">${sec}</td></tr>
-      ${filasItems}
-      <tr class="subtotal-row">
-        <td colspan="${labelColspan}">Subtotal ${sec}</td>
-        ${celdasSubtotalLinea}
-        ${celdaSubtotalItem}
-      </tr>`;
+      <div class="sec-block">
+        <div class="sec-title">${sec}:</div>
+        <table>
+          <thead>
+            <tr>
+              <th class="cant">Cant</th>
+              <th>Detalle</th>
+              ${mostrarCosto ? `<th class="right">Costo</th>` : ""}
+              ${
+                mostrarLineas
+                  ? lineasActivas
+                      .map((l) => `<th class="right">Línea ${l.linea}</th>`)
+                      .join("")
+                  : incluirPrecio
+                    ? `<th class="right">Precio unit.</th>`
+                    : ""
+              }
+              ${incluirSubtotalItem ? `<th class="right">Subtotal</th>` : ""}
+            </tr>
+          </thead>
+          <tbody>
+            ${filasItems}
+            <tr class="subtotal-row">
+              <td colspan="${labelColspan}">Total ${sec}:</td>
+              ${celdasSubtotalLinea}
+              ${celdaSubtotalItem}
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
       })
       .join("");
 
@@ -2274,53 +2297,41 @@ export default function PresupuestoNuevo({
         )
       : [];
 
+    // Estilo "clásico" tipo máquina de escribir (mismo aspecto que los
+    // presupuestos históricos de Daniel Roque S.R.L.): monoespaciado, blanco
+    // y negro, títulos de sección en cursiva subrayada, y solo totales por
+    // grupo (sin precio por ítem, salvo que se active incluirPrecio).
     const styleCSS = `
-    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Source Sans 3', Arial, sans-serif; background: #fff; color: #1a2a3a; font-size: 13px; }
-    .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 0; display: flex; flex-direction: column; background: #fff; }
-    .membrete-banner { width: 100%; padding: 8px 48px; text-align: center; background: #fff; }
-    .membrete-banner img { max-width: 100%; max-height: 70px; height: auto; }
-    .header { background: #fff; color: #0f2944; padding: 10px 48px 8px; display: flex; justify-content: space-between; align-items: baseline; }
-    .header-left { display: flex; align-items: baseline; gap: 10px; }
-    .header-right { text-align: right; }
-    .doc-title { font-family: 'Rajdhani', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: ${accent}; }
-    .doc-nro { font-family: 'Rajdhani', sans-serif; font-size: 17px; font-weight: 700; color: #0f2944; line-height: 1; }
-    .doc-fecha { font-size: 10px; color: #4a6a8c; margin-top: 2px; }
-    .accent-bar { height: 3px; background: linear-gradient(90deg, ${accent} 0%, ${accentLight} 50%, ${accent} 100%); }
-    .body { padding: 18px 48px 36px; flex: 1; }
-    .client-block { display: flex; gap: 24px; margin-bottom: 14px; }
-    .info-box { flex: 1; border: 1px solid #d0dde8; border-radius: 6px; padding: 8px 20px; }
-    .info-box-title { font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: ${accent}; margin-bottom: 10px; border-bottom: 1px solid #e8f0f7; padding-bottom: 6px; }
-    .info-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 13px; }
-    .info-label { color: #6a8aa0; }
-    .info-value { font-weight: 600; color: #0f2944; text-align: right; }
-    .leyenda { font-size: 12px; font-style: italic; color: #4a6a8c; background: #f5f9fc; border-left: 3px solid ${accent}; padding: 10px 14px; margin-bottom: 24px; border-radius: 0 4px 4px 0; }
-    .section-title { font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: ${accent}; margin-bottom: 10px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    thead tr { background: #0f2944; }
-    thead th { color: #fff; font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; padding: 10px 12px; text-align: left; }
-    thead th.center { text-align: center; }
+    body { font-family: 'Space Mono', 'Courier New', monospace; background: #fff; color: #111; font-size: 12px; }
+    .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 30px 56px 40px; display: flex; flex-direction: column; background: #fff; }
+    .membrete-banner { margin-bottom: 14px; }
+    .membrete-banner img { max-width: 100%; max-height: 90px; height: auto; }
+    .doc-nro-corner { text-align: right; font-size: 10px; color: #555; margin-bottom: 6px; }
+    .doc-title { text-align: center; font-weight: 700; font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 14px; }
+    .info-line { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; }
+    .info-line.right-only { justify-content: flex-end; }
+    .body { flex: 1; margin-top: 18px; }
+    .leyenda { font-size: 11px; font-style: italic; margin-bottom: 18px; }
+    .sec-block { margin-bottom: 20px; }
+    .sec-title { font-style: italic; font-weight: 700; text-transform: uppercase; text-decoration: underline; font-size: 12px; margin-bottom: 3px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead th { text-align: left; font-weight: 700; border-bottom: 1px solid #111; padding: 1px 8px 3px 0; }
+    thead th.cant, td.cant { width: 44px; }
     thead th.right { text-align: right; }
-    tbody td { padding: 8px 12px; font-size: 12px; color: #2a3a4a; border-bottom: 1px solid #e8f0f7; }
-    tbody td.center { text-align: center; }
+    thead th.center { text-align: center; }
+    tbody td { padding: 2px 8px 2px 0; vertical-align: top; }
     tbody td.right { text-align: right; }
-    .medida { color: #7a94a8; font-size: 11px; }
-    tr.seccion-row td { background: #ddeefa; font-weight: 700; color: #0f2944; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; padding: 7px 12px; }
-    tr.subtotal-row td { background: #f5f9fc; font-weight: 700; color: #0a5c3a; text-align: right; padding: 7px 12px; border-top: 1px solid #d0dde8; }
-    .totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 24px; }
-    .totals-box { width: 300px; }
-    .totals-total { display: flex; justify-content: space-between; padding: 13px 16px; background: #0f2944; border-radius: 4px; }
-    .totals-total + .totals-total { margin-top: 8px; }
-    .totals-total .t-label { color: #a8c4d8; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; }
-    .totals-total .t-value { color: #fff; font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; }
-    .iva-note { font-size: 10px; color: #6a8aa0; text-align: right; margin-top: 6px; }
-    .clausula { font-size: 11px; color: #6a8aa0; border-top: 1px dashed #d0dde8; padding-top: 10px; margin-bottom: 20px; }
-    .observaciones { font-size: 12px; color: #2a3a4a; white-space: pre-wrap; margin-bottom: 20px; }
-    .footer { background: #f0f6fb; border-top: 2px solid #d0dde8; padding: 20px 48px; display: flex; justify-content: space-between; align-items: center; }
-    .footer-left { font-size: 11px; color: #6a8aa0; line-height: 1.6; }
-    .footer-right { text-align: right; font-size: 11px; color: #6a8aa0; }
-    .footer-brand { font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700; color: #0f2944; letter-spacing: 0.06em; }
+    tbody td.center { text-align: center; }
+    .medida { color: #444; font-size: 11px; }
+    tr.subtotal-row td { border-top: 1px solid #111; font-weight: 700; padding-top: 4px; }
+    .totals-final { margin-top: 6px; text-align: right; }
+    .totals-final .t-row { font-weight: 700; font-size: 13px; padding: 3px 0; }
+    .iva-note { font-size: 10px; color: #555; text-align: right; margin-top: 4px; }
+    .clausula { font-size: 11px; color: #333; border-top: 1px dashed #999; padding-top: 8px; margin-top: 14px; margin-bottom: 14px; }
+    .observaciones { font-size: 11px; color: #111; white-space: pre-wrap; margin-top: 10px; }
+    .footer { margin-top: auto; border-top: 1px solid #111; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #333; }
     `;
 
     const pageHTML = `
@@ -2328,75 +2339,36 @@ export default function PresupuestoNuevo({
   <div class="membrete-banner">
     <img src="${MEMBRETE_DANIEL_ROQUE_B64}" alt="Daniel Roque S.R.L." />
   </div>
-  <div class="header">
-    <div class="header-left">
-      <div class="doc-title">Presupuesto</div>
-      <div class="doc-nro">N° ${nro}</div>
-    </div>
-    <div class="header-right">
-      <div class="doc-fecha">Fecha: ${fechaFmt}</div>
-      <div class="doc-fecha" style="margin-top:4px;">Revisión: ${revision}</div>
-    </div>
+  <div class="doc-nro-corner">N° ${nro} — Rev. ${revision}</div>
+  <div class="doc-title">Presupuesto</div>
+  <div class="info-line">
+    <span>Cliente: ${cliente || "Consumidor final"}${domicilio ? ` — ${domicilio}` : ""}</span>
+    <span>Fecha: ${fechaFmt}</span>
   </div>
-  <div class="accent-bar"></div>
-  <div class="body">
-    <div class="client-block">
-      <div class="info-box">
-        <div class="info-row"><span class="info-label">Cliente</span><span class="info-value">${cliente || "Consumidor final"}</span></div>
-        ${telefono1 ? `<div class="info-row"><span class="info-label">Teléfono</span><span class="info-value">${telefono1}</span></div>` : ""}
-        ${telefono2 ? `<div class="info-row"><span class="info-label">Teléfono 2</span><span class="info-value">${telefono2}</span></div>` : ""}
-        ${wapp ? `<div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value">${wapp}</span></div>` : ""}
-      </div>
-      <div class="info-box">
-        <div class="info-row"><span class="info-label">Domicilio</span><span class="info-value">${domicilio || "—"}</span></div>
-        ${domicilioFiscal ? `<div class="info-row"><span class="info-label">Dom. fiscal</span><span class="info-value">${domicilioFiscal}</span></div>` : ""}
-        <div class="info-row"><span class="info-label">Localidad</span><span class="info-value">${localidad || "—"}</span></div>
-      </div>
-    </div>
+  <div class="info-line right-only">
+    <span>Localidad: ${localidad || "—"}</span>
+  </div>
 
+  <div class="body">
     ${leyenda ? `<div class="leyenda">${leyenda.replace(/\n/g, "<br/>")}</div>` : ""}
 
-    <div class="section-title">Detalle del presupuesto</div>
-    <table>
-      <thead>
-        <tr>
-          <th>Producto</th>
-          <th class="center">Cant.</th>
-          ${mostrarCosto ? `<th class="right">Costo</th>` : ""}
-          ${
-            mostrarLineas
-              ? lineasActivas
-                  .map((l) => `<th class="right">Línea ${l.linea}</th>`)
-                  .join("")
-              : incluirPrecio
-                ? `<th class="right">Precio unit.</th>`
-                : ""
-          }
-          ${incluirSubtotalItem ? `<th class="right">Subtotal</th>` : ""}
-        </tr>
-      </thead>
-      <tbody>
-        ${filasHTML}
-      </tbody>
-    </table>
+    ${seccionesHTML}
 
     ${
       incluirTotal
-        ? `<div class="totals-wrap">
-      <div class="totals-box">
+        ? `<div class="totals-final">
         ${
           mostrarLineas
             ? totalesPorLinea
                 .map(
                   (t, li) =>
-                    `<div class="totals-total"><span class="t-label">TOTAL LÍNEA ${lineasActivas[li].linea}</span><span class="t-value">${formatPeso(t)}</span></div>`,
+                    `<div class="t-row">TOTAL LÍNEA ${lineasActivas[li].linea}: ${formatPeso(t)}</div>`,
                 )
                 .join("")
-            : `<div class="totals-total"><span class="t-label">TOTAL</span><span class="t-value">${formatPeso(totalGeneral)}</span></div>`
+            : `<div class="t-row">TOTAL: ${formatPeso(totalGeneral)}</div>`
         }
-        ${agregarIVA ? `<div class="iva-note">Precios con IVA incluido</div>` : ""}
-      </div>
-    </div>`
+        ${agregarIVA ? `<div class="iva-note">Precios con IVA incluido, sujetos a reajustes</div>` : ""}
+      </div>`
         : ""
     }
 
@@ -2408,19 +2380,13 @@ export default function PresupuestoNuevo({
 
     ${
       observaciones
-        ? `<div class="section-title" style="margin-top:8px;">Observaciones</div><div class="observaciones">${observaciones.replace(/\n/g, "<br/>")}</div>`
+        ? `<div class="sec-title" style="margin-top:14px;">Observaciones</div><div class="observaciones">${observaciones.replace(/\n/g, "<br/>")}</div>`
         : ""
     }
   </div>
   <div class="footer">
-    <div class="footer-left">
-      <div class="footer-brand">Integral</div>
-      Bahía Blanca, Buenos Aires
-    </div>
-    <div class="footer-right">
-      Presupuesto N° ${nro} — Rev. ${revision}<br/>
-      Emitido el ${fechaFmt}
-    </div>
+    <div>Daniel Roque S.R.L. — Bahía Blanca</div>
+    <div>Presupuesto N° ${nro} — Rev. ${revision}</div>
   </div>
 </div>`;
 
