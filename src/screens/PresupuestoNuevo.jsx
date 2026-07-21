@@ -1336,7 +1336,33 @@ export default function PresupuestoNuevo({
       setNumeroPres(num);
       setNumero(String(num).padStart(4, "0"));
       setCliente(pres.nombre ?? pres.NOMBRE ?? "");
-      setCodcliente(pres.codcliente ?? pres.CODCLIENTE ?? null);
+      const codclienteRestaurado = pres.codcliente ?? pres.CODCLIENTE ?? null;
+      setCodcliente(codclienteRestaurado);
+      // Restaurar teléfono del cliente. Si el objeto `pres` (proveniente del
+      // listado de presupuestos) ya trae telefono1/telefono2 -porque el
+      // endpoint hace JOIN con clientes- lo usamos directo. Si no, lo
+      // buscamos por codcliente. Sin esto, telefono1 queda "" y el guardado
+      // de una nueva revisión lo rechaza (línea ~2129: telefonoOk exige
+      // telefono1 no vacío).
+      const tel1Pres = pres.telefono1 ?? pres.TELEFONO1 ?? "";
+      const tel2Pres = pres.telefono2 ?? pres.TELEFONO2 ?? "";
+      if (tel1Pres || tel2Pres) {
+        setTelefono1(tel1Pres);
+        setTelefono2(tel2Pres);
+        setTelefonoSearch(tel1Pres || tel2Pres);
+      } else if (codclienteRestaurado) {
+        try {
+          const rc = await authFetch(`${API}/clientes/${codclienteRestaurado}`);
+          const cli = await rc.json();
+          const ct1 = cli?.telefono1 ?? cli?.TELEFONO1 ?? "";
+          const ct2 = cli?.telefono2 ?? cli?.TELEFONO2 ?? "";
+          setTelefono1(ct1);
+          setTelefono2(ct2);
+          setTelefonoSearch(ct1 || ct2 || "");
+        } catch (e) {
+          console.error("Error restaurando teléfono del cliente:", e);
+        }
+      }
       setFecha((pres.fecha ?? pres.FECHA ?? "").slice(0, 10));
       setRevision(Number(pres.revision ?? pres.REVISION ?? 1));
       const itemConLista = itemsDedup.find((it) => it.lista ?? it.LISTA);
