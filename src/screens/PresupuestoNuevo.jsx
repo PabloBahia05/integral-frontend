@@ -1346,22 +1346,30 @@ export default function PresupuestoNuevo({
       // telefono1 no vacío).
       const tel1Pres = pres.telefono1 ?? pres.TELEFONO1 ?? "";
       const tel2Pres = pres.telefono2 ?? pres.TELEFONO2 ?? "";
+      console.log("[DEBUG telefono] pres completo:", JSON.stringify(pres));
+      console.log("[DEBUG telefono] tel1Pres:", tel1Pres, "| tel2Pres:", tel2Pres, "| codclienteRestaurado:", codclienteRestaurado);
       if (tel1Pres || tel2Pres) {
+        console.log("[DEBUG telefono] usando telefono desde pres");
         setTelefono1(tel1Pres);
         setTelefono2(tel2Pres);
         setTelefonoSearch(tel1Pres || tel2Pres);
       } else if (codclienteRestaurado) {
         try {
+          console.log("[DEBUG telefono] pres no traia telefono, pidiendo a /clientes/", codclienteRestaurado);
           const rc = await authFetch(`${API}/clientes/${codclienteRestaurado}`);
+          console.log("[DEBUG telefono] status fetch clientes/:id:", rc.status);
           const cli = await rc.json();
+          console.log("[DEBUG telefono] respuesta clientes/:id:", JSON.stringify(cli));
           const ct1 = cli?.telefono1 ?? cli?.TELEFONO1 ?? "";
           const ct2 = cli?.telefono2 ?? cli?.TELEFONO2 ?? "";
           setTelefono1(ct1);
           setTelefono2(ct2);
           setTelefonoSearch(ct1 || ct2 || "");
         } catch (e) {
-          console.error("Error restaurando teléfono del cliente:", e);
+          console.error("[DEBUG telefono] Error restaurando teléfono del cliente:", e);
         }
+      } else {
+        console.log("[DEBUG telefono] no hay tel en pres NI codcliente -> no se puede restaurar");
       }
       setFecha((pres.fecha ?? pres.FECHA ?? "").slice(0, 10));
       setRevision(Number(pres.revision ?? pres.REVISION ?? 1));
