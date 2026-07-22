@@ -25,6 +25,22 @@ const MEMBRETE_DANIEL_ROQUE_B64 =
 
 const API = "https://integral-backend-production.up.railway.app";
 
+// Máximo de imágenes que se pueden asignar a un mismo grupo del presupuesto
+// (se persisten en la tabla presupuesto_imagenes, columnas grupoim1..grupoim5).
+const MAX_IMAGENES_POR_GRUPO = 5;
+
+async function uploadImageToCloud(file, token) {
+  const formData = new FormData();
+  formData.append("imagen", file);
+  const res = await fetch(`${API}/api/upload-imagen`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!res.ok) throw new Error("Error al subir imagen");
+  return (await res.json()).url;
+}
+
 const LOCALIDADES = [
   "Bahía Blanca",
   "Punta Alta",
@@ -591,15 +607,20 @@ export default function PresupuestoNuevo({
   // generar, no es un checkbox fijo en pantalla.
   const [incluirDescripcion, setIncluirDescripcion] = useState(false);
   // Imágenes y/o PDFs adjuntos. Cada uno puede asignarse a un grupo del
-  // presupuesto (se pega bajo el detalle de ese grupo) o quedar "sin grupo"
-  // (se agrega al final del presupuesto, como antes).
-  // { id, tipo: "pdf" | "imagen", nombre, dataUrl, grupo: string | null }
+  // presupuesto (se pega bajo el detalle de ese grupo, hasta 5 imágenes por
+  // grupo) o quedar "sin grupo" (se agrega al final del presupuesto).
+  // Las imágenes (no los PDF) se persisten en la tabla presupuesto_imagenes
+  // ligada a numeropres + grupo, así sobreviven a recargar/reabrir.
+  // Imagen: { id, tipo: "imagen", nombre, url, grupo: string | null }
+  // PDF:    { id, tipo: "pdf", nombre, dataUrl, grupo: null } (no se persiste)
   const [imagenesFinal, setImagenesFinal] = useState([]);
   const [mostrarGestorImagenes, setMostrarGestorImagenes] = useState(false);
+  const [subiendoImagenes, setSubiendoImagenes] = useState(false);
   const imagenInputRef = useRef(null);
 
-  const handleImagenSeleccionada = (e) => {
+  const handleImagenSeleccionada = async (e) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = "";
     if (!files.length) return;
 
     const validos = [];
@@ -613,42 +634,114 @@ export default function PresupuestoNuevo({
     }
     if (!validos.length) {
       alert("Solo se permiten archivos PDF, JPG o PNG.");
-      e.target.value = "";
       return;
     }
 
-    Promise.all(
-      validos.map(
-        ({ file, esPDF }) =>
-          new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () =>
-              resolve({
-                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                tipo: esPDF ? "pdf" : "imagen",
-                nombre: file.name,
-                dataUrl: reader.result,
-                grupo: null, // null = se agrega al final del presupuesto
-              });
-            reader.readAsDataURL(file);
-          }),
-      ),
-    ).then((nuevas) => {
+    setSubiendoImagenes(true);
+    try {
+      const nuevas = await Promise.all(
+        validos.map(async ({ file, esPDF }) => {
+          const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          if (esPDF) {
+            const dataUrl = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.readAsDataURL(file);
+            });
+            return { id, tipo: "pdf", nombre: file.name, dataUrl, grupo: null };
+          }
+          // Las imágenes se suben directo a la nube: se persisten como URL
+          // (no como base64), que es lo que viaja a presupuesto_imagenes.
+          const url = await uploadImageToCloud(file, token);
+          return { id, tipo: "imagen", nombre: file.name, url, grupo: null };
+        }),
+      );
       setImagenesFinal((prev) => [...prev, ...nuevas]);
       setMostrarGestorImagenes(true);
-    });
-
-    e.target.value = "";
+    } catch (err) {
+      alert("Error al subir una o más imágenes: " + err.message);
+    } finally {
+      setSubiendoImagenes(false);
+    }
   };
 
   const actualizarGrupoImagen = (id, grupo) => {
-    setImagenesFinal((prev) =>
-      prev.map((im) => (im.id === id ? { ...im, grupo: grupo || null } : im)),
-    );
+    const grupoFinal = grupo || null;
+    setImagenesFinal((prev) => {
+      if (grupoFinal) {
+        const yaEnEseGrupo = prev.filter(
+          (im) =>
+            im.id !== id && im.tipo === "imagen" && im.grupo === grupoFinal,
+        ).length;
+        if (yaEnEseGrupo >= MAX_IMAGENES_POR_GRUPO) {
+          alert(
+            `El grupo "${grupoFinal}" ya tiene el máximo de ${MAX_IMAGENES_POR_GRUPO} imágenes.`,
+          );
+          return prev;
+        }
+      }
+      return prev.map((im) =>
+        im.id === id ? { ...im, grupo: grupoFinal } : im,
+      );
+    });
   };
 
   const eliminarImagen = (id) => {
     setImagenesFinal((prev) => prev.filter((im) => im.id !== id));
+  };
+
+  // ── Persistencia de imágenes (tabla presupuesto_imagenes) ──────────────
+  const guardarImagenesPresupuesto = async (numPres) => {
+    const imagenes = imagenesFinal.filter((im) => im.tipo === "imagen");
+    const porGrupo = new Map();
+    imagenes.forEach((im) => {
+      const key = im.grupo || null;
+      if (!porGrupo.has(key)) porGrupo.set(key, []);
+      const arr = porGrupo.get(key);
+      if (arr.length < MAX_IMAGENES_POR_GRUPO) arr.push(im.url);
+    });
+    const grupos = Array.from(porGrupo.entries()).map(([grupo, urls]) => ({
+      grupo,
+      imagenes: urls,
+    }));
+    try {
+      await authFetch(`${API}/presupuesto-imagenes/${numPres}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grupos }),
+      });
+    } catch (err) {
+      console.error("Error guardando imágenes del presupuesto:", err);
+    }
+  };
+
+  const cargarImagenesPresupuesto = async (numPres) => {
+    try {
+      const r = await authFetch(`${API}/presupuesto-imagenes/${numPres}`);
+      const filas = await r.json();
+      if (!Array.isArray(filas)) {
+        setImagenesFinal([]);
+        return;
+      }
+      const cargadas = [];
+      filas.forEach((fila) => {
+        const grupo = fila.grupo ?? fila.GRUPO ?? null;
+        const urls = (fila.imagenes ?? []).filter(Boolean);
+        urls.forEach((url, i) => {
+          cargadas.push({
+            id: `${fila.id ?? numPres}-${grupo ?? "sin-grupo"}-${i}`,
+            tipo: "imagen",
+            nombre: `imagen-${i + 1}.jpg`,
+            url,
+            grupo,
+          });
+        });
+      });
+      setImagenesFinal(cargadas);
+    } catch (err) {
+      console.error("Error cargando imágenes del presupuesto:", err);
+      setImagenesFinal([]);
+    }
   };
 
   // Líneas (3 slots)
@@ -1339,6 +1432,7 @@ export default function PresupuestoNuevo({
       // 2. Restaurar encabezado
       setNumeroPres(num);
       setNumero(String(num).padStart(4, "0"));
+      cargarImagenesPresupuesto(num);
       setCliente(pres.nombre ?? pres.NOMBRE ?? "");
       const codclienteRestaurado = pres.codcliente ?? pres.CODCLIENTE ?? null;
       setCodcliente(codclienteRestaurado);
@@ -1598,6 +1692,7 @@ export default function PresupuestoNuevo({
     setDomicilio("");
     setDomicilioFiscal("");
     setClienteAutoResuelto(null);
+    setImagenesFinal([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presupuestoInicial]);
 
@@ -2289,6 +2384,9 @@ export default function PresupuestoNuevo({
             body: JSON.stringify({ numeropres: numAsignado, ids: vanitoryIds }),
           }).catch(() => {});
         }
+
+        // ── Persistir imágenes (hasta 5 por grupo) ──
+        guardarImagenesPresupuesto(numAsignado);
       }
       setRevision(Number(revAsignada));
 
@@ -2429,7 +2527,7 @@ export default function PresupuestoNuevo({
           ? `<div class="sec-fotos" style="margin-top:10px;">${fotosSec
               .map(
                 (im) =>
-                  `<img src="${im.dataUrl}" style="max-width:100%; display:block; margin-top:8px;" />`,
+                  `<img src="${im.url}" style="max-width:100%; display:block; margin-top:8px;" />`,
               )
               .join("")}</div>`
           : "";
@@ -2578,7 +2676,7 @@ export default function PresupuestoNuevo({
       .filter((im) => im.tipo === "imagen" && !im.grupo)
       .map(
         (im) =>
-          `<div class="adjunto-imagen" style="margin-top:18px;"><img src="${im.dataUrl}" style="max-width:100%; display:block;" /></div>`,
+          `<div class="adjunto-imagen" style="margin-top:18px;"><img src="${im.url}" style="max-width:100%; display:block;" /></div>`,
       )
       .join("")}
   </div>
@@ -2785,7 +2883,7 @@ export default function PresupuestoNuevo({
                 >
                   {im.tipo === "imagen" ? (
                     <img
-                      src={im.dataUrl}
+                      src={im.url}
                       alt={im.nombre}
                       style={{
                         width: 56,
@@ -3108,6 +3206,7 @@ export default function PresupuestoNuevo({
           />
           <button
             className="pn-tool-btn"
+            disabled={subiendoImagenes}
             onClick={() => {
               if (imagenesFinal.length) {
                 setMostrarGestorImagenes(true);
@@ -3116,18 +3215,23 @@ export default function PresupuestoNuevo({
               }
             }}
             title={
-              imagenesFinal.length
-                ? `${imagenesFinal.length} adjunto(s). Click para gestionarlos y asignarlos a un grupo.`
-                : "Adjuntar una o más imágenes/PDF y asignarlas a un grupo del presupuesto"
+              subiendoImagenes
+                ? "Subiendo imágenes..."
+                : imagenesFinal.length
+                  ? `${imagenesFinal.length} adjunto(s). Click para gestionarlos y asignarlos a un grupo (máx. ${MAX_IMAGENES_POR_GRUPO} por grupo).`
+                  : `Adjuntar una o más imágenes/PDF y asignarlas a un grupo del presupuesto (máx. ${MAX_IMAGENES_POR_GRUPO} imágenes por grupo)`
             }
             style={{
               background: imagenesFinal.length ? "#e6f7ff" : "#fff",
               borderColor: imagenesFinal.length ? "#1890ff" : undefined,
               color: imagenesFinal.length ? "#0a3a5c" : undefined,
               fontWeight: 700,
+              opacity: subiendoImagenes ? 0.6 : 1,
             }}
           >
-            🖼️ {imagenesFinal.length ? `Imagen ✓ (${imagenesFinal.length})` : "Imagen"}
+            {subiendoImagenes
+              ? "⏳ Subiendo..."
+              : `🖼️ ${imagenesFinal.length ? `Imagen ✓ (${imagenesFinal.length})` : "Imagen"}`}
           </button>
           <button
             className="pn-tool-btn"
