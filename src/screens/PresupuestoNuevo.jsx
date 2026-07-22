@@ -586,6 +586,10 @@ export default function PresupuestoNuevo({
   const [color, setColor] = useState("");
   const [incluirTextoColoc, setIncluirTextoColoc] = useState(false);
   const [agregarIVA, setAgregarIVA] = useState(true);
+  // Si mostrar o no el campo "descripcion" (texto libre del ítem, separado
+  // de nombreart) en el PDF. Se pregunta con un confirm() justo antes de
+  // generar, no es un checkbox fijo en pantalla.
+  const [incluirDescripcion, setIncluirDescripcion] = useState(false);
   // Imágenes y/o PDFs adjuntos. Cada uno puede asignarse a un grupo del
   // presupuesto (se pega bajo el detalle de ese grupo) o quedar "sin grupo"
   // (se agrega al final del presupuesto, como antes).
@@ -2300,6 +2304,17 @@ export default function PresupuestoNuevo({
 
   // ── Generar PDF del presupuesto ─────────────────────────────────────────────
   const handlePDF = () => {
+    // Se pregunta acá, no con un checkbox fijo en pantalla, porque es
+    // optativo caso a caso: puede que un mismo presupuesto se quiera
+    // generar una vez con descripción (para el cliente) y otra sin (para
+    // uso interno). Uso la respuesta local (querDescripcion) para el HTML
+    // de este PDF puntual, y además la guardo en el state por si el resto
+    // de la UI la necesita después.
+    const querDescripcion = window.confirm(
+      "¿Incluir la descripción de cada ítem en el PDF?",
+    );
+    setIncluirDescripcion(querDescripcion);
+
     const formatPeso = (v) =>
       "$" +
       Number(v || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 });
@@ -2360,6 +2375,14 @@ export default function PresupuestoNuevo({
               item.alto
                 ? ` <span class="medida">(${item.ancho} × ${item.alto} cm)</span>`
                 : "";
+            // Descripción del ítem (campo `descripcion`, separado del
+            // nombre/artículo). Solo se muestra si el usuario dijo que sí
+            // en el confirm() de más arriba, y solo si hay algo distinto
+            // que mostrar (evita duplicar el mismo texto de nombreart).
+            const descripcionHTML =
+              querDescripcion && item.descripcion && item.descripcion !== item.nombreart
+                ? `<div class="item-desc">${item.descripcion}</div>`
+                : "";
             // Precio por ítem: SOLO se muestra si incluirPrecio está activo.
             // Por defecto queda oculto (igual que el formato clásico), y solo
             // se ven los totales por sección/grupo al final de cada tabla.
@@ -2377,7 +2400,7 @@ export default function PresupuestoNuevo({
             return `
         <tr>
           <td class="cant">${item.cantidad ?? 1}</td>
-          <td>${item.nombreart ?? ""}${medida}</td>
+          <td>${item.nombreart ?? ""}${medida}${descripcionHTML}</td>
           ${mostrarCosto ? `<td class="right">${item.costo != null ? formatPeso(item.costo) : "—"}</td>` : ""}
           ${celdasPrecio}
           ${incluirSubtotalItem ? `<td class="right"><strong>${formatPeso(item.subtotal)}</strong></td>` : ""}
@@ -2490,6 +2513,7 @@ export default function PresupuestoNuevo({
     tbody td.right { text-align: right; }
     tbody td.center { text-align: center; }
     .medida { color: #444; font-size: 11px; }
+    .item-desc { color: #444; font-size: 11px; font-style: italic; margin-top: 2px; }
     tr.subtotal-row td { border-top: 1px solid #111; font-weight: 700; padding-top: 4px; }
     .totals-final { margin-top: 6px; text-align: right; }
     .totals-final .t-row { font-weight: 700; font-size: 13px; padding: 3px 0; }
@@ -2510,8 +2534,9 @@ export default function PresupuestoNuevo({
     <span>Cliente: ${cliente || "Consumidor final"}${domicilio ? ` — ${domicilio}` : ""}</span>
     <span>Fecha: ${fechaFmt}</span>
   </div>
-  <div class="info-line right-only">
+  <div class="info-line">
     <span>Localidad: ${localidad || "—"}</span>
+    <span>Tel: ${telefono1 || telefono2 || "—"}</span>
   </div>
 
   <div class="body">
