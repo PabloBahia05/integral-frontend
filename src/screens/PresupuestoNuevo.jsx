@@ -59,6 +59,20 @@ const formatFechaLarga = (fecha) => {
   });
 };
 
+// Formatea un DATETIME de MySQL (creado_en/actualizado_en) a "DD/MM/AAAA HH:MM".
+const formatFechaHora = (dt) => {
+  if (!dt) return "";
+  const d = new Date(dt);
+  if (isNaN(d.getTime())) return String(dt);
+  return d.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 // ── Componente reutilizable: formulario de medidas para Especiales ──────────
 function EspecialesMedidasForm({
   tipo,
@@ -546,6 +560,9 @@ export default function PresupuestoNuevo({
 
   const [numero, setNumero] = useState("Nuevo");
   const [numeroPres, setNumeroPres] = useState(null); // número real asignado tras primer guardado
+  // Quién creó / actualizó por última vez esta revisión, y cuándo (para
+  // mostrar en pantalla). null mientras es un presupuesto nuevo sin guardar.
+  const [metaPresupuesto, setMetaPresupuesto] = useState(null);
   const [presmv, setPresmv] = useState(null); // id de presupuesto_mampara vinculado
   const [mamparaAEditar, setMamparaAEditar] = useState(null); // datos para editar mampara existente
   const [prespv, setPrespv] = useState(null); // id de presupuesto_puerta vinculado
@@ -712,6 +729,19 @@ export default function PresupuestoNuevo({
       });
     } catch (err) {
       console.error("Error guardando imágenes del presupuesto:", err);
+    }
+  };
+
+  const cargarMetaPresupuesto = async (numPres, rev) => {
+    try {
+      const r = await authFetch(
+        `${API}/tabla-presupuestos/meta/${numPres}/${rev}`,
+      );
+      const data = await r.json();
+      setMetaPresupuesto(data ?? null);
+    } catch (err) {
+      console.error("Error cargando metadata del presupuesto:", err);
+      setMetaPresupuesto(null);
     }
   };
 
@@ -1433,6 +1463,7 @@ export default function PresupuestoNuevo({
       setNumeroPres(num);
       setNumero(String(num).padStart(4, "0"));
       cargarImagenesPresupuesto(num);
+      cargarMetaPresupuesto(num, rev);
       setCliente(pres.nombre ?? pres.NOMBRE ?? "");
       const codclienteRestaurado = pres.codcliente ?? pres.CODCLIENTE ?? null;
       setCodcliente(codclienteRestaurado);
@@ -1693,6 +1724,7 @@ export default function PresupuestoNuevo({
     setDomicilioFiscal("");
     setClienteAutoResuelto(null);
     setImagenesFinal([]);
+    setMetaPresupuesto(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presupuestoInicial]);
 
@@ -2387,6 +2419,9 @@ export default function PresupuestoNuevo({
 
         // ── Persistir imágenes (hasta 5 por grupo) ──
         guardarImagenesPresupuesto(numAsignado);
+
+        // ── Refrescar quién/cuándo guardó, para mostrar en pantalla ──
+        cargarMetaPresupuesto(numAsignado, Number(revAsignada));
       }
       setRevision(Number(revAsignada));
 
@@ -3360,6 +3395,42 @@ export default function PresupuestoNuevo({
           {guardadoOk && (
             <div className="pn-ok">✅ Presupuesto guardado correctamente</div>
           )}
+
+          {metaPresupuesto &&
+            (metaPresupuesto.creado_por || metaPresupuesto.actualizado_por) && (
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#555",
+                  marginBottom: 10,
+                  padding: "6px 10px",
+                  background: "#f5f5f5",
+                  border: "1px solid #e5e5e5",
+                  borderRadius: 6,
+                  display: "flex",
+                  gap: 20,
+                  flexWrap: "wrap",
+                }}
+              >
+                {metaPresupuesto.creado_por && (
+                  <span>
+                    📝 Creado por <strong>{metaPresupuesto.creado_por}</strong>
+                    {metaPresupuesto.creado_en
+                      ? ` — ${formatFechaHora(metaPresupuesto.creado_en)}`
+                      : ""}
+                  </span>
+                )}
+                {metaPresupuesto.actualizado_por && (
+                  <span>
+                    🔄 Última actualización:{" "}
+                    <strong>{metaPresupuesto.actualizado_por}</strong>
+                    {metaPresupuesto.actualizado_en
+                      ? ` — ${formatFechaHora(metaPresupuesto.actualizado_en)}`
+                      : ""}
+                  </span>
+                )}
+              </div>
+            )}
 
           {tab === "encabezado" && (
             <>
