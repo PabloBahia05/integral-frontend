@@ -558,6 +558,37 @@ export default function PresupuestoNuevo({
       },
     });
 
+  // ── Nombre del usuario logueado, extraído del payload del JWT ──
+  // El token no se valida acá (para eso está el backend), solo se lee el
+  // payload para saber quién es. El backend firma el token con nombre y
+  // apellido por separado (ver POST /login en server.js), así que se arman
+  // combinados acá.
+  const payloadTokenActual = (() => {
+    if (!token) return null;
+    try {
+      const payloadB64 = token.split(".")[1];
+      let base64 = payloadB64.replace(/-/g, "+").replace(/_/g, "/");
+      while (base64.length % 4 !== 0) base64 += "="; // base64url no lleva padding
+      const payloadJson = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+          .join(""),
+      );
+      return JSON.parse(payloadJson);
+    } catch {
+      return null;
+    }
+  })();
+
+  const nombreUsuarioActual = payloadTokenActual
+    ? `${payloadTokenActual.nombre ?? ""} ${payloadTokenActual.apellido ?? ""}`.trim()
+    : "";
+
+  const esLucianaRoque =
+    nombreUsuarioActual.trim().toLowerCase().includes("luciana") &&
+    nombreUsuarioActual.trim().toLowerCase().includes("roque");
+
   const [numero, setNumero] = useState("Nuevo");
   const [numeroPres, setNumeroPres] = useState(null); // número real asignado tras primer guardado
   // Quién creó / actualizó por última vez esta revisión, y cuándo (para
@@ -623,6 +654,11 @@ export default function PresupuestoNuevo({
   // de nombreart) en el PDF. Se pregunta con un confirm() justo antes de
   // generar, no es un checkbox fijo en pantalla.
   const [incluirDescripcion, setIncluirDescripcion] = useState(false);
+  // Controla el modal "¿Incluir descripción en el PDF? Sí/No" que reemplaza
+  // al window.confirm() anterior. Para Luciana Roque nunca se muestra: se
+  // asume que la respuesta es "No" directamente (ver iniciarGeneracionPDF).
+  const [mostrarModalDescripcionPDF, setMostrarModalDescripcionPDF] =
+    useState(false);
   // Imágenes y/o PDFs adjuntos. Cada uno puede asignarse a un grupo del
   // presupuesto (se pega bajo el detalle de ese grupo, hasta 5 imágenes por
   // grupo) o quedar "sin grupo" (se agrega al final del presupuesto).
@@ -2491,16 +2527,23 @@ export default function PresupuestoNuevo({
   };
 
   // ── Generar PDF del presupuesto ─────────────────────────────────────────────
-  const handlePDF = () => {
-    // Se pregunta acá, no con un checkbox fijo en pantalla, porque es
-    // optativo caso a caso: puede que un mismo presupuesto se quiera
-    // generar una vez con descripción (para el cliente) y otra sin (para
-    // uso interno). Uso la respuesta local (querDescripcion) para el HTML
-    // de este PDF puntual, y además la guardo en el state por si el resto
-    // de la UI la necesita después.
-    const querDescripcion = window.confirm(
-      "¿Incluir la descripción de cada ítem en el PDF?",
-    );
+  // Punto de entrada del botón "Generar PDF". Antes preguntaba con un
+  // window.confirm() (OK/Cancelar); ahora se pregunta con un modal propio
+  // con botones "Sí" / "No". Para Luciana Roque nunca se pregunta: se
+  // genera directo con querDescripcion = false.
+  const iniciarGeneracionPDF = () => {
+    if (esLucianaRoque) {
+      generarPDFConDescripcion(false);
+    } else {
+      setMostrarModalDescripcionPDF(true);
+    }
+  };
+
+  const generarPDFConDescripcion = (querDescripcion) => {
+    setMostrarModalDescripcionPDF(false);
+    // Uso la respuesta local (querDescripcion) para el HTML de este PDF
+    // puntual, y además la guardo en el state por si el resto de la UI la
+    // necesita después.
     setIncluirDescripcion(querDescripcion);
 
     const formatPeso = (v) =>
@@ -2913,6 +2956,63 @@ export default function PresupuestoNuevo({
     <>
 
       <div className="pn-root">
+        {/* ── ¿Incluir descripción en el PDF? Sí / No ── */}
+        {mostrarModalDescripcionPDF && (
+          <>
+            <div
+              className="pn-popover-backdrop"
+              onClick={() => setMostrarModalDescripcionPDF(false)}
+            />
+            <div
+              style={{
+                position: "fixed",
+                top: "5%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: "min(360px, 92vw)",
+                background: "#fff",
+                borderRadius: 10,
+                boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
+                padding: 18,
+                zIndex: 1100,
+                textAlign: "center",
+              }}
+            >
+              <strong style={{ fontSize: 15 }}>
+                ¿Incluir la descripción de cada ítem en el PDF?
+              </strong>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  marginTop: 18,
+                  justifyContent: "center",
+                }}
+              >
+                <button
+                  className="pn-tool-btn"
+                  onClick={() => generarPDFConDescripcion(true)}
+                  style={{
+                    fontWeight: 700,
+                    background: "#e6f7ff",
+                    borderColor: "#1890ff",
+                    minWidth: 90,
+                  }}
+                >
+                  Sí
+                </button>
+                <button
+                  className="pn-tool-btn"
+                  onClick={() => generarPDFConDescripcion(false)}
+                  style={{ minWidth: 90 }}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* ── Elegir grupo ANTES de subir las fotos/PDF recién seleccionados ── */}
         {pendienteGrupo && (
           <>
@@ -3479,7 +3579,7 @@ export default function PresupuestoNuevo({
           )}
           <button
             className="pn-tool-btn"
-            onClick={handlePDF}
+            onClick={iniciarGeneracionPDF}
             disabled={presupuestoItems.length === 0 || generandoPDF}
             title={
               presupuestoItems.length === 0
