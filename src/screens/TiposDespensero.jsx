@@ -141,6 +141,9 @@ export default function TiposDespensero({
       nombre: art.articulo ?? f.nombre,
       codtipdes: art.codartint ?? f.codtipdes,
       rubro: art.rubro ?? f.rubro,
+      // La tabla articulos no tiene un campo "descripción" propio: usamos
+      // "familia" como el dato más parecido disponible para autocompletarla.
+      descripcion: art.familia ?? f.descripcion,
       foto: art.artfoto ?? f.foto,
     }));
   };
