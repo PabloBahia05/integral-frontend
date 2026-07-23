@@ -2734,7 +2734,7 @@ export default function PresupuestoNuevo({
     .body { flex: 1; margin-top: 18px; }
     .leyenda { font-size: 11px; font-style: italic; margin-bottom: 18px; }
     .sec-block { margin-bottom: 20px; }
-    .sec-title { font-style: italic; font-weight: 700; text-transform: uppercase; text-decoration: underline; font-size: 12px; margin-bottom: 3px; }
+    .sec-title { font-style: italic; font-weight: 700; text-transform: uppercase; font-size: 12px; margin-bottom: 3px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     thead th { text-align: left; font-weight: 700; border-bottom: 1px solid #111; padding: 1px 8px 3px 0; }
     thead th.cant, td.cant { width: 44px; }
