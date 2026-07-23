@@ -1549,18 +1549,24 @@ export default function PresupuestoNuevo({
       const listaGuardada =
         pres.lista ?? pres.LISTA ?? itemConLista?.lista ?? itemConLista?.LISTA ?? null;
       if (listaGuardada) {
+        // cargandoPresupuestoRef.current ya está en true desde el arranque
+        // de esta función (línea ~1446) y el efecto que recalcula precios
+        // por listaPrecio lo respeta (línea ~1875: "if
+        // (cargandoPresupuestoRef.current) return;"), así que es seguro
+        // setear listaPrecio ya mismo sin esperar a que /lista haya
+        // resuelto. Antes esto dependía de listasDB.length > 0, pero
+        // listasDB es un valor capturado por closure en el momento en que
+        // se creó esta función: si el fetch a /lista resolvía DESPUÉS de
+        // este punto, listasDB seguía viendo [] acá (aunque el estado ya
+        // se hubiera actualizado en otro render), la condición daba falso,
+        // y listaPrecio se quedaba en "" para siempre en esa carga — el
+        // encabezado terminaba mostrando "Lista 1" por defecto aunque el
+        // presupuesto fuera de otra lista.
+        setListaPrecio(listaGuardada);
+        // Igual dejamos el ref por si en algún reorden futuro /lista
+        // resuelve ANTES de llegar a esta línea (poco probable, pero no
+        // cuesta nada como red de seguridad).
         listaPendienteRef.current = listaGuardada;
-        // Solo setear acá si /lista ya resolvió (listasDB con datos). Si
-        // todavía no llegó, dejamos que lo aplique el efecto del fetch de
-        // /lista (línea ~1247) vía listaPendienteRef: si seteamos acá antes
-        // de tiempo, el useEffect que recalcula precios por listaPrecio
-        // (línea ~1620) puede dispararse con listasDB vacío -> listaPorcentaje
-        // da 0 -> recalcFila pisa el precio bueno que vino de la BD con uno
-        // mal calculado (sin el % de lista real), y como ese % nunca se
-        // vuelve a recalcular (el valor de listaPrecio no cambia de nuevo),
-        // el precio queda mal para siempre en esa sesión aunque el badge de
-        // % del ítem se vea correcto.
-        if (listasDB.length > 0) setListaPrecio(listaGuardada);
       }
 
       const itemConLinea =
