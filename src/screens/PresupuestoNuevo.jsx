@@ -634,8 +634,13 @@ export default function PresupuestoNuevo({
   const [mostrarGestorImagenes, setMostrarGestorImagenes] = useState(false);
   const [subiendoImagenes, setSubiendoImagenes] = useState(false);
   const imagenInputRef = useRef(null);
+  // Archivos ya elegidos por el usuario pero todavía no subidos: primero se
+  // pregunta a qué grupo pertenecen (obligatorio elegir "Sin grupo" a
+  // propósito, o un grupo existente/nuevo) y recién ahí se suben.
+  // { validos: [{file, esPDF}], grupoSeleccionado: string, sinGrupo: boolean }
+  const [pendienteGrupo, setPendienteGrupo] = useState(null);
 
-  const handleImagenSeleccionada = async (e) => {
+  const handleImagenSeleccionada = (e) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
     e.target.value = "";
     if (!files.length) return;
@@ -654,6 +659,39 @@ export default function PresupuestoNuevo({
       return;
     }
 
+    // No se sube nada todavía: primero hay que elegir el grupo.
+    setPendienteGrupo({ validos, grupoSeleccionado: "", sinGrupo: false });
+  };
+
+  // Confirma el grupo elegido para el lote pendiente y recién ahí sube los
+  // archivos (las imágenes a la nube, los PDF quedan en memoria como antes).
+  const confirmarGrupoYSubir = async () => {
+    if (!pendienteGrupo) return;
+    const { validos, grupoSeleccionado, sinGrupo } = pendienteGrupo;
+    const grupoFinal = sinGrupo ? null : grupoSeleccionado.trim() || null;
+
+    if (!sinGrupo && !grupoFinal) {
+      alert(
+        'Elegí un grupo para estas fotos, o tocá "Sin grupo" si van al final del presupuesto.',
+      );
+      return;
+    }
+
+    if (grupoFinal) {
+      const cantImagenesLote = validos.filter((v) => !v.esPDF).length;
+      const yaEnEseGrupo = imagenesFinal.filter(
+        (im) => im.tipo === "imagen" && im.grupo === grupoFinal,
+      ).length;
+      if (yaEnEseGrupo + cantImagenesLote > MAX_IMAGENES_POR_GRUPO) {
+        alert(
+          `El grupo "${grupoFinal}" ya tiene ${yaEnEseGrupo} imagen(es). ` +
+            `No se pueden agregar ${cantImagenesLote} más (máximo ${MAX_IMAGENES_POR_GRUPO} por grupo).`,
+        );
+        return;
+      }
+    }
+
+    setPendienteGrupo(null);
     setSubiendoImagenes(true);
     try {
       const nuevas = await Promise.all(
@@ -665,12 +703,13 @@ export default function PresupuestoNuevo({
               reader.onload = () => resolve(reader.result);
               reader.readAsDataURL(file);
             });
+            // Los PDF siempre van al final, no llevan grupo.
             return { id, tipo: "pdf", nombre: file.name, dataUrl, grupo: null };
           }
           // Las imágenes se suben directo a la nube: se persisten como URL
           // (no como base64), que es lo que viaja a presupuesto_imagenes.
           const url = await uploadImageToCloud(file, token);
-          return { id, tipo: "imagen", nombre: file.name, url, grupo: null };
+          return { id, tipo: "imagen", nombre: file.name, url, grupo: grupoFinal };
         }),
       );
       setImagenesFinal((prev) => [...prev, ...nuevas]);
@@ -681,6 +720,8 @@ export default function PresupuestoNuevo({
       setSubiendoImagenes(false);
     }
   };
+
+  const cancelarPendienteGrupo = () => setPendienteGrupo(null);
 
   const actualizarGrupoImagen = (id, grupo) => {
     const grupoFinal = grupo || null;
@@ -708,7 +749,7 @@ export default function PresupuestoNuevo({
   };
 
   // ── Persistencia de imágenes (tabla presupuesto_imagenes) ──────────────
-  const guardarImagenesPresupuesto = async (numPres) => {
+  const guardarImagenesPresupuesto = async (numPres, rev) => {
     const imagenes = imagenesFinal.filter((im) => im.tipo === "imagen");
     const porGrupo = new Map();
     imagenes.forEach((im) => {
@@ -722,7 +763,7 @@ export default function PresupuestoNuevo({
       imagenes: urls,
     }));
     try {
-      await authFetch(`${API}/presupuesto-imagenes/${numPres}`, {
+      await authFetch(`${API}/presupuesto-imagenes/${numPres}/${rev ?? 0}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ grupos }),
@@ -745,9 +786,11 @@ export default function PresupuestoNuevo({
     }
   };
 
-  const cargarImagenesPresupuesto = async (numPres) => {
+  const cargarImagenesPresupuesto = async (numPres, rev) => {
     try {
-      const r = await authFetch(`${API}/presupuesto-imagenes/${numPres}`);
+      const r = await authFetch(
+        `${API}/presupuesto-imagenes/${numPres}/${rev ?? 0}`,
+      );
       const filas = await r.json();
       if (!Array.isArray(filas)) {
         setImagenesFinal([]);
@@ -1462,7 +1505,7 @@ export default function PresupuestoNuevo({
       // 2. Restaurar encabezado
       setNumeroPres(num);
       setNumero(String(num).padStart(4, "0"));
-      cargarImagenesPresupuesto(num);
+      cargarImagenesPresupuesto(num, rev);
       cargarMetaPresupuesto(num, rev);
       setCliente(pres.nombre ?? pres.NOMBRE ?? "");
       const codclienteRestaurado = pres.codcliente ?? pres.CODCLIENTE ?? null;
@@ -2418,7 +2461,13 @@ export default function PresupuestoNuevo({
         }
 
         // ── Persistir imágenes (hasta 5 por grupo) ──
-        guardarImagenesPresupuesto(numAsignado);
+        // imagenesFinal no se vacía al crear una "Nueva Revisión": sigue
+        // teniendo las fotos cargadas de la revisión de origen (más lo que
+        // se haya agregado/sacado en esta edición). Al guardar bajo
+        // revAsignada (el nuevo número de revisión), esas fotos quedan
+        // copiadas ahí — la revisión anterior conserva las suyas intactas,
+        // sin verse afectada.
+        guardarImagenesPresupuesto(numAsignado, Number(revAsignada));
 
         // ── Refrescar quién/cuándo guardó, para mostrar en pantalla ──
         cargarMetaPresupuesto(numAsignado, Number(revAsignada));
@@ -2858,6 +2907,119 @@ export default function PresupuestoNuevo({
     <>
 
       <div className="pn-root">
+        {/* ── Elegir grupo ANTES de subir las fotos/PDF recién seleccionados ── */}
+        {pendienteGrupo && (
+          <>
+            <div className="pn-popover-backdrop" onClick={cancelarPendienteGrupo} />
+            <div
+              style={{
+                position: "fixed",
+                top: "5%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: "min(420px, 92vw)",
+                background: "#fff",
+                borderRadius: 10,
+                boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
+                padding: 18,
+                zIndex: 1100,
+              }}
+            >
+              <strong style={{ fontSize: 15 }}>
+                ¿A qué grupo pertenece
+                {pendienteGrupo.validos.length === 1 ? " esta foto" : "n estas fotos"}?
+              </strong>
+              <div style={{ fontSize: 12, color: "#666", margin: "6px 0 14px" }}>
+                {pendienteGrupo.validos.length} archivo(s) seleccionado(s). Cada
+                foto queda ligada al presupuesto N° {numero || "(nuevo)"}, la
+                revisión actual y este grupo.
+              </div>
+
+              <select
+                value={
+                  pendienteGrupo.sinGrupo ? "" : pendienteGrupo.grupoSeleccionado
+                }
+                onChange={(e) =>
+                  setPendienteGrupo((prev) => ({
+                    ...prev,
+                    grupoSeleccionado: e.target.value,
+                    sinGrupo: false,
+                  }))
+                }
+                style={{ fontSize: 13, padding: "6px 8px", width: "100%" }}
+              >
+                <option value="">— Elegí un grupo —</option>
+                {nombresGruposUsados.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="text"
+                placeholder="...o escribí un grupo nuevo"
+                value={pendienteGrupo.sinGrupo ? "" : pendienteGrupo.grupoSeleccionado}
+                onChange={(e) =>
+                  setPendienteGrupo((prev) => ({
+                    ...prev,
+                    grupoSeleccionado: e.target.value,
+                    sinGrupo: false,
+                  }))
+                }
+                style={{
+                  fontSize: 13,
+                  padding: "6px 8px",
+                  width: "100%",
+                  marginTop: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+
+              <button
+                className="pn-tool-btn"
+                onClick={() =>
+                  setPendienteGrupo((prev) => ({
+                    ...prev,
+                    sinGrupo: true,
+                    grupoSeleccionado: "",
+                  }))
+                }
+                style={{
+                  marginTop: 10,
+                  width: "100%",
+                  fontWeight: pendienteGrupo.sinGrupo ? 700 : 400,
+                  background: pendienteGrupo.sinGrupo ? "#e6f7ff" : "#fff",
+                  borderColor: pendienteGrupo.sinGrupo ? "#1890ff" : undefined,
+                }}
+              >
+                {pendienteGrupo.sinGrupo ? "✓ " : ""}Sin grupo (van al final del
+                presupuesto)
+              </button>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  marginTop: 16,
+                  justifyContent: "flex-end",
+                }}
+              >
+                <button className="pn-tool-btn" onClick={cancelarPendienteGrupo}>
+                  Cancelar
+                </button>
+                <button
+                  className="pn-tool-btn"
+                  onClick={confirmarGrupoYSubir}
+                  style={{ fontWeight: 700, background: "#e6f7ff", borderColor: "#1890ff" }}
+                >
+                  Confirmar y subir
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* ── Gestor de fotos/PDF adjuntos ── */}
         {mostrarGestorImagenes && (
           <>
