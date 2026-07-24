@@ -2,6 +2,19 @@ import { useState, useMemo } from "react";
 
 const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+// Precio "de lista" de un artículo: la tabla productos guarda precios por
+// línea en un objeto `precios` (ej. {"1": 123.45, "2": 130}). Tomamos la
+// línea 1 como default; si no existe, el primer valor disponible; si no hay
+// objeto `precios`, probamos un campo plano `precio`.
+const precioDeArticulo = (a) => {
+  if (!a) return "";
+  if (a.precios && typeof a.precios === "object") {
+    const v = a.precios["1"] ?? Object.values(a.precios)[0];
+    if (v != null && v !== "") return v;
+  }
+  return a.precio ?? "";
+};
+
 const EMPTY = () => ({
   codart: "",
   articulo: "",
@@ -130,7 +143,7 @@ const CSS = `
   /* panel edición inline */
   .ep { padding:16px 18px 20px; }
   .ep-sec { font-size:10px; font-weight:700; color:#7a92b0; text-transform:uppercase; letter-spacing:.1em; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #e0eaf5; }
-  .ep-padre { display:grid; grid-template-columns:160px 1fr 130px; gap:10px; margin-bottom:16px; }
+  .ep-padre { display:grid; grid-template-columns:160px 1fr 130px 130px; gap:10px; margin-bottom:16px; }
   .ep-lbl { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px; }
   .ep-sel, .ep-inp { width:100%; padding:7px 10px; border:1.5px solid #dde4ef; border-radius:8px; background:#fff; font-family:'DM Sans',sans-serif; font-size:13px; color:#1a2332; outline:none; box-sizing:border-box; transition:border-color .2s; }
   .ep-sel:focus, .ep-inp:focus { border-color:#2563eb; }
@@ -194,19 +207,6 @@ function SlotEdit({
 
   const lista = listaSlot[n] ?? [];
   const artActual = form[`art${n}`] ?? "";
-
-  // Precio "de lista" del artículo: la tabla productos guarda precios por
-  // línea en un objeto `precios` (ej. {"1": 123.45, "2": 130}). Tomamos la
-  // línea 1 como default; si no existe, el primer valor disponible; si no
-  // hay objeto `precios`, probamos un campo plano `precio`.
-  const precioDeArticulo = (a) => {
-    if (!a) return "";
-    if (a.precios && typeof a.precios === "object") {
-      const v = a.precios["1"] ?? Object.values(a.precios)[0];
-      if (v != null && v !== "") return v;
-    }
-    return a.precio ?? "";
-  };
 
   const filtrados = busqueda.trim()
     ? lista.filter((a) =>
@@ -889,6 +889,26 @@ export default function Asociaciones({
                                     readOnly
                                   />
                                 </div>
+                                <div>
+                                  <div className="ep-lbl">Precio</div>
+                                  <input
+                                    className="ep-inp ro"
+                                    value={(() => {
+                                      const p = precioDeArticulo(
+                                        listaPadreEdit.find(
+                                          (a) => a.articulo === editForm.articulo,
+                                        ),
+                                      );
+                                      return p !== ""
+                                        ? Number(p).toLocaleString("es-AR", {
+                                            style: "currency",
+                                            currency: "ARS",
+                                          })
+                                        : "—";
+                                    })()}
+                                    readOnly
+                                  />
+                                </div>
                               </div>
 
                               {/* slots */}
@@ -988,6 +1008,26 @@ export default function Asociaciones({
                   <input
                     className="ep-inp ro"
                     value={newForm.codart}
+                    readOnly
+                  />
+                </div>
+                <div>
+                  <div className="ep-lbl">Precio</div>
+                  <input
+                    className="ep-inp ro"
+                    value={(() => {
+                      const p = precioDeArticulo(
+                        listaPadreNew.find(
+                          (a) => a.articulo === newForm.articulo,
+                        ),
+                      );
+                      return p !== ""
+                        ? Number(p).toLocaleString("es-AR", {
+                            style: "currency",
+                            currency: "ARS",
+                          })
+                        : "—";
+                    })()}
                     readOnly
                   />
                 </div>
