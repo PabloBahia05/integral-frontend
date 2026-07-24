@@ -9,51 +9,61 @@ const EMPTY = () => ({
   art1: "",
   cant1: 1,
   margen1: "",
+  precio1: "",
   form1: "",
   cod2: "",
   art2: "",
   cant2: 1,
   margen2: "",
+  precio2: "",
   form2: "",
   cod3: "",
   art3: "",
   cant3: 1,
   margen3: "",
+  precio3: "",
   form3: "",
   cod4: "",
   art4: "",
   cant4: 1,
   margen4: "",
+  precio4: "",
   form4: "",
   cod5: "",
   art5: "",
   cant5: 1,
   margen5: "",
+  precio5: "",
   form5: "",
   cod6: "",
   art6: "",
   cant6: 1,
   margen6: "",
+  precio6: "",
   form6: "",
   cod7: "",
   art7: "",
   cant7: 1,
   margen7: "",
+  precio7: "",
   form7: "",
   cod8: "",
   art8: "",
   cant8: 1,
   margen8: "",
+  precio8: "",
   form8: "",
   cod9: "",
   art9: "",
   cant9: 1,
   margen9: "",
+  precio9: "",
   form9: "",
   cod10: "",
   art10: "",
   cant10: 1,
   margen10: "",
+  precio10: "",
   form10: "",
 });
 
@@ -100,6 +110,7 @@ const CSS = `
   .b-rubro { display:inline-block; padding:2px 7px; background:#eff4ff; color:#2563eb; border-radius:5px; font-size:11px; font-weight:600; }
   .b-form { display:inline-block; padding:2px 6px; background:#fef3c7; color:#92400e; border-radius:4px; font-size:11px; font-weight:700; font-family:monospace; margin-top:2px; }
   .b-mg   { display:inline-flex; align-items:center; padding:1px 6px; background:#ecfdf5; color:#059669; border-radius:4px; font-size:11px; font-weight:600; margin-top:2px; }
+  .b-pr   { display:inline-flex; align-items:center; padding:1px 6px; background:#eff4ff; color:#2563eb; border-radius:4px; font-size:11px; font-weight:700; margin-top:2px; font-family:'Syne',sans-serif; }
   .sv  { display:flex; flex-direction:column; gap:2px; min-width:90px; }
   .sv-art { font-size:12px; font-weight:500; color:#1a2332; }
   .sv-sub { font-size:11px; color:#94a3b8; font-family:monospace; }
@@ -137,6 +148,9 @@ const CSS = `
   .sc-mg { width:100%; padding:6px 8px; border:1.5px solid #dde4ef; border-radius:6px; background:#fff; font-family:'DM Sans',sans-serif; font-size:11px; color:#059669; font-weight:600; outline:none; box-sizing:border-box; }
   .sc-mg::placeholder { color:#94a3b8; font-weight:400; }
   .sc-mg:focus { border-color:#059669; }
+  .sc-pr { width:100%; padding:6px 8px; border:1.5px solid #bfdbfe; border-radius:6px; background:#f0f6ff; font-family:'Syne',sans-serif; font-size:11px; color:#2563eb; font-weight:700; outline:none; box-sizing:border-box; }
+  .sc-pr::placeholder { color:#94a3b8; font-weight:400; }
+  .sc-pr:focus { border-color:#2563eb; }
   .sc-cant-row { display:flex; align-items:center; gap:6px; }
   .sc-cant-lbl { font-size:9px; font-weight:700; color:#7a92b0; text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; }
   .sc-cant { width:100%; padding:6px 8px; border:1.5px solid #bfdbfe; border-radius:6px; background:#f0f6ff; font-family:'Syne',sans-serif; font-size:12px; font-weight:700; color:#2563eb; outline:none; box-sizing:border-box; text-align:center; }
@@ -181,6 +195,19 @@ function SlotEdit({
   const lista = listaSlot[n] ?? [];
   const artActual = form[`art${n}`] ?? "";
 
+  // Precio "de lista" del artículo: la tabla productos guarda precios por
+  // línea en un objeto `precios` (ej. {"1": 123.45, "2": 130}). Tomamos la
+  // línea 1 como default; si no existe, el primer valor disponible; si no
+  // hay objeto `precios`, probamos un campo plano `precio`.
+  const precioDeArticulo = (a) => {
+    if (!a) return "";
+    if (a.precios && typeof a.precios === "object") {
+      const v = a.precios["1"] ?? Object.values(a.precios)[0];
+      if (v != null && v !== "") return v;
+    }
+    return a.precio ?? "";
+  };
+
   const filtrados = busqueda.trim()
     ? lista.filter((a) =>
         a.articulo.toLowerCase().includes(busqueda.toLowerCase()),
@@ -192,13 +219,19 @@ function SlotEdit({
       ...f,
       [`art${n}`]: a.articulo,
       [`cod${n}`]: a.codartint ?? a.codart ?? "",
+      [`precio${n}`]: precioDeArticulo(a),
     }));
     setBusqueda("");
     setAbierto(false);
   };
 
   const limpiar = () => {
-    setForm((f) => ({ ...f, [`art${n}`]: "", [`cod${n}`]: "" }));
+    setForm((f) => ({
+      ...f,
+      [`art${n}`]: "",
+      [`cod${n}`]: "",
+      [`precio${n}`]: "",
+    }));
     setBusqueda("");
     setAbierto(false);
   };
@@ -347,6 +380,17 @@ function SlotEdit({
         }
         placeholder="Margen %"
       />
+      <input
+        className="sc-pr"
+        type="number"
+        step="0.01"
+        value={form[`precio${n}`] ?? ""}
+        onChange={(e) =>
+          setForm((f) => ({ ...f, [`precio${n}`]: e.target.value }))
+        }
+        placeholder="Precio"
+        title="Precio — se autocompleta al elegir el artículo, editable"
+      />
       <div className="sc-fl">🧮 Fórmula</div>
       <select
         className="sc-fs"
@@ -373,6 +417,7 @@ function SlotView({ row, n }) {
   const cod = row[`cod${n}`];
   const cant = row[`cant${n}`];
   const margen = row[`margen${n}`];
+  const precio = row[`precio${n}`];
   const form = row[`form${n}`];
   if (!art) return <span className="sv-mt">—</span>;
   return (
@@ -383,6 +428,15 @@ function SlotView({ row, n }) {
         <span className="b-cant">✕ {cant}</span>
       )}
       {margen && <span className="b-mg">↑ {margen}%</span>}
+      {precio !== "" && precio != null && (
+        <span className="b-pr">
+          ${" "}
+          {Number(precio).toLocaleString("es-AR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </span>
+      )}
       {form && <span className="b-form">🧮 {form}</span>}
     </div>
   );
