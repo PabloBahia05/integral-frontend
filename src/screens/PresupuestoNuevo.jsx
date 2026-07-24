@@ -3793,6 +3793,7 @@ export default function PresupuestoNuevo({
           )}
           <PlacardSection
             tab={tab}
+            lineasActivas={lineasActivas}
             placardFamilia={placardFamilia}
             setPlacardFamilia={setPlacardFamilia}
             placardItems={placardItems}
