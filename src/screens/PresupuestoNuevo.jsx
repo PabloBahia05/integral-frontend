@@ -544,8 +544,6 @@ export default function PresupuestoNuevo({
   tiposVanitoryRUD = {},
   tiposDespensero = [],
   tiposDespenseroRUD = {},
-  tiposComponente = [],
-  tiposComponenteRUD = {},
   token,
 }) {
   const listaPendienteRef = useRef(null);
@@ -3847,9 +3845,6 @@ export default function PresupuestoNuevo({
           {tab === "componentes" && (
             <TabComponentes
               token={token}
-              tiposComponente={tiposComponente}
-              tiposComponenteRUD={tiposComponenteRUD}
-              onVerTabla={onVerTabla}
               agregarAPresupuesto={agregarAPresupuesto}
             />
           )}
