@@ -29,6 +29,7 @@ export default function PlacardSection({
   listaPorcentaje,
   abrirPrecioPopover,
   setTab,
+  lineasActivas,
 }) {
   return (
     <>
