@@ -7,6 +7,7 @@ import BreakdownFormulasVanitory from "./BreakdownFormulasVanitory";
 import PresupuestoVanitory from "./PresupuestoVanitory";
 import PresupuestoWallPanel from "./PresupuestoWallPanel";
 import TiposDespensero from "./TiposDespensero";
+import TabComponentes from "./TabComponentes";
 import PresupuestoDespensero from "./PresupuestoDespensero";
 import TabMampara from "./TabMampara";
 import TabPuertas from "./TabPuertas";
@@ -543,6 +544,8 @@ export default function PresupuestoNuevo({
   tiposVanitoryRUD = {},
   tiposDespensero = [],
   tiposDespenseroRUD = {},
+  tiposComponente = [],
+  tiposComponenteRUD = {},
   token,
 }) {
   const listaPendienteRef = useRef(null);
@@ -861,7 +864,7 @@ export default function PresupuestoNuevo({
   ]);
 
   // Pestañas
-  const [tab, setTab] = useState("encabezado"); // "encabezado" | "cocina" | "placard" | "mampara" | "puertas" | "especiales" | "presupuesto"
+  const [tab, setTab] = useState("encabezado"); // "encabezado" | "cocina" | "placard" | "mampara" | "puertas" | "componentes" | "especiales" | "presupuesto"
 
   // Sub-navegación Especiales
   const [especialesVista, setEspecialesVista] = useState("selector"); // "selector" | "vanitory" | "escritorio" | "despensero"
@@ -3644,6 +3647,12 @@ export default function PresupuestoNuevo({
             Puertas
           </button>
           <button
+            className={`pn-tab${tab === "componentes" ? " active" : ""}`}
+            onClick={() => setTab("componentes")}
+          >
+            Componentes
+          </button>
+          <button
             className={`pn-tab${tab === "especiales" ? " active" : ""}`}
             onClick={() => setTab("especiales")}
           >
@@ -3831,6 +3840,16 @@ export default function PresupuestoNuevo({
               puertaAEditar={puertaAEditar}
               setPrespv={setPrespv}
               setPresupuestoItems={setPresupuestoItems}
+            />
+          )}
+
+          {tab === "componentes" && (
+            <TabComponentes
+              token={token}
+              tiposComponente={tiposComponente}
+              tiposComponenteRUD={tiposComponenteRUD}
+              onVerTabla={onVerTabla}
+              agregarAPresupuesto={agregarAPresupuesto}
             />
           )}
 
