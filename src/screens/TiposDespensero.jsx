@@ -112,7 +112,8 @@ export default function TiposDespensero({
     cargarRubros();
   }, []);
 
-  // Busca artículos por nombre con debounce de 280ms
+  // Busca artículos por nombre con debounce de 280ms — solo dentro del
+  // rubro "Muebles", ya que los tipos de despensero son siempre muebles.
   const buscarArticulos = (q) => {
     setArtQuery(q);
     clearTimeout(artTimer.current);
@@ -123,10 +124,18 @@ export default function TiposDespensero({
     artTimer.current = setTimeout(() => {
       setArtBuscando(true);
       authFetch(
-        `${API}/despensero-tipos/buscar-articulo?q=${encodeURIComponent(q)}`,
+        `${API}/despensero-tipos/buscar-articulo?q=${encodeURIComponent(q)}&rubro=${encodeURIComponent("Muebles")}`,
       )
         .then((r) => r.json())
-        .then((data) => setArtResultados(Array.isArray(data) ? data : []))
+        .then((data) => {
+          const lista = Array.isArray(data) ? data : [];
+          // Filtro de respaldo por si el backend todavía no soporta el
+          // parámetro `rubro` y devuelve artículos de todos los rubros.
+          const soloMuebles = lista.filter((a) =>
+            (a.rubro ?? "").toUpperCase().includes("MUEBLE"),
+          );
+          setArtResultados(soloMuebles);
+        })
         .catch(() => setArtResultados([]))
         .finally(() => setArtBuscando(false));
     }, 280);
@@ -464,10 +473,10 @@ export default function TiposDespensero({
           <div className="form-grid">
             {/* ── Buscador de artículos ── */}
             <div className="form-group" style={{ position: "relative" }}>
-              <label className="form-label">Artículo (nombre) *</label>
+              <label className="form-label">Artículo (rubro Muebles) *</label>
               <input
                 className="form-input"
-                placeholder="Buscar en artículos…"
+                placeholder="Buscar en productos del rubro Muebles…"
                 value={artQuery}
                 onChange={(e) => buscarArticulos(e.target.value)}
                 autoComplete="off"
@@ -575,6 +584,14 @@ export default function TiposDespensero({
                   ✓ Vinculado a: <strong>{artSeleccionado.articulo}</strong>
                 </div>
               )}
+              {!artSeleccionado &&
+                !artBuscando &&
+                artQuery &&
+                artResultados.length === 0 && (
+                  <div style={{ fontSize: 11, color: "#b0c8d8", marginTop: 3 }}>
+                    Sin resultados en el rubro Muebles.
+                  </div>
+                )}
             </div>
             <div className="form-group">
               <label className="form-label">Código *</label>
