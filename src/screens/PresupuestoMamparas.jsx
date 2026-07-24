@@ -283,16 +283,28 @@ export default function PresupuestoMamparas({
           const codLower2 = (cod ?? "").toLowerCase().trim();
           const artLower2 = (art ?? "").toLowerCase().trim();
 
-          // Precio del artículo asociado desde el catálogo
+          // Precio del artículo asociado: primero el precio propio guardado
+          // en la fila de asociaciones (precioN, editable ahí), si no hay,
+          // el del catálogo.
           const productoAsoc = articulos.find(
             (p) =>
               (p.codart ?? "").toLowerCase().trim() === codLower2 ||
               (p.articulo ?? "").toLowerCase().trim() === artLower2,
           );
-          const precioAsoc = productoAsoc?.precio
-            ? parseFloat(productoAsoc.precio)
-            : 0;
+          const precioAsociaciones = parseFloat(
+            String(fila[`precio${n}`] ?? "").replace(",", "."),
+          );
+          const precioAsoc =
+            precioAsociaciones > 0
+              ? precioAsociaciones
+              : productoAsoc?.precio
+                ? parseFloat(productoAsoc.precio)
+                : 0;
           const codartAsoc = productoAsoc?.codart ?? cod ?? "";
+
+          // Cantidad propia del slot (ej: "4 bisagras por mampara")
+          const cantSlot =
+            parseFloat(String(fila[`cant${n}`] ?? "").replace(",", ".")) || 1;
 
           // Margen: primero buscar en tabla MARGEN por codart del artículo asociado,
           // si no está ahí usar el campo margenN de asociaciones como fallback.
@@ -304,18 +316,26 @@ export default function PresupuestoMamparas({
             null;
           const margen = margenTabla ?? margenAsoc ?? 1;
 
+          // Sin fórmula pero con precio conocido → se trata como un artículo
+          // "directo": su resultado se calcula como precio × cantidad, igual
+          // que devolvería una fórmula trivial (ver calcular()). Solo es un
+          // error real si no hay fórmula NI precio.
+          const directo = !codform;
+
           slots.push({
             slot: n,
             art: art ?? codartAsoc,
             cod: codartAsoc,
             precio: precioAsoc,
+            cant: cantSlot,
             codform: codform || null,
+            directo,
             margen: margen, // editable en el front
             margenBD: margen, // valor original de BD para restaurar
-            resultadoBase: 0, // resultado puro de la fórmula (sin margen)
+            resultadoBase: 0, // resultado puro de la fórmula/directo (sin margen)
             resultado: 0, // resultado final = base * margen
             parciales: {},
-            error: codform ? "" : "Sin fórmula",
+            error: codform || precioAsoc > 0 ? "" : "Sin fórmula ni precio",
           });
         }
         setAsociados(slots);
@@ -333,106 +353,140 @@ export default function PresupuestoMamparas({
     const slots = slotsActuales ?? asociados;
     if (!articuloSeleccionado?.codart) return;
     const slotsConFormula = slots.filter((a) => a.codform);
-    if (slotsConFormula.length === 0) return;
+    const slotsDirectos = slots.filter(
+      (a) => !a.codform && (a.art || a.cod),
+    );
+    if (slotsConFormula.length === 0 && slotsDirectos.length === 0) return;
 
     setErrorCalc("");
     setCalculando(true);
 
     try {
-      // Obtener textos de fórmulas para resolver dependencias FORM_XXX
-      const resFormulas = await authFetch(
-        "https://integral-backend-production.up.railway.app/formulas",
-      )
-        .then((r) => r.json())
-        .catch(() => []);
-      const formulasTexto = {};
-      if (Array.isArray(resFormulas))
-        resFormulas.forEach((f) => {
-          formulasTexto[f.codform] = f.formula ?? "";
-        });
+      let nuevos = slots.map((a) => ({ ...a }));
 
-      const getDeps = (cf) =>
-        (formulasTexto[cf] ?? "")
-          .match(/FORM_([A-Z0-9]+)/g)
-          ?.map((m) => m.replace("FORM_", "")) ?? [];
+      // ── Artículos "directos" (sin fórmula asignada): se consideran como
+      // si fueran una fórmula trivial "precio del artículo × cantidad del
+      // slot × cantidad total del pedido". No requieren ida y vuelta al
+      // backend — es una simple multiplicación local.
+      nuevos = nuevos.map((a) => {
+        if (a.codform || !(a.art || a.cod)) return a;
+        const cantSlot =
+          parseFloat(String(a.cant ?? 1).replace(",", ".")) || 1;
+        const cantTotal = Number(form.cantidad) || 1;
+        const base = (Number(a.precio) || 0) * cantSlot * cantTotal;
+        const mg = parseFloat(String(a.margen).replace(",", ".")) || 1;
+        const final = Math.round(base * mg);
+        return {
+          ...a,
+          directo: true,
+          resultadoBase: base,
+          resultado: final,
+          parciales: {},
+          error: base > 0 ? "" : "Sin fórmula ni precio",
+        };
+      });
 
-      // Sort topológico
-      const codformsList = [...new Set(slotsConFormula.map((a) => a.codform))];
-      const ordenados = [];
-      const visitados = new Set();
-      const visitar = (cf) => {
-        if (visitados.has(cf)) return;
-        visitados.add(cf);
-        getDeps(cf).forEach((dep) => {
-          if (codformsList.includes(dep)) visitar(dep);
-        });
-        ordenados.push(cf);
-      };
-      codformsList.forEach((cf) => visitar(cf));
+      if (slotsConFormula.length > 0) {
+        // Obtener textos de fórmulas para resolver dependencias FORM_XXX
+        const resFormulas = await authFetch(
+          "https://integral-backend-production.up.railway.app/formulas",
+        )
+          .then((r) => r.json())
+          .catch(() => []);
+        const formulasTexto = {};
+        if (Array.isArray(resFormulas))
+          resFormulas.forEach((f) => {
+            formulasTexto[f.codform] = f.formula ?? "";
+          });
 
-      // Calcular secuencialmente; acumular FORM_XXX para anidadas
-      const resultadosMap = {};
-      const nuevos = slots.map((a) => ({ ...a }));
+        const getDeps = (cf) =>
+          (formulasTexto[cf] ?? "")
+            .match(/FORM_([A-Z0-9]+)/g)
+            ?.map((m) => m.replace("FORM_", "")) ?? [];
 
-      for (const codform of ordenados) {
-        const idxs = nuevos.reduce((acc, a, i) => {
-          if (a.codform === codform) acc.push(i);
-          return acc;
-        }, []);
+        // Sort topológico
+        const codformsList = [
+          ...new Set(slotsConFormula.map((a) => a.codform)),
+        ];
+        const ordenados = [];
+        const visitados = new Set();
+        const visitar = (cf) => {
+          if (visitados.has(cf)) return;
+          visitados.add(cf);
+          getDeps(cf).forEach((dep) => {
+            if (codformsList.includes(dep)) visitar(dep);
+          });
+          ordenados.push(cf);
+        };
+        codformsList.forEach((cf) => visitar(cf));
 
-        for (const idx of idxs) {
-          const asoc = nuevos[idx];
-          const variables = {
-            ancho: Number(form.ancho),
-            alto: Number(form.alto),
-            cantidad: Number(form.cantidad),
-            colocacion: Number(form.colocacion),
-            precio: asoc.precio,
-            ...(esFijoBatiente
-              ? {
-                  ancho_fijo: Number(form.ancho_fijo),
-                  ancho_bat: Number(form.ancho_bat),
-                }
-              : {}),
-            ...Object.fromEntries(
-              Object.entries(resultadosMap).map(([cf, v]) => [`FORM_${cf}`, v]),
-            ),
-          };
+        // Calcular secuencialmente; acumular FORM_XXX para anidadas
+        const resultadosMap = {};
 
-          const res = await authFetch(
-            "https://integral-backend-production.up.railway.app/formulas/calcular",
-            {
-              method: "POST",
-              body: JSON.stringify({
-                codform,
-                codart_modelo: asoc.cod,
-                variables,
-              }),
-            },
-          )
-            .then((r) => r.json())
-            .catch((err) => ({ error: err.message }));
+        for (const codform of ordenados) {
+          const idxs = nuevos.reduce((acc, a, i) => {
+            if (a.codform === codform) acc.push(i);
+            return acc;
+          }, []);
 
-          if (res.error) {
-            nuevos[idx] = {
-              ...asoc,
-              resultadoBase: 0,
-              resultado: 0,
-              parciales: {},
-              error: res.error,
+          for (const idx of idxs) {
+            const asoc = nuevos[idx];
+            const variables = {
+              ancho: Number(form.ancho),
+              alto: Number(form.alto),
+              cantidad: Number(form.cantidad),
+              colocacion: Number(form.colocacion),
+              precio: asoc.precio,
+              ...(esFijoBatiente
+                ? {
+                    ancho_fijo: Number(form.ancho_fijo),
+                    ancho_bat: Number(form.ancho_bat),
+                  }
+                : {}),
+              ...Object.fromEntries(
+                Object.entries(resultadosMap).map(([cf, v]) => [
+                  `FORM_${cf}`,
+                  v,
+                ]),
+              ),
             };
-          } else {
-            const base = res.resultado ?? 0;
-            const mg = parseFloat(String(asoc.margen).replace(",", ".")) || 1;
-            const final = Math.round(base * mg);
-            resultadosMap[codform] = base;
-            nuevos[idx] = {
-              ...asoc,
-              resultadoBase: base,
-              resultado: final,
-              parciales: res.parciales ?? {},
-              error: "",
-            };
+
+            const res = await authFetch(
+              "https://integral-backend-production.up.railway.app/formulas/calcular",
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  codform,
+                  codart_modelo: asoc.cod,
+                  variables,
+                }),
+              },
+            )
+              .then((r) => r.json())
+              .catch((err) => ({ error: err.message }));
+
+            if (res.error) {
+              nuevos[idx] = {
+                ...asoc,
+                resultadoBase: 0,
+                resultado: 0,
+                parciales: {},
+                error: res.error,
+              };
+            } else {
+              const base = res.resultado ?? 0;
+              const mg =
+                parseFloat(String(asoc.margen).replace(",", ".")) || 1;
+              const final = Math.round(base * mg);
+              resultadosMap[codform] = base;
+              nuevos[idx] = {
+                ...asoc,
+                resultadoBase: base,
+                resultado: final,
+                parciales: res.parciales ?? {},
+                error: "",
+              };
+            }
           }
         }
       }
@@ -451,7 +505,7 @@ export default function PresupuestoMamparas({
   // (cambios de margen se aplican reactivamente sin fetch — ver abajo)
   useEffect(() => {
     if (!articuloSeleccionado?.codart || asociados.length === 0) return;
-    if (!asociados.some((a) => a.codform)) return;
+    if (!asociados.some((a) => a.codform || a.directo)) return;
     calcular();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1190,6 +1244,21 @@ export default function PresupuestoMamparas({
                                   >
                                     {a.codform}
                                   </span>
+                                ) : a.precio > 0 ? (
+                                  <span
+                                    style={{
+                                      marginLeft: 6,
+                                      background: "#eff4ff",
+                                      color: "#2563eb",
+                                      borderRadius: 3,
+                                      padding: "1px 5px",
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                    }}
+                                    title="Sin fórmula: se calcula como precio × cantidad"
+                                  >
+                                    directo × {a.cant ?? 1}
+                                  </span>
                                 ) : (
                                   <span
                                     style={{
@@ -1201,7 +1270,7 @@ export default function PresupuestoMamparas({
                                       fontSize: 10,
                                     }}
                                   >
-                                    sin fórmula
+                                    sin fórmula ni precio
                                   </span>
                                 )}
                               </div>
@@ -1655,7 +1724,7 @@ export default function PresupuestoMamparas({
 
                   {/* Errores de artículos */}
                   {asociados
-                    .filter((a) => a.error && a.error !== "Sin fórmula")
+                    .filter((a) => a.error)
                     .map((a) => (
                       <div
                         key={`err_${a.slot}`}

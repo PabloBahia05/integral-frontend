@@ -399,7 +399,7 @@ function SlotEdit({
           setForm((f) => ({ ...f, [`form${n}`]: e.target.value }))
         }
       >
-        <option value="">— Sin fórmula —</option>
+        <option value="">— Sin fórmula (usa precio × cantidad) —</option>
         {formulasList.map((f) => (
           <option key={f.codform} value={f.codform}>
             {f.codform}
