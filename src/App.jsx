@@ -138,7 +138,6 @@ function App() {
 
   const [clientes, setClientes] = useState([]);
   const [productos, setProductos] = useState([]);
-  const [mamparasTipos, setMamparasTipos] = useState([]);
   const [tiposVanitory, setTiposVanitory] = useState([]);
   const [tiposEscritorio, setTiposEscritorio] = useState([]);
   const [tiposDespensero, setTiposDespensero] = useState([]);
@@ -166,7 +165,6 @@ function App() {
   const [selectedColocacion, setSelectedColocacion] = useState(null);
   const [selectedCliente, setSelectedCliente] = useState(null);
   const [selectedProducto, setSelectedProducto] = useState(null);
-  const [selectedMamparaTipo, setSelectedMamparaTipo] = useState(null);
   const [selectedTipoVanitory, setSelectedTipoVanitory] = useState(null);
   const [selectedTipoEscritorio, setSelectedTipoEscritorio] = useState(null);
   const [selectedTipoDespensero, setSelectedTipoDespensero] = useState(null);
@@ -235,12 +233,6 @@ function App() {
     authFetch(`${API}/productos`)
       .then((r) => r.json())
       .then(setProductos)
-      .catch(console.error);
-
-  const fetchMamparasTipos = () =>
-    authFetch(`${API}/mamparas-tipos`)
-      .then((r) => r.json())
-      .then(setMamparasTipos)
       .catch(console.error);
 
   const fetchTiposVanitory = () =>
@@ -358,7 +350,6 @@ function App() {
     if (puedeVer("clientes"))                fetchClientes();
     if (puedeVer("productos"))               fetchProductos();
     if (puedeVer("presupuesto-mamparas"))    fetchColocaciones();
-    if (puedeVer("presupuesto-mamparas"))    fetchMamparasTipos();
     if (puedeVer("presupuesto-vanitory"))    fetchTiposVanitory();
     if (puedeVer("ver-tablas"))              fetchTiposEscritorio();
     if (puedeVer("ver-tablas"))              fetchTiposDespensero();
@@ -517,14 +508,6 @@ function App() {
     setSelectedProducto,
     fetchProductos,
     "Producto",
-  );
-  const mamparasTiposCRUD = makeCRUD(
-    "mamparas-tipos",
-    mamparasTipos,
-    setMamparasTipos,
-    setSelectedMamparaTipo,
-    fetchMamparasTipos,
-    "Tipo de mampara",
   );
   const tiposVanitoryRUD = makeCRUD(
     "vanitory-tipos",
@@ -1038,12 +1021,6 @@ function App() {
                 productos={productos}
                 productosCRUD={productosCRUD}
                 selectedProducto={selectedProducto}
-                mamparasTipos={mamparasTipos}
-                mamparasTiposCRUD={mamparasTiposCRUD}
-                selectedMamparaTipo={selectedMamparaTipo}
-                tiposVanitory={tiposVanitory}
-                tiposVanitoryRUD={tiposVanitoryRUD}
-                selectedTipoVanitory={selectedTipoVanitory}
                 colocaciones={colocaciones ?? []}
                 colocacionesCRUD={colocacionesCRUD}
                 selectedColocacion={selectedColocacion}
