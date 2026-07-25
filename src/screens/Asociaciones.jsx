@@ -15,10 +15,13 @@ const precioDeArticulo = (a) => {
   return a.precio ?? "";
 };
 
-// modo${n}: "precio" | "formula" — son EXCLUYENTES. En Asociaciones se elige
-// una sola forma de calcular el valor del artículo asociado; el presupuesto
-// después usa ese modo para saber si debe tomar el precio cargado (× cant.)
-// o ejecutar la fórmula, sin ambigüedad ni advertencias de "sin fórmula ni precio".
+// modo${n}: "precio" | "formula" — son EXCLUYENTES, pero es un dato que vive
+// SOLO en el estado del formulario (la tabla no tiene columna modoN). Sirve
+// para decidir qué campo mostrar en el editor. Al guardar, se descarta y en
+// su lugar se limpia el campo que no corresponde (precio_unN o formN), así
+// la base sigue recibiendo únicamente las columnas que ya existen.
+// Al leer un registro guardado, el modo se vuelve a inferir: si tiene formN
+// cargado → "formula", si no → "precio".
 const EMPTY = () => ({
   codart: "",
   articulo: "",
@@ -26,73 +29,95 @@ const EMPTY = () => ({
   art1: "",
   cant1: 1,
   margen1: "",
-  precio1: "",
+  precio_un1: "",
   form1: "",
   modo1: "precio",
   cod2: "",
   art2: "",
   cant2: 1,
   margen2: "",
-  precio2: "",
+  precio_un2: "",
   form2: "",
   modo2: "precio",
   cod3: "",
   art3: "",
   cant3: 1,
   margen3: "",
-  precio3: "",
+  precio_un3: "",
   form3: "",
   modo3: "precio",
   cod4: "",
   art4: "",
   cant4: 1,
   margen4: "",
-  precio4: "",
+  precio_un4: "",
   form4: "",
   modo4: "precio",
   cod5: "",
   art5: "",
   cant5: 1,
   margen5: "",
-  precio5: "",
+  precio_un5: "",
   form5: "",
   modo5: "precio",
   cod6: "",
   art6: "",
   cant6: 1,
   margen6: "",
-  precio6: "",
+  precio_un6: "",
   form6: "",
   modo6: "precio",
   cod7: "",
   art7: "",
   cant7: 1,
   margen7: "",
-  precio7: "",
+  precio_un7: "",
   form7: "",
   modo7: "precio",
   cod8: "",
   art8: "",
   cant8: 1,
   margen8: "",
-  precio8: "",
+  precio_un8: "",
   form8: "",
   modo8: "precio",
   cod9: "",
   art9: "",
   cant9: 1,
   margen9: "",
-  precio9: "",
+  precio_un9: "",
   form9: "",
   modo9: "precio",
   cod10: "",
   art10: "",
   cant10: 1,
   margen10: "",
-  precio10: "",
+  precio_un10: "",
   form10: "",
   modo10: "precio",
 });
+
+// La tabla NO tiene columna modoN: se infiere a partir de si el slot tiene
+// una fórmula cargada (formN) o no. Se usa al abrir un registro para editar.
+const inferirModos = (row) =>
+  Object.fromEntries(
+    SLOTS.map((n) => [`modo${n}`, row[`form${n}`] ? "formula" : "precio"]),
+  );
+
+// Antes de mandar al backend se descarta modoN (no existe como columna) y,
+// por las dudas, se asegura que el campo no usado en cada slot vaya vacío
+// (si es fórmula, sin precio_unN; si es precio, sin formN), para que nunca
+// convivan los dos guardados a la vez.
+const paraGuardar = (form) => {
+  const limpio = { ...form };
+  SLOTS.forEach((n) => {
+    const modo = limpio[`modo${n}`];
+    if (modo === "formula") limpio[`precio_un${n}`] = "";
+    else limpio[`form${n}`] = "";
+    delete limpio[`modo${n}`];
+  });
+  return limpio;
+};
 
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
@@ -245,7 +270,7 @@ function SlotEdit({
       [`cod${n}`]: a.codartint ?? a.codart ?? "",
       // Al elegir un artículo se autocompleta su precio de lista y el modo
       // pasa a "precio" (se puede cambiar a fórmula después si corresponde).
-      [`precio${n}`]: precioDeArticulo(a),
+      [`precio_un${n}`]: precioDeArticulo(a),
       [`modo${n}`]: f[`modo${n}`] === "formula" ? "formula" : "precio",
     }));
     setBusqueda("");
@@ -257,7 +282,7 @@ function SlotEdit({
       ...f,
       [`art${n}`]: "",
       [`cod${n}`]: "",
-      [`precio${n}`]: "",
+      [`precio_un${n}`]: "",
     }));
     setBusqueda("");
     setAbierto(false);
@@ -270,14 +295,14 @@ function SlotEdit({
       // Excluyentes: al pasar a fórmula se limpia el precio manual, y al
       // pasar a precio se limpia la fórmula, para que no queden los dos
       // valores cargados a la vez ni se generen ambigüedades en el presupuesto.
-      ...(nuevoModo === "formula" ? { [`precio${n}`]: "" } : { [`form${n}`]: "" }),
+      ...(nuevoModo === "formula" ? { [`precio_un${n}`]: "" } : { [`form${n}`]: "" }),
     }));
   };
 
   const cant = Number(form[`cant${n}`] ?? 1) || 0;
-  const precioNum = Number(form[`precio${n}`]);
+  const precioNum = Number(form[`precio_un${n}`]);
   const total =
-    modo === "precio" && !Number.isNaN(precioNum) && form[`precio${n}`] !== ""
+    modo === "precio" && !Number.isNaN(precioNum) && form[`precio_un${n}`] !== ""
       ? precioNum * cant
       : null;
 
@@ -452,9 +477,9 @@ function SlotEdit({
             className="sc-pr"
             type="number"
             step="0.01"
-            value={form[`precio${n}`] ?? ""}
+            value={form[`precio_un${n}`] ?? ""}
             onChange={(e) =>
-              setForm((f) => ({ ...f, [`precio${n}`]: e.target.value }))
+              setForm((f) => ({ ...f, [`precio_un${n}`]: e.target.value }))
             }
             placeholder="Precio"
             title="Precio — se autocompleta al elegir el artículo, editable"
@@ -498,7 +523,7 @@ function SlotView({ row, n }) {
   const cod = row[`cod${n}`];
   const cant = row[`cant${n}`];
   const margen = row[`margen${n}`];
-  const precio = row[`precio${n}`];
+  const precio = row[`precio_un${n}`];
   const form = row[`form${n}`];
   // Compatibilidad con registros viejos sin `modo`: si tienen fórmula
   // cargada se asume modo fórmula, si no, modo precio.
@@ -660,7 +685,7 @@ export default function Asociaciones({
   // iniciar edición inline
   const startEdit = (row) => {
     setEditId(row.id);
-    setEditForm({ ...EMPTY(), ...row });
+    setEditForm({ ...EMPTY(), ...row, ...inferirModos(row) });
     const pf = articulosList.find((a) => a.articulo === row.articulo);
     setEditRubroPadre(pf?.rubro ?? "");
     setEditRubroSlots(
@@ -678,7 +703,7 @@ export default function Asociaciones({
   };
   const saveEdit = () => {
     if (!editForm) return;
-    onSave?.({ id: editId, ...editForm });
+    onSave?.({ id: editId, ...paraGuardar(editForm) });
     cancelEdit();
   };
 
@@ -696,7 +721,7 @@ export default function Asociaciones({
   };
   const saveNew = () => {
     if (!newForm.codart && !newForm.articulo) return;
-    onSave?.({ ...newForm });
+    onSave?.(paraGuardar(newForm));
     closeNew();
   };
 
@@ -704,7 +729,13 @@ export default function Asociaciones({
   // existente, pero sin id y sin artículo padre (para que se elija uno nuevo)
   const openDuplicate = (row) => {
     const { id, ...rest } = row;
-    setNewForm({ ...EMPTY(), ...rest, codart: "", articulo: "" });
+    setNewForm({
+      ...EMPTY(),
+      ...rest,
+      ...inferirModos(row),
+      codart: "",
+      articulo: "",
+    });
     setNewRubroPadre("");
     setNewRubroSlots(
       Object.fromEntries(
