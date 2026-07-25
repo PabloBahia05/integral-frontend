@@ -1047,17 +1047,18 @@ export default function PresupuestoMamparas({
         .asociados-section { margin-bottom: 20px; border: 1.5px solid #d0dde8; border-radius: 8px; overflow: hidden; }
         .asociados-header { background: #0f2944; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; }
         .asociados-header-title { font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; color: #a8c4d8; text-transform: uppercase; }
-        .asociado-row { display: grid; grid-template-columns: 1fr 110px auto; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #e8f0f7; font-size: 13px; }
+        .asociado-row { display: grid; grid-template-columns: 1fr 110px 100px; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #e8f0f7; font-size: 13px; }
+        .asociado-row > * { min-width: 0; }
         .asociado-row:last-child { border-bottom: none; }
         .asociado-row:nth-child(even) { background: #f7fafd; }
-        .asociado-nombre { color: #0f2944; font-weight: 600; }
+        .asociado-nombre { color: #0f2944; font-weight: 600; overflow-wrap: anywhere; word-break: break-word; }
         .asociado-cod { color: #6a8aa0; font-size: 11px; font-family: monospace; }
         .asociado-resultado { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; color: #2d7fc1; text-align: right; white-space: nowrap; }
         .asociado-error { font-size: 11px; color: #c0392b; font-style: italic; }
         .asociado-empty { padding: 14px 16px; text-align: center; color: #9ab0c0; font-size: 12px; font-style: italic; }
         .asociado-manual-add { background: #eaf3fb; color: #2d7fc1; border: 1px solid #7ab2d4; border-radius: 5px; font-size: 11px; font-weight: 700; padding: 4px 10px; cursor: pointer; }
         .asociado-manual-add:hover { background: #d8ecf7; }
-        .asociado-row-manual { display: grid; grid-template-columns: 1fr 110px auto; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #e8f0f7; background: #fffdf5; }
+        .asociado-row-manual { display: grid; grid-template-columns: 1fr 110px 100px; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #e8f0f7; background: #fffdf5; }
         .asociado-row-manual:last-child { border-bottom: none; }
         .asociado-manual-input { padding: 6px 8px; border: 1.5px solid #f0d99b; border-radius: 5px; font-size: 12px; color: #0f2944; outline: none; }
         .asociado-manual-precio { text-align: right; font-family: monospace; font-weight: 700; color: #2d7fc1; }
@@ -1309,7 +1310,7 @@ export default function PresupuestoMamparas({
                           <div
                             className="asociado-row"
                             style={{
-                              gridTemplateColumns: "1fr 110px auto",
+                              gridTemplateColumns: "1fr 110px 100px",
                               gap: 8,
                             }}
                           >
@@ -1317,6 +1318,7 @@ export default function PresupuestoMamparas({
                             <div
                               style={{
                                 cursor: tieneParciales ? "pointer" : "default",
+                                minWidth: 0,
                               }}
                               onClick={() =>
                                 tieneParciales &&
