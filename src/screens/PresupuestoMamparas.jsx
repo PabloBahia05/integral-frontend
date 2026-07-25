@@ -1415,7 +1415,7 @@ export default function PresupuestoMamparas({
                             {/* Resultado final */}
                             <div
                               className="asociado-resultado"
-                              style={{ alignSelf: "center" }}
+                              style={{ alignSelf: "start", paddingTop: 1 }}
                             >
                               {a.resultado > 0 ? (
                                 formatPeso(a.resultado)
