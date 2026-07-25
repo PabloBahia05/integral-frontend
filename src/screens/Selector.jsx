@@ -8,12 +8,13 @@ import FormField from "../Component/FormField";
 
 const API = "https://integral-backend-production.up.railway.app";
 
-const EMPTY = { nombre: "", aplicacion: "", area: "" };
+const EMPTY = { nombre: "", aplicacion: "", area: "", descripcion: "" };
 
 const FIELDS = [
   { field: "nombre", label: "Nombre *", placeholder: "Ej: Torre 6 estantes" },
   { field: "aplicacion", label: "Aplicación", placeholder: "Ej: Placard" },
   { field: "area", label: "Área", placeholder: "Ej: Muebles" },
+  { field: "descripcion", label: "Descripción", placeholder: "Ej: Detalle del ítem" },
 ];
 
 const columns = [
@@ -21,6 +22,7 @@ const columns = [
   { key: "nombre", label: "Nombre" },
   { key: "aplicacion", label: "Aplicación" },
   { key: "area", label: "Área" },
+  { key: "descripcion", label: "Descripción" },
 ];
 
 export default function Selector({ token }) {
@@ -62,7 +64,7 @@ export default function Selector({ token }) {
   const filtered = rows.filter((r) =>
     !search.trim()
       ? true
-      : [r.nombre, r.aplicacion, r.area]
+      : [r.nombre, r.aplicacion, r.area, r.descripcion]
           .filter(Boolean)
           .some((v) => v.toLowerCase().includes(search.toLowerCase())),
   );
@@ -79,6 +81,7 @@ export default function Selector({ token }) {
       nombre: selected.nombre ?? "",
       aplicacion: selected.aplicacion ?? "",
       area: selected.area ?? "",
+      descripcion: selected.descripcion ?? "",
     });
     setError("");
     setModal("editar");
