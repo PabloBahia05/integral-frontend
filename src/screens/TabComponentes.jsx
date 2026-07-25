@@ -53,7 +53,16 @@ export default function TabComponentes({ token, agregarAPresupuesto }) {
           setCargando(false);
           return;
         }
-        const normalized = data.map((a) => ({
+        // Filtro explícito por proveedor y familia, por las dudas de que
+        // el endpoint no venga ya acotado (ver caso DESCRIPCION en selector).
+        const filtrados = data.filter((a) => {
+          const proveedor = (a.proveedor ?? "").trim().toUpperCase();
+          const familiaCruda = (a.familia ?? a.rubro ?? "").trim().toUpperCase();
+          return (
+            proveedor === "DANIEL ROQUE SRL" && familiaCruda === "COMPONENTE"
+          );
+        });
+        const normalized = filtrados.map((a) => ({
           ...a,
           codart: a.codart ?? a.codartint ?? "",
           familia:
