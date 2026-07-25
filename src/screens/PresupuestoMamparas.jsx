@@ -219,6 +219,12 @@ export default function PresupuestoMamparas({
   //   1. GET /asociaciones → fila con art1..art10, cod1..cod10, margen1..10, form1..form10
   //   La fórmula viene directamente del campo form1..form10 de la tabla asociaciones.
   //   El margen viene de margen1..margen10 y es editable en el front.
+  //   2. Para los slots SIN fórmula ("modo Precio" en Asociaciones), el precio
+  //   NO se guarda en asociaciones: se busca acá mismo, en el momento, en la
+  //   tabla `articulos` real (GET /articulos/:cod, por codartint), no en el
+  //   catálogo de mamparas (que no contiene vidrios, bisagras, etc).
+  //   Los slots CON fórmula (form${n} cargado) siguen como siempre, sin tocar
+  //   nada — la fórmula ya resuelve su propio valor en calcular().
   useEffect(() => {
     if (!articuloSeleccionado?.codart) {
       setAsociados([]);
@@ -241,7 +247,7 @@ export default function PresupuestoMamparas({
         .then((r) => r.json())
         .catch(() => []),
     ])
-      .then(([dataAsoc, dataMargen]) => {
+      .then(async ([dataAsoc, dataMargen]) => {
         if (!Array.isArray(dataAsoc)) return;
 
         // Mapa codart → margen desde tabla MARGEN (fuente de verdad)
@@ -273,34 +279,41 @@ export default function PresupuestoMamparas({
           return;
         }
 
-        const slots = [];
+        // Slots crudos tal cual vienen de asociaciones (sin precio todavía)
+        const slotsCrudos = [];
         for (let n = 1; n <= 10; n++) {
           const art = fila[`art${n}`];
           const cod = fila[`cod${n}`];
           const codform = fila[`form${n}`] ?? null; // ← fórmula directa de asociaciones
           if (!art && !cod) continue;
+          slotsCrudos.push({ n, art, cod, codform });
+        }
 
+        // Traer el precio real desde `articulos` (tabla completa) SOLO para
+        // los slots sin fórmula — los que tienen fórmula no lo necesitan acá.
+        const preciosPorSlot = {};
+        await Promise.all(
+          slotsCrudos
+            .filter((s) => !s.codform && s.cod)
+            .map((s) =>
+              authFetch(
+                `https://integral-backend-production.up.railway.app/articulos/${encodeURIComponent(s.cod)}`,
+              )
+                .then((r) => (r.ok ? r.json() : null))
+                .then((data) => {
+                  const p = parseFloat(data?.precio);
+                  if (data && !isNaN(p)) preciosPorSlot[s.n] = p;
+                })
+                .catch(() => {}),
+            ),
+        );
+
+        const slots = slotsCrudos.map(({ n, art, cod, codform }) => {
           const codLower2 = (cod ?? "").toLowerCase().trim();
-          const artLower2 = (art ?? "").toLowerCase().trim();
 
-          // Precio del artículo asociado: primero el precio propio guardado
-          // en la fila de asociaciones (precioN, editable ahí), si no hay,
-          // el del catálogo.
-          const productoAsoc = articulos.find(
-            (p) =>
-              (p.codart ?? "").toLowerCase().trim() === codLower2 ||
-              (p.articulo ?? "").toLowerCase().trim() === artLower2,
-          );
-          const precioAsociaciones = parseFloat(
-            String(fila[`precio${n}`] ?? "").replace(",", "."),
-          );
-          const precioAsoc =
-            precioAsociaciones > 0
-              ? precioAsociaciones
-              : productoAsoc?.precio
-                ? parseFloat(productoAsoc.precio)
-                : 0;
-          const codartAsoc = productoAsoc?.codart ?? cod ?? "";
+          // Precio: si tiene fórmula no se usa (la fórmula manda); si no
+          // tiene, es el que se acaba de traer de la tabla articulos.
+          const precioAsoc = codform ? 0 : (preciosPorSlot[n] ?? 0);
 
           // Cantidad propia del slot (ej: "4 bisagras por mampara")
           const cantSlot =
@@ -308,43 +321,45 @@ export default function PresupuestoMamparas({
 
           // Margen: primero buscar en tabla MARGEN por codart del artículo asociado,
           // si no está ahí usar el campo margenN de asociaciones como fallback.
-          const margenTabla =
-            margenPorCodart[codLower2] ??
-            margenPorCodart[codartAsoc.toLowerCase().trim()];
+          const margenTabla = margenPorCodart[codLower2];
           const margenAsoc =
             parseFloat(String(fila[`margen${n}`] ?? "").replace(",", ".")) ||
             null;
           const margen = margenTabla ?? margenAsoc ?? 1;
 
-          // Sin fórmula pero con precio conocido → se trata como un artículo
-          // "directo": su resultado se calcula como precio × cantidad, igual
-          // que devolvería una fórmula trivial (ver calcular()). Solo es un
-          // error real si no hay fórmula NI precio.
+          // Sin fórmula pero con precio conocido (traído de articulos) →
+          // se trata como un artículo "directo": su resultado se calcula
+          // como precio × cantidad, igual que devolvería una fórmula
+          // trivial (ver calcular()). Solo es un error real si no hay
+          // fórmula NI precio cargado en Artículos.
           const directo = !codform;
 
-          slots.push({
+          return {
             slot: n,
-            art: art ?? codartAsoc,
-            cod: codartAsoc,
+            art: art ?? cod,
+            cod,
             precio: precioAsoc,
             cant: cantSlot,
             codform: codform || null,
             directo,
-            margen: margen, // editable en el front
+            margen, // editable en el front
             margenBD: margen, // valor original de BD para restaurar
             resultadoBase: 0, // resultado puro de la fórmula/directo (sin margen)
             resultado: 0, // resultado final = base * margen
             parciales: {},
-            error: codform || precioAsoc > 0 ? "" : "Sin fórmula ni precio",
-          });
-        }
+            error:
+              codform || precioAsoc > 0 ? "" : "Sin fórmula ni precio en Artículos",
+          };
+        });
+
         setAsociados(slots);
       })
       .catch(() => {})
       .finally(() => setCargandoAsociados(false));
 
-    // Re-ejecutar cuando cambia el artículo o el catálogo
-  }, [articuloSeleccionado?.id, articuloSeleccionado?.codart, articulos]);
+    // Re-ejecutar solo cuando cambia el artículo seleccionado — ya no depende
+    // del catálogo de mamparas, porque el precio se busca directo en articulos.
+  }, [articuloSeleccionado?.id, articuloSeleccionado?.codart]);
 
   // ── Calcular bases: llama al backend por cada artículo asociado ─────────────
   // Calcula resultadoBase (valor puro de la fórmula, sin margen).
