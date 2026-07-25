@@ -15,6 +15,10 @@ const precioDeArticulo = (a) => {
   return a.precio ?? "";
 };
 
+// modo${n}: "precio" | "formula" — son EXCLUYENTES. En Asociaciones se elige
+// una sola forma de calcular el valor del artículo asociado; el presupuesto
+// después usa ese modo para saber si debe tomar el precio cargado (× cant.)
+// o ejecutar la fórmula, sin ambigüedad ni advertencias de "sin fórmula ni precio".
 const EMPTY = () => ({
   codart: "",
   articulo: "",
@@ -24,60 +28,70 @@ const EMPTY = () => ({
   margen1: "",
   precio1: "",
   form1: "",
+  modo1: "precio",
   cod2: "",
   art2: "",
   cant2: 1,
   margen2: "",
   precio2: "",
   form2: "",
+  modo2: "precio",
   cod3: "",
   art3: "",
   cant3: 1,
   margen3: "",
   precio3: "",
   form3: "",
+  modo3: "precio",
   cod4: "",
   art4: "",
   cant4: 1,
   margen4: "",
   precio4: "",
   form4: "",
+  modo4: "precio",
   cod5: "",
   art5: "",
   cant5: 1,
   margen5: "",
   precio5: "",
   form5: "",
+  modo5: "precio",
   cod6: "",
   art6: "",
   cant6: 1,
   margen6: "",
   precio6: "",
   form6: "",
+  modo6: "precio",
   cod7: "",
   art7: "",
   cant7: 1,
   margen7: "",
   precio7: "",
   form7: "",
+  modo7: "precio",
   cod8: "",
   art8: "",
   cant8: 1,
   margen8: "",
   precio8: "",
   form8: "",
+  modo8: "precio",
   cod9: "",
   art9: "",
   cant9: 1,
   margen9: "",
   precio9: "",
   form9: "",
+  modo9: "precio",
   cod10: "",
   art10: "",
   cant10: 1,
   margen10: "",
   precio10: "",
   form10: "",
+  modo10: "precio",
 });
 
 const CSS = `
@@ -173,6 +187,14 @@ const CSS = `
   .sc-fs { width:100%; padding:6px 8px; border:1.5px solid #fde68a; border-radius:6px; background:#fffbeb; font-family:monospace; font-size:10px; color:#92400e; font-weight:700; outline:none; box-sizing:border-box; cursor:pointer; }
   .sc-fs:focus { border-color:#f59e0b; }
 
+  .sc-modo { display:flex; gap:4px; background:#eef2f7; border-radius:6px; padding:3px; }
+  .sc-modo-btn { flex:1; border:none; background:transparent; padding:5px 6px; font-family:'Syne',sans-serif; font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#7a92b0; border-radius:5px; cursor:pointer; transition:background .15s,color .15s; }
+  .sc-modo-btn.on-precio { background:#fff; color:#2563eb; box-shadow:0 1px 3px rgba(15,31,53,.12); }
+  .sc-modo-btn.on-formula { background:#fff; color:#92400e; box-shadow:0 1px 3px rgba(15,31,53,.12); }
+  .sc-total { display:flex; align-items:baseline; justify-content:space-between; padding:6px 8px; background:#f0f6ff; border:1.5px solid #bfdbfe; border-radius:6px; }
+  .sc-total-lbl { font-size:9px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.05em; }
+  .sc-total-val { font-family:'Syne',sans-serif; font-size:12px; font-weight:700; color:#2563eb; }
+
   .ep-acts { display:flex; gap:8px; justify-content:flex-end; padding-top:12px; border-top:1px solid #e0eaf5; }
   .ep-save   { padding:8px 20px; background:linear-gradient(135deg,#2563eb,#1d4ed8); border:none; border-radius:8px; font-family:'Syne',sans-serif; font-size:13px; font-weight:700; color:#fff; cursor:pointer; }
   .ep-save:hover { transform:translateY(-1px); }
@@ -214,12 +236,17 @@ function SlotEdit({
       )
     : lista;
 
+  const modo = form[`modo${n}`] || "precio";
+
   const seleccionar = (a) => {
     setForm((f) => ({
       ...f,
       [`art${n}`]: a.articulo,
       [`cod${n}`]: a.codartint ?? a.codart ?? "",
+      // Al elegir un artículo se autocompleta su precio de lista y el modo
+      // pasa a "precio" (se puede cambiar a fórmula después si corresponde).
       [`precio${n}`]: precioDeArticulo(a),
+      [`modo${n}`]: f[`modo${n}`] === "formula" ? "formula" : "precio",
     }));
     setBusqueda("");
     setAbierto(false);
@@ -235,6 +262,24 @@ function SlotEdit({
     setBusqueda("");
     setAbierto(false);
   };
+
+  const elegirModo = (nuevoModo) => {
+    setForm((f) => ({
+      ...f,
+      [`modo${n}`]: nuevoModo,
+      // Excluyentes: al pasar a fórmula se limpia el precio manual, y al
+      // pasar a precio se limpia la fórmula, para que no queden los dos
+      // valores cargados a la vez ni se generen ambigüedades en el presupuesto.
+      ...(nuevoModo === "formula" ? { [`precio${n}`]: "" } : { [`form${n}`]: "" }),
+    }));
+  };
+
+  const cant = Number(form[`cant${n}`] ?? 1) || 0;
+  const precioNum = Number(form[`precio${n}`]);
+  const total =
+    modo === "precio" && !Number.isNaN(precioNum) && form[`precio${n}`] !== ""
+      ? precioNum * cant
+      : null;
 
   return (
     <div className="sc">
@@ -380,33 +425,69 @@ function SlotEdit({
         }
         placeholder="Margen %"
       />
-      <input
-        className="sc-pr"
-        type="number"
-        step="0.01"
-        value={form[`precio${n}`] ?? ""}
-        onChange={(e) =>
-          setForm((f) => ({ ...f, [`precio${n}`]: e.target.value }))
-        }
-        placeholder="Precio"
-        title="Precio — se autocompleta al elegir el artículo, editable"
-      />
-      <div className="sc-fl">🧮 Fórmula</div>
-      <select
-        className="sc-fs"
-        value={form[`form${n}`] ?? ""}
-        onChange={(e) =>
-          setForm((f) => ({ ...f, [`form${n}`]: e.target.value }))
-        }
-      >
-        <option value="">— Sin fórmula (usa precio × cantidad) —</option>
-        {formulasList.map((f) => (
-          <option key={f.codform} value={f.codform}>
-            {f.codform}
-            {f.codart ? ` (${f.codart})` : ""}
-          </option>
-        ))}
-      </select>
+
+      {/* Toggle excluyente: o se carga un Precio, o se elige una Fórmula.
+          Nunca conviven los dos para que el presupuesto no tenga que
+          adivinar cuál usar. */}
+      <div className="sc-modo">
+        <button
+          type="button"
+          className={`sc-modo-btn ${modo === "precio" ? "on-precio" : ""}`}
+          onClick={() => elegirModo("precio")}
+        >
+          💲 Precio
+        </button>
+        <button
+          type="button"
+          className={`sc-modo-btn ${modo === "formula" ? "on-formula" : ""}`}
+          onClick={() => elegirModo("formula")}
+        >
+          🧮 Fórmula
+        </button>
+      </div>
+
+      {modo === "precio" ? (
+        <>
+          <input
+            className="sc-pr"
+            type="number"
+            step="0.01"
+            value={form[`precio${n}`] ?? ""}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, [`precio${n}`]: e.target.value }))
+            }
+            placeholder="Precio"
+            title="Precio — se autocompleta al elegir el artículo, editable"
+          />
+          {total !== null && (
+            <div className="sc-total">
+              <span className="sc-total-lbl">Total (× {cant})</span>
+              <span className="sc-total-val">
+                {total.toLocaleString("es-AR", {
+                  style: "currency",
+                  currency: "ARS",
+                })}
+              </span>
+            </div>
+          )}
+        </>
+      ) : (
+        <select
+          className="sc-fs"
+          value={form[`form${n}`] ?? ""}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, [`form${n}`]: e.target.value }))
+          }
+        >
+          <option value="">— Elegir fórmula —</option>
+          {formulasList.map((f) => (
+            <option key={f.codform} value={f.codform}>
+              {f.codform}
+              {f.codart ? ` (${f.codart})` : ""}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }
@@ -419,7 +500,16 @@ function SlotView({ row, n }) {
   const margen = row[`margen${n}`];
   const precio = row[`precio${n}`];
   const form = row[`form${n}`];
+  // Compatibilidad con registros viejos sin `modo`: si tienen fórmula
+  // cargada se asume modo fórmula, si no, modo precio.
+  const modo = row[`modo${n}`] || (form ? "formula" : "precio");
   if (!art) return <span className="sv-mt">—</span>;
+
+  const cantNum = Number(cant ?? 1) || 0;
+  const precioNum = Number(precio);
+  const hayPrecio = precio !== "" && precio != null && !Number.isNaN(precioNum);
+  const total = modo === "precio" && hayPrecio ? precioNum * cantNum : null;
+
   return (
     <div className="sv">
       <span className="sv-art">{art}</span>
@@ -428,16 +518,23 @@ function SlotView({ row, n }) {
         <span className="b-cant">✕ {cant}</span>
       )}
       {margen && <span className="b-mg">↑ {margen}%</span>}
-      {precio !== "" && precio != null && (
+
+      {modo === "formula" ? (
+        form ? (
+          <span className="b-form">🧮 {form}</span>
+        ) : (
+          <span className="sv-mt">Sin fórmula elegida</span>
+        )
+      ) : total !== null ? (
         <span className="b-pr">
-          ${" "}
-          {Number(precio).toLocaleString("es-AR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
+          {total.toLocaleString("es-AR", {
+            style: "currency",
+            currency: "ARS",
           })}
         </span>
+      ) : (
+        <span className="sv-mt">Sin precio cargado</span>
       )}
-      {form && <span className="b-form">🧮 {form}</span>}
     </div>
   );
 }
