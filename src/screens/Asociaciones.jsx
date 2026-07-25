@@ -431,6 +431,7 @@ function SlotEdit({
           {formulasList.map((f) => (
             <option key={f.codform} value={f.codform}>
               {f.codform}
+              {f.descripcion ? ` — ${f.descripcion}` : ""}
               {f.codart ? ` (${f.codart})` : ""}
             </option>
           ))}
