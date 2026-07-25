@@ -93,6 +93,45 @@ export default function TiposVanitory({
   const [agregandoRubro, setAgregandoRubro] = useState(false);
   const fileRef = useRef(null);
 
+  // ── Catálogo en vivo para el modo selector ──────────────────
+  // Reemplaza la tabla manual tipos_vanitory: en modoSelector las
+  // tarjetas salen directo de `articulos` filtrando
+  // proveedor = DANIEL ROQUE SRL, rubro = MUEBLES, familia = VANITORY.
+  const [catalogoVanitory, setCatalogoVanitory] = useState([]);
+  const [cargandoCatalogo, setCargandoCatalogo] = useState(false);
+  const [errorCatalogo, setErrorCatalogo] = useState("");
+
+  useEffect(() => {
+    if (!modoSelector) return;
+    setCargandoCatalogo(true);
+    setErrorCatalogo("");
+    authFetch(`${API}/productos/vanitory-tipos-catalogo`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data)) {
+          setErrorCatalogo("Respuesta inesperada del servidor.");
+          setCatalogoVanitory([]);
+          return;
+        }
+        const normalizado = data.map((a) => ({
+          id: a.id ?? a.codartint ?? a.codart,
+          nombre: a.articulo ?? "",
+          descripcion: a.descripcion ?? "",
+          codtipvan: a.codartint ?? a.codart ?? "",
+          foto: a.artfoto ?? "",
+          PRECIO_BASE: parseFloat(a.precio ?? a.PRECIO ?? 0) || 0,
+        }));
+        setCatalogoVanitory(normalizado);
+      })
+      .catch(() => {
+        setErrorCatalogo("No se pudo cargar el catálogo de Vanitory.");
+        setCatalogoVanitory([]);
+      })
+      .finally(() => setCargandoCatalogo(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modoSelector]);
+
+
   // Buscador de artículos
   const [artQuery, setArtQuery] = useState("");
   const [artResultados, setArtResultados] = useState([]);
@@ -282,10 +321,20 @@ export default function TiposVanitory({
             </div>
           </div>
         </div>
+        {cargandoCatalogo && (
+          <p style={{ color: "#88aacc", fontSize: 13 }}>Cargando catálogo…</p>
+        )}
+        {errorCatalogo && <p className="form-error">{errorCatalogo}</p>}
+        {!cargandoCatalogo && !errorCatalogo && catalogoVanitory.length === 0 && (
+          <p style={{ color: "#88aacc", fontSize: 13 }}>
+            No hay artículos cargados (proveedor Daniel Roque, rubro
+            Muebles, familia Vanitory).
+          </p>
+        )}
         <div
           style={{ display: "flex", flexWrap: "wrap", gap: 20, marginTop: 24 }}
         >
-          {(tiposVanitory ?? []).map((tipo) => (
+          {catalogoVanitory.map((tipo) => (
             <div
               key={tipo.id}
               onClick={() => onArmar?.(tipo)}
