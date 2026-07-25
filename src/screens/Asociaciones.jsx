@@ -15,13 +15,10 @@ const precioDeArticulo = (a) => {
   return a.precio ?? "";
 };
 
-// modo${n}: "precio" | "formula" — son EXCLUYENTES, pero es un dato que vive
-// SOLO en el estado del formulario (la tabla no tiene columna modoN). Sirve
-// para decidir qué campo mostrar en el editor. Al guardar, se descarta y en
-// su lugar se limpia el campo que no corresponde (precio_unN o formN), así
-// la base sigue recibiendo únicamente las columnas que ya existen.
-// Al leer un registro guardado, el modo se vuelve a inferir: si tiene formN
-// cargado → "formula", si no → "precio".
+// El precio de cada artículo asociado NO se carga ni se guarda acá: se
+// busca después, en Mampara/Presupuesto, en la tabla `articulos` usando el
+// código guardado en art${n}. Acá solo se define QUÉ artículo, cantidad,
+// margen y (opcional) fórmula corresponde a cada slot.
 const EMPTY = () => ({
   codart: "",
   articulo: "",
@@ -29,95 +26,53 @@ const EMPTY = () => ({
   art1: "",
   cant1: 1,
   margen1: "",
-  precio_un1: "",
   form1: "",
-  modo1: "precio",
   cod2: "",
   art2: "",
   cant2: 1,
   margen2: "",
-  precio_un2: "",
   form2: "",
-  modo2: "precio",
   cod3: "",
   art3: "",
   cant3: 1,
   margen3: "",
-  precio_un3: "",
   form3: "",
-  modo3: "precio",
   cod4: "",
   art4: "",
   cant4: 1,
   margen4: "",
-  precio_un4: "",
   form4: "",
-  modo4: "precio",
   cod5: "",
   art5: "",
   cant5: 1,
   margen5: "",
-  precio_un5: "",
   form5: "",
-  modo5: "precio",
   cod6: "",
   art6: "",
   cant6: 1,
   margen6: "",
-  precio_un6: "",
   form6: "",
-  modo6: "precio",
   cod7: "",
   art7: "",
   cant7: 1,
   margen7: "",
-  precio_un7: "",
   form7: "",
-  modo7: "precio",
   cod8: "",
   art8: "",
   cant8: 1,
   margen8: "",
-  precio_un8: "",
   form8: "",
-  modo8: "precio",
   cod9: "",
   art9: "",
   cant9: 1,
   margen9: "",
-  precio_un9: "",
   form9: "",
-  modo9: "precio",
   cod10: "",
   art10: "",
   cant10: 1,
   margen10: "",
-  precio_un10: "",
   form10: "",
-  modo10: "precio",
 });
-
-// La tabla NO tiene columna modoN: se infiere a partir de si el slot tiene
-// una fórmula cargada (formN) o no. Se usa al abrir un registro para editar.
-const inferirModos = (row) =>
-  Object.fromEntries(
-    SLOTS.map((n) => [`modo${n}`, row[`form${n}`] ? "formula" : "precio"]),
-  );
-
-// Antes de mandar al backend se descarta modoN (no existe como columna) y,
-// por las dudas, se asegura que el campo no usado en cada slot vaya vacío
-// (si es fórmula, sin precio_unN; si es precio, sin formN), para que nunca
-// convivan los dos guardados a la vez.
-const paraGuardar = (form) => {
-  const limpio = { ...form };
-  SLOTS.forEach((n) => {
-    const modo = limpio[`modo${n}`];
-    if (modo === "formula") limpio[`precio_un${n}`] = "";
-    else limpio[`form${n}`] = "";
-    delete limpio[`modo${n}`];
-  });
-  return limpio;
-};
 
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
@@ -200,9 +155,6 @@ const CSS = `
   .sc-mg { width:100%; padding:6px 8px; border:1.5px solid #dde4ef; border-radius:6px; background:#fff; font-family:'DM Sans',sans-serif; font-size:11px; color:#059669; font-weight:600; outline:none; box-sizing:border-box; }
   .sc-mg::placeholder { color:#94a3b8; font-weight:400; }
   .sc-mg:focus { border-color:#059669; }
-  .sc-pr { width:100%; padding:6px 8px; border:1.5px solid #bfdbfe; border-radius:6px; background:#f0f6ff; font-family:'Syne',sans-serif; font-size:11px; color:#2563eb; font-weight:700; outline:none; box-sizing:border-box; }
-  .sc-pr::placeholder { color:#94a3b8; font-weight:400; }
-  .sc-pr:focus { border-color:#2563eb; }
   .sc-cant-row { display:flex; align-items:center; gap:6px; }
   .sc-cant-lbl { font-size:9px; font-weight:700; color:#7a92b0; text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; }
   .sc-cant { width:100%; padding:6px 8px; border:1.5px solid #bfdbfe; border-radius:6px; background:#f0f6ff; font-family:'Syne',sans-serif; font-size:12px; font-weight:700; color:#2563eb; outline:none; box-sizing:border-box; text-align:center; }
@@ -212,13 +164,7 @@ const CSS = `
   .sc-fs { width:100%; padding:6px 8px; border:1.5px solid #fde68a; border-radius:6px; background:#fffbeb; font-family:monospace; font-size:10px; color:#92400e; font-weight:700; outline:none; box-sizing:border-box; cursor:pointer; }
   .sc-fs:focus { border-color:#f59e0b; }
 
-  .sc-modo { display:flex; gap:4px; background:#eef2f7; border-radius:6px; padding:3px; }
-  .sc-modo-btn { flex:1; border:none; background:transparent; padding:5px 6px; font-family:'Syne',sans-serif; font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#7a92b0; border-radius:5px; cursor:pointer; transition:background .15s,color .15s; }
-  .sc-modo-btn.on-precio { background:#fff; color:#2563eb; box-shadow:0 1px 3px rgba(15,31,53,.12); }
-  .sc-modo-btn.on-formula { background:#fff; color:#92400e; box-shadow:0 1px 3px rgba(15,31,53,.12); }
-  .sc-total { display:flex; align-items:baseline; justify-content:space-between; padding:6px 8px; background:#f0f6ff; border:1.5px solid #bfdbfe; border-radius:6px; }
-  .sc-total-lbl { font-size:9px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.05em; }
-  .sc-total-val { font-family:'Syne',sans-serif; font-size:12px; font-weight:700; color:#2563eb; }
+  .sv-auto { color:#94a3b8; font-size:10.5px; font-style:italic; }
 
   .ep-acts { display:flex; gap:8px; justify-content:flex-end; padding-top:12px; border-top:1px solid #e0eaf5; }
   .ep-save   { padding:8px 20px; background:linear-gradient(135deg,#2563eb,#1d4ed8); border:none; border-radius:8px; font-family:'Syne',sans-serif; font-size:13px; font-weight:700; color:#fff; cursor:pointer; }
@@ -261,17 +207,11 @@ function SlotEdit({
       )
     : lista;
 
-  const modo = form[`modo${n}`] || "precio";
-
   const seleccionar = (a) => {
     setForm((f) => ({
       ...f,
       [`art${n}`]: a.articulo,
       [`cod${n}`]: a.codartint ?? a.codart ?? "",
-      // Al elegir un artículo se autocompleta su precio de lista y el modo
-      // pasa a "precio" (se puede cambiar a fórmula después si corresponde).
-      [`precio_un${n}`]: precioDeArticulo(a),
-      [`modo${n}`]: f[`modo${n}`] === "formula" ? "formula" : "precio",
     }));
     setBusqueda("");
     setAbierto(false);
@@ -282,29 +222,10 @@ function SlotEdit({
       ...f,
       [`art${n}`]: "",
       [`cod${n}`]: "",
-      [`precio_un${n}`]: "",
     }));
     setBusqueda("");
     setAbierto(false);
   };
-
-  const elegirModo = (nuevoModo) => {
-    setForm((f) => ({
-      ...f,
-      [`modo${n}`]: nuevoModo,
-      // Excluyentes: al pasar a fórmula se limpia el precio manual, y al
-      // pasar a precio se limpia la fórmula, para que no queden los dos
-      // valores cargados a la vez ni se generen ambigüedades en el presupuesto.
-      ...(nuevoModo === "formula" ? { [`precio_un${n}`]: "" } : { [`form${n}`]: "" }),
-    }));
-  };
-
-  const cant = Number(form[`cant${n}`] ?? 1) || 0;
-  const precioNum = Number(form[`precio_un${n}`]);
-  const total =
-    modo === "precio" && !Number.isNaN(precioNum) && form[`precio_un${n}`] !== ""
-      ? precioNum * cant
-      : null;
 
   return (
     <div className="sc">
@@ -451,68 +372,25 @@ function SlotEdit({
         placeholder="Margen %"
       />
 
-      {/* Toggle excluyente: o se carga un Precio, o se elige una Fórmula.
-          Nunca conviven los dos para que el presupuesto no tenga que
-          adivinar cuál usar. */}
-      <div className="sc-modo">
-        <button
-          type="button"
-          className={`sc-modo-btn ${modo === "precio" ? "on-precio" : ""}`}
-          onClick={() => elegirModo("precio")}
-        >
-          💲 Precio
-        </button>
-        <button
-          type="button"
-          className={`sc-modo-btn ${modo === "formula" ? "on-formula" : ""}`}
-          onClick={() => elegirModo("formula")}
-        >
-          🧮 Fórmula
-        </button>
-      </div>
-
-      {modo === "precio" ? (
-        <>
-          <input
-            className="sc-pr"
-            type="number"
-            step="0.01"
-            value={form[`precio_un${n}`] ?? ""}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, [`precio_un${n}`]: e.target.value }))
-            }
-            placeholder="Precio"
-            title="Precio — se autocompleta al elegir el artículo, editable"
-          />
-          {total !== null && (
-            <div className="sc-total">
-              <span className="sc-total-lbl">Total (× {cant})</span>
-              <span className="sc-total-val">
-                {total.toLocaleString("es-AR", {
-                  style: "currency",
-                  currency: "ARS",
-                })}
-              </span>
-            </div>
-          )}
-        </>
-      ) : (
-        <select
-          className="sc-fs"
-          value={form[`form${n}`] ?? ""}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, [`form${n}`]: e.target.value }))
-          }
-        >
-          <option value="">— Elegir fórmula —</option>
-          {formulasList.map((f) => (
-            <option key={f.codform} value={f.codform}>
-              {f.codform}
-              {f.codart ? ` (${f.codart})` : ""}
-            </option>
-          ))}
-        </select>
-      )}
+      {/* La fórmula es opcional: si no se elige ninguna, el precio del
+          artículo se toma automáticamente de la tabla `articulos` (por el
+          código en art${n}) al armar el presupuesto en Mampara. */}
+      <div className="sc-fl">🧮 Fórmula (opcional)</div>
+      <select
+        className="sc-fs"
+        value={form[`form${n}`] ?? ""}
+        onChange={(e) =>
+          setForm((f) => ({ ...f, [`form${n}`]: e.target.value }))
+        }
+      >
+        <option value="">— Sin fórmula (precio automático desde Artículos) —</option>
+        {formulasList.map((f) => (
+          <option key={f.codform} value={f.codform}>
+            {f.codform}
+            {f.codart ? ` (${f.codart})` : ""}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -523,17 +401,8 @@ function SlotView({ row, n }) {
   const cod = row[`cod${n}`];
   const cant = row[`cant${n}`];
   const margen = row[`margen${n}`];
-  const precio = row[`precio_un${n}`];
   const form = row[`form${n}`];
-  // Compatibilidad con registros viejos sin `modo`: si tienen fórmula
-  // cargada se asume modo fórmula, si no, modo precio.
-  const modo = row[`modo${n}`] || (form ? "formula" : "precio");
   if (!art) return <span className="sv-mt">—</span>;
-
-  const cantNum = Number(cant ?? 1) || 0;
-  const precioNum = Number(precio);
-  const hayPrecio = precio !== "" && precio != null && !Number.isNaN(precioNum);
-  const total = modo === "precio" && hayPrecio ? precioNum * cantNum : null;
 
   return (
     <div className="sv">
@@ -544,21 +413,10 @@ function SlotView({ row, n }) {
       )}
       {margen && <span className="b-mg">↑ {margen}%</span>}
 
-      {modo === "formula" ? (
-        form ? (
-          <span className="b-form">🧮 {form}</span>
-        ) : (
-          <span className="sv-mt">Sin fórmula elegida</span>
-        )
-      ) : total !== null ? (
-        <span className="b-pr">
-          {total.toLocaleString("es-AR", {
-            style: "currency",
-            currency: "ARS",
-          })}
-        </span>
+      {form ? (
+        <span className="b-form">🧮 {form}</span>
       ) : (
-        <span className="sv-mt">Sin precio cargado</span>
+        <span className="sv-auto">💲 Precio automático (Artículos)</span>
       )}
     </div>
   );
@@ -685,7 +543,7 @@ export default function Asociaciones({
   // iniciar edición inline
   const startEdit = (row) => {
     setEditId(row.id);
-    setEditForm({ ...EMPTY(), ...row, ...inferirModos(row) });
+    setEditForm({ ...EMPTY(), ...row });
     const pf = articulosList.find((a) => a.articulo === row.articulo);
     setEditRubroPadre(pf?.rubro ?? "");
     setEditRubroSlots(
@@ -703,7 +561,7 @@ export default function Asociaciones({
   };
   const saveEdit = () => {
     if (!editForm) return;
-    onSave?.({ id: editId, ...paraGuardar(editForm) });
+    onSave?.({ id: editId, ...editForm });
     cancelEdit();
   };
 
@@ -721,7 +579,7 @@ export default function Asociaciones({
   };
   const saveNew = () => {
     if (!newForm.codart && !newForm.articulo) return;
-    onSave?.(paraGuardar(newForm));
+    onSave?.({ ...newForm });
     closeNew();
   };
 
@@ -732,7 +590,6 @@ export default function Asociaciones({
     setNewForm({
       ...EMPTY(),
       ...rest,
-      ...inferirModos(row),
       codart: "",
       articulo: "",
     });
