@@ -164,6 +164,13 @@ const CSS = `
   .sc-fs { width:100%; padding:6px 8px; border:1.5px solid #fde68a; border-radius:6px; background:#fffbeb; font-family:monospace; font-size:10px; color:#92400e; font-weight:700; outline:none; box-sizing:border-box; cursor:pointer; }
   .sc-fs:focus { border-color:#f59e0b; }
 
+  .sc-modo { display:flex; gap:4px; background:#eef2f7; border-radius:6px; padding:3px; }
+  .sc-modo-btn { flex:1; border:none; background:transparent; padding:5px 6px; font-family:'Syne',sans-serif; font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#7a92b0; border-radius:5px; cursor:pointer; transition:background .15s,color .15s; }
+  .sc-modo-btn.on-precio { background:#fff; color:#2563eb; box-shadow:0 1px 3px rgba(15,31,53,.12); }
+  .sc-modo-btn.on-formula { background:#fff; color:#92400e; box-shadow:0 1px 3px rgba(15,31,53,.12); }
+  .sc-auto { padding:6px 8px; background:#f0f6ff; border:1.5px dashed #bfdbfe; border-radius:6px; font-size:10.5px; color:#3b5a82; }
+  .sc-auto strong { color:#2563eb; }
+
   .sv-auto { color:#94a3b8; font-size:10.5px; font-style:italic; }
 
   .ep-acts { display:flex; gap:8px; justify-content:flex-end; padding-top:12px; border-top:1px solid #e0eaf5; }
@@ -197,6 +204,13 @@ function SlotEdit({
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [abierto, setAbierto] = useState(false);
+  // Estado de UI puro: qué botón está activo. El dato que realmente se
+  // guarda sigue siendo solo form${n}: si está vacío, el slot funciona en
+  // modo "precio" (Mampara lo resuelve solo contra la tabla `articulos`);
+  // si tiene una fórmula elegida, funciona en modo "fórmula" como siempre.
+  const [modoUI, setModoUI] = useState(() =>
+    form[`form${n}`] ? "formula" : "precio",
+  );
 
   const lista = listaSlot[n] ?? [];
   const artActual = form[`art${n}`] ?? "";
@@ -225,6 +239,15 @@ function SlotEdit({
     }));
     setBusqueda("");
     setAbierto(false);
+  };
+
+  const elegirModo = (nuevo) => {
+    setModoUI(nuevo);
+    // Excluyentes: si se pasa a "precio" se descarta la fórmula elegida,
+    // para que Mampara no dude cuál de las dos usar.
+    if (nuevo === "precio") {
+      setForm((f) => ({ ...f, [`form${n}`]: "" }));
+    }
   };
 
   return (
@@ -372,25 +395,47 @@ function SlotEdit({
         placeholder="Margen %"
       />
 
-      {/* La fórmula es opcional: si no se elige ninguna, el precio del
-          artículo se toma automáticamente de la tabla `articulos` (por el
-          código en art${n}) al armar el presupuesto en Mampara. */}
-      <div className="sc-fl">🧮 Fórmula (opcional)</div>
-      <select
-        className="sc-fs"
-        value={form[`form${n}`] ?? ""}
-        onChange={(e) =>
-          setForm((f) => ({ ...f, [`form${n}`]: e.target.value }))
-        }
-      >
-        <option value="">— Sin fórmula (precio automático desde Artículos) —</option>
-        {formulasList.map((f) => (
-          <option key={f.codform} value={f.codform}>
-            {f.codform}
-            {f.codart ? ` (${f.codart})` : ""}
-          </option>
-        ))}
-      </select>
+      {/* Precio: no se carga nada acá, Mampara lo busca solo en la tabla
+          `articulos` por el código de este artículo hijo al armar el
+          presupuesto. Fórmula: se seguirá calculando como hasta ahora. */}
+      <div className="sc-modo">
+        <button
+          type="button"
+          className={`sc-modo-btn ${modoUI === "precio" ? "on-precio" : ""}`}
+          onClick={() => elegirModo("precio")}
+        >
+          💲 Precio
+        </button>
+        <button
+          type="button"
+          className={`sc-modo-btn ${modoUI === "formula" ? "on-formula" : ""}`}
+          onClick={() => elegirModo("formula")}
+        >
+          🧮 Fórmula
+        </button>
+      </div>
+
+      {modoUI === "precio" ? (
+        <div className="sc-auto">
+          Precio automático desde <strong>Artículos</strong> (por código)
+        </div>
+      ) : (
+        <select
+          className="sc-fs"
+          value={form[`form${n}`] ?? ""}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, [`form${n}`]: e.target.value }))
+          }
+        >
+          <option value="">— Elegir fórmula —</option>
+          {formulasList.map((f) => (
+            <option key={f.codform} value={f.codform}>
+              {f.codform}
+              {f.codart ? ` (${f.codart})` : ""}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }
