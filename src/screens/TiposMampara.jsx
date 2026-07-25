@@ -12,7 +12,7 @@ export default function TiposMampara({ onBack }) {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    fetch(`${API}/mamparas-tipos`, {
+    fetch(`${API}/productos/mamparas`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -20,7 +20,7 @@ export default function TiposMampara({ onBack }) {
       .then((r) => r.json())
       .then((data) => {
         if (!Array.isArray(data)) {
-          console.error("Respuesta inesperada de /mamparas-tipos:", data);
+          console.error("Respuesta inesperada de /productos/mamparas:", data);
           setError(data?.error || "Respuesta inesperada del servidor.");
           setLoading(false);
           return;
@@ -38,9 +38,9 @@ export default function TiposMampara({ onBack }) {
     return (
       <FormMampara
         modelo={{
-          label: selected.NOMBRE,
-          codformv: selected.CODFORMV, // clave para calcular vidrio
-          codformh: selected.CODFORMH, // por si se necesita en el futuro
+          label: selected.articulo,
+          codformv: selected.codformv, // clave para calcular vidrio
+          codformh: selected.codformh, // por si se necesita en el futuro
         }}
         onBack={() => setSelected(null)}
       />
@@ -64,8 +64,7 @@ export default function TiposMampara({ onBack }) {
       {error && <p className="form-error">{error}</p>}
       {!loading && !error && tipos.length === 0 && (
         <p style={{ color: "#88aacc", fontSize: "13px" }}>
-          No hay tipos cargados. Creá uno desde{" "}
-          <strong>Ver Tablas → Tipos de Mampara</strong>.
+          No hay artículos cargados (proveedor Daniel Roque, rubro Mampara).
         </p>
       )}
 
@@ -77,7 +76,7 @@ export default function TiposMampara({ onBack }) {
             onClick={() => setSelected(tipo)}
           >
             <span className="presup-icon">🪟</span>
-            <span className="presup-label">{tipo.NOMBRE}</span>
+            <span className="presup-label">{tipo.articulo}</span>
           </button>
         ))}
       </div>

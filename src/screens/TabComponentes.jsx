@@ -42,10 +42,11 @@ export default function TabComponentes({ token, agregarAPresupuesto }) {
   const [precio, setPrecio] = useState("");
   const [agregado, setAgregado] = useState(false);
 
-  // ── Catálogo: mismo endpoint/normalización que Mampara ──
+  // ── Catálogo: endpoint ya filtrado en el backend (proveedor DANIEL ROQUE
+  // SRL, rubro COMPONENTES, familia COMPONENTE) ──
   useEffect(() => {
     setCargando(true);
-    authFetch(`${API}/productos/componentes`)
+    authFetch(`${API}/productos/componentes-catalogo`)
       .then((r) => r.json())
       .then((data) => {
         if (!Array.isArray(data)) {
@@ -53,16 +54,7 @@ export default function TabComponentes({ token, agregarAPresupuesto }) {
           setCargando(false);
           return;
         }
-        // Filtro explícito por proveedor y familia, por las dudas de que
-        // el endpoint no venga ya acotado (ver caso DESCRIPCION en selector).
-        const filtrados = data.filter((a) => {
-          const proveedor = (a.proveedor ?? "").trim().toUpperCase();
-          const familiaCruda = (a.familia ?? a.rubro ?? "").trim().toUpperCase();
-          return (
-            proveedor === "DANIEL ROQUE SRL" && familiaCruda === "COMPONENTE"
-          );
-        });
-        const normalized = filtrados.map((a) => ({
+        const normalized = data.map((a) => ({
           ...a,
           codart: a.codart ?? a.codartint ?? "",
           familia:
