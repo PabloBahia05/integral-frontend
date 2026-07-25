@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 
 export default function PresupuestoMamparas({
@@ -24,6 +24,13 @@ export default function PresupuestoMamparas({
   // Cada slot: { slot, art, cod, precio, codform, resultado, parciales, error }
   const [asociados, setAsociados] = useState([]);
   const [cargandoAsociados, setCargandoAsociados] = useState(false);
+
+  // ── Control de medidas contra el herraje ────────────────────────────────────
+  // Los artículos hijos con area = 4 en la tabla `articulos` son piezas con
+  // una medida física límite (ej: el herraje/riel de una corrediza). Si el
+  // ancho o el alto del presupuesto superan esa medida, se avisa con un
+  // cartel para poder corregir los datos antes de seguir.
+  const [avisoDimension, setAvisoDimension] = useState(null);
 
   // ── Cálculo ─────────────────────────────────────────────────────────────────
   const [calculando, setCalculando] = useState(false);
@@ -194,7 +201,53 @@ export default function PresupuestoMamparas({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── Colocación desde BD al cambiar artículo ─────────────────────────────────
+  // Artículo con medida límite (area = 4), memoizado para que esto NO
+  // cambie de identidad cuando se edita el margen de cualquier slot (que
+  // reemplaza el array `asociados` entero en cada tecla tipeada).
+  const herrajeLimitante = useMemo(
+    () => asociados.find((a) => Number(a.area) === 4) ?? null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      asociados
+        .filter((a) => Number(a.area) === 4)
+        .map((a) => `${a.slot}|${a.art}|${a.anchoLimite}|${a.altoLimite}`)
+        .join(","),
+    ],
+  );
+
+  // ── Control de medidas contra el herraje ────────────────────────────────────
+  // Cualquier artículo hijo con area = 4 tiene una medida física límite (ej.
+  // el herraje/riel de una corrediza). Si el ancho o el alto cargados en el
+  // presupuesto superan esa medida, se muestra un cartel de aviso.
+  useEffect(() => {
+    if (!herrajeLimitante) {
+      setAvisoDimension(null);
+      return;
+    }
+    const anchoPres = Number(form.ancho) || 0;
+    const altoPres = Number(form.alto) || 0;
+    const { anchoLimite, altoLimite } = herrajeLimitante;
+
+    const excesos = [];
+    if (anchoLimite != null && anchoPres > anchoLimite) {
+      excesos.push(`ancho ${anchoPres}cm supera los ${anchoLimite}cm del herraje`);
+    }
+    if (altoLimite != null && altoPres > altoLimite) {
+      excesos.push(`alto ${altoPres}cm supera los ${altoLimite}cm del herraje`);
+    }
+
+    if (!excesos.length) {
+      setAvisoDimension(null);
+      return;
+    }
+
+    setAvisoDimension({
+      articulo: herrajeLimitante.art,
+      mensaje: excesos.join(" y "),
+    });
+  }, [herrajeLimitante, form.ancho, form.alto]);
+
+
   useEffect(() => {
     if (!articuloSeleccionado?.codart) return;
     authFetch(
@@ -289,20 +342,22 @@ export default function PresupuestoMamparas({
           slotsCrudos.push({ n, art, cod, codform });
         }
 
-        // Traer el precio real desde `articulos` (tabla completa) SOLO para
-        // los slots sin fórmula — los que tienen fórmula no lo necesitan acá.
-        const preciosPorSlot = {};
+        // Traer datos reales desde `articulos` para cada hijo con código:
+        // - precio: solo se usa para los que NO tienen fórmula.
+        // - area/ancho/alto: se traen siempre, para poder detectar los que
+        //   tienen area = 4 (medida límite, ej. herraje/riel) y validar el
+        //   ancho/alto del presupuesto contra esa medida.
+        const datosPorSlot = {};
         await Promise.all(
           slotsCrudos
-            .filter((s) => !s.codform && s.cod)
+            .filter((s) => s.cod)
             .map((s) =>
               authFetch(
                 `https://integral-backend-production.up.railway.app/articulos/${encodeURIComponent(s.cod)}`,
               )
                 .then((r) => (r.ok ? r.json() : null))
                 .then((data) => {
-                  const p = parseFloat(data?.precio);
-                  if (data && !isNaN(p)) preciosPorSlot[s.n] = p;
+                  if (data) datosPorSlot[s.n] = data;
                 })
                 .catch(() => {}),
             ),
@@ -310,10 +365,22 @@ export default function PresupuestoMamparas({
 
         const slots = slotsCrudos.map(({ n, art, cod, codform }) => {
           const codLower2 = (cod ?? "").toLowerCase().trim();
+          const datos = datosPorSlot[n];
 
           // Precio: si tiene fórmula no se usa (la fórmula manda); si no
           // tiene, es el que se acaba de traer de la tabla articulos.
-          const precioAsoc = codform ? 0 : (preciosPorSlot[n] ?? 0);
+          const precioAsoc = codform ? 0 : parseFloat(datos?.precio) || 0;
+
+          // area = 4 → artículo con medida límite física (ej. herraje/riel).
+          const area = datos?.area != null ? Number(datos.area) : null;
+          const anchoLimite =
+            datos?.ancho != null && datos.ancho !== ""
+              ? Number(datos.ancho)
+              : null;
+          const altoLimite =
+            datos?.alto != null && datos.alto !== ""
+              ? Number(datos.alto)
+              : null;
 
           // Cantidad propia del slot (ej: "4 bisagras por mampara")
           const cantSlot =
@@ -342,6 +409,9 @@ export default function PresupuestoMamparas({
             cant: cantSlot,
             codform: codform || null,
             directo,
+            area,
+            anchoLimite,
+            altoLimite,
             margen, // editable en el front
             margenBD: margen, // valor original de BD para restaurar
             resultadoBase: 0, // resultado puro de la fórmula/directo (sin margen)
@@ -995,9 +1065,36 @@ export default function PresupuestoMamparas({
         #presupuesto-print { display: none; }
         @media print { .sidebar, .actions { display: none !important; } .card { box-shadow: none; } #presupuesto-print { display: block !important; } }
         @media (max-width: 768px) { .presup-layout { flex-direction: column; } .foto-panel { max-width: 100%; width: 100%; position: static; min-width: unset; } }
+        .aviso-dim-overlay { position: fixed; inset: 0; background: rgba(15,41,68,0.55); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .aviso-dim-card { background: #fff; border-radius: 10px; padding: 28px 30px; max-width: 420px; width: 100%; box-shadow: 0 8px 30px rgba(15,41,68,0.25); border-top: 5px solid #dc2626; }
+        .aviso-dim-title { display: flex; align-items: center; gap: 8px; font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700; color: #b91c1c; margin-bottom: 12px; }
+        .aviso-dim-texto { font-size: 14px; color: #334155; line-height: 1.5; margin-bottom: 8px; }
+        .aviso-dim-texto strong { color: #0f2944; }
+        .aviso-dim-btn { margin-top: 16px; width: 100%; padding: 11px; border-radius: 6px; border: none; background: #0f2944; color: #fff; font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.05em; cursor: pointer; }
+        .aviso-dim-btn:hover { background: #16314f; }
       `}</style>
 
       <div className="layout">
+        {avisoDimension && (
+          <div className="aviso-dim-overlay">
+            <div className="aviso-dim-card">
+              <div className="aviso-dim-title">⚠️ Medidas fuera de rango</div>
+              <p className="aviso-dim-texto">
+                El artículo <strong>{avisoDimension.articulo}</strong> no
+                soporta las medidas cargadas: {avisoDimension.mensaje}.
+              </p>
+              <p className="aviso-dim-texto">
+                Corregí el ancho y/o el alto del presupuesto para continuar.
+              </p>
+              <button
+                className="aviso-dim-btn"
+                onClick={() => setAvisoDimension(null)}
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        )}
         <main className="main">
           <div className="presup-layout">
             <div className="presup-form-col">
