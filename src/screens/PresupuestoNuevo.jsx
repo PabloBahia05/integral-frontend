@@ -540,8 +540,6 @@ export default function PresupuestoNuevo({
   onGuardado,
   onVerTabla,
   presupuestoInicial = null,
-  tiposVanitory = [],
-  tiposVanitoryRUD = {},
   tiposDespensero = [],
   tiposDespenseroRUD = {},
   token,
@@ -3856,8 +3854,6 @@ export default function PresupuestoNuevo({
               cliente={cliente}
               codcliente={codcliente}
               revision={revision}
-              tiposVanitory={tiposVanitory}
-              tiposVanitoryRUD={tiposVanitoryRUD}
               tiposDespensero={tiposDespensero}
               tiposDespenseroRUD={tiposDespenseroRUD}
               onVerTabla={onVerTabla}
