@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import ScreenHeader from "../Component/ScreenHeader";
 import Clientes from "./Clientes";
 import Productos from "./Productos";
-import MamparasTipos from "./MamparasTipos";
-import TiposVanitory from "./TiposVanitory";
 import TiposEscritorio from "./TiposEscritorio";
 import TiposDespensero from "./TiposDespensero";
 import Formulas from "./Formulas";
@@ -230,18 +228,6 @@ const TABLAS = [
   { id: "clientes", label: "Clientes", icon: "👥", color: "#eb56d7" },
   { id: "productos", label: "Productos", icon: "🛒", color: "#ff6b6b" },
   {
-    id: "mamparas-tipos",
-    label: "Tipos de Mampara",
-    icon: "🪟",
-    color: "#c77dff",
-  },
-  {
-    id: "vanitory-tipos",
-    label: "Tipos de Vanitory",
-    icon: "🛁",
-    color: "#00b4d8",
-  },
-  {
     id: "escritorio-tipos",
     label: "Tipos de Escritorio",
     icon: "🖥️",
@@ -298,12 +284,6 @@ export default function VerTablas({
   productos,
   productosCRUD,
   selectedProducto,
-  mamparasTipos,
-  mamparasTiposCRUD,
-  selectedMamparaTipo,
-  tiposVanitory,
-  tiposVanitoryRUD,
-  selectedTipoVanitory,
   tiposEscritorio,
   tiposEscritorioRUD,
   selectedTipoEscritorio,
@@ -394,31 +374,6 @@ export default function VerTablas({
           selected={selectedProducto}
           modal={modal}
           {...localCRUD(productosCRUD)}
-        />
-      </div>
-    );
-  if (tablaActiva === "mamparas-tipos")
-    return (
-      <div>
-        {back}
-        <MamparasTipos
-          mamparasTipos={mamparasTipos}
-          selected={selectedMamparaTipo}
-          modal={modal}
-          {...localCRUD(mamparasTiposCRUD)}
-        />
-      </div>
-    );
-  if (tablaActiva === "vanitory-tipos")
-    return (
-      <div>
-        {back}
-        <TiposVanitory
-          tiposVanitory={tiposVanitory ?? []}
-          selected={selectedTipoVanitory}
-          modal={modal}
-          token={token}
-          {...localCRUD(tiposVanitoryRUD ?? {})}
         />
       </div>
     );
