@@ -14,7 +14,13 @@ const normalizar = (p) => ({
 const fmt = (v) =>
   `$${Number(v).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export default function PresupuestoWallPanel({ onVolver }) {
+export default function PresupuestoWallPanel({ onVolver, token }) {
+  const authFetch = (url, options = {}) => {
+    const headers = { ...(options.headers || {}) };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(url, { ...options, headers });
+  };
+
   const [form, setForm] = useState({
     ancho: "",
     alto: "",
@@ -54,10 +60,10 @@ export default function PresupuestoWallPanel({ onVolver }) {
     };
 
     Promise.all([
-      fetch(`${API}/productos/wall-panel`)
+      authFetch(`${API}/productos/wall-panel`)
         .then((r) => r.json())
         .catch(() => []),
-      fetch(`${API}/asociaciones-form`)
+      authFetch(`${API}/asociaciones-form`)
         .then((r) => r.json())
         .catch(() => []),
     ])
@@ -97,7 +103,7 @@ export default function PresupuestoWallPanel({ onVolver }) {
         await Promise.all(
           codartsBD.map(async (cod) => {
             try {
-              const res = await fetch(
+              const res = await authFetch(
                 `${API}/articulos/${encodeURIComponent(cod)}`,
               );
               const data = await res.json();
@@ -150,7 +156,7 @@ export default function PresupuestoWallPanel({ onVolver }) {
 
   // Cargar margen de WALLPANEL desde BD
   useEffect(() => {
-    fetch(`${API}/margen/por-codart?codart=WALLPANEL`)
+    authFetch(`${API}/margen/por-codart?codart=WALLPANEL`)
       .then((r) => r.json())
       .then((d) => {
         const row = Array.isArray(d) ? d[0] : d;
@@ -588,7 +594,7 @@ export default function PresupuestoWallPanel({ onVolver }) {
                         setBaseSearch("");
                         setBaseDropdown(false);
                         try {
-                          const r = await fetch(
+                          const r = await authFetch(
                             `${API}/articulos/${encodeURIComponent(p.codartint ?? p.codart ?? "")}`,
                           );
                           const d = await r.json();
