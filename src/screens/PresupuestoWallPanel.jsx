@@ -54,7 +54,7 @@ export default function PresupuestoWallPanel({ onVolver }) {
     };
 
     Promise.all([
-      fetch(`${API}/productos?area=2`)
+      fetch(`${API}/productos/wall-panel`)
         .then((r) => r.json())
         .catch(() => []),
       fetch(`${API}/asociaciones-form`)
