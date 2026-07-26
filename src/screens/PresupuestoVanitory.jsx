@@ -298,13 +298,14 @@ export default function PresupuestoVanitory({
               codform)
             : (codform ?? `Fórmula ${i}`);
 
-          // Siempre priorizar la fórmula actualizada de la tabla formulas (fDef),
-          // y solo usar la expresión guardada en asociaciones_form como fallback.
+          // Priorizar la expresión guardada en asociaciones_form (form{i}),
+          // y usar la fórmula de la tabla formulas solo como fallback si
+          // asociaciones_form no tiene expresión propia para ese slot.
           const exprFinal =
+            expresion ||
             (fDef
               ? (fDef.formula ?? fDef.FORMULA ?? fDef.expresion ?? "")
               : "") ||
-            expresion ||
             "";
           slotsRaw.push({ codform, nombre, expresion: exprFinal, slot: i });
         }
