@@ -844,7 +844,7 @@ export default function Asociaciones({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (window.confirm("¿Eliminar?"))
-                                      onDelete?.(row);
+                                      onDelete?.(row.id ?? row);
                                   }}
                                 >
                                   🗑️
