@@ -161,6 +161,7 @@ function App() {
   const [selectedColocacion, setSelectedColocacion] = useState(null);
   const [selectedCliente, setSelectedCliente] = useState(null);
   const [selectedProducto, setSelectedProducto] = useState(null);
+  const [selectedTipoVanitory, setSelectedTipoVanitory] = useState(null);
   const [selectedTipoEscritorio, setSelectedTipoEscritorio] = useState(null);
   const [selectedTipoDespensero, setSelectedTipoDespensero] = useState(null);
   const [selectedFormula, setSelectedFormula] = useState(null);
