@@ -305,34 +305,71 @@ export default function PresupuestoVanitory({
             row[`form${i}`] ??
             row[`FORM${i}`] ??
             null;
-          if (!codform) continue;
 
-          const fDef = formulasMap[codform.toUpperCase()] ?? null;
-          console.log(
-            `[Vanitory] slot ${i} → codform="${codform}" → fDef:`,
-            fDef,
-          );
-          const nombre = fDef
-            ? (fDef.articulo ??
-              fDef.ARTICULO ??
-              fDef.nombre ??
-              fDef.NOMBRE ??
-              fDef.descripcion ??
-              codform)
-            : codform;
+          if (codform) {
+            const fDef = formulasMap[codform.toUpperCase()] ?? null;
+            console.log(
+              `[Vanitory] slot ${i} → codform="${codform}" → fDef:`,
+              fDef,
+            );
+            const nombre = fDef
+              ? (fDef.articulo ??
+                fDef.ARTICULO ??
+                fDef.nombre ??
+                fDef.NOMBRE ??
+                fDef.descripcion ??
+                codform)
+              : codform;
 
-          const exprFinal = fDef
-            ? (fDef.formula ?? fDef.FORMULA ?? fDef.expresion ?? "")
-            : "";
-          if (!exprFinal) continue;
-          slotsRaw.push({ codform, nombre, expresion: exprFinal, slot: i });
+            const exprFinal = fDef
+              ? (fDef.formula ?? fDef.FORMULA ?? fDef.expresion ?? "")
+              : "";
+            if (!exprFinal) continue;
+            slotsRaw.push({
+              codform,
+              nombre,
+              expresion: exprFinal,
+              slot: i,
+              tipo: "formula",
+            });
+            continue;
+          }
+
+          // Sin fórmula: puede ser un artículo asociado "directo"
+          // (cod{i}/art{i}/cant{i}), que se cotiza como precio × cantidad.
+          const codArticulo = row[`cod${i}`] ?? row[`COD${i}`] ?? null;
+          if (!codArticulo) continue;
+
+          const nombreArt = row[`art${i}`] ?? row[`ART${i}`] ?? codArticulo;
+          const cantidadSlot =
+            Number(row[`cant${i}`] ?? row[`CANT${i}`] ?? 1) || 1;
+          const margenSlot =
+            Number(row[`margen${i}`] ?? row[`MARGEN${i}`] ?? 0) || 0;
+
+          slotsRaw.push({
+            codform: null,
+            nombre: nombreArt,
+            expresion: "",
+            slot: i,
+            tipo: "directo",
+            codArticulo,
+            cantidadSlot,
+            margenSlot,
+          });
         }
         console.log("[Vanitory] slotsRaw armados:", slotsRaw);
 
 
         // Recolectar todos los codarts únicos usados como precio_XXXX en las expresiones
         const todasExpresiones = slotsRaw.map((s) => s.expresion).join(" ");
-        const codartsBD = [...new Set(extraerCodarts(todasExpresiones))];
+        const codartsDeFormulas = extraerCodarts(todasExpresiones);
+        // + los codart de los slots "directos" (artículo sin fórmula)
+        const codartsDirectos = slotsRaw
+          .filter((s) => s.tipo === "directo")
+          .map((s) => s.codArticulo);
+        const codartsBD = [
+          ...new Set([...codartsDeFormulas, ...codartsDirectos]),
+        ];
 
         // Buscar precio de cada codart en la tabla articulos
         const nuevosPrecios = {};
@@ -429,10 +466,16 @@ export default function PresupuestoVanitory({
           ...preciosBD.current, // ← precios de BD inyectados
         };
 
-        const slots = slotsRaw.map((s) => ({
-          ...s,
-          resultado: evalExpr(s.expresion, vars),
-        }));
+        const slots = slotsRaw.map((s) => {
+          if (s.tipo === "directo") {
+            const precioUnit = preciosBD.current[`precio_${s.codArticulo}`] ?? 0;
+            const base = precioUnit * s.cantidadSlot;
+            const resultado =
+              Math.round(base * (1 + (s.margenSlot || 0) / 100) * 100) / 100;
+            return { ...s, precioUnit, resultado };
+          }
+          return { ...s, resultado: evalExpr(s.expresion, vars) };
+        });
         const suma = slots.reduce((a, s) => a + (s.resultado ?? 0), 0);
         setSlotsFormulas(slots);
         setTotalSlots(Math.round(suma * 100) / 100);
@@ -496,10 +539,9 @@ export default function PresupuestoVanitory({
       }
     };
 
-    const actualizados = slotsFormulas.map((s) => ({
-      ...s,
-      resultado: evalExpr(s.expresion),
-    }));
+    const actualizados = slotsFormulas.map((s) =>
+      s.tipo === "directo" ? s : { ...s, resultado: evalExpr(s.expresion) },
+    );
     const suma = actualizados.reduce((a, s) => a + (s.resultado ?? 0), 0);
     setSlotsFormulas(actualizados);
     setTotalSlots(Math.round(suma * 100) / 100);
@@ -1776,6 +1818,20 @@ export default function PresupuestoVanitory({
                               }}
                             >
                               #{slot.codform}
+                            </div>
+                          )}
+                          {slot.tipo === "directo" && (
+                            <div
+                              style={{
+                                fontSize: "10px",
+                                color: "#4a8ab5",
+                                fontFamily: "monospace",
+                                marginTop: 2,
+                                letterSpacing: "0.04em",
+                              }}
+                            >
+                              {slot.codArticulo} · {formatPeso(slot.precioUnit)} × {slot.cantidadSlot}
+                              {slot.margenSlot ? ` (+${slot.margenSlot}%)` : ""}
                             </div>
                           )}
                         </div>
