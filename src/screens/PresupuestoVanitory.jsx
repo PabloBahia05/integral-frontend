@@ -403,7 +403,7 @@ export default function PresupuestoVanitory({
                 : 0,
           precio_bisagra: Number(form.bisagraPrecio) || 0,
           cant_bisagras: Number(form.bisagraCantidad) || 0,
-          cant_cajones_verticales: Number(form.cajonesVerticales) || 0,
+          cant: Number(form.cajonesVerticales) || 0,
           lateral_der: form.lateralDer,
           lateral_izq: form.lateralIzq,
           base_color: form.base,
@@ -583,7 +583,7 @@ export default function PresupuestoVanitory({
       profundidad: profundo,
       cantidad,
       colocacion,
-      cant_cajones_verticales: Number(form.cajonesVerticales) || 0,
+      cant: Number(form.cajonesVerticales) || 0,
       precio_material: Number(materialPrecio) || 0,
       precio_base: modelo?.PRECIO_BASE ? parseFloat(modelo.PRECIO_BASE) : 0,
     };
