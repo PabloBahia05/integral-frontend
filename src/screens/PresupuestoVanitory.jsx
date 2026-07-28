@@ -285,11 +285,18 @@ export default function PresupuestoVanitory({
         // Armar slots sin evaluar todavía
         const slotsRaw = [];
         for (let i = 1; i <= 10; i++) {
-          const codform = row[`codf${i}`] ?? row[`CODF${i}`] ?? null;
-          const expresion = row[`form${i}`] ?? row[`FORM${i}`] ?? null;
-          if (!codform && !expresion) continue;
+          // form{i} guarda el código de la fórmula elegida en Asociaciones
+          // (codf{i} no se usa desde esa pantalla). Buscamos ese código en
+          // la tabla `formulas` para obtener la expresión real a evaluar.
+          const codform =
+            row[`codf${i}`] ??
+            row[`CODF${i}`] ??
+            row[`form${i}`] ??
+            row[`FORM${i}`] ??
+            null;
+          if (!codform) continue;
 
-          const fDef = codform ? formulasMap[codform.toUpperCase()] : null;
+          const fDef = formulasMap[codform.toUpperCase()] ?? null;
           const nombre = fDef
             ? (fDef.articulo ??
               fDef.ARTICULO ??
@@ -297,17 +304,12 @@ export default function PresupuestoVanitory({
               fDef.NOMBRE ??
               fDef.descripcion ??
               codform)
-            : (codform ?? `Fórmula ${i}`);
+            : codform;
 
-          // Priorizar la expresión guardada en asociaciones_form (form{i}),
-          // y usar la fórmula de la tabla formulas solo como fallback si
-          // asociaciones_form no tiene expresión propia para ese slot.
-          const exprFinal =
-            expresion ||
-            (fDef
-              ? (fDef.formula ?? fDef.FORMULA ?? fDef.expresion ?? "")
-              : "") ||
-            "";
+          const exprFinal = fDef
+            ? (fDef.formula ?? fDef.FORMULA ?? fDef.expresion ?? "")
+            : "";
+          if (!exprFinal) continue;
           slotsRaw.push({ codform, nombre, expresion: exprFinal, slot: i });
         }
 
