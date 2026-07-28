@@ -22,6 +22,8 @@ const precioDeArticulo = (a) => {
 const EMPTY = () => ({
   codartint: "",
   articulo: "",
+  codf: "",
+  form: "",
   cod1: "",
   art1: "",
   cant1: 1,
@@ -942,6 +944,45 @@ export default function Asociaciones({
                                 </div>
                               </div>
 
+                              {/* fórmula principal del artículo padre */}
+                              <div className="ep-sec">
+                                Fórmula Principal (opcional)
+                              </div>
+                              <div className="ep-padre">
+                                <div>
+                                  <div className="ep-lbl">Fórmula</div>
+                                  <select
+                                    className="ep-sel"
+                                    value={editForm.codf ?? ""}
+                                    onChange={(e) => {
+                                      const found = formulasList.find(
+                                        (f) => f.codform === e.target.value,
+                                      );
+                                      setEditForm((f) => ({
+                                        ...f,
+                                        codf: e.target.value,
+                                        form:
+                                          found?.formula ??
+                                          found?.FORMULA ??
+                                          "",
+                                      }));
+                                    }}
+                                  >
+                                    <option value="">
+                                      — Sin fórmula principal —
+                                    </option>
+                                    {formulasList.map((f) => (
+                                      <option key={f.codform} value={f.codform}>
+                                        {f.codform}
+                                        {f.descripcion
+                                          ? ` — ${f.descripcion}`
+                                          : ""}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+
                               {/* slots */}
                               <div className="ep-sec">Artículos Asociados</div>
                               <div className="slots-wrap">
@@ -1061,6 +1102,36 @@ export default function Asociaciones({
                     })()}
                     readOnly
                   />
+                </div>
+              </div>
+
+              {/* fórmula principal del artículo padre */}
+              <div className="ep-sec">Fórmula Principal (opcional)</div>
+              <div className="ep-padre">
+                <div>
+                  <div className="ep-lbl">Fórmula</div>
+                  <select
+                    className="ep-sel"
+                    value={newForm.codf ?? ""}
+                    onChange={(e) => {
+                      const found = formulasList.find(
+                        (f) => f.codform === e.target.value,
+                      );
+                      setNewForm((f) => ({
+                        ...f,
+                        codf: e.target.value,
+                        form: found?.formula ?? found?.FORMULA ?? "",
+                      }));
+                    }}
+                  >
+                    <option value="">— Sin fórmula principal —</option>
+                    {formulasList.map((f) => (
+                      <option key={f.codform} value={f.codform}>
+                        {f.codform}
+                        {f.descripcion ? ` — ${f.descripcion}` : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
