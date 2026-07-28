@@ -2760,6 +2760,10 @@ export default function PresupuestoNuevo({
     .clausula { font-size: 11px; color: #333; border-top: 1px dashed #999; padding-top: 8px; margin-top: 14px; margin-bottom: 14px; }
     .observaciones { font-size: 11px; color: #111; white-space: pre-wrap; margin-top: 10px; }
     .footer { margin-top: auto; border-top: 1px solid #111; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #333; }
+    /* Evita que html2pdf corte una imagen a la mitad entre dos hojas A4:
+       si no entra completa en lo que queda de página, la empuja entera a
+       la siguiente. */
+    img, .sec-fotos, .adjunto-imagen { page-break-inside: avoid; break-inside: avoid; }
     `;
 
     const pageHTML = `
@@ -2869,6 +2873,13 @@ export default function PresupuestoNuevo({
               "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js",
             );
 
+      // Antes: format usaba scrollHeight, generando UNA sola página del
+      // tamaño de todo el contenido. Eso hacía que, al imprimir en A4 real,
+      // el corte entre hojas físicas cayera en cualquier punto (incluso en
+      // medio de una foto), porque el PDF mismo no tenía páginas reales.
+      // Ahora: alto fijo de A4 (1123px), para que html2pdf pagine de
+      // verdad, + "pagebreak.avoid" para que nunca corte a la mitad de una
+      // imagen (empuja la imagen entera a la página siguiente en su lugar).
       const opcionesPDF = {
         margin: 0,
         image: { type: "jpeg", quality: 0.98 },
@@ -2879,8 +2890,12 @@ export default function PresupuestoNuevo({
         },
         jsPDF: {
           unit: "px",
-          format: [794, Math.max(paginaEl.scrollHeight, 1123)],
+          format: [794, 1123],
           orientation: "portrait",
+        },
+        pagebreak: {
+          mode: ["css", "legacy"],
+          avoid: ["img", ".sec-fotos", ".adjunto-imagen"],
         },
       };
 
