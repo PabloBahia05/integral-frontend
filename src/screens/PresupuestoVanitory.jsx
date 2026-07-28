@@ -264,12 +264,19 @@ export default function PresupuestoVanitory({
           : asocData
             ? [asocData]
             : [];
+        console.log(
+          "[Vanitory] asociaciones-form recibidas:",
+          todos.length,
+          todos.map((a) => a.codartint ?? a.CODARTINT ?? a.codart ?? a.CODART),
+        );
+        console.log("[Vanitory] buscando codart modelo:", modelo.codart);
         const row =
           todos.find(
             (a) =>
               (a.codartint ?? a.CODARTINT ?? a.codart ?? a.CODART ?? "")
                 .toUpperCase() === (modelo.codart ?? "").toUpperCase(),
           ) ?? null;
+        console.log("[Vanitory] row encontrada:", row);
         if (!row) {
           setSlotsFormulas([]);
           setTotalSlots(0);
@@ -281,6 +288,10 @@ export default function PresupuestoVanitory({
           const cod = f.codform ?? f.CODFORM ?? "";
           if (cod) formulasMap[cod.toUpperCase()] = f;
         });
+        console.log(
+          "[Vanitory] formulas cargadas:",
+          Object.keys(formulasMap),
+        );
 
         // Armar slots sin evaluar todavía
         const slotsRaw = [];
@@ -297,6 +308,10 @@ export default function PresupuestoVanitory({
           if (!codform) continue;
 
           const fDef = formulasMap[codform.toUpperCase()] ?? null;
+          console.log(
+            `[Vanitory] slot ${i} → codform="${codform}" → fDef:`,
+            fDef,
+          );
           const nombre = fDef
             ? (fDef.articulo ??
               fDef.ARTICULO ??
@@ -312,6 +327,8 @@ export default function PresupuestoVanitory({
           if (!exprFinal) continue;
           slotsRaw.push({ codform, nombre, expresion: exprFinal, slot: i });
         }
+        console.log("[Vanitory] slotsRaw armados:", slotsRaw);
+
 
         // Recolectar todos los codarts únicos usados como precio_XXXX en las expresiones
         const todasExpresiones = slotsRaw.map((s) => s.expresion).join(" ");
