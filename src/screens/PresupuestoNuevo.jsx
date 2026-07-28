@@ -1923,6 +1923,15 @@ export default function PresupuestoNuevo({
     // cambio de dependencia vuelve a disparar este mismo efecto, esta vez
     // con datos completos.
     if (!listaPrecio) return;
+    // No recalcular si listasDB todavía no llegó del fetch a /lista: si
+    // corriéramos acá, listaActiva no encuentra nada (listasDB === []),
+    // listaPorcentaje da 0, y ese 0% queda "horneado" en cocinaItems/
+    // placardItems. Como listasDB no formaba parte de las dependencias de
+    // este efecto, cuando /lista finalmente resolvía no se volvía a
+    // disparar el recálculo — el precio quedaba pisado sin el % de lista
+    // aunque listaPrecio nunca haya cambiado (bug: se perdía el +21% de
+    // Lista 3 al crear una nueva revisión).
+    if (listasDB.length === 0) return;
     // Ajuste con scope a un ítem puntual: no está cubierto por
     // conAjusteGeneral (no hay dónde persistir el scope en BD), lo maneja
     // aplicarAjuste/revertirAjuste mutando esa fila directamente. Si
@@ -1943,7 +1952,7 @@ export default function PresupuestoNuevo({
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listaPrecio, ajusteAplicado, ajusteValor, ajusteModo, ajusteScope]);
+  }, [listaPrecio, listasDB, ajusteAplicado, ajusteValor, ajusteModo, ajusteScope]);
 
   // Sincronizar cocina y placard con la tabla de presupuesto
   useEffect(() => {
