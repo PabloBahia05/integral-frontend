@@ -38,6 +38,7 @@ export default function PresupuestoVanitory({
   const [form, setForm] = useState({
     cliente: "",
     cantidad: 1,
+    cajonesVerticales: 2,
     ancho: 60,
     alto: 50,
     profundo: 45,
@@ -402,6 +403,7 @@ export default function PresupuestoVanitory({
                 : 0,
           precio_bisagra: Number(form.bisagraPrecio) || 0,
           cant_bisagras: Number(form.bisagraCantidad) || 0,
+          cant_cajones_verticales: Number(form.cajonesVerticales) || 0,
           lateral_der: form.lateralDer,
           lateral_izq: form.lateralIzq,
           base_color: form.base,
@@ -581,6 +583,7 @@ export default function PresupuestoVanitory({
       profundidad: profundo,
       cantidad,
       colocacion,
+      cant_cajones_verticales: Number(form.cajonesVerticales) || 0,
       precio_material: Number(materialPrecio) || 0,
       precio_base: modelo?.PRECIO_BASE ? parseFloat(modelo.PRECIO_BASE) : 0,
     };
@@ -775,6 +778,7 @@ export default function PresupuestoVanitory({
       <div class="info-row"><span class="info-label">Cliente</span><span class="info-value">${form.cliente || "—"}</span></div>
       <div class="info-row"><span class="info-label">Modelo</span><span class="info-value">${modelo?.nombre ?? "Personalizado"}</span></div>
       <div class="info-row"><span class="info-label">Cantidad</span><span class="info-value">${form.cantidad} unidad(es)</span></div>
+      <div class="info-row"><span class="info-label">Cajones verticales</span><span class="info-value">${form.cajonesVerticales}</span></div>
       <div class="info-row"><span class="info-label">Medidas</span><span class="info-value">${form.ancho} × ${form.alto} × ${form.profundo} cm</span></div>
       ${form.material ? `<div class="info-row"><span class="info-label">Material</span><span class="info-value">${form.material}</span></div>` : ""}
       ${form.corredera ? `<div class="info-row"><span class="info-label">Correderas</span><span class="info-value">${form.corredera} × ${form.correderaCantidad} u.</span></div>` : ""}
@@ -1575,6 +1579,23 @@ export default function PresupuestoVanitory({
                   value={form.cantidad}
                   onChange={(e) =>
                     setForm({ ...form, cantidad: Number(e.target.value) })
+                  }
+                />
+              </div>
+
+              {/* Cajones verticales */}
+              <div className="field">
+                <span className="label-text">CANTIDAD DE CAJONES VERTICALES</span>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  value={form.cajonesVerticales}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      cajonesVerticales: Math.max(0, Number(e.target.value)),
+                    }))
                   }
                 />
               </div>
