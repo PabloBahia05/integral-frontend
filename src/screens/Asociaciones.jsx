@@ -622,7 +622,11 @@ export default function Asociaciones({
   };
   const saveEdit = () => {
     if (!editForm) return;
-    onSave?.({ id: editId, ...editForm });
+    // codartint es solo un campo de uso interno en el front (para mostrar
+    // el código en la tabla); la tabla "asociaciones" no tiene esa columna,
+    // así que no se manda al backend.
+    const { codartint, ...editFormSinCodartint } = editForm;
+    onSave?.({ id: editId, ...editFormSinCodartint });
     cancelEdit();
   };
 
@@ -640,7 +644,9 @@ export default function Asociaciones({
   };
   const saveNew = () => {
     if (!newForm.codartint && !newForm.articulo) return;
-    onSave?.({ ...newForm });
+    // mismo motivo que en saveEdit: codartint no es columna real.
+    const { codartint, ...newFormSinCodartint } = newForm;
+    onSave?.({ ...newFormSinCodartint });
     closeNew();
   };
 
