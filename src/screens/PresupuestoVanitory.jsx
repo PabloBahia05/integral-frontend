@@ -459,7 +459,7 @@ export default function PresupuestoVanitory({
                 : 0,
           precio_bisagra: Number(form.bisagraPrecio) || 0,
           cant_bisagras: Number(form.bisagraCantidad) || 0,
-          cant: Number(form.cajonesVerticales) || 0,
+          cantcjver: Number(form.cajonesVerticales) || 0,
           lateral_der: form.lateralDer,
           lateral_izq: form.lateralIzq,
           base_color: form.base,
@@ -496,6 +496,7 @@ export default function PresupuestoVanitory({
       profundidad: Number(form.profundo),
       cantidad: Number(form.cantidad),
       colocacion: Number(form.colocacion),
+      cantcjver: Number(form.cajonesVerticales) || 0,
       precio_material: Number(form.materialPrecio) || 0,
       precio_lateral_der:
         form.lateralDer === "COLOR"
@@ -553,6 +554,7 @@ export default function PresupuestoVanitory({
     form.profundo,
     form.cantidad,
     form.colocacion,
+    form.cajonesVerticales,
     form.materialPrecio,
     form.materialBlancoPrecio,
     form.lateralDer,
@@ -644,7 +646,7 @@ export default function PresupuestoVanitory({
       profundidad: profundo,
       cantidad,
       colocacion,
-      cant: Number(form.cajonesVerticales) || 0,
+      cantcjver: Number(form.cajonesVerticales) || 0,
       precio_material: Number(materialPrecio) || 0,
       precio_base: modelo?.PRECIO_BASE ? parseFloat(modelo.PRECIO_BASE) : 0,
     };
@@ -687,6 +689,7 @@ export default function PresupuestoVanitory({
     form.profundo,
     form.cantidad,
     form.colocacion,
+    form.cajonesVerticales,
     form.materialPrecio,
     slotsFormulas,
   ]);
