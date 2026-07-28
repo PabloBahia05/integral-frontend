@@ -516,6 +516,19 @@ export default function Asociaciones({
       porCodigo.get(row.codartint) || porNombre.get(row.articulo) || "";
   }, [articulosList]);
 
+  // El código tampoco está guardado en la fila de "asociaciones" (solo el
+  // nombre del artículo padre): se resuelve buscando el artículo padre por
+  // nombre en articulosList, igual que rubroDeArticulo.
+  const codigoDeArticulo = useMemo(() => {
+    const porNombreCod = new Map();
+    articulosList.forEach((a) => {
+      const cod = a.codartint ?? a.codart ?? "";
+      if (a.articulo && cod) porNombreCod.set(a.articulo, cod);
+    });
+    return (row) =>
+      row.codartint || porNombreCod.get(row.articulo) || "";
+  }, [articulosList]);
+
   const formulasList = formulas;
 
   // edición inline
@@ -764,7 +777,11 @@ export default function Asociaciones({
                           <span className="b-id">{row.id}</span>
                         </td>
                         <td>
-                          <span className="b-cod">{row.codartint}</span>
+                          {codigoDeArticulo(row) ? (
+                            <span className="b-cod">{codigoDeArticulo(row)}</span>
+                          ) : (
+                            <span className="sv-mt">—</span>
+                          )}
                         </td>
                         <td>
                           {rubroDeArticulo(row) ? (
