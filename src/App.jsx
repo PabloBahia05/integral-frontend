@@ -8,9 +8,6 @@ import VerTablas from "./screens/VerTablas";
 import Margen from "./screens/Margen";
 import Lista from "./screens/Lista";
 import PresupuestosMamparasTabla from "./screens/PresupuestosMamparasTabla";
-import TiposVanitory from "./screens/TiposVanitory";
-import ArmarVanitory from "./screens/ArmarVanitory";
-import BreakdownFormulasVanitory from "./screens/BreakdownFormulasVanitory";
 import PresupuestosVanitoryTabla from "./screens/PresupuestosVanitoryTabla";
 import PresupuestoAmoblamiento from "./screens/PresupuestoAmoblamiento";
 import PresupuestoNuevo from "./screens/PresupuestoNuevo";
@@ -34,7 +31,6 @@ const SCREENS = {
   "presupuesto-mamparas": { label: "PRESUPUESTO MAMPARAS", icon: "🪟" },
   "ver-tablas": { label: "VER TABLAS", icon: "🗃️" },
   "presupuestos-tabla": { label: "PRESUPUESTOS MAMPARAS", icon: "📋" },
-  "presupuesto-vanitory": { label: "PRESUPUESTO VANITORY", icon: "🚿" },
   "presupuestos-vanitory-tabla": { label: "PRESUPUESTOS VANITORY", icon: "🛁" },
   "presupuesto-amoblamiento": { label: "PRESUPUESTO AMOBLAMIENTO", icon: "🪑" },
   "presupuesto-nuevo": { label: "PRESUPUESTO NUEVO", icon: "📝" },
@@ -165,7 +161,6 @@ function App() {
   const [selectedColocacion, setSelectedColocacion] = useState(null);
   const [selectedCliente, setSelectedCliente] = useState(null);
   const [selectedProducto, setSelectedProducto] = useState(null);
-  const [selectedTipoVanitory, setSelectedTipoVanitory] = useState(null);
   const [selectedTipoEscritorio, setSelectedTipoEscritorio] = useState(null);
   const [selectedTipoDespensero, setSelectedTipoDespensero] = useState(null);
   const [selectedFormula, setSelectedFormula] = useState(null);
@@ -212,9 +207,6 @@ function App() {
   const [selectedFeriado, setSelectedFeriado] = useState(null);
   const [semanasAnio, setSemanasAnio] = useState([]); // solo lectura, sin selección
 
-  // ── Navegación interna Vanitory ──────────────────────────
-  const [vanitoryVista, setVanitoryVista] = useState("tipos");
-  const [vanitoryModelo, setVanitoryModelo] = useState(null);
   // ── Navegación interna Amoblamiento ─────────────────────
   const [amoblamientoVista, setAmoblamientoVista] = useState("selector");
   const [presupuestoAbierto, setPresupuestoAbierto] = useState(null);
@@ -350,7 +342,7 @@ function App() {
     if (puedeVer("clientes"))                fetchClientes();
     if (puedeVer("productos"))               fetchProductos();
     if (puedeVer("presupuesto-mamparas"))    fetchColocaciones();
-    if (puedeVer("presupuesto-vanitory"))    fetchTiposVanitory();
+    if (puedeVer("presupuesto-nuevo"))       fetchTiposVanitory();
     if (puedeVer("ver-tablas"))              fetchTiposEscritorio();
     if (puedeVer("ver-tablas"))              fetchTiposDespensero();
     if (puedeVer("ver-tablas"))              fetchFormulas();
@@ -682,10 +674,6 @@ function App() {
       addLog(`${btn.icon} Abriendo ${btn.label}`);
       if (btn.screen === "presupuestos-tabla") fetchPresupuestosMamparas();
       if (btn.screen === "lista-margenes") fetchListas();
-      if (btn.screen === "presupuesto-vanitory") {
-        setVanitoryVista("tipos");
-        setVanitoryModelo(null);
-      }
       return;
     }
 
@@ -811,7 +799,6 @@ function App() {
               "productos",
               "presupuesto-mamparas",
               "presupuesto-muebles",
-              "presupuesto-vanitory",
               "presupuestos-tabla",
               "presupuestos-vanitory-tabla",
               "presupuesto-amoblamiento",
@@ -900,36 +887,6 @@ function App() {
                 onSelectItem={(item) => console.log("Mueble:", item)}
               />
             )}
-            {screen === "presupuesto-vanitory" && vanitoryVista === "tipos" && (
-              <TiposVanitory
-                tiposVanitory={tiposVanitory}
-                selected={selectedTipoVanitory}
-                modal={modal}
-                token={token}
-                {...tiposVanitoryRUD}
-                onArmar={(modelo) => {
-                  setVanitoryModelo(modelo);
-                  setVanitoryVista("armar");
-                }}
-                onPrueba={() => setVanitoryVista("breakdown")}
-              />
-            )}
-            {screen === "presupuesto-vanitory" && vanitoryVista === "armar" && (
-              <ArmarVanitory
-                modelo={vanitoryModelo}
-                token={token}
-                onVolver={() => {
-                  setVanitoryVista("tipos");
-                  setVanitoryModelo(null);
-                }}
-              />
-            )}
-            {screen === "presupuesto-vanitory" &&
-              vanitoryVista === "breakdown" && (
-                <BreakdownFormulasVanitory
-                  onVolver={() => setVanitoryVista("tipos")}
-                />
-              )}
             {screen === "presupuesto-mamparas" && (
               <PresupuestoMamparas
                 onSelectItem={(item) => console.log("Mampara:", item)}
@@ -1177,7 +1134,6 @@ function App() {
         <h3>Menú</h3>
         {puedo("clientes", "ver") && <p onClick={() => { setScreen("clientes"); setSidebarOpen(false); }}>👥 Clientes</p>}
         {puedo("presupuesto-mamparas", "ver") && <p onClick={() => { setScreen("presupuestos-tabla"); setSidebarOpen(false); }}>📋 Presupuestos Mamparas</p>}
-        {puedo("presupuesto-vanitory", "ver") && <p onClick={() => { setScreen("presupuesto-vanitory"); setSidebarOpen(false); }}>🚿 Presupuesto Vanitory</p>}
         {puedo("productos", "ver") && <p onClick={() => { setScreen("productos"); setSidebarOpen(false); }}>🛒 Productos</p>}
         {puedo("lista-margenes", "ver") && <p onClick={() => { setScreen("lista-margenes"); fetchListas(); setSidebarOpen(false); }}>📊 Lista de Márgenes</p>}
         {puedo("facturas", "ver") && <p onClick={() => { setScreen("facturas"); setSidebarOpen(false); }}>🧾 Facturas</p>}
