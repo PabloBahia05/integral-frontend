@@ -20,7 +20,7 @@ const precioDeArticulo = (a) => {
 // código guardado en art${n}. Acá solo se define QUÉ artículo, cantidad,
 // margen y (opcional) fórmula corresponde a cada slot.
 const EMPTY = () => ({
-  codart: "",
+  codartint: "",
   articulo: "",
   cod1: "",
   art1: "",
@@ -511,7 +511,7 @@ export default function Asociaciones({
       if (a.articulo) porNombre.set(a.articulo, a.rubro);
     });
     return (row) =>
-      porCodigo.get(row.codart) || porNombre.get(row.articulo) || "";
+      porCodigo.get(row.codartint) || porNombre.get(row.articulo) || "";
   }, [articulosList]);
 
   const formulasList = formulas;
@@ -624,7 +624,7 @@ export default function Asociaciones({
     onCloseModal?.();
   };
   const saveNew = () => {
-    if (!newForm.codart && !newForm.articulo) return;
+    if (!newForm.codartint && !newForm.articulo) return;
     onSave?.({ ...newForm });
     closeNew();
   };
@@ -636,7 +636,7 @@ export default function Asociaciones({
     setNewForm({
       ...EMPTY(),
       ...rest,
-      codart: "",
+      codartint: "",
       articulo: "",
     });
     setNewRubroPadre("");
@@ -656,7 +656,7 @@ export default function Asociaciones({
     const matchTexto =
       !search ||
       (a.articulo ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (a.codart ?? "").toLowerCase().includes(search.toLowerCase());
+      (a.codartint ?? "").toLowerCase().includes(search.toLowerCase());
     const matchRubro = !rubroFiltro || rubroDeArticulo(a) === rubroFiltro;
     return matchTexto && matchRubro;
   });
@@ -762,7 +762,7 @@ export default function Asociaciones({
                           <span className="b-id">{row.id}</span>
                         </td>
                         <td>
-                          <span className="b-cod">{row.codart}</span>
+                          <span className="b-cod">{row.codartint}</span>
                         </td>
                         <td>
                           {rubroDeArticulo(row) ? (
@@ -876,7 +876,7 @@ export default function Asociaciones({
                                       setEditForm((f) => ({
                                         ...f,
                                         articulo: "",
-                                        codart: "",
+                                        codartint: "",
                                       }));
                                     }}
                                   >
@@ -900,7 +900,7 @@ export default function Asociaciones({
                                       setEditForm((f) => ({
                                         ...f,
                                         articulo: e.target.value,
-                                        codart: found?.codartint ?? "",
+                                        codartint: found?.codartint ?? "",
                                       }));
                                     }}
                                   >
@@ -916,7 +916,7 @@ export default function Asociaciones({
                                   <div className="ep-lbl">Código</div>
                                   <input
                                     className="ep-inp ro"
-                                    value={editForm.codart}
+                                    value={editForm.codartint}
                                     readOnly
                                   />
                                 </div>
@@ -999,7 +999,7 @@ export default function Asociaciones({
                     value={newRubroPadre}
                     onChange={(e) => {
                       setNewRubroPadre(e.target.value);
-                      setNewForm((f) => ({ ...f, articulo: "", codart: "" }));
+                      setNewForm((f) => ({ ...f, articulo: "", codartint: "" }));
                     }}
                   >
                     <option value="">— Todos —</option>
@@ -1022,7 +1022,7 @@ export default function Asociaciones({
                       setNewForm((f) => ({
                         ...f,
                         articulo: e.target.value,
-                        codart: found?.codartint ?? "",
+                        codartint: found?.codartint ?? "",
                       }));
                     }}
                   >
@@ -1038,7 +1038,7 @@ export default function Asociaciones({
                   <div className="ep-lbl">Código</div>
                   <input
                     className="ep-inp ro"
-                    value={newForm.codart}
+                    value={newForm.codartint}
                     readOnly
                   />
                 </div>
