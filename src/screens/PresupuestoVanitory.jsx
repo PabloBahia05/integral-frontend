@@ -266,8 +266,8 @@ export default function PresupuestoVanitory({
         const row =
           todos.find(
             (a) =>
-              (a.codart ?? a.CODART ?? "").toUpperCase() ===
-              (modelo.codart ?? "").toUpperCase(),
+              (a.codartint ?? a.CODARTINT ?? a.codart ?? a.CODART ?? "")
+                .toUpperCase() === (modelo.codart ?? "").toUpperCase(),
           ) ?? null;
         if (!row) {
           setSlotsFormulas([]);
