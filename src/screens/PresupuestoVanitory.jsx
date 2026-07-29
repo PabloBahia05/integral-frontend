@@ -667,6 +667,13 @@ export default function PresupuestoVanitory({
         body: JSON.stringify({ codart_modelo: modelo.codart, variables }),
       });
       const data = await res.json();
+      // 404 con este mensaje puntual = el modelo no tiene fórmula principal
+      // configurada (normal en vanitory: el precio sale de las fórmulas por
+      // slot, no de una fórmula única del modelo). No es un error real.
+      if (res.status === 404) {
+        setResult({ subtotal: 0 });
+        return;
+      }
       if (!res.ok) throw new Error(data.error);
       setResult({ subtotal: data.resultado });
     } catch (err) {
