@@ -203,6 +203,7 @@ function SlotEdit({
   setRubroSlots,
   rubros,
   formulasList,
+  formulasSlot,
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [abierto, setAbierto] = useState(false);
@@ -216,6 +217,7 @@ function SlotEdit({
 
   const lista = listaSlot[n] ?? [];
   const artActual = form[`art${n}`] ?? "";
+  const formulasFiltradas = formulasSlot?.[n] ?? formulasList;
 
   const filtrados = busqueda.trim()
     ? lista.filter((a) =>
@@ -430,7 +432,7 @@ function SlotEdit({
           }
         >
           <option value="">— Elegir fórmula —</option>
-          {formulasList.map((f) => (
+          {formulasFiltradas.map((f) => (
             <option key={f.codform} value={f.codform}>
               {f.codform}
               {f.descripcion ? ` — ${f.descripcion}` : ""}
@@ -516,6 +518,10 @@ export default function Asociaciones({
       porCodigo.get(row.codartint) || porNombre.get(row.articulo) || "";
   }, [articulosList]);
 
+  // Rubro de una fórmula: se resuelve por el código del artículo al que está
+  // ligada (f.codart), reusando el mismo mapa que rubroDeArticulo.
+  const rubroDeFormula = (f) => rubroDeArticulo({ codartint: f.codart });
+
   // El código tampoco está guardado en la fila de "asociaciones" (solo el
   // nombre del artículo padre): se resuelve buscando el artículo padre por
   // nombre en articulosList, igual que rubroDeArticulo.
@@ -563,6 +569,24 @@ export default function Asociaciones({
     [articulosList, newRubroPadre],
   );
 
+  // Fórmula principal: solo las que están ligadas a un artículo del mismo
+  // rubro elegido para el padre (igual criterio que listaPadreEdit/New).
+  const formulasPadreEdit = useMemo(
+    () =>
+      editRubroPadre
+        ? formulasList.filter((f) => rubroDeFormula(f) === editRubroPadre)
+        : formulasList,
+    [formulasList, editRubroPadre],
+  );
+
+  const formulasPadreNew = useMemo(
+    () =>
+      newRubroPadre
+        ? formulasList.filter((f) => rubroDeFormula(f) === newRubroPadre)
+        : formulasList,
+    [formulasList, newRubroPadre],
+  );
+
   const PROV_EXCLUIDO = "DANIEL ROQUE SRL";
 
   const filtrarSlot = (lista, rubroSlot, rubroPadre) => {
@@ -599,6 +623,29 @@ export default function Asociaciones({
         ]),
       ),
     [articulosList, newRubroSlots, newRubroPadre],
+  );
+
+  // Fórmula por slot: solo las ligadas a un artículo del rubro elegido en
+  // ese slot. Sin rubro elegido, se muestran todas (igual que listaSlot).
+  const filtrarFormulasSlot = (rubroSlot) =>
+    rubroSlot
+      ? formulasList.filter((f) => rubroDeFormula(f) === rubroSlot)
+      : formulasList;
+
+  const formulasSlotEdit = useMemo(
+    () =>
+      Object.fromEntries(
+        SLOTS.map((n) => [n, filtrarFormulasSlot(editRubroSlots[n])]),
+      ),
+    [formulasList, editRubroSlots],
+  );
+
+  const formulasSlotNew = useMemo(
+    () =>
+      Object.fromEntries(
+        SLOTS.map((n) => [n, filtrarFormulasSlot(newRubroSlots[n])]),
+      ),
+    [formulasList, newRubroSlots],
   );
 
   // iniciar edición inline
@@ -685,6 +732,7 @@ export default function Asociaciones({
   const sharedSlotProps = (isEdit) => ({
     rubros,
     formulasList,
+    formulasSlot: isEdit ? formulasSlotEdit : formulasSlotNew,
     form: isEdit ? editForm : newForm,
     setForm: isEdit ? setEditForm : setNewForm,
     listaSlot: isEdit ? listaSlotEdit : listaSlotNew,
@@ -994,7 +1042,7 @@ export default function Asociaciones({
                                     <option value="">
                                       — Sin fórmula principal —
                                     </option>
-                                    {formulasList.map((f) => (
+                                    {formulasPadreEdit.map((f) => (
                                       <option key={f.codform} value={f.codform}>
                                         {f.codform}
                                         {f.descripcion
@@ -1148,7 +1196,7 @@ export default function Asociaciones({
                     }}
                   >
                     <option value="">— Sin fórmula principal —</option>
-                    {formulasList.map((f) => (
+                    {formulasPadreNew.map((f) => (
                       <option key={f.codform} value={f.codform}>
                         {f.codform}
                         {f.descripcion ? ` — ${f.descripcion}` : ""}
