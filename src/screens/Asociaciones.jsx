@@ -518,9 +518,17 @@ export default function Asociaciones({
       porCodigo.get(row.codartint) || porNombre.get(row.articulo) || "";
   }, [articulosList]);
 
-  // Rubro de una fórmula: se resuelve por el código del artículo al que está
-  // ligada (f.codart), reusando el mismo mapa que rubroDeArticulo.
-  const rubroDeFormula = (f) => rubroDeArticulo({ codartint: f.codart });
+  // Rubro de una fórmula: viene directo del backend (f.rubro). Si por algún
+  // motivo no viniera cargado, se intenta inferir por el código del artículo
+  // ligado (f.codart) como respaldo, igual que antes.
+  const rubroDeFormula = (f) =>
+    f.rubro || f.RUBRO || rubroDeArticulo({ codartint: f.codart });
+
+  // Una fórmula "GENERAL" aplica a cualquier rubro (mismo criterio que
+  // Formulas.jsx al filtrar por rubro).
+  const formulaAplicaARubro = (f, rubroSlot) =>
+    rubroDeFormula(f) === rubroSlot ||
+    rubroDeFormula(f).toUpperCase() === "GENERAL";
 
   // El código tampoco está guardado en la fila de "asociaciones" (solo el
   // nombre del artículo padre): se resuelve buscando el artículo padre por
@@ -574,7 +582,7 @@ export default function Asociaciones({
   const formulasPadreEdit = useMemo(
     () =>
       editRubroPadre
-        ? formulasList.filter((f) => rubroDeFormula(f) === editRubroPadre)
+        ? formulasList.filter((f) => formulaAplicaARubro(f, editRubroPadre))
         : formulasList,
     [formulasList, editRubroPadre],
   );
@@ -582,7 +590,7 @@ export default function Asociaciones({
   const formulasPadreNew = useMemo(
     () =>
       newRubroPadre
-        ? formulasList.filter((f) => rubroDeFormula(f) === newRubroPadre)
+        ? formulasList.filter((f) => formulaAplicaARubro(f, newRubroPadre))
         : formulasList,
     [formulasList, newRubroPadre],
   );
@@ -629,7 +637,7 @@ export default function Asociaciones({
   // ese slot. Sin rubro elegido, se muestran todas (igual que listaSlot).
   const filtrarFormulasSlot = (rubroSlot) =>
     rubroSlot
-      ? formulasList.filter((f) => rubroDeFormula(f) === rubroSlot)
+      ? formulasList.filter((f) => formulaAplicaARubro(f, rubroSlot))
       : formulasList;
 
   const formulasSlotEdit = useMemo(
