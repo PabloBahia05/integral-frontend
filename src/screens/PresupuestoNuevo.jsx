@@ -17,6 +17,7 @@ import TablaArticulos from "./TablaArticulos";
 import PlacardSection from "./PlacardSection";
 import Observaciones from "./Observaciones";
 import EncabezadoSection from "./EncabezadoSection";
+import useCocinaPlacard from "./useCocinaPlacard";
 
 const WALLPANEL_IMG =
   "data:image/jpeg;base64,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";
@@ -601,9 +602,6 @@ export default function PresupuestoNuevo({
   const [cliente, setCliente] = useState("");
   const [codcliente, setCodcliente] = useState(null);
   const cargandoPresupuestoRef = useRef(false); // true mientras cargarPresupuesto está en curso
-  const lineasActivasClaveRef = useRef(""); // última combinación de líneas activas ya sincronizada con los ítems
-  const cocinaItemsRef = useRef({}); // espejo de cocinaItems para leer sin generar dependencia circular
-  const placardItemsRef = useRef({}); // espejo de placardItems, ídem
   const [clientesSugeridos, setClientesSugeridos] = useState([]);
   const [lineasBD, setLineasBD] = useState([]); // valores distintos de columna 'linea' en articulos
   const [telefonoSearch, setTelefonoSearch] = useState("");
@@ -941,27 +939,6 @@ export default function PresupuestoNuevo({
     }
   };
 
-  // ── Cocina ───────────────────────────────────────────────
-  // familiaActiva: null | "bajomesadas" | "alacenas"
-  const [cocinaFamilia, setCocinaFamilia] = useState(null);
-  // líneas cargadas por familia: { bajomesadas: [...], alacenas: [...] }
-  const [cocinaItems, setCocinaItems] = useState({
-    bajomesadas: [],
-    alacenas: [],
-  });
-
-  // ── Placard ──────────────────────────────────────────────
-  const [placardFamilia, setPlacardFamilia] = useState(null);
-  const [placardItems, setPlacardItems] = useState({
-    placard: [],
-    frente: [],
-    auxiliares: [],
-    accesorios: [],
-  });
-
-  cocinaItemsRef.current = cocinaItems;
-  placardItemsRef.current = placardItems;
-
   // ── Tabla resumen presupuesto (solapa Presupuesto) ───────
   // Cada ítem: { id, seccion, descripcion, cantidad, precio, subtotal }
   const [presupuestoItems, setPresupuestoItems] = useState([]);
@@ -986,134 +963,6 @@ export default function PresupuestoNuevo({
       presupuestoItems.map((it) => grupoDe(it)).filter((g) => g && g.trim()),
     ),
   ];
-
-  // ── Popover de ajuste inline por fila ───────────────────
-  // { tipo: "cocina"|"placard", familia, idx, campo: "precio"|linea_idx, anchorRect }
-  const [precioPopover, setPrecioPopover] = useState(null);
-  const [popoverModo, setPopoverModo] = useState("valor"); // "valor" | "porcentaje"
-  const [popoverInput, setPopoverInput] = useState("");
-
-  const abrirPrecioPopover = (tipo, familia, idx, campo, precioActual, e) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-
-    // Recuperar el porcentaje ya guardado en esa columna (si existe)
-    const items =
-      tipo === "cocina"
-        ? (cocinaItems[familia] ?? [])
-        : (placardItems[familia] ?? []);
-    const fila = items[idx];
-    const CAMPOS_POR_IDX = [
-      { v: "valor1", p: "porcentaje1" },
-      { v: "valor2", p: "porcentaje2" },
-      { v: "valor3", p: "porcentaje3" },
-    ];
-    let porcentajeActual = null;
-    if (fila) {
-      if (campo === "precio") {
-        porcentajeActual = fila.porcentaje1 ?? null;
-      } else if (CAMPOS_POR_IDX[campo]) {
-        porcentajeActual = fila[CAMPOS_POR_IDX[campo].p] ?? null;
-      }
-    }
-
-    setPrecioPopover({
-      tipo,
-      familia,
-      idx,
-      campo,
-      precioActual,
-      porcentajeActual,
-      rect,
-    });
-    setPopoverModo("valor");
-    setPopoverInput(String(precioActual ?? ""));
-  };
-
-  const cerrarPopover = () => {
-    setPrecioPopover(null);
-    setPopoverInput("");
-  };
-
-  const confirmarPopover = () => {
-    if (!precioPopover) return;
-    const val = parseFloat(popoverInput);
-    if (isNaN(val)) {
-      cerrarPopover();
-      return;
-    }
-    const { tipo, familia, idx, campo, precioActual } = precioPopover;
-
-    const calcNuevo = (base) => {
-      const b = parseFloat(base) || 0;
-      if (popoverModo === "valor") return val < 0 ? Math.max(0, b + val) : val;
-      return Math.round(b * (1 + val / 100) * 100) / 100;
-    };
-
-    // Devuelve { valor: "N", porcentaje: N|null } para guardar en valorN/porcentajeN
-    const calcPersist = (base) => {
-      const nuevo = calcNuevo(base);
-      return {
-        valor: nuevo,
-        porcentaje: popoverModo === "porcentaje" ? val : null,
-      };
-    };
-
-    // Mapeo índice de columna (0,1,2) → campos valor/porcentaje en la fila
-    const CAMPOS_POR_IDX = [
-      { v: "valor1", p: "porcentaje1" },
-      { v: "valor2", p: "porcentaje2" },
-      { v: "valor3", p: "porcentaje3" },
-    ];
-
-    const actualizarItems = (prev) =>
-      prev.map((fila, i) => {
-        if (i !== idx) return fila;
-
-        if (campo === "precio") {
-          // Sin líneas activas: precio único — guardamos en valor1/porcentaje1
-          const { valor, porcentaje } = calcPersist(fila.precio);
-          return {
-            ...fila,
-            precio: String(valor),
-            valor1: valor,
-            porcentaje1: porcentaje,
-          };
-        }
-
-        // campo es índice de línea (número)
-        const lineaIdx = campo; // 0-based
-        const precios = (fila.precios ?? []).map((p, li) => {
-          if (li !== lineaIdx) return p;
-          const { valor } = calcPersist(p.precio);
-          return { ...p, precio: String(valor) };
-        });
-        const nuevoPrecio = precios[0]?.precio ?? fila.precio;
-
-        // Guardar valor y porcentaje en el slot correspondiente (valorN/porcentajeN)
-        const slot = CAMPOS_POR_IDX[lineaIdx];
-        const { valor, porcentaje } = calcPersist(
-          (fila.precios?.[lineaIdx]?.precio ?? fila.precio) || 0,
-        );
-
-        const extra = slot ? { [slot.v]: valor, [slot.p]: porcentaje } : {};
-
-        return { ...fila, precios, precio: String(nuevoPrecio), ...extra };
-      });
-
-    if (tipo === "cocina") {
-      setCocinaItems((prev) => ({
-        ...prev,
-        [familia]: actualizarItems(prev[familia] ?? []),
-      }));
-    } else {
-      setPlacardItems((prev) => ({
-        ...prev,
-        [familia]: actualizarItems(prev[familia] ?? []),
-      }));
-    }
-    cerrarPopover();
-  };
 
   // ── Popover de edición inline de ítem en Presupuesto ───
   const [presItemPopover, setPresItemPopover] = useState(null); // { id, lineaIdx (null = sin líneas), precioActual, rect }
@@ -1259,6 +1108,72 @@ export default function PresupuestoNuevo({
         : Math.round((b + val) * 100) / 100;
     return n < 0 ? 0 : n;
   };
+
+  // Líneas activas elegidas en el encabezado (sin "[Sin líneas]")
+  const lineasActivas = lineas.filter(
+    (l) => l.linea && l.linea !== "[Sin líneas]",
+  );
+
+  // ── Cocina + Placard (estado y lógica extraídos a un hook propio) ──
+  const {
+    cocinaItemsRef,
+    placardItemsRef,
+    cocinaFamilia,
+    setCocinaFamilia,
+    cocinaItems,
+    setCocinaItems,
+    placardFamilia,
+    setPlacardFamilia,
+    placardItems,
+    setPlacardItems,
+    productosDB,
+    setProductosDB,
+    placardEditIdx,
+    setPlacardEditIdx,
+    placardFila,
+    setPlacardFila,
+    placardSearch,
+    setPlacardSearch,
+    placardSearchFocus,
+    setPlacardSearchFocus,
+    articulosFamilia,
+    setArticulosFamilia,
+    precioPopover,
+    popoverModo,
+    setPopoverModo,
+    popoverInput,
+    setPopoverInput,
+    abrirPrecioPopover,
+    cerrarPopover,
+    confirmarPopover,
+    placard_total,
+    normalizar,
+    getProductoFamilia,
+    nombreBase,
+    getPrecioParaLinea,
+    resolverPrecioBasePlacard,
+    productosFiltrados,
+    recalcFila,
+    handleActualizar,
+    placardAgregarFila,
+    placardEliminarFila,
+    placardGuardarEdit,
+    placardIniciarEdit,
+  } = useCocinaPlacard({
+    authFetch,
+    tab,
+    lineasActivas,
+    listaPrecio,
+    listasDB,
+    aplicarPorcentaje,
+    ajusteAplicado,
+    ajusteScope,
+    ajusteValor,
+    ajusteModo,
+    calcularAjuste,
+    cargandoPresupuestoRef,
+    setPresupuestoItems,
+  });
 
   const aplicarAjuste = () => {
     const val = parseFloat(ajusteValor);
@@ -1418,31 +1333,6 @@ export default function PresupuestoNuevo({
 
   const quitarDePresupuesto = (id) =>
     setPresupuestoItems((prev) => prev.filter((p) => p.id !== id));
-
-  // ── Estado compartido para el buscador de artículos ─────
-  // productos traídos de la BD (para el autocomplete)
-  const [productosDB, setProductosDB] = useState([]);
-  // placard edit state
-  const [placardEditIdx, setPlacardEditIdx] = useState(null);
-  const [placardFila, setPlacardFila] = useState({
-    articulo: "",
-    nombreart: "",
-    cantidad: 1,
-    precio: "",
-    precios: [],
-    precioPlacard: "",
-    margen: null,
-    valor1: null,
-    porcentaje1: null,
-    valor2: null,
-    porcentaje2: null,
-    valor3: null,
-    porcentaje3: null,
-  });
-  const [placardSearch, setPlacardSearch] = useState("");
-  const [placardSearchFocus, setPlacardSearchFocus] = useState(false);
-  // Artículos del endpoint agrupado (por familia activa)
-  const [articulosFamilia, setArticulosFamilia] = useState([]);
 
   useEffect(() => {
     // Próximo número
@@ -1812,189 +1702,6 @@ export default function PresupuestoNuevo({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presupuestoInicial]);
 
-  // Recargar artículos cuando cambia la familia activa (placard)
-  // Nota: cocina maneja su propia familia internamente en TabCocina
-  const familiaActivaActual =
-    tab === "placard" ? placardFamilia : null;
-  useEffect(() => {
-    if (!familiaActivaActual) {
-      setArticulosFamilia([]);
-      return;
-    }
-    // Mapear nombre interno → nombre en BD
-    const familiaMap = {
-      bajomesadas: "Bajomesada",
-      alacenas: "Alacena",
-      placard: "PLACARD",
-      frente: "FRENTE DE PLACARD",
-      auxiliares: "Auxiliares",
-      accesorios: "Accesorios",
-    };
-    const familiaBD = familiaMap[familiaActivaActual] ?? familiaActivaActual;
-    authFetch(
-      `${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`,
-    )
-      .then((r) => r.json())
-      .then((data) => setArticulosFamilia(Array.isArray(data) ? data : []))
-      .catch(() => {});
-  }, [familiaActivaActual]);
-
-  // Recalcula una fila aplicando el porcentaje de la lista activa
-  // + el porcentaje extra propio del ítem (si lo tiene), compuestos.
-  const recalcFila = (fila) => {
-    const PCT_POR_IDX = ["porcentaje1", "porcentaje2", "porcentaje3"];
-    const conExtra = (precioConLista, pctExtra) => {
-      if (pctExtra == null || pctExtra === "") return precioConLista;
-      const p = parseFloat(precioConLista) || 0;
-      const extra = parseFloat(pctExtra) || 0;
-      return String(Math.round(p * (1 + extra / 100) * 100) / 100);
-    };
-    // Ajuste general (panel "AJUSTE DE PRECIOS"): mismo patrón que %lista y
-    // %item — se aplica como un factor más sobre el precio, nunca se
-    // "hornea" por separado. Solo cubre el scope "todos": el scope a un
-    // ítem puntual se sigue manejando aparte en aplicarAjuste/revertirAjuste
-    // porque no hay dónde persistir ese scope en tabla_presupuestos.
-    const conAjusteGeneral = (precio) => {
-      if (!ajusteAplicado || ajusteScope !== "todos") return precio;
-      const val = parseFloat(ajusteValor);
-      if (!val || isNaN(val)) return precio;
-      return String(calcularAjuste(precio, val));
-    };
-
-    if (fila.preciosBase && fila.preciosBase.length > 0) {
-      const nuevosPrecios = fila.preciosBase.map((pb, li) => {
-        const conLista = aplicarPorcentaje(pb.precioBase);
-        const pctExtra = fila[PCT_POR_IDX[li]];
-        return {
-          linea: pb.linea,
-          precioBase: pb.precioBase,
-          precio: conAjusteGeneral(conExtra(conLista, pctExtra)),
-        };
-      });
-      const nuevoPrecio =
-        nuevosPrecios[0]?.precio ?? fila.precioBase ?? fila.precio;
-      return { ...fila, precios: nuevosPrecios, precio: String(nuevoPrecio) };
-    }
-    if (fila.precioBase != null && fila.precioBase !== "") {
-      const conLista = aplicarPorcentaje(fila.precioBase);
-      return {
-        ...fila,
-        precio: conAjusteGeneral(conExtra(conLista, fila.porcentaje1)),
-      };
-    }
-    return fila;
-  };
-
-  // Actualiza todo el front con los parámetros actuales del encabezado — sin tocar el backend
-  const handleActualizar = () => {
-    setCocinaItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map(recalcFila);
-      }
-      return next;
-    });
-    setPlacardItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map(recalcFila);
-      }
-      return next;
-    });
-  };
-
-  // Recalcular precios cuando cambia la lista de precios o el ajuste general.
-  // recalcFila ahora es la única fuente de verdad para el precio final
-  // (base × %lista × %item × %ajusteGeneral), así que este efecto puede
-  // recalcular sin miedo a perder el ajuste general: si está aplicado
-  // (scope "todos"), recalcFila lo vuelve a incluir solo.
-  useEffect(() => {
-    // No recalcular mientras se está cargando un presupuesto existente: los
-    // datos que trae la BD (base1/2/3, porcentaje1/2/3, ajusteValor/Modo)
-    // todavía se están restaurando y recalcular a mitad de camino podría
-    // usar valores parciales.
-    if (cargandoPresupuestoRef.current) return;
-    // No recalcular si todavía no se resolvió la lista de precios activa
-    // (fetch a /lista en curso, o listaPendienteRef.current sin aplicar
-    // todavía). Sin este guard, este efecto puede dispararse con
-    // listaPrecio === "" -> listaPorcentaje da 0 -> se pisa el precio bien
-    // cargado desde la BD (con %lista y/o %ajuste ya incluidos) con uno
-    // recalculado incompleto. Cuando listaPrecio finalmente se setea, el
-    // cambio de dependencia vuelve a disparar este mismo efecto, esta vez
-    // con datos completos.
-    if (!listaPrecio) return;
-    // No recalcular si listasDB todavía no llegó del fetch a /lista: si
-    // corriéramos acá, listaActiva no encuentra nada (listasDB === []),
-    // listaPorcentaje da 0, y ese 0% queda "horneado" en cocinaItems/
-    // placardItems. Como listasDB no formaba parte de las dependencias de
-    // este efecto, cuando /lista finalmente resolvía no se volvía a
-    // disparar el recálculo — el precio quedaba pisado sin el % de lista
-    // aunque listaPrecio nunca haya cambiado (bug: se perdía el +21% de
-    // Lista 3 al crear una nueva revisión).
-    if (listasDB.length === 0) return;
-    // Ajuste con scope a un ítem puntual: no está cubierto por
-    // conAjusteGeneral (no hay dónde persistir el scope en BD), lo maneja
-    // aplicarAjuste/revertirAjuste mutando esa fila directamente. Si
-    // recalculáramos acá igual, pisaríamos ese ajuste puntual.
-    if (ajusteAplicado && ajusteScope !== "todos") return;
-    setCocinaItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map(recalcFila);
-      }
-      return next;
-    });
-    setPlacardItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map(recalcFila);
-      }
-      return next;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listaPrecio, listasDB, ajusteAplicado, ajusteValor, ajusteModo, ajusteScope]);
-
-  // Sincronizar cocina y placard con la tabla de presupuesto
-  useEffect(() => {
-    const toItems = (seccion, itemsObj) =>
-      Object.entries(itemsObj).flatMap(([familia, filas]) =>
-        filas.map((f, i) => ({
-          id: `${seccion}-${familia}-${i}`,
-          seccion:
-            seccion === "cocina"
-              ? `Cocina / ${familia.charAt(0).toUpperCase() + familia.slice(1)}`
-              : `Placard / ${familia.charAt(0).toUpperCase() + familia.slice(1)}`,
-          descripcion: f.articulo,
-          nombreart: f.nombreart ?? "",
-          cantidad: parseFloat(f.cantidad) || 1,
-          precio: parseFloat(f.precio) || 0,
-          subtotal: (parseFloat(f.precio) || 0) * (parseFloat(f.cantidad) || 1),
-          precios: f.precios ?? [],
-          precioBase: f.precioBase ?? null,
-          preciosBase: f.preciosBase ?? [],
-          margen: f.margen ?? null,
-          valor1: f.valor1 ?? null,
-          porcentaje1: f.porcentaje1 ?? null,
-          valor2: f.valor2 ?? null,
-          porcentaje2: f.porcentaje2 ?? null,
-          valor3: f.valor3 ?? null,
-          porcentaje3: f.porcentaje3 ?? null,
-          grupo: f.grupo && f.grupo.trim() ? f.grupo.trim() : null,
-        })),
-      );
-
-    const cocinaRows = toItems("cocina", cocinaItems);
-    const placardRows = toItems("placard", placardItems);
-
-    setPresupuestoItems((prev) => {
-      // Mantener los ítems de mampara/especiales, reemplazar cocina/placard
-      const otros = prev.filter(
-        (p) => !p.id.startsWith("cocina-") && !p.id.startsWith("placard-"),
-      );
-      return [...cocinaRows, ...placardRows, ...otros];
-    });
-  }, [cocinaItems, placardItems]);
-
   // ── Resolución automática de cliente ────────────────────────────────────
   // Cuando el usuario carga nombre + teléfono a mano (sin elegir una
   // sugerencia de la lista):
@@ -2174,221 +1881,6 @@ export default function PresupuestoNuevo({
     setLineas((prev) =>
       prev.map((l, i) => (i === idx ? { ...l, [field]: val } : l)),
     );
-  };
-
-  const placard_total = (familia) =>
-    placardItems[familia]?.reduce(
-      (s, r) => s + (parseFloat(r.precio) || 0) * (parseFloat(r.cantidad) || 0),
-      0,
-    ) ?? 0;
-
-  // Normaliza un string: minúsculas y sin tildes
-  const normalizar = (s) =>
-    String(s ?? "")
-      .toLowerCase()
-      .trim()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-
-  // Devuelve la familia del producto desde el campo 'familia'
-  const getProductoFamilia = (p) => normalizar(p.familia ?? p.FAMILIA ?? "");
-
-  // Quita el sufijo de número de línea al final
-  // Ejemplos: "Bajomesada 100 2 Ptas Nº 14" → "Bajomesada 100 2 Ptas"
-  const nombreBase = (nombre) => {
-    const s = String(nombre ?? "").trim();
-    const result = s.replace(/\s+N.{0,3}\s*\d+\s*$/i, "").trim();
-    return result || s;
-  };
-
-  // Líneas activas elegidas en el encabezado (sin "[Sin líneas]")
-  const lineasActivas = lineas.filter(
-    (l) => l.linea && l.linea !== "[Sin líneas]",
-  );
-
-  // Completar preciosBase/precios de ítems YA cargados cuando se agrega
-  // (o se saca) una línea en el Encabezado. Sin esto, un ítem cargado antes
-  // de activar "Línea 1" nunca tiene precios[1], y la tabla cae al fallback
-  // item.precio (el de la primera línea) para las columnas nuevas.
-  useEffect(() => {
-    if (cargandoPresupuestoRef.current) return;
-    const clave = lineasActivas.map((l) => l.linea).join("|");
-    if (clave === lineasActivasClaveRef.current) return;
-    lineasActivasClaveRef.current = clave;
-    if (lineasActivas.length === 0) return;
-
-    const familiaMapCocina = { bajomesadas: "Bajomesada", alacenas: "Alacena" };
-    const familiaMapPlacard = {
-      bajomesadas: "Bajomesada",
-      alacenas: "Alacena",
-      placard: "PLACARD",
-      frente: "FRENTE DE PLACARD",
-      auxiliares: "Auxiliares",
-      accesorios: "Accesorios",
-    };
-
-    // Alinea preciosBase de una fila con lineasActivas, completando solo
-    // las líneas que le falten (no toca las que ya tenía).
-    const alinearPreciosBaseConLineas = (fila, mapaArticulos) => {
-      const actuales = fila.preciosBase ?? [];
-      const tieneTodas = lineasActivas.every((l) =>
-        actuales.some((pb) => pb.linea === l.linea),
-      );
-      if (tieneTodas) return fila;
-
-      const art = mapaArticulos.get(fila.articulo);
-      const combinado = lineasActivas.map((l) => {
-        const existente = actuales.find((pb) => pb.linea === l.linea);
-        if (existente) return existente;
-        return {
-          linea: l.linea,
-          precioBase: art?.precios?.[String(l.linea)] ?? "",
-        };
-      });
-      return recalcFila({ ...fila, preciosBase: combinado });
-    };
-
-    const familiasConItems = (itemsObj, familiaMap) =>
-      Object.entries(itemsObj)
-        .filter(([, filas]) => filas?.length)
-        .map(([familia]) => familiaMap[familia] ?? familia);
-
-    const familiasBDNecesarias = new Set([
-      ...familiasConItems(cocinaItemsRef.current, familiaMapCocina),
-      ...familiasConItems(placardItemsRef.current, familiaMapPlacard),
-    ]);
-    if (familiasBDNecesarias.size === 0) return;
-
-    Promise.all(
-      [...familiasBDNecesarias].map((familiaBD) =>
-        authFetch(`${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`)
-          .then((r) => r.json())
-          .then((data) => [familiaBD, Array.isArray(data) ? data : []])
-          .catch(() => [familiaBD, []]),
-      ),
-    ).then((resultados) => {
-      const mapaPorFamiliaBD = new Map(resultados);
-      const mapaArticulosDe = (familiaInterna, familiaMap) => {
-        const familiaBD = familiaMap[familiaInterna] ?? familiaInterna;
-        const lista = mapaPorFamiliaBD.get(familiaBD) ?? [];
-        return new Map(lista.map((a) => [a.articulo, a]));
-      };
-
-      setCocinaItems((prev) => {
-        const next = {};
-        for (const [familia, filas] of Object.entries(prev)) {
-          const mapa = mapaArticulosDe(familia, familiaMapCocina);
-          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa));
-        }
-        return next;
-      });
-      setPlacardItems((prev) => {
-        const next = {};
-        for (const [familia, filas] of Object.entries(prev)) {
-          const mapa = mapaArticulosDe(familia, familiaMapPlacard);
-          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa));
-        }
-        return next;
-      });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lineasActivas]);
-
-
-  // Dado un nombre base, devuelve el precio para una línea específica (usa datos del nuevo endpoint)
-  const getPrecioParaLinea = (base, lineaNombre) => {
-    const art = articulosFamilia.find((a) => a.articulo === base);
-    return art?.precios?.[String(lineaNombre)] ?? null;
-  };
-
-  // Placard tiene su propia línea de precios fija en la base de datos (línea 15),
-  // independiente de las líneas que se hayan elegido en el Encabezado (16, 21, etc.).
-  // Si el artículo no tiene precio cargado para ninguna de las líneas activas,
-  // se usa la línea 15 como respaldo — sin necesidad de activarla en Encabezado.
-  const LINEA_FIJA_PLACARD = "15";
-  const resolverPrecioBasePlacard = (articuloBD) => {
-    const preciosBase = lineasActivas.map((l) => ({
-      linea: l.linea,
-      precioBase: articuloBD.precios?.[String(l.linea)] ?? "",
-    }));
-    let precioBaseUsar = preciosBase[0]?.precioBase;
-    if (precioBaseUsar == null || precioBaseUsar === "") {
-      const p15 = articuloBD.precios?.[LINEA_FIJA_PLACARD];
-      precioBaseUsar = p15 != null && p15 !== "" ? p15 : "";
-    }
-    return { preciosBase, precioBaseUsar };
-  };
-
-  // Filtra artículos por texto de búsqueda — solo para placard (cocina filtra internamente en TabCocina)
-  const productosFiltrados = articulosFamilia.filter(
-    (a) =>
-      !placardSearch.trim() ||
-      normalizar(a.articulo).includes(normalizar(placardSearch)),
-  );
-
-  // ── Helpers Placard ──────────────────────────────────────
-  const placardAgregarFila = () => {
-    if (!placardFila.articulo.trim()) return;
-    setPlacardItems((prev) => ({
-      ...prev,
-      [placardFamilia]: [...(prev[placardFamilia] ?? []), { ...placardFila }],
-    }));
-    setPlacardFila({
-      articulo: "",
-      nombreart: "",
-      cantidad: 1,
-      precio: "",
-      precios: [],
-      precioPlacard: "",
-      margen: null,
-      valor1: null,
-      porcentaje1: null,
-      valor2: null,
-      porcentaje2: null,
-      valor3: null,
-      porcentaje3: null,
-    });
-    setPlacardSearch("");
-  };
-
-  const placardEliminarFila = (idx) => {
-    setPlacardItems((prev) => ({
-      ...prev,
-      [placardFamilia]: prev[placardFamilia].filter((_, i) => i !== idx),
-    }));
-  };
-
-  const placardGuardarEdit = (idx) => {
-    setPlacardItems((prev) => ({
-      ...prev,
-      [placardFamilia]: prev[placardFamilia].map((r, i) =>
-        i === idx ? { ...placardFila } : r,
-      ),
-    }));
-    setPlacardEditIdx(null);
-    setPlacardFila({
-      articulo: "",
-      nombreart: "",
-      cantidad: 1,
-      precio: "",
-      precios: [],
-      precioPlacard: "",
-      margen: null,
-      valor1: null,
-      porcentaje1: null,
-      valor2: null,
-      porcentaje2: null,
-      valor3: null,
-      porcentaje3: null,
-    });
-    setPlacardSearch("");
-  };
-
-  const placardIniciarEdit = (idx) => {
-    const fila = placardItems[placardFamilia][idx];
-    setPlacardFila({ ...fila });
-    setPlacardSearch(fila.articulo);
-    setPlacardEditIdx(idx);
   };
 
   const handleGuardar = async (esNuevaRev = false) => {
