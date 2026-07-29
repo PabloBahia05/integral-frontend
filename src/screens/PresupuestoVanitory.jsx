@@ -297,13 +297,14 @@ export default function PresupuestoVanitory({
         const slotsRaw = [];
         for (let i = 1; i <= 10; i++) {
           // form{i} guarda el código de la fórmula elegida en Asociaciones
-          // (codf{i} no se usa desde esa pantalla). Buscamos ese código en
-          // la tabla `formulas` para obtener la expresión real a evaluar.
+          // (codf{i} es una columna legacy que esa pantalla ya no escribe,
+          // así que puede contener un valor viejo/obsoleto). Por eso form{i}
+          // tiene prioridad: es el único campo que se actualiza al editar.
           const codform =
-            row[`codf${i}`] ??
-            row[`CODF${i}`] ??
             row[`form${i}`] ??
             row[`FORM${i}`] ??
+            row[`codf${i}`] ??
+            row[`CODF${i}`] ??
             null;
 
           if (codform) {
