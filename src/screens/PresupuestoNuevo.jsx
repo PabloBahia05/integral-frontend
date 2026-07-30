@@ -2381,8 +2381,8 @@ export default function PresupuestoNuevo({
           backgroundColor: "#ffffff",
         },
         jsPDF: {
-          unit: "px",
-          format: [794, 1123],
+          unit: "mm",
+          format: "a4",
           orientation: "portrait",
         },
         pagebreak: {
