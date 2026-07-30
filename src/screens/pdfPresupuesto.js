@@ -18,6 +18,8 @@ export const MEMBRETE_DANIEL_ROQUE_B64 ="data:image/png;base64,iVBORw0KGgoAAAANS
 //  - presupuestoItems: ítems del presupuesto
 //  - grupoDe: función (item) => nombre de sección/grupo
 //  - mostrarCosto, incluirPrecio, incluirSubtotalItem, incluirTotal, agregarIVA, incluirTextoColoc: flags de armado
+//  - incluirTextoSena: bool, si se agrega el recuadro de seña/condiciones (fondo amarillo)
+//  - textoSena: texto libre de ese recuadro, editable desde el Encabezado
 //  - imagenesFinal: fotos y PDFs adjuntos
 //  - setGenerandoPDF: setter de estado para mostrar "Generando..." en el botón
 export function generarPresupuestoPDF({
@@ -42,6 +44,8 @@ export function generarPresupuestoPDF({
   incluirTotal,
   agregarIVA,
   incluirTextoColoc,
+  incluirTextoSena,
+  textoSena,
   imagenesFinal,
   setGenerandoPDF,
 }) {
@@ -250,6 +254,7 @@ export function generarPresupuestoPDF({
     .iva-note { font-size: 10px; color: #555; text-align: right; margin-top: 4px; }
     .clausula { font-size: 11px; color: #333; border-top: 1px dashed #999; padding-top: 8px; margin-top: 14px; margin-bottom: 14px; }
     .observaciones { font-size: 11px; color: #111; white-space: pre-wrap; margin-top: 10px; }
+    .texto-sena { background: #fff59d; border: 1px solid #d4c400; border-radius: 4px; padding: 10px 12px; margin-top: 14px; font-size: 11px; font-weight: 700; white-space: pre-wrap; }
     .footer { margin-top: auto; border-top: 1px solid #111; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #333; }
     /* Evita que html2pdf corte una imagen a la mitad entre dos hojas A4:
        si no entra completa en lo que queda de página, la empuja entera a
@@ -305,6 +310,12 @@ export function generarPresupuestoPDF({
     ${
       observaciones
         ? `<div class="sec-title" style="margin-top:14px;">Observaciones</div><div class="observaciones">${observaciones.replace(/\n/g, "<br/>")}</div>`
+        : ""
+    }
+
+    ${
+      incluirTextoSena && textoSena
+        ? `<div class="texto-sena">${textoSena.replace(/\n/g, "<br/>")}</div>`
         : ""
     }
 

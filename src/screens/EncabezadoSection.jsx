@@ -61,6 +61,9 @@ export default function EncabezadoSection({
   setIncluirTextoColoc,
   agregarIVA,
   setAgregarIVA,
+  incluirTextoSena,
+  setIncluirTextoSena,
+  onAbrirTextoSena,
 }) {
   return (
     <>
@@ -264,6 +267,31 @@ export default function EncabezadoSection({
             />{" "}
             Agregar IVA al precio de cada módulo
           </label>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 4,
+            }}
+          >
+            <label className="pn-check-row" style={{ margin: 0 }}>
+              <input
+                type="checkbox"
+                checked={incluirTextoSena}
+                onChange={(e) => setIncluirTextoSena(e.target.checked)}
+              />{" "}
+              Incluir texto de seña
+            </label>
+            <button
+              type="button"
+              className="pn-tool-btn"
+              onClick={onAbrirTextoSena}
+              style={{ fontSize: 12, padding: "2px 10px" }}
+            >
+              ✏️ Ver/editar texto
+            </button>
+          </div>
         </div>
       </div>
     </>
