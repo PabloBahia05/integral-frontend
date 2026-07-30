@@ -21,9 +21,21 @@ export default function PresupuestoMuebles({ onSelectItem }) {
   useEffect(() => {
     if (subScreen !== "vanitory-modelos") return;
     setLoading(true);
-    fetch(`${API}/vanitory-tipos`)
+    fetch(`${API}/productos/vanitory-tipos-catalogo`)
       .then((r) => r.json())
-      .then((d) => setTiposVanitory(Array.isArray(d) ? d : []))
+      .then((d) => {
+        const lista = Array.isArray(d) ? d : [];
+        const normalizado = lista.map((a) => ({
+          id: a.id ?? a.codartint ?? a.codart,
+          nombre: a.articulo ?? "",
+          descripcion: a.descripcion ?? "",
+          codtipvan: a.codartint ?? a.codart ?? "",
+          foto: a.artfoto ?? "",
+          codart: a.codartint ?? a.codart ?? "",
+          PRECIO_BASE: parseFloat(a.precio ?? a.valorlista ?? 0) || 0,
+        }));
+        setTiposVanitory(normalizado);
+      })
       .catch(() => setTiposVanitory([]))
       .finally(() => setLoading(false));
   }, [subScreen]);
