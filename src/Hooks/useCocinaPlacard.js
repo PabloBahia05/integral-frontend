@@ -95,6 +95,7 @@ export default function useCocinaPlacard({
     porcentaje2: null,
     valor3: null,
     porcentaje3: null,
+    grupo: "",
   };
   const [placardFila, setPlacardFila] = useState({ ...PLACARD_FILA_INIT });
   const [placardSearch, setPlacardSearch] = useState("");
@@ -564,7 +565,10 @@ export default function useCocinaPlacard({
       ...prev,
       [placardFamilia]: [...(prev[placardFamilia] ?? []), { ...placardFila }],
     }));
-    setPlacardFila({ ...PLACARD_FILA_INIT });
+    // Conserva el grupo elegido para que el usuario pueda agregar varios
+    // artículos seguidos al mismo grupo sin tener que retipearlo (igual que
+    // en Cocina).
+    setPlacardFila((f) => ({ ...PLACARD_FILA_INIT, grupo: f.grupo ?? "" }));
     setPlacardSearch("");
   };
 
@@ -583,7 +587,7 @@ export default function useCocinaPlacard({
       ),
     }));
     setPlacardEditIdx(null);
-    setPlacardFila({ ...PLACARD_FILA_INIT });
+    setPlacardFila((f) => ({ ...PLACARD_FILA_INIT, grupo: f.grupo ?? "" }));
     setPlacardSearch("");
   };
 
