@@ -1009,10 +1009,17 @@ export default function PresupuestoNuevo({
     }
     const { id, lineaIdx } = presItemPopover;
 
-    const calcNuevo = (base) => {
-      const b = parseFloat(base) || 0;
+    // baseActual = precio mostrado hoy (puede ya tener un % previo aplicado).
+    // baseOriginal = precio base sin ningún % de ítem aplicado, si existe.
+    // En modo "porcentaje" SIEMPRE calculamos sobre baseOriginal para que
+    // cambiar de 20% a 10% (o a 30%) reemplace el ajuste anterior en vez de
+    // acumularse sobre él. En modo "valor" seguimos usando baseActual (el
+    // +/- monto es relativo a lo que se ve hoy en pantalla).
+    const calcNuevo = (baseActual, baseOriginal) => {
+      const b = parseFloat(baseActual) || 0;
       if (presItemModo === "valor") return val < 0 ? Math.max(0, b + val) : val;
-      return Math.round(b * (1 + val / 100) * 100) / 100;
+      const bOrig = parseFloat(baseOriginal ?? baseActual) || 0;
+      return Math.round(bOrig * (1 + val / 100) * 100) / 100;
     };
 
     // Si el ítem viene de Cocina o Placard, escribimos el cambio en el
@@ -1032,17 +1039,29 @@ export default function PresupuestoNuevo({
 
         let nuevaFila;
         if (lineaIdx == null) {
-          const nuevo = calcNuevo(fila.precio);
+          // Fijamos precioBase la primera vez que se aplica un % a este
+          // ítem: así un cambio posterior de 20% a 10%/30% se recalcula
+          // siempre desde el precio original, no desde el último ajustado.
+          const baseOriginal = fila.precioBase ?? fila.precio;
+          const nuevo = calcNuevo(fila.precio, baseOriginal);
           nuevaFila = {
             ...fila,
             precio: String(nuevo),
+            precioBase:
+              presItemModo === "porcentaje" ? baseOriginal : fila.precioBase,
             porcentaje1:
               presItemModo === "porcentaje" ? val : fila.porcentaje1,
           };
         } else {
           const precios = (fila.precios ?? []).map((p, li) => {
             if (li !== lineaIdx) return p;
-            return { ...p, precio: String(calcNuevo(p.precio)) };
+            const baseOriginalLinea = p.precioBase ?? p.precio;
+            return {
+              ...p,
+              precio: String(calcNuevo(p.precio, baseOriginalLinea)),
+              precioBase:
+                presItemModo === "porcentaje" ? baseOriginalLinea : p.precioBase,
+            };
           });
           const nuevoPrecio = precios[0]?.precio ?? fila.precio;
           const slot = PCT_POR_IDX[lineaIdx];
@@ -1079,16 +1098,25 @@ export default function PresupuestoNuevo({
       prev.map((it) => {
         if (it.id !== id) return it;
         if (lineaIdx == null) {
-          const nuevo = calcNuevo(it.precio);
+          const baseOriginal = it.precioBase ?? it.precio;
+          const nuevo = calcNuevo(it.precio, baseOriginal);
           return {
             ...it,
             precio: nuevo,
+            precioBase:
+              presItemModo === "porcentaje" ? baseOriginal : it.precioBase,
             subtotal: nuevo * (parseFloat(it.cantidad) || 1),
           };
         }
         const precios = (it.precios ?? []).map((p, li) => {
           if (li !== lineaIdx) return p;
-          return { ...p, precio: String(calcNuevo(p.precio)) };
+          const baseOriginalLinea = p.precioBase ?? p.precio;
+          return {
+            ...p,
+            precio: String(calcNuevo(p.precio, baseOriginalLinea)),
+            precioBase:
+              presItemModo === "porcentaje" ? baseOriginalLinea : p.precioBase,
+          };
         });
         const nuevoPrecio = parseFloat(precios[0]?.precio ?? it.precio) || 0;
         return {
