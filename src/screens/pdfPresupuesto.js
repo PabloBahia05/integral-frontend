@@ -153,6 +153,11 @@ export function generarPresupuestoPDF({
         const celdaSubtotalItem = incluirSubtotalItem
           ? `<td class="right">${formatPeso(subtotalSec)}</td>`
           : "";
+        // Si no hay ninguna columna de precio/línea/subtotal visible (caso del
+        // formato clásico: solo Cant/Detalle), no queda dónde poner el monto
+        // del parcial y se pierde. En ese caso lo mostramos igual, dentro de
+        // la misma celda del label "Total XXX:", alineado a la derecha.
+        const sinColumnaMonto = !celdasSubtotalLinea && !celdaSubtotalItem;
 
         // Fotos asignadas manualmente a este grupo — se pegan justo debajo
         // del detalle/tabla del grupo correspondiente.
@@ -192,9 +197,13 @@ export function generarPresupuestoPDF({
           <tbody>
             ${filasItems}
             <tr class="subtotal-row">
-              <td colspan="${labelColspan}">Total ${sec}:</td>
+              ${
+                sinColumnaMonto
+                  ? `<td colspan="${labelColspan}" class="subtotal-cell"><span>Total ${sec}:</span><span>${formatPeso(subtotalSec)}</span></td>`
+                  : `<td colspan="${labelColspan}">Total ${sec}:</td>
               ${celdasSubtotalLinea}
-              ${celdaSubtotalItem}
+              ${celdaSubtotalItem}`
+              }
             </tr>
           </tbody>
         </table>
@@ -249,6 +258,7 @@ export function generarPresupuestoPDF({
     .medida { color: #444; font-size: 11px; }
     .item-desc { color: #444; font-size: 11px; font-style: italic; margin-top: 2px; }
     tr.subtotal-row td { border-top: 1px solid #111; font-weight: 700; padding-top: 4px; }
+    tr.subtotal-row td.subtotal-cell { display: flex; justify-content: space-between; align-items: baseline; }
     .totals-final { margin-top: 6px; text-align: right; }
     .totals-final .t-row { font-weight: 700; font-size: 13px; padding: 3px 0; }
     .iva-note { font-size: 10px; color: #555; text-align: right; margin-top: 4px; }
