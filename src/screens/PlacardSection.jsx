@@ -30,6 +30,7 @@ export default function PlacardSection({
   abrirPrecioPopover,
   setTab,
   lineasActivas,
+  nombresGruposUsados = [],
 }) {
   return (
     <>
@@ -683,6 +684,21 @@ export default function PlacardSection({
                             }}
                           >
                             {fila.nombreart}
+                            {fila.grupo && fila.grupo.trim() && (
+                              <div
+                                style={{
+                                  marginTop: 2,
+                                  fontSize: 9,
+                                  color: "#2277bb",
+                                  background: "#e0f0fc",
+                                  borderRadius: 3,
+                                  padding: "1px 5px",
+                                  display: "inline-block",
+                                }}
+                              >
+                                🗂️ {fila.grupo}
+                              </div>
+                            )}
                           </td>
                           <td
                             style={{
@@ -864,6 +880,44 @@ export default function PlacardSection({
                       flexWrap: "wrap",
                     }}
                   >
+                    {/* Grupo (subdivisión manual para el presupuesto/PDF) */}
+                    <div style={{ flex: "1 1 160px" }}>
+                      <label
+                        style={{
+                          display: "block",
+                          fontSize: 11,
+                          color: "#6699bb",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Grupo
+                      </label>
+                      <input
+                        list="ps-grupos-existentes"
+                        value={placardFila.grupo ?? ""}
+                        onChange={(e) =>
+                          setPlacardFila((f) => ({
+                            ...f,
+                            grupo: e.target.value,
+                          }))
+                        }
+                        placeholder="(automático)"
+                        title="Los artículos que agregues quedan bajo este grupo en el presupuesto y el PDF. Dejalo vacío para usar el grupo automático."
+                        style={{
+                          width: "100%",
+                          fontFamily: "'Space Mono',monospace",
+                          fontSize: 12,
+                          border: "1px solid #b8cfe0",
+                          padding: "6px 10px",
+                          borderRadius: 2,
+                        }}
+                      />
+                      <datalist id="ps-grupos-existentes">
+                        {nombresGruposUsados.map((g) => (
+                          <option key={g} value={g} />
+                        ))}
+                      </datalist>
+                    </div>
                     <div style={{ position: "relative", flex: "2 1 220px" }}>
                       <label
                         style={{

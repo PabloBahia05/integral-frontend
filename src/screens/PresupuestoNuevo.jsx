@@ -3039,6 +3039,7 @@ export default function PresupuestoNuevo({
             listaPorcentaje={listaPorcentaje}
             abrirPrecioPopover={abrirPrecioPopover}
             setTab={setTab}
+            nombresGruposUsados={nombresGruposUsados}
           />
 
           {tab === "mampara" && (
