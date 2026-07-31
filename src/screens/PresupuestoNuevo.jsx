@@ -1353,13 +1353,17 @@ export default function PresupuestoNuevo({
     setPresupuestoItems((prev) => prev.filter((p) => p.id !== id));
 
   useEffect(() => {
-    // Próximo número
-    authFetch(`${API}/tabla-presupuestos/proximo-numero`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.proximo != null) setNumero(String(d.proximo).padStart(4, "0"));
-      })
-      .catch(() => {});
+    // Próximo número (solo aplica a un presupuesto nuevo; si viene
+    // presupuestoInicial, cargarPresupuesto ya setea el número real y
+    // este fetch no debe pisarlo)
+    if (!presupuestoInicial) {
+      authFetch(`${API}/tabla-presupuestos/proximo-numero`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.proximo != null) setNumero(String(d.proximo).padStart(4, "0"));
+        })
+        .catch(() => {});
+    }
     // Líneas disponibles desde BD (columna linea de articulos)
     authFetch(`${API}/articulos/lineas`)
       .then((r) => r.json())
@@ -1411,6 +1415,7 @@ export default function PresupuestoNuevo({
           it.alto ?? it.ALTO ?? "",
           it.presmv ?? it.PRESMV ?? "",
           it.presp ?? it.PRESP ?? "",
+          it.grupo ?? it.GRUPO ?? "",
         ].join("||");
       const itemsPorKey = new Map();
       items.forEach((it) => {
