@@ -469,18 +469,6 @@ export default function TabCocina({
               <th
                 style={{
                   padding: "8px 12px",
-                  textAlign: "right",
-                  border: "1px solid #c8dae8",
-                  fontWeight: 700,
-                  width: 100,
-                }}
-                title="Cargo por freno = Área del artículo × valor cargado acá. Se suma al precio del ítem."
-              >
-                Freno $/m²
-              </th>
-              <th
-                style={{
-                  padding: "8px 12px",
                   textAlign: "center",
                   border: "1px solid #c8dae8",
                   fontWeight: 700,
@@ -687,37 +675,6 @@ export default function TabCocina({
                         fontSize: 12,
                         border: "1px solid #7aaac8",
                         padding: "4px 4px",
-                        borderRadius: 2,
-                      }}
-                    />
-                  </td>
-                  <td
-                    style={{ padding: "6px 8px", border: "1px solid #c8dae8" }}
-                  >
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={cocinaFila.freno ?? ""}
-                      onChange={(e) =>
-                        setCocinaFila((f) => ({
-                          ...f,
-                          freno: e.target.value,
-                        }))
-                      }
-                      title={
-                        cocinaFila.area
-                          ? `Área: ${cocinaFila.area} m²`
-                          : "Este artículo no tiene área cargada en la BD"
-                      }
-                      style={{
-                        width: "100%",
-                        textAlign: "right",
-                        fontFamily: "'Space Mono',monospace",
-                        fontSize: 12,
-                        border: "1px solid #7aaac8",
-                        padding: "4px 8px",
                         borderRadius: 2,
                       }}
                     />
@@ -941,38 +898,6 @@ export default function TabCocina({
                     }}
                   >
                     {fila.cantidad}
-                  </td>
-                  <td
-                    style={{
-                      padding: "6px 8px",
-                      border: "1px solid #c8dae8",
-                      textAlign: "right",
-                    }}
-                  >
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={fila.freno ?? ""}
-                      onChange={(e) =>
-                        setFrenoItemCocina?.(cocinaFamilia, idx, e.target.value)
-                      }
-                      title={
-                        fila.area
-                          ? `Área: ${fila.area} m²`
-                          : "Este artículo no tiene área cargada en la BD"
-                      }
-                      style={{
-                        width: "100%",
-                        textAlign: "right",
-                        fontFamily: "'Space Mono',monospace",
-                        fontSize: 12,
-                        border: "1px solid #c8dae8",
-                        padding: "4px 6px",
-                        borderRadius: 2,
-                      }}
-                    />
                   </td>
                   <td
                     style={{
@@ -1226,7 +1151,7 @@ export default function TabCocina({
             {/* Fila de total */}
             <tr style={{ background: "#e8f4ee" }}>
               <td
-                colSpan={5}
+                colSpan={4}
                 style={{
                   padding: "8px 12px",
                   border: "1px solid #c8dae8",

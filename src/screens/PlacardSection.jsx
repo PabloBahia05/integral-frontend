@@ -423,18 +423,6 @@ export default function PlacardSection({
                       <th
                         style={{
                           padding: "8px 12px",
-                          textAlign: "right",
-                          border: "1px solid #c8dae8",
-                          fontWeight: 700,
-                          width: 100,
-                        }}
-                        title="Cargo por freno = Área del artículo × valor cargado acá. Se suma al precio del ítem."
-                      >
-                        Freno $/m²
-                      </th>
-                      <th
-                        style={{
-                          padding: "8px 12px",
                           textAlign: "center",
                           border: "1px solid #c8dae8",
                           fontWeight: 700,
@@ -666,40 +654,6 @@ export default function PlacardSection({
                             style={{
                               padding: "6px 8px",
                               border: "1px solid #c8dae8",
-                            }}
-                          >
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              placeholder="0.00"
-                              value={placardFila.freno ?? ""}
-                              onChange={(e) =>
-                                setPlacardFila((f) => ({
-                                  ...f,
-                                  freno: e.target.value,
-                                }))
-                              }
-                              title={
-                                placardFila.area
-                                  ? `Área: ${placardFila.area} m²`
-                                  : "Este artículo no tiene área cargada en la BD"
-                              }
-                              style={{
-                                width: "100%",
-                                textAlign: "right",
-                                fontFamily: "'Space Mono',monospace",
-                                fontSize: 12,
-                                border: "1px solid #7aaac8",
-                                padding: "4px 8px",
-                                borderRadius: 2,
-                              }}
-                            />
-                          </td>
-                          <td
-                            style={{
-                              padding: "6px 8px",
-                              border: "1px solid #c8dae8",
                               textAlign: "center",
                             }}
                           >
@@ -918,42 +872,6 @@ export default function PlacardSection({
                             style={{
                               padding: "6px 8px",
                               border: "1px solid #c8dae8",
-                              textAlign: "right",
-                            }}
-                          >
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              placeholder="0.00"
-                              value={fila.freno ?? ""}
-                              onChange={(e) =>
-                                setFrenoItemPlacard?.(
-                                  placardFamilia,
-                                  idx,
-                                  e.target.value,
-                                )
-                              }
-                              title={
-                                fila.area
-                                  ? `Área: ${fila.area} m²`
-                                  : "Este artículo no tiene área cargada en la BD"
-                              }
-                              style={{
-                                width: "100%",
-                                textAlign: "right",
-                                fontFamily: "'Space Mono',monospace",
-                                fontSize: 12,
-                                border: "1px solid #c8dae8",
-                                padding: "4px 6px",
-                                borderRadius: 2,
-                              }}
-                            />
-                          </td>
-                          <td
-                            style={{
-                              padding: "6px 8px",
-                              border: "1px solid #c8dae8",
                               textAlign: "center",
                             }}
                           >
@@ -1095,7 +1013,7 @@ export default function PlacardSection({
                     )}
                     <tr style={{ background: "#e8f4ee" }}>
                       <td
-                        colSpan={7}
+                        colSpan={6}
                         style={{
                           padding: "8px 12px",
                           border: "1px solid #c8dae8",
