@@ -994,7 +994,7 @@ export default function PlacardSection({
                     )}
                     <tr style={{ background: "#e8f4ee" }}>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         style={{
                           padding: "8px 12px",
                           border: "1px solid #c8dae8",
@@ -1262,6 +1262,46 @@ export default function PlacardSection({
                           fontSize: 12,
                           border: "1px solid #b8cfe0",
                           padding: "6px 6px",
+                          borderRadius: 2,
+                        }}
+                      />
+                    </div>
+                    {/* Freno ($/m²) — se multiplica por el área del artículo (BD) y se suma al precio */}
+                    <div style={{ flex: "0 0 100px" }}>
+                      <label
+                        style={{
+                          display: "block",
+                          fontSize: 11,
+                          color: "#6699bb",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Freno $/m²
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={placardFila.freno ?? ""}
+                        onChange={(e) =>
+                          setPlacardFila((f) => ({
+                            ...f,
+                            freno: e.target.value,
+                          }))
+                        }
+                        title={
+                          placardFila.area
+                            ? `Área: ${placardFila.area} m²`
+                            : "Elegí un artículo de la BD para traer su área"
+                        }
+                        style={{
+                          width: "100%",
+                          textAlign: "right",
+                          fontFamily: "'Space Mono',monospace",
+                          fontSize: 12,
+                          border: "1px solid #b8cfe0",
+                          padding: "6px 10px",
                           borderRadius: 2,
                         }}
                       />

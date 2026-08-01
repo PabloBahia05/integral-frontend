@@ -3059,6 +3059,7 @@ export default function PresupuestoNuevo({
               nombresGruposUsados={nombresGruposUsados}
               aplicarFrenoATodosCocina={aplicarFrenoATodosCocina}
               setFrenoItemCocina={setFrenoItemCocina}
+              recalcFila={recalcFila}
             />
           )}
           <PlacardSection

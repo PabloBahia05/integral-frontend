@@ -15,6 +15,8 @@ const FILA_VACIA = {
   porcentaje2: null,
   valor3: null,
   porcentaje3: null,
+  area: null,
+  freno: null,
   grupo: "",
 };
 
@@ -37,6 +39,11 @@ export default function TabCocina({
   authFetch,
   // grupos ya usados en el presupuesto (autocompletado)
   nombresGruposUsados = [],
+  // freno: área × valor freno, se suma al precio del ítem
+  aplicarFrenoATodosCocina,
+  setFrenoItemCocina,
+  // recalcula precio (lista + %item + ajuste + freno) — se usa al agregar/editar
+  recalcFila,
 }) {
   // ── Estado local del tab ──────────────────────────────────
   const [cocinaEditIdx, setCocinaEditIdx] = useState(null);
@@ -91,7 +98,10 @@ export default function TabCocina({
     if (!cocinaFila.articulo.trim()) return;
     setCocinaItems((prev) => ({
       ...prev,
-      [cocinaFamilia]: [...prev[cocinaFamilia], { ...cocinaFila }],
+      [cocinaFamilia]: [
+        ...prev[cocinaFamilia],
+        recalcFila ? recalcFila({ ...cocinaFila }) : { ...cocinaFila },
+      ],
     }));
     resetFila();
   };
@@ -107,7 +117,11 @@ export default function TabCocina({
     setCocinaItems((prev) => ({
       ...prev,
       [cocinaFamilia]: prev[cocinaFamilia].map((r, i) =>
-        i === idx ? { ...cocinaFila } : r,
+        i === idx
+          ? recalcFila
+            ? recalcFila({ ...cocinaFila })
+            : { ...cocinaFila }
+          : r,
       ),
     }));
     setCocinaEditIdx(null);
@@ -133,10 +147,86 @@ export default function TabCocina({
     resetFila();
   };
 
+  // ── Freno general (toda la sección Cocina) ────────────────
+  const [frenoGeneralCocina, setFrenoGeneralCocina] = useState("");
+  const hayItemsCocina =
+    cocinaItems.bajomesadas.length > 0 || cocinaItems.alacenas.length > 0;
+
   // ── Render: selector de familia ───────────────────────────
   if (!cocinaFamilia) {
     return (
       <div>
+        {hayItemsCocina && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-end",
+              gap: 10,
+              marginBottom: 20,
+              padding: "12px 16px",
+              background: "#f5f9fc",
+              border: "1px solid #c8dae8",
+              borderRadius: 3,
+            }}
+          >
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "#6699bb",
+                  marginBottom: 4,
+                }}
+              >
+                Freno $/m² — toda la Cocina
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={frenoGeneralCocina}
+                onChange={(e) => setFrenoGeneralCocina(e.target.value)}
+                style={{
+                  width: 140,
+                  textAlign: "right",
+                  fontFamily: "'Space Mono',monospace",
+                  fontSize: 12,
+                  border: "1px solid #b8cfe0",
+                  padding: "6px 10px",
+                  borderRadius: 2,
+                }}
+              />
+            </div>
+            <button
+              onClick={() => aplicarFrenoATodosCocina?.(frenoGeneralCocina)}
+              disabled={
+                frenoGeneralCocina === "" || isNaN(parseFloat(frenoGeneralCocina))
+              }
+              title="Aplica este valor de freno a todos los ítems de Bajomesada y Alacena. No afecta a Placard."
+              style={{
+                padding: "7px 18px",
+                background:
+                  frenoGeneralCocina !== "" &&
+                  !isNaN(parseFloat(frenoGeneralCocina))
+                    ? "#0a3a5c"
+                    : "#c8dae8",
+                color: "#fff",
+                border: "none",
+                borderRadius: 2,
+                fontFamily: "'Space Mono',monospace",
+                fontSize: 12,
+                cursor:
+                  frenoGeneralCocina !== "" &&
+                  !isNaN(parseFloat(frenoGeneralCocina))
+                    ? "pointer"
+                    : "default",
+              }}
+            >
+              🛑 Aplicar freno a toda la Cocina
+            </button>
+          </div>
+        )}
         <div
           style={{
             fontSize: 11,
@@ -368,6 +458,18 @@ export default function TabCocina({
               >
                 Cant.
               </th>
+              <th
+                style={{
+                  padding: "8px 12px",
+                  textAlign: "right",
+                  border: "1px solid #c8dae8",
+                  fontWeight: 700,
+                  width: 100,
+                }}
+                title="Cargo por freno = Área del artículo × valor cargado acá. Se suma al precio del ítem."
+              >
+                Freno $/m²
+              </th>
               {lineasActivas.length > 0 ? (
                 lineasActivas.map((l) => (
                   <th
@@ -570,6 +672,37 @@ export default function TabCocina({
                       }}
                     />
                   </td>
+                  <td
+                    style={{ padding: "6px 8px", border: "1px solid #c8dae8" }}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={cocinaFila.freno ?? ""}
+                      onChange={(e) =>
+                        setCocinaFila((f) => ({
+                          ...f,
+                          freno: e.target.value,
+                        }))
+                      }
+                      title={
+                        cocinaFila.area
+                          ? `Área: ${cocinaFila.area} m²`
+                          : "Este artículo no tiene área cargada en la BD"
+                      }
+                      style={{
+                        width: "100%",
+                        textAlign: "right",
+                        fontFamily: "'Space Mono',monospace",
+                        fontSize: 12,
+                        border: "1px solid #7aaac8",
+                        padding: "4px 8px",
+                        borderRadius: 2,
+                      }}
+                    />
+                  </td>
                   {lineasActivas.length > 0 ? (
                     lineasActivas.map((l, li) => (
                       <td
@@ -749,6 +882,38 @@ export default function TabCocina({
                     }}
                   >
                     {fila.cantidad}
+                  </td>
+                  <td
+                    style={{
+                      padding: "6px 8px",
+                      border: "1px solid #c8dae8",
+                      textAlign: "right",
+                    }}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={fila.freno ?? ""}
+                      onChange={(e) =>
+                        setFrenoItemCocina?.(cocinaFamilia, idx, e.target.value)
+                      }
+                      title={
+                        fila.area
+                          ? `Área: ${fila.area} m²`
+                          : "Este artículo no tiene área cargada en la BD"
+                      }
+                      style={{
+                        width: "100%",
+                        textAlign: "right",
+                        fontFamily: "'Space Mono',monospace",
+                        fontSize: 12,
+                        border: "1px solid #c8dae8",
+                        padding: "4px 6px",
+                        borderRadius: 2,
+                      }}
+                    />
                   </td>
                   {lineasActivas.length > 0 ? (
                     lineasActivas.map((l, li) => {
@@ -963,7 +1128,7 @@ export default function TabCocina({
             {/* Fila de total */}
             <tr style={{ background: "#e8f4ee" }}>
               <td
-                colSpan={3}
+                colSpan={4}
                 style={{
                   padding: "8px 12px",
                   border: "1px solid #c8dae8",
@@ -1176,6 +1341,10 @@ export default function TabCocina({
                             preciosBase[0]?.precioBase ?? "";
                           const precioUsar = precios[0]?.precio ?? "";
                           const nombreart = p.nombreart ?? p.NOMBREART ?? base;
+                          // Área del artículo (columna AREA en la tabla
+                          // articulos): se usa para el cargo de freno
+                          // (área × valor de freno cargado en el ítem).
+                          const area = p.area ?? p.AREA ?? null;
                           setCocinaFila((f) => ({
                             ...f,
                             articulo: base,
@@ -1184,6 +1353,7 @@ export default function TabCocina({
                             precioBase: String(precioBaseUsar),
                             precios,
                             preciosBase,
+                            area,
                           }));
                           setCocinaSearch(base);
                         }}
@@ -1265,6 +1435,44 @@ export default function TabCocina({
                   fontSize: 12,
                   border: "1px solid #b8cfe0",
                   padding: "6px 6px",
+                  borderRadius: 2,
+                }}
+              />
+            </div>
+
+            {/* Freno ($/m²) — se multiplica por el área del artículo (BD) y se suma al precio */}
+            <div style={{ flex: "0 0 100px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "#6699bb",
+                  marginBottom: 4,
+                }}
+              >
+                Freno $/m²
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={cocinaFila.freno ?? ""}
+                onChange={(e) =>
+                  setCocinaFila((f) => ({ ...f, freno: e.target.value }))
+                }
+                title={
+                  cocinaFila.area
+                    ? `Área: ${cocinaFila.area} m²`
+                    : "Elegí un artículo de la BD para traer su área"
+                }
+                style={{
+                  width: "100%",
+                  textAlign: "right",
+                  fontFamily: "'Space Mono',monospace",
+                  fontSize: 12,
+                  border: "1px solid #b8cfe0",
+                  padding: "6px 10px",
                   borderRadius: 2,
                 }}
               />
