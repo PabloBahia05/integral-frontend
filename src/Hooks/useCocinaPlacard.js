@@ -629,7 +629,10 @@ export default function useCocinaPlacard({
     if (!placardFila.articulo.trim()) return;
     setPlacardItems((prev) => ({
       ...prev,
-      [placardFamilia]: [...(prev[placardFamilia] ?? []), { ...placardFila }],
+      [placardFamilia]: [
+        ...(prev[placardFamilia] ?? []),
+        recalcFila({ ...placardFila }),
+      ],
     }));
     // Conserva el grupo elegido para que el usuario pueda agregar varios
     // artículos seguidos al mismo grupo sin tener que retipearlo (igual que
@@ -649,7 +652,7 @@ export default function useCocinaPlacard({
     setPlacardItems((prev) => ({
       ...prev,
       [placardFamilia]: prev[placardFamilia].map((r, i) =>
-        i === idx ? { ...placardFila } : r,
+        i === idx ? recalcFila({ ...placardFila }) : r,
       ),
     }));
     setPlacardEditIdx(null);
