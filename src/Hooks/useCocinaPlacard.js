@@ -97,6 +97,7 @@ export default function useCocinaPlacard({
     porcentaje3: null,
     area: null,
     freno: null,
+    accesorios: [],
     grupo: "",
   };
   const [placardFila, setPlacardFila] = useState({ ...PLACARD_FILA_INIT });
@@ -367,6 +368,63 @@ export default function useCocinaPlacard({
     }));
   };
 
+  // ── Accesorios ───────────────────────────────────────────
+  // Cada ítem de Cocina/Placard puede tener accesorios extra (autofreno,
+  // led, etc), tomados de los artículos con area = 'accesorio'. Se guardan
+  // en `fila.accesorios` (array de nombres de artículo, ej: ["AUTOFRENO"]).
+  // No modifican el precio del ítem (a diferencia del freno) — son solo una
+  // lista de agregados que viaja con el ítem hasta el backend.
+  const [accesoriosDisponibles, setAccesoriosDisponibles] = useState([]);
+  useEffect(() => {
+    authFetch(`${API}/articulos/accesorios`)
+      .then((r) => r.json())
+      .then((data) => setAccesoriosDisponibles(Array.isArray(data) ? data : []))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Menú desplegable de accesorios: no sabe si el ítem está guardado o es
+  // el draft de una fila en edición — solo necesita `actuales` (los
+  // accesorios ya tildados, para pintar los checkboxes) y `onToggle`
+  // (qué hacer cuando se tilda/destilda uno). Quien abre el menú
+  // (TabCocina/PlacardSection) decide si onToggle pega contra
+  // cocinaItems/placardItems (ítem ya guardado, fila de vista) o contra
+  // cocinaFila/placardFila (draft de la fila en edición). Así se puede
+  // editar accesorios tanto desde la fila de vista como desde "editar".
+  const [accesorioMenu, setAccesorioMenu] = useState(null);
+
+  const abrirAccesorioMenu = (actuales, onToggle, e) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setAccesorioMenu({ actuales: actuales ?? [], onToggle, rect });
+  };
+
+  const cerrarAccesorioMenu = () => setAccesorioMenu(null);
+
+  // Devuelve un array nuevo con el accesorio agregado o quitado — helper
+  // puro para armar el onToggle de cocinaItems/placardItems/cocinaFila/etc.
+  const toggleAccesorioEnArray = (actuales, nombreAccesorio) => {
+    const lista = actuales ?? [];
+    return lista.includes(nombreAccesorio)
+      ? lista.filter((a) => a !== nombreAccesorio)
+      : [...lista, nombreAccesorio];
+  };
+
+  // Atajo para el caso más común: togglear el accesorio de un ítem YA
+  // guardado en cocinaItems/placardItems por índice (fila de vista).
+  const toggleAccesorioItem = (tipo, familia, idx, nombreAccesorio) => {
+    const actualizar = (prev) => ({
+      ...prev,
+      [familia]: (prev[familia] ?? []).map((f, i) =>
+        i === idx
+          ? { ...f, accesorios: toggleAccesorioEnArray(f.accesorios, nombreAccesorio) }
+          : f,
+      ),
+    });
+    if (tipo === "cocina") setCocinaItems(actualizar);
+    else setPlacardItems(actualizar);
+  };
+
   // Actualiza todo el front con los parámetros actuales del encabezado — sin tocar el backend
   const handleActualizar = () => {
     setCocinaItems((prev) => {
@@ -463,6 +521,7 @@ export default function useCocinaPlacard({
           porcentaje3: f.porcentaje3 ?? null,
           area: f.area ?? null,
           freno: f.freno ?? null,
+          accesorios: f.accesorios ?? [],
           grupo: f.grupo && f.grupo.trim() ? f.grupo.trim() : null,
         })),
       );
@@ -722,5 +781,12 @@ export default function useCocinaPlacard({
     aplicarFrenoATodosPlacard,
     setFrenoItemCocina,
     setFrenoItemPlacard,
+    // accesorios
+    accesoriosDisponibles,
+    accesorioMenu,
+    abrirAccesorioMenu,
+    cerrarAccesorioMenu,
+    toggleAccesorioItem,
+    toggleAccesorioEnArray,
   };
 }
