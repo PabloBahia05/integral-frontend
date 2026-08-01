@@ -17,6 +17,7 @@ const FILA_VACIA = {
   porcentaje3: null,
   area: null,
   freno: null,
+  accesorios: [],
   grupo: "",
 };
 
@@ -42,6 +43,13 @@ export default function TabCocina({
   // freno: área × valor freno, se suma al precio del ítem
   aplicarFrenoATodosCocina,
   setFrenoItemCocina,
+  // accesorios: lista de artículos "extra" (area='accesorio') por ítem
+  accesoriosDisponibles,
+  accesorioMenu,
+  abrirAccesorioMenu,
+  cerrarAccesorioMenu,
+  toggleAccesorioItem,
+  toggleAccesorioEnArray,
   // recalcula precio (lista + %item + ajuste + freno) — se usa al agregar/editar
   recalcFila,
 }) {
@@ -470,6 +478,17 @@ export default function TabCocina({
               >
                 Freno $/m²
               </th>
+              <th
+                style={{
+                  padding: "8px 12px",
+                  textAlign: "center",
+                  border: "1px solid #c8dae8",
+                  fontWeight: 700,
+                  width: 90,
+                }}
+              >
+                Accesorios
+              </th>
               {lineasActivas.length > 0 ? (
                 lineasActivas.map((l) => (
                   <th
@@ -703,6 +722,46 @@ export default function TabCocina({
                       }}
                     />
                   </td>
+                  <td
+                    style={{
+                      padding: "6px 8px",
+                      border: "1px solid #c8dae8",
+                      textAlign: "center",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) =>
+                        abrirAccesorioMenu?.(
+                          cocinaFila.accesorios ?? [],
+                          (nombre) =>
+                            setCocinaFila((f) => ({
+                              ...f,
+                              accesorios: toggleAccesorioEnArray(
+                                f.accesorios,
+                                nombre,
+                              ),
+                            })),
+                          e,
+                        )
+                      }
+                      title="Agregar/quitar accesorios (autofreno, led, etc)"
+                      style={{
+                        padding: "4px 8px",
+                        background: cocinaFila.accesorios?.length
+                          ? "#0a5c3a"
+                          : "#fff",
+                        color: cocinaFila.accesorios?.length ? "#fff" : "#0a3a5c",
+                        border: "1px solid #7aaac8",
+                        borderRadius: 2,
+                        fontFamily: "'Space Mono',monospace",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      🔧 {cocinaFila.accesorios?.length ?? 0}
+                    </button>
+                  </td>
                   {lineasActivas.length > 0 ? (
                     lineasActivas.map((l, li) => (
                       <td
@@ -914,6 +973,45 @@ export default function TabCocina({
                         borderRadius: 2,
                       }}
                     />
+                  </td>
+                  <td
+                    style={{
+                      padding: "6px 8px",
+                      border: "1px solid #c8dae8",
+                      textAlign: "center",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) =>
+                        abrirAccesorioMenu?.(
+                          fila.accesorios ?? [],
+                          (nombre) =>
+                            toggleAccesorioItem?.(
+                              "cocina",
+                              cocinaFamilia,
+                              idx,
+                              nombre,
+                            ),
+                          e,
+                        )
+                      }
+                      title="Agregar/quitar accesorios (autofreno, led, etc)"
+                      style={{
+                        padding: "4px 8px",
+                        background: fila.accesorios?.length
+                          ? "#0a5c3a"
+                          : "#fff",
+                        color: fila.accesorios?.length ? "#fff" : "#0a3a5c",
+                        border: "1px solid #c8dae8",
+                        borderRadius: 2,
+                        fontFamily: "'Space Mono',monospace",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      🔧 {fila.accesorios?.length ?? 0}
+                    </button>
                   </td>
                   {lineasActivas.length > 0 ? (
                     lineasActivas.map((l, li) => {
@@ -1128,7 +1226,7 @@ export default function TabCocina({
             {/* Fila de total */}
             <tr style={{ background: "#e8f4ee" }}>
               <td
-                colSpan={4}
+                colSpan={5}
                 style={{
                   padding: "8px 12px",
                   border: "1px solid #c8dae8",

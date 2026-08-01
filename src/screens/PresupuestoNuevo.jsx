@@ -1209,6 +1209,12 @@ export default function PresupuestoNuevo({
     aplicarFrenoATodosPlacard,
     setFrenoItemCocina,
     setFrenoItemPlacard,
+    accesoriosDisponibles,
+    accesorioMenu,
+    abrirAccesorioMenu,
+    cerrarAccesorioMenu,
+    toggleAccesorioItem,
+    toggleAccesorioEnArray,
   } = useCocinaPlacard({
     authFetch,
     tab,
@@ -1621,6 +1627,10 @@ export default function PresupuestoNuevo({
           porcentaje3: parseFloat(it.porcentaje3 ?? it.PORCENTAJE3) || null,
           area: parseFloat(it.area ?? it.AREA) || null,
           freno: parseFloat(it.freno ?? it.FRENO) || null,
+          accesorios: String(it.accesorio ?? it.ACCESORIO ?? "")
+            .split(",")
+            .map((a) => a.trim())
+            .filter(Boolean),
           grupo: it.grupo ?? it.GRUPO ?? "",
         };
         if (tipo.includes("cocina") && tipo.includes("bajomesada"))
@@ -2010,6 +2020,14 @@ export default function PresupuestoNuevo({
           // nota al usuario.
           area: it.area ?? null,
           freno: it.freno ?? null,
+          // Accesorios: lista de artículos "extra" tildados para este ítem
+          // (autofreno, led, etc). Se manda como texto separado por comas.
+          // Igual que area/freno, requiere que la tabla de ítems del
+          // presupuesto tenga la columna `accesorio` — ver nota al usuario.
+          accesorio:
+            it.accesorios && it.accesorios.length
+              ? it.accesorios.join(",")
+              : null,
           // Vinculación vanitory
           tabla: it.tabla ?? null,
           vtabla: it.vtabla ?? null,
@@ -2669,6 +2687,59 @@ export default function PresupuestoNuevo({
             );
           })()}
 
+        {/* ── Popover de accesorios (Cocina/Placard) ── */}
+        {accesorioMenu &&
+          (() => {
+            const rect = accesorioMenu.rect;
+            const top = Math.min(rect.bottom + 6, window.innerHeight - 260);
+            const left = Math.min(rect.left, window.innerWidth - 240);
+            return (
+              <>
+                <div
+                  className="pn-popover-backdrop"
+                  onClick={cerrarAccesorioMenu}
+                />
+                <div
+                  className="pn-popover"
+                  style={{ top, left, maxHeight: 260, overflowY: "auto" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="pn-popover-title">Accesorios</div>
+                  {accesoriosDisponibles.length === 0 ? (
+                    <div style={{ fontSize: 12, color: "#6699bb", padding: "6px 2px" }}>
+                      No hay artículos cargados con área "accesorio".
+                    </div>
+                  ) : (
+                    accesoriosDisponibles.map((a) => {
+                      const marcado = accesorioMenu.actuales.includes(a.articulo);
+                      return (
+                        <label
+                          key={a.articulo}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "5px 2px",
+                            fontSize: 12,
+                            color: "#0a3a5c",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={marcado}
+                            onChange={() => accesorioMenu.onToggle(a.articulo)}
+                          />
+                          {a.articulo}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            );
+          })()}
+
         {/* ── Popover de edición de precio en solapa Presupuesto ── */}
         {presItemPopover &&
           (() => {
@@ -3059,6 +3130,12 @@ export default function PresupuestoNuevo({
               nombresGruposUsados={nombresGruposUsados}
               aplicarFrenoATodosCocina={aplicarFrenoATodosCocina}
               setFrenoItemCocina={setFrenoItemCocina}
+              accesoriosDisponibles={accesoriosDisponibles}
+              accesorioMenu={accesorioMenu}
+              abrirAccesorioMenu={abrirAccesorioMenu}
+              cerrarAccesorioMenu={cerrarAccesorioMenu}
+              toggleAccesorioItem={toggleAccesorioItem}
+              toggleAccesorioEnArray={toggleAccesorioEnArray}
               recalcFila={recalcFila}
             />
           )}
@@ -3090,6 +3167,12 @@ export default function PresupuestoNuevo({
             nombresGruposUsados={nombresGruposUsados}
             aplicarFrenoATodosPlacard={aplicarFrenoATodosPlacard}
             setFrenoItemPlacard={setFrenoItemPlacard}
+            accesoriosDisponibles={accesoriosDisponibles}
+            accesorioMenu={accesorioMenu}
+            abrirAccesorioMenu={abrirAccesorioMenu}
+            cerrarAccesorioMenu={cerrarAccesorioMenu}
+            toggleAccesorioItem={toggleAccesorioItem}
+            toggleAccesorioEnArray={toggleAccesorioEnArray}
           />
 
           {tab === "mampara" && (

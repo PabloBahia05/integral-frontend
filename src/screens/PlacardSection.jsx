@@ -35,6 +35,13 @@ export default function PlacardSection({
   // freno: área × valor freno, se suma al precio del ítem
   aplicarFrenoATodosPlacard,
   setFrenoItemPlacard,
+  // accesorios: lista de artículos "extra" (area='accesorio') por ítem
+  accesoriosDisponibles,
+  accesorioMenu,
+  abrirAccesorioMenu,
+  cerrarAccesorioMenu,
+  toggleAccesorioItem,
+  toggleAccesorioEnArray,
 }) {
   // ── Freno general (toda la sección Placard) ───────────────
   const [frenoGeneralPlacard, setFrenoGeneralPlacard] = useState("");
@@ -428,6 +435,17 @@ export default function PlacardSection({
                       <th
                         style={{
                           padding: "8px 12px",
+                          textAlign: "center",
+                          border: "1px solid #c8dae8",
+                          fontWeight: 700,
+                          width: 90,
+                        }}
+                      >
+                        Accesorios
+                      </th>
+                      <th
+                        style={{
+                          padding: "8px 12px",
                           textAlign: "right",
                           border: "1px solid #c8dae8",
                           fontWeight: 700,
@@ -682,6 +700,48 @@ export default function PlacardSection({
                             style={{
                               padding: "6px 8px",
                               border: "1px solid #c8dae8",
+                              textAlign: "center",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) =>
+                                abrirAccesorioMenu?.(
+                                  placardFila.accesorios ?? [],
+                                  (nombre) =>
+                                    setPlacardFila((f) => ({
+                                      ...f,
+                                      accesorios: toggleAccesorioEnArray(
+                                        f.accesorios,
+                                        nombre,
+                                      ),
+                                    })),
+                                  e,
+                                )
+                              }
+                              title="Agregar/quitar accesorios (autofreno, led, etc)"
+                              style={{
+                                padding: "4px 8px",
+                                background: placardFila.accesorios?.length
+                                  ? "#0a5c3a"
+                                  : "#fff",
+                                color: placardFila.accesorios?.length
+                                  ? "#fff"
+                                  : "#0a3a5c",
+                                border: "1px solid #7aaac8",
+                                borderRadius: 2,
+                                fontFamily: "'Space Mono',monospace",
+                                fontSize: 11,
+                                cursor: "pointer",
+                              }}
+                            >
+                              🔧 {placardFila.accesorios?.length ?? 0}
+                            </button>
+                          </td>
+                          <td
+                            style={{
+                              padding: "6px 8px",
+                              border: "1px solid #c8dae8",
                             }}
                           >
                             <input
@@ -892,6 +952,47 @@ export default function PlacardSection({
                           </td>
                           <td
                             style={{
+                              padding: "6px 8px",
+                              border: "1px solid #c8dae8",
+                              textAlign: "center",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) =>
+                                abrirAccesorioMenu?.(
+                                  fila.accesorios ?? [],
+                                  (nombre) =>
+                                    toggleAccesorioItem?.(
+                                      "placard",
+                                      placardFamilia,
+                                      idx,
+                                      nombre,
+                                    ),
+                                  e,
+                                )
+                              }
+                              title="Agregar/quitar accesorios (autofreno, led, etc)"
+                              style={{
+                                padding: "4px 8px",
+                                background: fila.accesorios?.length
+                                  ? "#0a5c3a"
+                                  : "#fff",
+                                color: fila.accesorios?.length
+                                  ? "#fff"
+                                  : "#0a3a5c",
+                                border: "1px solid #c8dae8",
+                                borderRadius: 2,
+                                fontFamily: "'Space Mono',monospace",
+                                fontSize: 11,
+                                cursor: "pointer",
+                              }}
+                            >
+                              🔧 {fila.accesorios?.length ?? 0}
+                            </button>
+                          </td>
+                          <td
+                            style={{
                               padding: "8px 12px",
                               border: "1px solid #c8dae8",
                               textAlign: "right",
@@ -994,7 +1095,7 @@ export default function PlacardSection({
                     )}
                     <tr style={{ background: "#e8f4ee" }}>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         style={{
                           padding: "8px 12px",
                           border: "1px solid #c8dae8",
