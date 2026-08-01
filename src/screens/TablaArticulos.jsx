@@ -514,7 +514,23 @@ export default function TablaArticulos({
                             fontSize: 11,
                           }}
                         >
-                          <div>{item.nombreart}</div>
+                          <div>
+                            {item.nombreart}
+                            {item.accesorios?.some((a) =>
+                              String(a).toLowerCase().includes("autofreno"),
+                            ) && (
+                              <span
+                                style={{
+                                  marginLeft: 6,
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: "#0a5c3a",
+                                }}
+                              >
+                                c/freno
+                              </span>
+                            )}
+                          </div>
                           {item.seccion === "Puerta" && item.codherraje && (
                             <div
                               style={{
