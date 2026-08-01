@@ -95,6 +95,8 @@ export default function useCocinaPlacard({
     porcentaje2: null,
     valor3: null,
     porcentaje3: null,
+    area: null,
+    freno: null,
     grupo: "",
   };
   const [placardFila, setPlacardFila] = useState({ ...PLACARD_FILA_INIT });
@@ -279,6 +281,19 @@ export default function useCocinaPlacard({
       return String(calcularAjuste(precio, val));
     };
 
+    // Freno: cargo fijo por ítem = área del artículo (columna AREA de la
+    // tabla `articulos`, traída por /articulos/por-familia) × valor de
+    // freno cargado en el ítem. Se suma APARTE, después de %lista, %item y
+    // ajuste general — no compone con esos porcentajes. Si el ítem no tiene
+    // área o no tiene freno cargado, no cambia nada.
+    const conFreno = (precio) => {
+      const area = parseFloat(fila.area);
+      const freno = parseFloat(fila.freno);
+      if (!area || !freno) return precio;
+      const p = parseFloat(precio) || 0;
+      return String(Math.round((p + area * freno) * 100) / 100);
+    };
+
     if (fila.preciosBase && fila.preciosBase.length > 0) {
       const nuevosPrecios = fila.preciosBase.map((pb, li) => {
         const conLista = aplicarPorcentaje(pb.precioBase);
@@ -286,7 +301,7 @@ export default function useCocinaPlacard({
         return {
           linea: pb.linea,
           precioBase: pb.precioBase,
-          precio: conAjusteGeneral(conExtra(conLista, pctExtra)),
+          precio: conFreno(conAjusteGeneral(conExtra(conLista, pctExtra))),
         };
       });
       const nuevoPrecio =
@@ -297,10 +312,59 @@ export default function useCocinaPlacard({
       const conLista = aplicarPorcentaje(fila.precioBase);
       return {
         ...fila,
-        precio: conAjusteGeneral(conExtra(conLista, fila.porcentaje1)),
+        precio: conFreno(conAjusteGeneral(conExtra(conLista, fila.porcentaje1))),
       };
     }
     return fila;
+  };
+
+  // ── Freno ────────────────────────────────────────────────
+  // Carga el mismo valor de freno ($/m²) a TODOS los ítems de una sección
+  // (Cocina o Placard, de forma independiente entre sí — no toca la otra
+  // sección). Cada ítem conserva su propio campo `freno`, así que después
+  // de "aplicar a todos" el usuario puede seguir editando el valor de un
+  // ítem puntual sin afectar al resto.
+  const aplicarFrenoATodosCocina = (valor) => {
+    const val = parseFloat(valor);
+    if (isNaN(val)) return;
+    setCocinaItems((prev) => {
+      const next = {};
+      for (const [familia, filas] of Object.entries(prev)) {
+        next[familia] = filas.map((f) => recalcFila({ ...f, freno: val }));
+      }
+      return next;
+    });
+  };
+
+  const aplicarFrenoATodosPlacard = (valor) => {
+    const val = parseFloat(valor);
+    if (isNaN(val)) return;
+    setPlacardItems((prev) => {
+      const next = {};
+      for (const [familia, filas] of Object.entries(prev)) {
+        next[familia] = filas.map((f) => recalcFila({ ...f, freno: val }));
+      }
+      return next;
+    });
+  };
+
+  // Aplica/edita el freno de un único ítem (cocina o placard) por índice.
+  const setFrenoItemCocina = (familia, idx, valor) => {
+    setCocinaItems((prev) => ({
+      ...prev,
+      [familia]: (prev[familia] ?? []).map((f, i) =>
+        i === idx ? recalcFila({ ...f, freno: valor }) : f,
+      ),
+    }));
+  };
+
+  const setFrenoItemPlacard = (familia, idx, valor) => {
+    setPlacardItems((prev) => ({
+      ...prev,
+      [familia]: (prev[familia] ?? []).map((f, i) =>
+        i === idx ? recalcFila({ ...f, freno: valor }) : f,
+      ),
+    }));
   };
 
   // Actualiza todo el front con los parámetros actuales del encabezado — sin tocar el backend
@@ -397,6 +461,8 @@ export default function useCocinaPlacard({
           porcentaje2: f.porcentaje2 ?? null,
           valor3: f.valor3 ?? null,
           porcentaje3: f.porcentaje3 ?? null,
+          area: f.area ?? null,
+          freno: f.freno ?? null,
           grupo: f.grupo && f.grupo.trim() ? f.grupo.trim() : null,
         })),
       );
@@ -648,5 +714,10 @@ export default function useCocinaPlacard({
     placardEliminarFila,
     placardGuardarEdit,
     placardIniciarEdit,
+    // freno
+    aplicarFrenoATodosCocina,
+    aplicarFrenoATodosPlacard,
+    setFrenoItemCocina,
+    setFrenoItemPlacard,
   };
 }
