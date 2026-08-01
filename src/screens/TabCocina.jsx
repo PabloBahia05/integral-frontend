@@ -50,6 +50,7 @@ export default function TabCocina({
   cerrarAccesorioMenu,
   toggleAccesorioItem,
   toggleAccesorioEnArray,
+  confirmarAccesoriosItem,
   // recalcula precio (lista + %item + ajuste + freno) — se usa al agregar/editar
   recalcFila,
 }) {
@@ -699,6 +700,10 @@ export default function TabCocina({
                                 nombre,
                               ),
                             })),
+                          () =>
+                            setCocinaFila((f) =>
+                              recalcFila ? recalcFila(f) : f,
+                            ),
                           e,
                         )
                       }
@@ -917,6 +922,12 @@ export default function TabCocina({
                               cocinaFamilia,
                               idx,
                               nombre,
+                            ),
+                          () =>
+                            confirmarAccesoriosItem?.(
+                              "cocina",
+                              cocinaFamilia,
+                              idx,
                             ),
                           e,
                         )

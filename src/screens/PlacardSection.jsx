@@ -42,6 +42,8 @@ export default function PlacardSection({
   cerrarAccesorioMenu,
   toggleAccesorioItem,
   toggleAccesorioEnArray,
+  confirmarAccesoriosItem,
+  recalcFila,
 }) {
   // ── Freno general (toda la sección Placard) ───────────────
   const [frenoGeneralPlacard, setFrenoGeneralPlacard] = useState("");
@@ -670,6 +672,10 @@ export default function PlacardSection({
                                         nombre,
                                       ),
                                     })),
+                                  () =>
+                                    setPlacardFila((f) =>
+                                      recalcFila ? recalcFila(f) : f,
+                                    ),
                                   e,
                                 )
                               }
@@ -886,6 +892,12 @@ export default function PlacardSection({
                                       placardFamilia,
                                       idx,
                                       nombre,
+                                    ),
+                                  () =>
+                                    confirmarAccesoriosItem?.(
+                                      "placard",
+                                      placardFamilia,
+                                      idx,
                                     ),
                                   e,
                                 )

@@ -1215,6 +1215,7 @@ export default function PresupuestoNuevo({
     cerrarAccesorioMenu,
     toggleAccesorioItem,
     toggleAccesorioEnArray,
+    confirmarAccesoriosItem,
   } = useCocinaPlacard({
     authFetch,
     tab,
@@ -2730,11 +2731,38 @@ export default function PresupuestoNuevo({
                             checked={marcado}
                             onChange={() => accesorioMenu.onToggle(a.articulo)}
                           />
-                          {a.articulo}
+                          <span style={{ flex: 1 }}>{a.articulo}</span>
+                          <span style={{ color: "#6699bb", fontFamily: "'Space Mono',monospace" }}>
+                            {Number(a.precio || 0).toLocaleString("es-AR", {
+                              style: "currency",
+                              currency: "ARS",
+                            })}
+                          </span>
                         </label>
                       );
                     })
                   )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      accesorioMenu.onConfirm?.();
+                      cerrarAccesorioMenu();
+                    }}
+                    style={{
+                      marginTop: 8,
+                      width: "100%",
+                      padding: "6px 10px",
+                      background: "#0a6cbc",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 3,
+                      fontWeight: 700,
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Ingresar
+                  </button>
                 </div>
               </>
             );
@@ -3136,6 +3164,7 @@ export default function PresupuestoNuevo({
               cerrarAccesorioMenu={cerrarAccesorioMenu}
               toggleAccesorioItem={toggleAccesorioItem}
               toggleAccesorioEnArray={toggleAccesorioEnArray}
+              confirmarAccesoriosItem={confirmarAccesoriosItem}
               recalcFila={recalcFila}
             />
           )}
@@ -3173,6 +3202,8 @@ export default function PresupuestoNuevo({
             cerrarAccesorioMenu={cerrarAccesorioMenu}
             toggleAccesorioItem={toggleAccesorioItem}
             toggleAccesorioEnArray={toggleAccesorioEnArray}
+            confirmarAccesoriosItem={confirmarAccesoriosItem}
+            recalcFila={recalcFila}
           />
 
           {tab === "mampara" && (
