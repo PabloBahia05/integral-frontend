@@ -1,3 +1,4 @@
+import { useState } from "react";
 // Tab "Placard": selector de familia (Placard/Frente/Auxiliares/Accesorios)
 // y la tabla editable de cada familia (agregar, editar inline, buscar
 // artículo con precio_un, eliminar).
@@ -31,11 +32,95 @@ export default function PlacardSection({
   setTab,
   lineasActivas,
   nombresGruposUsados = [],
+  // freno: área × valor freno, se suma al precio del ítem
+  aplicarFrenoATodosPlacard,
+  setFrenoItemPlacard,
 }) {
+  // ── Freno general (toda la sección Placard) ───────────────
+  const [frenoGeneralPlacard, setFrenoGeneralPlacard] = useState("");
+  const hayItemsPlacard =
+    (placardItems.placard?.length ?? 0) > 0 ||
+    (placardItems.frente?.length ?? 0) > 0 ||
+    (placardItems.auxiliares?.length ?? 0) > 0 ||
+    (placardItems.accesorios?.length ?? 0) > 0;
   return (
     <>
           {tab === "placard" && !placardFamilia && (
             <div>
+              {hayItemsPlacard && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-end",
+                    gap: 10,
+                    marginBottom: 20,
+                    padding: "12px 16px",
+                    background: "#f5f9fc",
+                    border: "1px solid #c8dae8",
+                    borderRadius: 3,
+                  }}
+                >
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: 11,
+                        color: "#6699bb",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Freno $/m² — todo Placard
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={frenoGeneralPlacard}
+                      onChange={(e) => setFrenoGeneralPlacard(e.target.value)}
+                      style={{
+                        width: 140,
+                        textAlign: "right",
+                        fontFamily: "'Space Mono',monospace",
+                        fontSize: 12,
+                        border: "1px solid #b8cfe0",
+                        padding: "6px 10px",
+                        borderRadius: 2,
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={() =>
+                      aplicarFrenoATodosPlacard?.(frenoGeneralPlacard)
+                    }
+                    disabled={
+                      frenoGeneralPlacard === "" ||
+                      isNaN(parseFloat(frenoGeneralPlacard))
+                    }
+                    title="Aplica este valor de freno a todos los ítems de Placard/Frente/Auxiliares/Accesorios. No afecta a Cocina."
+                    style={{
+                      padding: "7px 18px",
+                      background:
+                        frenoGeneralPlacard !== "" &&
+                        !isNaN(parseFloat(frenoGeneralPlacard))
+                          ? "#0a3a5c"
+                          : "#c8dae8",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 2,
+                      fontFamily: "'Space Mono',monospace",
+                      fontSize: 12,
+                      cursor:
+                        frenoGeneralPlacard !== "" &&
+                        !isNaN(parseFloat(frenoGeneralPlacard))
+                          ? "pointer"
+                          : "default",
+                    }}
+                  >
+                    🛑 Aplicar freno a todo Placard
+                  </button>
+                </div>
+              )}
               <div
                 style={{
                   fontSize: 11,
@@ -334,6 +419,18 @@ export default function PlacardSection({
                           textAlign: "right",
                           border: "1px solid #c8dae8",
                           fontWeight: 700,
+                          width: 100,
+                        }}
+                        title="Cargo por freno = Área del artículo × valor cargado acá. Se suma al precio del ítem."
+                      >
+                        Freno $/m²
+                      </th>
+                      <th
+                        style={{
+                          padding: "8px 12px",
+                          textAlign: "right",
+                          border: "1px solid #c8dae8",
+                          fontWeight: 700,
                           width: 110,
                         }}
                       >
@@ -472,6 +569,11 @@ export default function PlacardSection({
                                           const precioUsar = precioPlacard || "";
                                           const nombreart =
                                             p.nombreart ?? p.NOMBREART ?? base;
+                                          // Área del artículo (columna AREA
+                                          // en la tabla articulos): se usa
+                                          // para el cargo de freno (área ×
+                                          // valor de freno cargado en el ítem).
+                                          const area = p.area ?? p.AREA ?? null;
                                           setPlacardFila((f) => ({
                                             ...f,
                                             articulo: base,
@@ -482,6 +584,7 @@ export default function PlacardSection({
                                               String(precioPlacard),
                                             precios,
                                             preciosBase,
+                                            area,
                                           }));
                                           setPlacardSearch(base);
                                         }}
@@ -537,6 +640,40 @@ export default function PlacardSection({
                                 fontSize: 12,
                                 border: "1px solid #7aaac8",
                                 padding: "4px 4px",
+                                borderRadius: 2,
+                              }}
+                            />
+                          </td>
+                          <td
+                            style={{
+                              padding: "6px 8px",
+                              border: "1px solid #c8dae8",
+                            }}
+                          >
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={placardFila.freno ?? ""}
+                              onChange={(e) =>
+                                setPlacardFila((f) => ({
+                                  ...f,
+                                  freno: e.target.value,
+                                }))
+                              }
+                              title={
+                                placardFila.area
+                                  ? `Área: ${placardFila.area} m²`
+                                  : "Este artículo no tiene área cargada en la BD"
+                              }
+                              style={{
+                                width: "100%",
+                                textAlign: "right",
+                                fontFamily: "'Space Mono',monospace",
+                                fontSize: 12,
+                                border: "1px solid #7aaac8",
+                                padding: "4px 8px",
                                 borderRadius: 2,
                               }}
                             />
@@ -716,6 +853,42 @@ export default function PlacardSection({
                             }}
                           >
                             {fila.cantidad}
+                          </td>
+                          <td
+                            style={{
+                              padding: "6px 8px",
+                              border: "1px solid #c8dae8",
+                              textAlign: "right",
+                            }}
+                          >
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={fila.freno ?? ""}
+                              onChange={(e) =>
+                                setFrenoItemPlacard?.(
+                                  placardFamilia,
+                                  idx,
+                                  e.target.value,
+                                )
+                              }
+                              title={
+                                fila.area
+                                  ? `Área: ${fila.area} m²`
+                                  : "Este artículo no tiene área cargada en la BD"
+                              }
+                              style={{
+                                width: "100%",
+                                textAlign: "right",
+                                fontFamily: "'Space Mono',monospace",
+                                fontSize: 12,
+                                border: "1px solid #c8dae8",
+                                padding: "4px 6px",
+                                borderRadius: 2,
+                              }}
+                            />
                           </td>
                           <td
                             style={{
@@ -988,6 +1161,11 @@ export default function PlacardSection({
                                   const precioUsar = precioPlacard || "";
                                   const nombreart =
                                     p.nombreart ?? p.NOMBREART ?? base;
+                                  // Área del artículo (columna AREA en la
+                                  // tabla articulos): se usa para el cargo
+                                  // de freno (área × valor de freno cargado
+                                  // en el ítem).
+                                  const area = p.area ?? p.AREA ?? null;
                                   setPlacardFila((f) => ({
                                     ...f,
                                     articulo: base,
@@ -997,6 +1175,7 @@ export default function PlacardSection({
                                     precioPlacard: String(precioPlacard),
                                     precios,
                                     preciosBase,
+                                    area,
                                   }));
                                   setPlacardSearch(base);
                                 }}

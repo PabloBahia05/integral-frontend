@@ -1205,6 +1205,10 @@ export default function PresupuestoNuevo({
     placardEliminarFila,
     placardGuardarEdit,
     placardIniciarEdit,
+    aplicarFrenoATodosCocina,
+    aplicarFrenoATodosPlacard,
+    setFrenoItemCocina,
+    setFrenoItemPlacard,
   } = useCocinaPlacard({
     authFetch,
     tab,
@@ -1615,6 +1619,8 @@ export default function PresupuestoNuevo({
           porcentaje2: parseFloat(it.porcentaje2 ?? it.PORCENTAJE2) || null,
           valor3: v3,
           porcentaje3: parseFloat(it.porcentaje3 ?? it.PORCENTAJE3) || null,
+          area: parseFloat(it.area ?? it.AREA) || null,
+          freno: parseFloat(it.freno ?? it.FRENO) || null,
           grupo: it.grupo ?? it.GRUPO ?? "",
         };
         if (tipo.includes("cocina") && tipo.includes("bajomesada"))
@@ -1998,6 +2004,12 @@ export default function PresupuestoNuevo({
           precios: it.precios ?? [],
           ancho: it.ancho ?? null,
           alto: it.alto ?? null,
+          // Freno: área del artículo (BD) × valor cargado por ítem. Se
+          // manda al backend para persistir, pero requiere que la tabla de
+          // ítems del presupuesto tenga las columnas `area`/`freno` — ver
+          // nota al usuario.
+          area: it.area ?? null,
+          freno: it.freno ?? null,
           // Vinculación vanitory
           tabla: it.tabla ?? null,
           vtabla: it.vtabla ?? null,
@@ -3045,6 +3057,8 @@ export default function PresupuestoNuevo({
               onVerPresupuesto={() => setTab("presupuesto")}
               abrirPrecioPopover={abrirPrecioPopover}
               nombresGruposUsados={nombresGruposUsados}
+              aplicarFrenoATodosCocina={aplicarFrenoATodosCocina}
+              setFrenoItemCocina={setFrenoItemCocina}
             />
           )}
           <PlacardSection
@@ -3073,6 +3087,8 @@ export default function PresupuestoNuevo({
             abrirPrecioPopover={abrirPrecioPopover}
             setTab={setTab}
             nombresGruposUsados={nombresGruposUsados}
+            aplicarFrenoATodosPlacard={aplicarFrenoATodosPlacard}
+            setFrenoItemPlacard={setFrenoItemPlacard}
           />
 
           {tab === "mampara" && (
