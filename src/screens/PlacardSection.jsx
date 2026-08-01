@@ -841,6 +841,20 @@ export default function PlacardSection({
                             }}
                           >
                             {fila.nombreart}
+                            {fila.accesorios?.some((a) =>
+                              a.toLowerCase().includes("autofreno"),
+                            ) && (
+                              <span
+                                style={{
+                                  marginLeft: 6,
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: "#0a5c3a",
+                                }}
+                              >
+                                c/freno
+                              </span>
+                            )}
                             {fila.grupo && fila.grupo.trim() && (
                               <div
                                 style={{
