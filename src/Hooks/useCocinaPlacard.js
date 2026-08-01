@@ -295,6 +295,23 @@ export default function useCocinaPlacard({
       return String(Math.round((p + area * freno) * 100) / 100);
     };
 
+    // Accesorios: suma el precio de cada artículo "extra" tildado para
+    // este ítem (fila.accesorios, nombres de artículos con area =
+    // 'accesorio') al precio del ítem. Se suma aparte, después del freno,
+    // igual para todas las líneas. Se recalcula siempre desde cero (no es
+    // acumulativo) así que confirmar el popover de accesorios varias veces
+    // no duplica el cargo.
+    const totalAccesorios = (fila.accesorios ?? []).reduce((acc, nombre) => {
+      const art = accesoriosDisponibles.find((a) => a.articulo === nombre);
+      const p = parseFloat(art?.precio);
+      return acc + (isNaN(p) ? 0 : p);
+    }, 0);
+    const conAccesorios = (precio) => {
+      if (!totalAccesorios) return precio;
+      const p = parseFloat(precio) || 0;
+      return String(Math.round((p + totalAccesorios) * 100) / 100);
+    };
+
     if (fila.preciosBase && fila.preciosBase.length > 0) {
       const nuevosPrecios = fila.preciosBase.map((pb, li) => {
         const conLista = aplicarPorcentaje(pb.precioBase);
@@ -302,7 +319,7 @@ export default function useCocinaPlacard({
         return {
           linea: pb.linea,
           precioBase: pb.precioBase,
-          precio: conFreno(conAjusteGeneral(conExtra(conLista, pctExtra))),
+          precio: conAccesorios(conFreno(conAjusteGeneral(conExtra(conLista, pctExtra)))),
         };
       });
       const nuevoPrecio =
@@ -313,7 +330,7 @@ export default function useCocinaPlacard({
       const conLista = aplicarPorcentaje(fila.precioBase);
       return {
         ...fila,
-        precio: conFreno(conAjusteGeneral(conExtra(conLista, fila.porcentaje1))),
+        precio: conAccesorios(conFreno(conAjusteGeneral(conExtra(conLista, fila.porcentaje1)))),
       };
     }
     return fila;
@@ -393,10 +410,10 @@ export default function useCocinaPlacard({
   // editar accesorios tanto desde la fila de vista como desde "editar".
   const [accesorioMenu, setAccesorioMenu] = useState(null);
 
-  const abrirAccesorioMenu = (actuales, onToggle, e) => {
+  const abrirAccesorioMenu = (actuales, onToggle, onConfirm, e) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    setAccesorioMenu({ actuales: actuales ?? [], onToggle, rect });
+    setAccesorioMenu({ actuales: actuales ?? [], onToggle, onConfirm, rect });
   };
 
   const cerrarAccesorioMenu = () => setAccesorioMenu(null);
@@ -419,6 +436,22 @@ export default function useCocinaPlacard({
         i === idx
           ? { ...f, accesorios: toggleAccesorioEnArray(f.accesorios, nombreAccesorio) }
           : f,
+      ),
+    });
+    if (tipo === "cocina") setCocinaItems(actualizar);
+    else setPlacardItems(actualizar);
+  };
+
+  // Confirma la selección de accesorios de un ítem YA guardado (fila de
+  // vista): recalcula el precio desde cero (precioBase + %lista + %item +
+  // ajuste + freno + accesorios), para que el total de accesorios elegido
+  // quede sumado al valor del ítem. Se llama al pinchar "Ingresar" en el
+  // popover.
+  const confirmarAccesoriosItem = (tipo, familia, idx) => {
+    const actualizar = (prev) => ({
+      ...prev,
+      [familia]: (prev[familia] ?? []).map((f, i) =>
+        i === idx ? recalcFila(f) : f,
       ),
     });
     if (tipo === "cocina") setCocinaItems(actualizar);
@@ -788,5 +821,6 @@ export default function useCocinaPlacard({
     cerrarAccesorioMenu,
     toggleAccesorioItem,
     toggleAccesorioEnArray,
+    confirmarAccesoriosItem,
   };
 }
