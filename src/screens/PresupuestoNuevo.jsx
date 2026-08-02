@@ -2039,12 +2039,13 @@ export default function PresupuestoNuevo({
           ancho: it.ancho ?? null,
           alto: it.alto ?? null,
           // Hasta 3 accesorios por ítem: cada uno se manda como su
-          // codartint (columnas accesorio/accesorio1/accesorio2) + cantidad
-          // (columnas cantacc/cantacc1/cantacc2, por ahora siempre 1 — no
-          // hay selector de cantidad por accesorio en el popover). Slots
-          // sin usar quedan en null.
+          // codartint (columnas accesorio/accesorio1/accesorio2) + el área
+          // del artículo del ítem (columnas cantacc/cantacc1/cantacc2 —
+          // el área del ítem, no una cantidad de accesorios). Slots sin
+          // usar quedan en null.
           ...(() => {
             const nombres = (it.accesorios ?? []).slice(0, 3);
+            const areaItem = parseFloat(it.area) || null;
             const cods = nombres.map((nombre) => {
               const art = accesoriosDisponibles.find(
                 (a) => a.articulo === nombre,
@@ -2053,11 +2054,11 @@ export default function PresupuestoNuevo({
             });
             return {
               accesorio: cods[0] ?? null,
-              cantacc: cods[0] != null ? 1 : null,
+              cantacc: cods[0] != null ? areaItem : null,
               accesorio1: cods[1] ?? null,
-              cantacc1: cods[1] != null ? 1 : null,
+              cantacc1: cods[1] != null ? areaItem : null,
               accesorio2: cods[2] ?? null,
-              cantacc2: cods[2] != null ? 1 : null,
+              cantacc2: cods[2] != null ? areaItem : null,
             };
           })(),
           // Vinculación vanitory
