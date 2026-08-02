@@ -1631,7 +1631,17 @@ export default function PresupuestoNuevo({
           // accesorio/accesorio1/accesorio2 en BD guardan el codartint de
           // hasta 3 artículos tildados en el ítem (null en los slots sin
           // usar). Al recargar, se busca cada codartint en
-          // accesoriosDisponibles para volver a tildarlos.
+          // accesoriosDisponibles para volver a tildarlos. Además de
+          // resolverlo ya (si accesoriosDisponibles ya está cargado), se
+          // guardan los códigos crudos en _accesorioCods: si el fetch de
+          // /articulos/accesorios todavía no terminó en este momento (carga
+          // en paralelo), un efecto aparte los vuelve a resolver apenas
+          // esa lista esté lista — ver useCocinaPlacard.js.
+          _accesorioCods: [
+            it.accesorio ?? it.ACCESORIO ?? null,
+            it.accesorio1 ?? it.ACCESORIO1 ?? null,
+            it.accesorio2 ?? it.ACCESORIO2 ?? null,
+          ].filter((cod) => cod != null && cod !== ""),
           accesorios: [
             it.accesorio ?? it.ACCESORIO ?? null,
             it.accesorio1 ?? it.ACCESORIO1 ?? null,
