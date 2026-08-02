@@ -2076,6 +2076,23 @@ export default function PresupuestoNuevo({
         cliente: payload.nombre,
       }),
     );
+    console.log(
+      "[handleGuardar] items con accesorio:",
+      JSON.stringify(
+        payload.items
+          ?.filter((it) => it.accesorio || it.accesorio1 || it.accesorio2)
+          .map((it) => ({
+            seccion: it.seccion,
+            nombreart: it.nombreart,
+            accesorio: it.accesorio,
+            cantacc: it.cantacc,
+            accesorio1: it.accesorio1,
+            cantacc1: it.cantacc1,
+            accesorio2: it.accesorio2,
+            cantacc2: it.cantacc2,
+          })),
+      ),
+    );
     try {
       const res = await authFetch(`${API}/tabla-presupuestos`, {
         method: "POST",
