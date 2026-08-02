@@ -400,6 +400,39 @@ export default function useCocinaPlacard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Si un presupuesto se cargó ANTES de que terminara este fetch, las filas
+  // quedan con `_accesorioCods` (los codartint crudos) pero `accesorios: []`
+  // sin resolver. En cuanto accesoriosDisponibles esté listo, se resuelven
+  // acá y se recalcula el precio (recalcFila) para que el cargo del
+  // accesorio quede sumado.
+  useEffect(() => {
+    if (accesoriosDisponibles.length === 0) return;
+    const resolverPendientes = (itemsObj) => {
+      let cambio = false;
+      const next = {};
+      for (const [familia, filas] of Object.entries(itemsObj)) {
+        next[familia] = filas.map((f) => {
+          if (!f._accesorioCods?.length || f.accesorios?.length) return f;
+          const nombres = f._accesorioCods
+            .map(
+              (cod) =>
+                accesoriosDisponibles.find(
+                  (a) => String(a.codartint) === String(cod),
+                )?.articulo,
+            )
+            .filter(Boolean);
+          if (!nombres.length) return f;
+          cambio = true;
+          return recalcFila({ ...f, accesorios: nombres });
+        });
+      }
+      return cambio ? next : itemsObj;
+    };
+    setCocinaItems((prev) => resolverPendientes(prev));
+    setPlacardItems((prev) => resolverPendientes(prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accesoriosDisponibles]);
+
   // Menú desplegable de accesorios: no sabe si el ítem está guardado o es
   // el draft de una fila en edición — solo necesita `actuales` (los
   // accesorios ya tildados, para pintar los checkboxes) y `onToggle`
