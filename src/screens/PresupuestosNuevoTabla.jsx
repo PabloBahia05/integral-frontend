@@ -131,6 +131,11 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto, authFetch }
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(null);
 
+  // Revisión individual a borrar (desde el modal de Revisiones), separado
+  // de `selected`/`modal` que son para borrar el presupuesto completo.
+  const [revisionAEliminar, setRevisionAEliminar] = useState(null);
+  const [eliminandoRevision, setEliminandoRevision] = useState(false);
+
   // ── Fetch encabezados ─────────────────────────────────────────────────────
 
   const fetchEncabezados = () => {
@@ -233,6 +238,33 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto, authFetch }
       setModal(null);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // ── DELETE: borra una sola revisión (desde el modal "Revisiones") ─────────
+  // A diferencia de handleDelete (que borra TODO el presupuesto usando el
+  // `selected` de la tabla principal), esto borra solo la revisión puntual
+  // que se tilda en el modal de historial, sin tocar las demás.
+
+  const handleDeleteRevision = async () => {
+    if (!revisionAEliminar) return;
+    setEliminandoRevision(true);
+    try {
+      const res = await authFetch(
+        `${API}/tabla-presupuestos/revision/${revisionAEliminar.numeropres}/${revisionAEliminar.revision}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setRevisiones((prev) =>
+        prev.filter((r) => r.id !== revisionAEliminar.id),
+      );
+      fetchEncabezados();
+      setRevisionAEliminar(null);
+    } catch (e) {
+      console.error("Error borrando revisión:", e);
+      alert("No se pudo borrar la revisión. Revisá la consola.");
+    } finally {
+      setEliminandoRevision(false);
     }
   };
 
@@ -424,6 +456,24 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto, authFetch }
                       },
                     ]
                   : []),
+                {
+                  key: "_eliminar",
+                  label: "",
+                  render: (_, row) => (
+                    <button
+                      className="btn-abrir-sm"
+                      title="Eliminar esta revisión"
+                      onClick={() => setRevisionAEliminar(row)}
+                      style={{
+                        background: "#fdecea",
+                        color: "#c0392b",
+                        borderColor: "#f3b8b0",
+                      }}
+                    >
+                      🗑️ Eliminar
+                    </button>
+                  ),
+                },
               ]}
               rows={revisiones}
               selectedId={null}
@@ -439,6 +489,15 @@ export default function PresupuestosNuevoTabla({ onAbrirPresupuesto, authFetch }
             </button>
           </div>
         </Modal>
+      )}
+
+      {/* ── Confirmación: borrar una revisión individual ──────────────── */}
+      {revisionAEliminar && (
+        <ConfirmDelete
+          item={revisionAEliminar}
+          onConfirm={handleDeleteRevision}
+          onClose={() => !eliminandoRevision && setRevisionAEliminar(null)}
+        />
       )}
 
       {/* ── Modal eliminar ────────────────────────────────────────────── */}
