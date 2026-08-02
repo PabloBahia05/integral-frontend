@@ -1628,9 +1628,22 @@ export default function PresupuestoNuevo({
           porcentaje3: parseFloat(it.porcentaje3 ?? it.PORCENTAJE3) || null,
           area: parseFloat(it.area ?? it.AREA) || null,
           freno: parseFloat(it.freno ?? it.FRENO) || null,
-          accesorios: String(it.accesorio ?? it.ACCESORIO ?? "")
-            .split(",")
-            .map((a) => a.trim())
+          // accesorio/accesorio1/accesorio2 en BD guardan el codartint de
+          // hasta 3 artículos tildados en el ítem (null en los slots sin
+          // usar). Al recargar, se busca cada codartint en
+          // accesoriosDisponibles para volver a tildarlos.
+          accesorios: [
+            it.accesorio ?? it.ACCESORIO ?? null,
+            it.accesorio1 ?? it.ACCESORIO1 ?? null,
+            it.accesorio2 ?? it.ACCESORIO2 ?? null,
+          ]
+            .filter((cod) => cod != null && cod !== "")
+            .map(
+              (cod) =>
+                accesoriosDisponibles.find(
+                  (a) => String(a.codartint) === String(cod),
+                )?.articulo,
+            )
             .filter(Boolean),
           grupo: it.grupo ?? it.GRUPO ?? "",
         };
@@ -2015,20 +2028,28 @@ export default function PresupuestoNuevo({
           precios: it.precios ?? [],
           ancho: it.ancho ?? null,
           alto: it.alto ?? null,
-          // Freno: área del artículo (BD) × valor cargado por ítem. Se
-          // manda al backend para persistir, pero requiere que la tabla de
-          // ítems del presupuesto tenga las columnas `area`/`freno` — ver
-          // nota al usuario.
-          area: it.area ?? null,
-          freno: it.freno ?? null,
-          // Accesorios: lista de artículos "extra" tildados para este ítem
-          // (autofreno, led, etc). Se manda como texto separado por comas.
-          // Igual que area/freno, requiere que la tabla de ítems del
-          // presupuesto tenga la columna `accesorio` — ver nota al usuario.
-          accesorio:
-            it.accesorios && it.accesorios.length
-              ? it.accesorios.join(",")
-              : null,
+          // Hasta 3 accesorios por ítem: cada uno se manda como su
+          // codartint (columnas accesorio/accesorio1/accesorio2) + cantidad
+          // (columnas cantacc/cantacc1/cantacc2, por ahora siempre 1 — no
+          // hay selector de cantidad por accesorio en el popover). Slots
+          // sin usar quedan en null.
+          ...(() => {
+            const nombres = (it.accesorios ?? []).slice(0, 3);
+            const cods = nombres.map((nombre) => {
+              const art = accesoriosDisponibles.find(
+                (a) => a.articulo === nombre,
+              );
+              return art?.codartint ?? null;
+            });
+            return {
+              accesorio: cods[0] ?? null,
+              cantacc: cods[0] != null ? 1 : null,
+              accesorio1: cods[1] ?? null,
+              cantacc1: cods[1] != null ? 1 : null,
+              accesorio2: cods[2] ?? null,
+              cantacc2: cods[2] != null ? 1 : null,
+            };
+          })(),
           // Vinculación vanitory
           tabla: it.tabla ?? null,
           vtabla: it.vtabla ?? null,
