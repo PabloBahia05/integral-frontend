@@ -592,6 +592,12 @@ export default function TabCocina({
                                   const precioUsar = precios[0]?.precio ?? "";
                                   const nombreart =
                                     p.nombreart ?? p.NOMBREART ?? base;
+                                  // Área del artículo (columna AREA en la
+                                  // tabla articulos): se usa como cantidad
+                                  // (cantacc) del accesorio de freno al
+                                  // guardar y para calcular el cargo por
+                                  // accesorios en recalcFila.
+                                  const area = p.area ?? p.AREA ?? null;
                                   setCocinaFila((f) => ({
                                     ...f,
                                     articulo: base,
@@ -600,6 +606,7 @@ export default function TabCocina({
                                     precioBase: String(precioBaseUsar),
                                     precios,
                                     preciosBase,
+                                    area,
                                   }));
                                   setCocinaSearch(base);
                                 }}
