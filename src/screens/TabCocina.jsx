@@ -2,6 +2,16 @@ import { useState, useEffect } from "react";
 
 const API = "https://integral-backend-production.up.railway.app";
 
+// Codartint reales de los accesorios "autofreno" (puerta y cajonera/correderas).
+// Mismo criterio que useCocinaPlacard.js — NO buscar la palabra "autofreno"
+// en el nombre, porque el de cajonera se llama "TELESCOPICA SOFT CLOSING...".
+const CODARTINT_FRENO = ["EH35C0SCB", "EHCTSC500B"];
+const tieneFreno = (accesorios, accesoriosDisponibles) =>
+  (accesorios ?? []).some((nombre) => {
+    const art = accesoriosDisponibles?.find((a) => a.articulo === nombre);
+    return art && CODARTINT_FRENO.includes(String(art.codartint));
+  });
+
 const FILA_VACIA = {
   articulo: "",
   nombreart: "",
@@ -852,9 +862,7 @@ export default function TabCocina({
                     }}
                   >
                     {fila.nombreart}
-                    {fila.accesorios?.some((a) =>
-                      a.toLowerCase().includes("autofreno"),
-                    ) && (
+                    {tieneFreno(fila.accesorios, accesoriosDisponibles) && (
                       <span
                         style={{
                           marginLeft: 6,

@@ -3,6 +3,19 @@ import Totales from "./Totales";
 // Secciones cuyos ítems llevan medidas de ancho/alto.
 const TIENE_MEDIDAS = ["Mampara", "Puerta", "Vanitory"];
 
+// Codartint reales de los accesorios "autofreno" (puerta y cajonera/correderas).
+// Mismo criterio que useCocinaPlacard.js / TabCocina.jsx / PlacardSection.jsx —
+// NO buscar la palabra "autofreno" en el nombre, porque el de cajonera se
+// llama "TELESCOPICA SOFT CLOSING...".
+const CODARTINT_FRENO = ["EH35C0SCB", "EHCTSC500B"];
+const tieneFreno = (accesorios, accesoriosDisponibles) =>
+  (accesorios ?? []).some((nombre) => {
+    const art = accesoriosDisponibles?.find(
+      (a) => a.articulo === String(nombre),
+    );
+    return art && CODARTINT_FRENO.includes(String(art.codartint));
+  });
+
 // Contenido completo del tab "Presupuesto": resumen de cliente, panel de
 // ajuste de precios, y la tabla de ítems agrupados por sección con
 // subtotales y el total general.
@@ -43,6 +56,9 @@ export default function TablaArticulos({
   gruposCustom,
   setGruposCustom,
   nombresGruposUsados,
+  // accesorios: lista de artículos "extra" (area='accesorio'), para poder
+  // saber si un accesorio pegado a un ítem es "de freno" por su codartint
+  accesoriosDisponibles,
 }) {
   // Grupo efectivo de un ítem: el personalizado si el usuario le asignó uno,
   // si no la sección automática de siempre.
@@ -516,9 +532,7 @@ export default function TablaArticulos({
                         >
                           <div>
                             {item.nombreart}
-                            {item.accesorios?.some((a) =>
-                              String(a).toLowerCase().includes("autofreno"),
-                            ) && (
+                            {tieneFreno(item.accesorios, accesoriosDisponibles) && (
                               <span
                                 style={{
                                   marginLeft: 6,

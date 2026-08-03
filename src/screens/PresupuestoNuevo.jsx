@@ -3341,6 +3341,7 @@ export default function PresupuestoNuevo({
               gruposCustom={gruposCustom}
               setGruposCustom={setGruposCustom}
               nombresGruposUsados={nombresGruposUsados}
+              accesoriosDisponibles={accesoriosDisponibles}
             />
           )}
         </div>

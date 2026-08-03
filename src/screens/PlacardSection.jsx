@@ -1,4 +1,14 @@
 import { useState } from "react";
+
+// Codartint reales de los accesorios "autofreno" (puerta y cajonera/correderas).
+// Mismo criterio que useCocinaPlacard.js — NO buscar la palabra "autofreno"
+// en el nombre, porque el de cajonera se llama "TELESCOPICA SOFT CLOSING...".
+const CODARTINT_FRENO = ["EH35C0SCB", "EHCTSC500B"];
+const tieneFreno = (accesorios, accesoriosDisponibles) =>
+  (accesorios ?? []).some((nombre) => {
+    const art = accesoriosDisponibles?.find((a) => a.articulo === nombre);
+    return art && CODARTINT_FRENO.includes(String(art.codartint));
+  });
 // Tab "Placard": selector de familia (Placard/Frente/Auxiliares/Accesorios)
 // y la tabla editable de cada familia (agregar, editar inline, buscar
 // artículo con precio_un, eliminar).
@@ -812,9 +822,7 @@ export default function PlacardSection({
                             }}
                           >
                             {fila.nombreart}
-                            {fila.accesorios?.some((a) =>
-                              a.toLowerCase().includes("autofreno"),
-                            ) && (
+                            {tieneFreno(fila.accesorios, accesoriosDisponibles) && (
                               <span
                                 style={{
                                   marginLeft: 6,
