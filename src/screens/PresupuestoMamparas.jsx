@@ -8,6 +8,7 @@ export default function PresupuestoMamparas({
   clienteInicial = "",
   codclienteInicial = null,
   numeroPres = null,
+  nombresGruposExistentes = [],
 }) {
   const { authFetch } = useAuth();
   const [presupuestoId, setPresupuestoId] = useState(null); // número entero, null = sin asignar
@@ -58,6 +59,7 @@ export default function PresupuestoMamparas({
     alto: 200,
     vidrio: "esmerilado",
     colocacion: 0,
+    grupo: "",
   });
 
   // ── Cargar presupuesto guardado (reabrir) ────────────────────────────────────
@@ -797,6 +799,7 @@ export default function PresupuestoMamparas({
         ALTO: Number(form.alto),
         VIDRIO: form.vidrio,
         COLOCACION: Number(form.colocacion),
+        GRUPO: form.grupo && form.grupo.trim() ? form.grupo.trim() : null,
       });
 
       // Resetea el formulario (modoEdicion, presupuestoId, campos) apenas se
@@ -833,6 +836,7 @@ export default function PresupuestoMamparas({
       alto: 200,
       vidrio: "esmerilado",
       colocacion: 0,
+      grupo: "",
     });
     setColocacionBD(null);
     setErrorCalc("");
@@ -1601,6 +1605,32 @@ export default function PresupuestoMamparas({
                       setForm({ ...form, cantidad: Number(e.target.value) })
                     }
                   />
+                </div>
+
+                {/* Grupo — para agrupar manualmente varias mamparas (u
+                    otros ítems) dentro del mismo presupuesto/PDF. Vacío =
+                    se agrupa automáticamente por sección ("Mampara"). */}
+                <div className="field">
+                  <span className="label-text">GRUPO (opcional)</span>
+                  <input
+                    className="input"
+                    type="text"
+                    list="mampara-grupos-existentes"
+                    placeholder="Ej: Baño planta alta"
+                    value={form.grupo ?? ""}
+                    onChange={(e) =>
+                      setForm({ ...form, grupo: e.target.value })
+                    }
+                    title="Nombre de grupo para el PDF/resumen del presupuesto (vacío = automático)"
+                  />
+                  {Array.isArray(nombresGruposExistentes) &&
+                    nombresGruposExistentes.length > 0 && (
+                      <datalist id="mampara-grupos-existentes">
+                        {nombresGruposExistentes.map((g) => (
+                          <option key={g} value={g} />
+                        ))}
+                      </datalist>
+                    )}
                 </div>
 
                 {/* Ancho / Alto */}

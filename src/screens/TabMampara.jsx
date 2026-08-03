@@ -11,6 +11,8 @@ export default function TabMampara({
   // Setters para actualizar el presupuesto global
   setPresmv,
   setPresupuestoItems,
+  // Nombres de grupo ya usados en el presupuesto, para autocompletar
+  nombresGruposUsados,
 }) {
   return (
     <div>
@@ -71,6 +73,7 @@ export default function TabMampara({
         presupuestoACargar={mamparaAEditar}
         onCargado={() => {}}
         onSelectItem={(item) => console.log("Mampara:", item)}
+        nombresGruposExistentes={nombresGruposUsados}
         onGuardado={(data) => {
           if (!data) return;
           // presm = valor generado por trigger (ej: "M00008") → se asigna a presmv
@@ -88,6 +91,7 @@ export default function TabMampara({
             ancho: Number(data.ANCHO ?? 0),
             alto: Number(data.ALTO ?? 0),
             presmv: presm ?? null,
+            grupo: data.GRUPO ?? null,
           };
 
           // Solo actualiza en el lugar si es la MISMA mampara (mismo

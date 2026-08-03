@@ -572,11 +572,11 @@ export default function TablaArticulos({
                               style={{
                                 marginLeft: 8,
                                 fontSize: 10,
-                                color: presmv != null ? "#2277bb" : "#c0392b",
+                                color: item.presmv != null ? "#2277bb" : "#c0392b",
                                 fontFamily: "monospace",
                               }}
                             >
-                              presmv: {presmv ?? "null"}
+                              presmv: {item.presmv ?? "null"}
                             </span>
                           )}
                           {item.seccion === "Puerta" && (
@@ -794,12 +794,12 @@ export default function TablaArticulos({
                             textAlign: "center",
                           }}
                         >
-                          {item.seccion === "Mampara" && presmv != null && (
+                          {item.seccion === "Mampara" && item.presmv != null && (
                             <button
                               onClick={async () => {
                                 try {
                                   const res = await authFetch(
-                                    `${API}/presupuestos-mamparas/${presmv}`,
+                                    `${API}/presupuestos-mamparas/${item.presmv}`,
                                   );
                                   const data = await res.json();
                                   setMamparaAEditar(data);

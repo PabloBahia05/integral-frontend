@@ -3328,6 +3328,7 @@ export default function PresupuestoNuevo({
               mamparaAEditar={mamparaAEditar}
               setPresmv={setPresmv}
               setPresupuestoItems={setPresupuestoItems}
+              nombresGruposUsados={nombresGruposUsados}
             />
           )}
 
