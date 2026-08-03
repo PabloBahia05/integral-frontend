@@ -90,9 +90,18 @@ export default function TabMampara({
             presmv: presm ?? null,
           };
 
-          // Si ya existe un ítem de mampara, actualizarlo; si no, agregarlo
+          // Solo actualiza en el lugar si es la MISMA mampara (mismo
+          // presmv, ej. una revisión); si es una mampara distinta (presmv
+          // nuevo, o ninguna mampara guardada todavía con ese presmv), se
+          // agrega como ítem nuevo. Esto permite tener varias mamparas
+          // distintas dentro del mismo presupuesto.
           setPresupuestoItems((prev) => {
-            const idx = prev.findIndex((it) => it.seccion === "Mampara");
+            const idx = prev.findIndex(
+              (it) =>
+                it.seccion === "Mampara" &&
+                nuevoItem.presmv != null &&
+                it.presmv === nuevoItem.presmv,
+            );
             if (idx >= 0) {
               const updated = [...prev];
               updated[idx] = {

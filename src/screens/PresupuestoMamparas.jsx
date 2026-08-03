@@ -799,6 +799,14 @@ export default function PresupuestoMamparas({
         COLOCACION: Number(form.colocacion),
       });
 
+      // Resetea el formulario (modoEdicion, presupuestoId, campos) apenas se
+      // guarda con éxito, para que la próxima vez que se clickee "Guardar"
+      // sea siempre una mampara NUEVA (REVISION 0, sin PRESM) y no una
+      // revisión de la que se acaba de guardar. Esto es lo que permite
+      // cargar varias mamparas distintas dentro de un mismo presupuesto sin
+      // que la segunda pise a la primera.
+      handleNuevo();
+
       setTimeout(() => setGuardadoOk(false), 3000);
     } catch (err) {
       setErrorCalc(err.message);
