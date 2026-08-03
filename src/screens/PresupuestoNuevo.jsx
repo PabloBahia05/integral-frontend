@@ -2038,6 +2038,13 @@ export default function PresupuestoNuevo({
           precios: it.precios ?? [],
           ancho: it.ancho ?? null,
           alto: it.alto ?? null,
+          // Área del artículo (columna AREA en tabla articulos), guardada
+          // en el ítem al elegirlo del buscador. Se manda tal cual para
+          // que sobreviva al recargar el presupuesto (antes se perdía:
+          // solo se usaba para calcular cantacc/cantacc1/cantacc2 más
+          // abajo, nunca se mandaba como campo propio del ítem).
+          area: parseFloat(it.area) || null,
+          freno: parseFloat(it.freno) || null,
           // Hasta 3 accesorios por ítem: cada uno se manda como su
           // codartint (columnas accesorio/accesorio1/accesorio2) + el área
           // del artículo del ítem (columnas cantacc/cantacc1/cantacc2 —
