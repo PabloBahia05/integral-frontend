@@ -498,12 +498,20 @@ export default function useCocinaPlacard({
   // ajuste + accesorios), para que el total de accesorios elegido
   // quede sumado al valor del ítem. Se llama al pinchar "Ingresar" en el
   // popover.
-  const confirmarAccesoriosItem = (tipo, familia, idx) => {
+  const confirmarAccesoriosItem = (tipo, familia, idx, areaResuelta) => {
     const actualizar = (prev) => ({
       ...prev,
-      [familia]: (prev[familia] ?? []).map((f, i) =>
-        i === idx ? recalcFila(f) : f,
-      ),
+      [familia]: (prev[familia] ?? []).map((f, i) => {
+        if (i !== idx) return f;
+        // f.area puede venir null en ítems guardados antes de persistir
+        // esa columna, o agregados por un flujo que todavía no la seteaba.
+        // Los llamadores (TabCocina/PlacardSection) ya resuelven el área
+        // correcta con resolverAreaItem antes de llamar acá — la usamos
+        // como fallback y la dejamos guardada en la fila para que los
+        // próximos recalcFila (ej. handleActualizar) no vuelvan a perderla.
+        const fila = f.area != null ? f : { ...f, area: areaResuelta ?? f.area };
+        return recalcFila(fila);
+      }),
     });
     if (tipo === "cocina") setCocinaItems(actualizar);
     else setPlacardItems(actualizar);
