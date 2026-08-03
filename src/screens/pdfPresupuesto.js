@@ -236,9 +236,7 @@ export function generarPresupuestoPDF({
     @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Space Mono', 'Courier New', monospace; background: #fff; color: #111; font-size: 12px; }
-    .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 30px 56px 40px; display: flex; flex-direction: column; background: #fff; }
-    .membrete-banner { margin-bottom: 14px; }
-    .membrete-banner img { max-width: 100%; max-height: 130px; height: auto; }
+    .page { width: 794px; min-height: 1123px; margin: 0 auto; padding: 4px 56px 40px; display: flex; flex-direction: column; background: #fff; }
     .doc-nro-corner { text-align: right; font-size: 10px; color: #555; margin-bottom: 6px; }
     .doc-title { text-align: center; font-weight: 700; font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 14px; }
     .info-line { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; }
@@ -274,9 +272,6 @@ export function generarPresupuestoPDF({
 
     const pageHTML = `
 <div class="page">
-  <div class="membrete-banner">
-    <img src="${MEMBRETE_DANIEL_ROQUE_B64}" alt="Daniel Roque S.R.L." />
-  </div>
   <div class="doc-nro-corner">N° ${nro} — Rev. ${revision}</div>
   <div class="doc-title">Presupuesto</div>
   <div class="info-line">
@@ -392,8 +387,18 @@ export function generarPresupuestoPDF({
       // Ahora: alto fijo de A4 (1123px), para que html2pdf pagine de
       // verdad, + "pagebreak.avoid" para que nunca corte a la mitad de una
       // imagen (empuja la imagen entera a la página siguiente en su lugar).
+      // Margen superior reservado en CADA hoja del PDF (en mm) para el logo
+      // repetido. Como html2pdf pagina cortando un único documento largo en
+      // trozos de A4, la única forma de que el membrete aparezca en todas
+      // las hojas (y no solo en la primera) es reservarle este hueco fijo
+      // arriba de cada página y luego "estamparlo" con jsPDF una vez que el
+      // PDF ya está generado (ver estamparMembreteEnTodasLasPaginas).
+      const MARGEN_SUP_MM = 26;
+      const MARGEN_IZQ_MM = 14.8; // ≈ padding-left de .page (56px)
+      const LOGO_ALTO_MM = 16;
+
       const opcionesPDF = {
-        margin: 0,
+        margin: [MARGEN_SUP_MM, 0, 10, 0],
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: {
           scale: 2,
@@ -411,6 +416,26 @@ export function generarPresupuestoPDF({
         },
       };
 
+      // Dibuja el membrete arriba de TODAS las páginas del PDF ya generado
+      // (dentro del margen superior reservado por MARGEN_SUP_MM).
+      const estamparMembreteEnTodasLasPaginas = (pdf) => {
+        const propsLogo = pdf.getImageProperties(MEMBRETE_DANIEL_ROQUE_B64);
+        const anchoMM = (propsLogo.width * LOGO_ALTO_MM) / propsLogo.height;
+        const totalPaginas = pdf.internal.getNumberOfPages();
+        for (let i = 1; i <= totalPaginas; i++) {
+          pdf.setPage(i);
+          pdf.addImage(
+            MEMBRETE_DANIEL_ROQUE_B64,
+            "PNG",
+            MARGEN_IZQ_MM,
+            5,
+            anchoMM,
+            LOGO_ALTO_MM,
+          );
+        }
+        return pdf;
+      };
+
       esperarFuentes
         .then(() => new Promise((resolve) => setTimeout(resolve, 300)))
         .then(() => (necesitaFusionPDF ? asegurarPDFLib() : Promise.resolve()))
@@ -422,7 +447,12 @@ export function generarPresupuestoPDF({
               .html2pdf()
               .set(opcionesPDF)
               .from(paginaEl)
-              .outputPdf("arraybuffer");
+              .toPdf()
+              .get("pdf")
+              .then((pdf) => {
+                estamparMembreteEnTodasLasPaginas(pdf);
+                return pdf.output("arraybuffer");
+              });
 
             const { PDFDocument } = window.PDFLib;
             const docFinal = await PDFDocument.create();
@@ -461,6 +491,9 @@ export function generarPresupuestoPDF({
               .html2pdf()
               .set({ ...opcionesPDF, filename: `Presupuesto_${nro}.pdf` })
               .from(paginaEl)
+              .toPdf()
+              .get("pdf")
+              .then((pdf) => estamparMembreteEnTodasLasPaginas(pdf))
               .save();
           }
         })
