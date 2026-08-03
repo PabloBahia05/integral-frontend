@@ -32,7 +32,7 @@ export default function PlacardSection({
   setTab,
   lineasActivas,
   nombresGruposUsados = [],
-  // freno: área × valor freno, se suma al precio del ítem
+  // freno: le pega el accesorio autofreno que corresponda (puerta/cajonera)
   aplicarFrenoATodosPlacard,
   setFrenoItemPlacard,
   // accesorios: lista de artículos "extra" (area='accesorio') por ítem
@@ -46,7 +46,6 @@ export default function PlacardSection({
   recalcFila,
 }) {
   // ── Freno general (toda la sección Placard) ───────────────
-  const [frenoGeneralPlacard, setFrenoGeneralPlacard] = useState("");
   const hayItemsPlacard =
     (placardItems.placard?.length ?? 0) > 0 ||
     (placardItems.frente?.length ?? 0) > 0 ||
@@ -60,7 +59,7 @@ export default function PlacardSection({
                 <div
                   style={{
                     display: "flex",
-                    alignItems: "flex-end",
+                    alignItems: "center",
                     gap: 10,
                     marginBottom: 20,
                     padding: "12px 16px",
@@ -69,61 +68,18 @@ export default function PlacardSection({
                     borderRadius: 3,
                   }}
                 >
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 11,
-                        color: "#6699bb",
-                        marginBottom: 4,
-                      }}
-                    >
-                      Freno $/m² — todo Placard
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={frenoGeneralPlacard}
-                      onChange={(e) => setFrenoGeneralPlacard(e.target.value)}
-                      style={{
-                        width: 140,
-                        textAlign: "right",
-                        fontFamily: "'Space Mono',monospace",
-                        fontSize: 12,
-                        border: "1px solid #b8cfe0",
-                        padding: "6px 10px",
-                        borderRadius: 2,
-                      }}
-                    />
-                  </div>
                   <button
-                    onClick={() =>
-                      aplicarFrenoATodosPlacard?.(frenoGeneralPlacard)
-                    }
-                    disabled={
-                      frenoGeneralPlacard === "" ||
-                      isNaN(parseFloat(frenoGeneralPlacard))
-                    }
-                    title="Aplica este valor de freno a todos los ítems de Placard/Frente/Auxiliares/Accesorios. No afecta a Cocina."
+                    onClick={() => aplicarFrenoATodosPlacard?.()}
+                    title="Le pega el accesorio de freno que corresponda (puerta o cajonera) a cada ítem de Placard/Frente/Auxiliares/Accesorios, según su nombre. No afecta a Cocina."
                     style={{
                       padding: "7px 18px",
-                      background:
-                        frenoGeneralPlacard !== "" &&
-                        !isNaN(parseFloat(frenoGeneralPlacard))
-                          ? "#0a3a5c"
-                          : "#c8dae8",
+                      background: "#0a3a5c",
                       color: "#fff",
                       border: "none",
                       borderRadius: 2,
                       fontFamily: "'Space Mono',monospace",
                       fontSize: 12,
-                      cursor:
-                        frenoGeneralPlacard !== "" &&
-                        !isNaN(parseFloat(frenoGeneralPlacard))
-                          ? "pointer"
-                          : "default",
+                      cursor: "pointer",
                     }}
                   >
                     🛑 Aplicar freno a todo Placard
@@ -579,8 +535,8 @@ export default function PlacardSection({
                                             p.nombreart ?? p.NOMBREART ?? base;
                                           // Área del artículo (columna AREA
                                           // en la tabla articulos): se usa
-                                          // para el cargo de freno (área ×
-                                          // valor de freno cargado en el ítem).
+                                          // como cantidad (cantacc) del
+                                          // accesorio de freno al guardar.
                                           const area = p.area ?? p.AREA ?? null;
                                           setPlacardFila((f) => ({
                                             ...f,
@@ -1230,9 +1186,9 @@ export default function PlacardSection({
                                   const nombreart =
                                     p.nombreart ?? p.NOMBREART ?? base;
                                   // Área del artículo (columna AREA en la
-                                  // tabla articulos): se usa para el cargo
-                                  // de freno (área × valor de freno cargado
-                                  // en el ítem).
+                                  // tabla articulos): se usa como cantidad
+                                  // (cantacc) del accesorio de freno al
+                                  // guardar.
                                   const area = p.area ?? p.AREA ?? null;
                                   setPlacardFila((f) => ({
                                     ...f,
@@ -1330,46 +1286,6 @@ export default function PlacardSection({
                           fontSize: 12,
                           border: "1px solid #b8cfe0",
                           padding: "6px 6px",
-                          borderRadius: 2,
-                        }}
-                      />
-                    </div>
-                    {/* Freno ($/m²) — se multiplica por el área del artículo (BD) y se suma al precio */}
-                    <div style={{ flex: "0 0 100px" }}>
-                      <label
-                        style={{
-                          display: "block",
-                          fontSize: 11,
-                          color: "#6699bb",
-                          marginBottom: 4,
-                        }}
-                      >
-                        Freno $/m²
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={placardFila.freno ?? ""}
-                        onChange={(e) =>
-                          setPlacardFila((f) => ({
-                            ...f,
-                            freno: e.target.value,
-                          }))
-                        }
-                        title={
-                          placardFila.area
-                            ? `Área: ${placardFila.area} m²`
-                            : "Elegí un artículo de la BD para traer su área"
-                        }
-                        style={{
-                          width: "100%",
-                          textAlign: "right",
-                          fontFamily: "'Space Mono',monospace",
-                          fontSize: 12,
-                          border: "1px solid #b8cfe0",
-                          padding: "6px 10px",
                           borderRadius: 2,
                         }}
                       />

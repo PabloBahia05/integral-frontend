@@ -16,7 +16,6 @@ const FILA_VACIA = {
   valor3: null,
   porcentaje3: null,
   area: null,
-  freno: null,
   accesorios: [],
   grupo: "",
 };
@@ -40,7 +39,7 @@ export default function TabCocina({
   authFetch,
   // grupos ya usados en el presupuesto (autocompletado)
   nombresGruposUsados = [],
-  // freno: área × valor freno, se suma al precio del ítem
+  // freno: le pega el accesorio autofreno que corresponda (puerta/cajonera)
   aplicarFrenoATodosCocina,
   setFrenoItemCocina,
   // accesorios: lista de artículos "extra" (area='accesorio') por ítem
@@ -51,7 +50,7 @@ export default function TabCocina({
   toggleAccesorioItem,
   toggleAccesorioEnArray,
   confirmarAccesoriosItem,
-  // recalcula precio (lista + %item + ajuste + freno) — se usa al agregar/editar
+  // recalcula precio (lista + %item + ajuste + accesorios) — se usa al agregar/editar
   recalcFila,
 }) {
   // ── Estado local del tab ──────────────────────────────────
@@ -157,7 +156,6 @@ export default function TabCocina({
   };
 
   // ── Freno general (toda la sección Cocina) ────────────────
-  const [frenoGeneralCocina, setFrenoGeneralCocina] = useState("");
   const hayItemsCocina =
     cocinaItems.bajomesadas.length > 0 || cocinaItems.alacenas.length > 0;
 
@@ -169,7 +167,7 @@ export default function TabCocina({
           <div
             style={{
               display: "flex",
-              alignItems: "flex-end",
+              alignItems: "center",
               gap: 10,
               marginBottom: 20,
               padding: "12px 16px",
@@ -178,58 +176,18 @@ export default function TabCocina({
               borderRadius: 3,
             }}
           >
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 11,
-                  color: "#6699bb",
-                  marginBottom: 4,
-                }}
-              >
-                Freno $/m² — toda la Cocina
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={frenoGeneralCocina}
-                onChange={(e) => setFrenoGeneralCocina(e.target.value)}
-                style={{
-                  width: 140,
-                  textAlign: "right",
-                  fontFamily: "'Space Mono',monospace",
-                  fontSize: 12,
-                  border: "1px solid #b8cfe0",
-                  padding: "6px 10px",
-                  borderRadius: 2,
-                }}
-              />
-            </div>
             <button
-              onClick={() => aplicarFrenoATodosCocina?.(frenoGeneralCocina)}
-              disabled={
-                frenoGeneralCocina === "" || isNaN(parseFloat(frenoGeneralCocina))
-              }
-              title="Aplica este valor de freno a todos los ítems de Bajomesada y Alacena. No afecta a Placard."
+              onClick={() => aplicarFrenoATodosCocina?.()}
+              title="Le pega el accesorio de freno que corresponda (puerta o cajonera) a cada ítem de Bajomesada y Alacena, según su nombre. No afecta a Placard."
               style={{
                 padding: "7px 18px",
-                background:
-                  frenoGeneralCocina !== "" &&
-                  !isNaN(parseFloat(frenoGeneralCocina))
-                    ? "#0a3a5c"
-                    : "#c8dae8",
+                background: "#0a3a5c",
                 color: "#fff",
                 border: "none",
                 borderRadius: 2,
                 fontFamily: "'Space Mono',monospace",
                 fontSize: 12,
-                cursor:
-                  frenoGeneralCocina !== "" &&
-                  !isNaN(parseFloat(frenoGeneralCocina))
-                    ? "pointer"
-                    : "default",
+                cursor: "pointer",
               }}
             >
               🛑 Aplicar freno a toda la Cocina
@@ -1413,8 +1371,8 @@ export default function TabCocina({
                           const precioUsar = precios[0]?.precio ?? "";
                           const nombreart = p.nombreart ?? p.NOMBREART ?? base;
                           // Área del artículo (columna AREA en la tabla
-                          // articulos): se usa para el cargo de freno
-                          // (área × valor de freno cargado en el ítem).
+                          // articulos): se usa como cantidad (cantacc) del
+                          // accesorio de freno al guardar.
                           const area = p.area ?? p.AREA ?? null;
                           setCocinaFila((f) => ({
                             ...f,
@@ -1506,44 +1464,6 @@ export default function TabCocina({
                   fontSize: 12,
                   border: "1px solid #b8cfe0",
                   padding: "6px 6px",
-                  borderRadius: 2,
-                }}
-              />
-            </div>
-
-            {/* Freno ($/m²) — se multiplica por el área del artículo (BD) y se suma al precio */}
-            <div style={{ flex: "0 0 100px" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 11,
-                  color: "#6699bb",
-                  marginBottom: 4,
-                }}
-              >
-                Freno $/m²
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={cocinaFila.freno ?? ""}
-                onChange={(e) =>
-                  setCocinaFila((f) => ({ ...f, freno: e.target.value }))
-                }
-                title={
-                  cocinaFila.area
-                    ? `Área: ${cocinaFila.area} m²`
-                    : "Elegí un artículo de la BD para traer su área"
-                }
-                style={{
-                  width: "100%",
-                  textAlign: "right",
-                  fontFamily: "'Space Mono',monospace",
-                  fontSize: 12,
-                  border: "1px solid #b8cfe0",
-                  padding: "6px 10px",
                   borderRadius: 2,
                 }}
               />

@@ -1627,7 +1627,6 @@ export default function PresupuestoNuevo({
           valor3: v3,
           porcentaje3: parseFloat(it.porcentaje3 ?? it.PORCENTAJE3) || null,
           area: parseFloat(it.area ?? it.AREA) || null,
-          freno: parseFloat(it.freno ?? it.FRENO) || null,
           // accesorio/accesorio1/accesorio2 en BD guardan el codartint de
           // hasta 3 artículos tildados en el ítem (null en los slots sin
           // usar). Al recargar, se busca cada codartint en
@@ -2044,7 +2043,6 @@ export default function PresupuestoNuevo({
           // solo se usaba para calcular cantacc/cantacc1/cantacc2 más
           // abajo, nunca se mandaba como campo propio del ítem).
           area: parseFloat(it.area) || null,
-          freno: parseFloat(it.freno) || null,
           // Hasta 3 accesorios por ítem: cada uno se manda como su
           // codartint (columnas accesorio/accesorio1/accesorio2) + el área
           // del artículo del ítem (columnas cantacc/cantacc1/cantacc2 —
