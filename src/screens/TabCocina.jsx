@@ -871,7 +871,9 @@ export default function TabCocina({
                         const art = accesoriosDisponibles.find(
                           (a) => a.articulo === nombre,
                         );
-                        const precio = parseFloat(art?.precio) || 0;
+                        const precioUn = parseFloat(art?.precio) || 0;
+                        const area = parseFloat(fila.area) || 1;
+                        const total = precioUn * area;
                         return (
                           <div
                             key={nombre}
@@ -882,7 +884,7 @@ export default function TabCocina({
                             }}
                           >
                             🔧 {nombre} — cant: {fila.area ?? "-"} · +
-                            {precio.toLocaleString("es-AR", {
+                            {total.toLocaleString("es-AR", {
                               style: "currency",
                               currency: "ARS",
                             })}
