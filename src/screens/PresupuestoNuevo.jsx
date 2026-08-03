@@ -2267,6 +2267,7 @@ export default function PresupuestoNuevo({
       textoSena,
       imagenesFinal,
       setGenerandoPDF,
+      authFetch,
     });
   };
 

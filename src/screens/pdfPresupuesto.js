@@ -22,7 +22,7 @@ export const MEMBRETE_DANIEL_ROQUE_B64 ="data:image/png;base64,iVBORw0KGgoAAAANS
 //  - textoSena: texto libre de ese recuadro, editable desde el Encabezado
 //  - imagenesFinal: fotos y PDFs adjuntos
 //  - setGenerandoPDF: setter de estado para mostrar "Generando..." en el botón
-export function generarPresupuestoPDF({
+export async function generarPresupuestoPDF({
   querDescripcion,
   fecha,
   numeroPres,
@@ -48,10 +48,37 @@ export function generarPresupuestoPDF({
   textoSena,
   imagenesFinal,
   setGenerandoPDF,
+  authFetch,
 }) {
     const formatPeso = (v) =>
       "$" +
       Number(v || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 });
+
+    // Foto de la mampara: no se persiste en el ítem del presupuesto, así que
+    // se busca en vivo en la tabla `articulos` (mismo endpoint que usa
+    // PresupuestoMamparas.jsx para el panel de foto) justo antes de armar el
+    // PDF, matcheando por el nombre del modelo guardado en item.descripcion.
+    const fotosMamparaPorModelo = {};
+    const hayItemMampara = presupuestoItems.some(
+      (it) => it.seccion === "Mampara" && it.descripcion,
+    );
+    if (hayItemMampara && typeof authFetch === "function") {
+      try {
+        const resFotos = await authFetch(
+          "https://integral-backend-production.up.railway.app/productos/mamparas",
+        );
+        const catalogo = await resFotos.json();
+        if (Array.isArray(catalogo)) {
+          catalogo.forEach((a) => {
+            if (a.articulo && a.artfoto && a.artfoto !== "null") {
+              fotosMamparaPorModelo[a.articulo] = a.artfoto;
+            }
+          });
+        }
+      } catch (err) {
+        console.error("No se pudo obtener la foto de la mampara para el PDF:", err);
+      }
+    }
 
     const fechaFmt = fecha
       ? new Date(fecha + "T00:00:00").toLocaleDateString("es-AR", {
@@ -117,6 +144,12 @@ export function generarPresupuestoPDF({
               querDescripcion && item.descripcion && item.descripcion !== item.nombreart
                 ? `<div class="item-desc">${item.descripcion}</div>`
                 : "";
+            // Foto de la mampara (tabla `articulos`, columna artfoto),
+            // buscada por modelo al principio de esta función.
+            const fotoMamparaHTML =
+              item.seccion === "Mampara" && fotosMamparaPorModelo[item.descripcion]
+                ? `<div class="mampara-foto"><img src="${fotosMamparaPorModelo[item.descripcion]}" style="max-width:220px; max-height:220px; display:block; margin-top:6px; border:1px solid #ddd; border-radius:4px;" /></div>`
+                : "";
             // Precio por ítem: SOLO se muestra si incluirPrecio está activo.
             // Por defecto queda oculto (igual que el formato clásico), y solo
             // se ven los totales por sección/grupo al final de cada tabla.
@@ -134,7 +167,7 @@ export function generarPresupuestoPDF({
             return `
         <tr>
           <td class="cant">${item.cantidad ?? 1}</td>
-          <td>${item.nombreart ?? ""}${medida}${descripcionHTML}</td>
+          <td>${item.nombreart ?? ""}${medida}${descripcionHTML}${fotoMamparaHTML}</td>
           ${mostrarCosto ? `<td class="right">${item.costo != null ? formatPeso(item.costo) : "—"}</td>` : ""}
           ${celdasPrecio}
           ${incluirSubtotalItem ? `<td class="right"><strong>${formatPeso(item.subtotal)}</strong></td>` : ""}
@@ -267,7 +300,7 @@ export function generarPresupuestoPDF({
     /* Evita que html2pdf corte una imagen a la mitad entre dos hojas A4:
        si no entra completa en lo que queda de página, la empuja entera a
        la siguiente. */
-    img, .sec-fotos, .adjunto-imagen { page-break-inside: avoid; break-inside: avoid; }
+    img, .sec-fotos, .adjunto-imagen, .mampara-foto { page-break-inside: avoid; break-inside: avoid; }
     `;
 
     const pageHTML = `
@@ -412,7 +445,7 @@ export function generarPresupuestoPDF({
         },
         pagebreak: {
           mode: ["css", "legacy"],
-          avoid: ["img", ".sec-fotos", ".adjunto-imagen"],
+          avoid: ["img", ".sec-fotos", ".adjunto-imagen", ".mampara-foto"],
         },
       };
 
