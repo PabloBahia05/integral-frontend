@@ -96,7 +96,6 @@ export default function useCocinaPlacard({
     valor3: null,
     porcentaje3: null,
     area: null,
-    freno: null,
     accesorios: [],
     grupo: "",
   };
@@ -282,25 +281,12 @@ export default function useCocinaPlacard({
       return String(calcularAjuste(precio, val));
     };
 
-    // Freno: cargo fijo por ítem = área del artículo (columna AREA de la
-    // tabla `articulos`, traída por /articulos/por-familia) × valor de
-    // freno cargado en el ítem. Se suma APARTE, después de %lista, %item y
-    // ajuste general — no compone con esos porcentajes. Si el ítem no tiene
-    // área o no tiene freno cargado, no cambia nada.
-    const conFreno = (precio) => {
-      const area = parseFloat(fila.area);
-      const freno = parseFloat(fila.freno);
-      if (!area || !freno) return precio;
-      const p = parseFloat(precio) || 0;
-      return String(Math.round((p + area * freno) * 100) / 100);
-    };
-
     // Accesorios: suma el precio de cada artículo "extra" tildado para
     // este ítem (fila.accesorios, nombres de artículos con area =
-    // 'accesorio') al precio del ítem. Se suma aparte, después del freno,
-    // igual para todas las líneas. Se recalcula siempre desde cero (no es
-    // acumulativo) así que confirmar el popover de accesorios varias veces
-    // no duplica el cargo.
+    // 'accesorio') al precio del ítem. Se suma después de %lista, %item y
+    // ajuste general, igual para todas las líneas. Se recalcula siempre
+    // desde cero (no es acumulativo) así que confirmar el popover de
+    // accesorios varias veces no duplica el cargo.
     const totalAccesorios = (fila.accesorios ?? []).reduce((acc, nombre) => {
       const art = accesoriosDisponibles.find((a) => a.articulo === nombre);
       const p = parseFloat(art?.precio);
@@ -319,7 +305,7 @@ export default function useCocinaPlacard({
         return {
           linea: pb.linea,
           precioBase: pb.precioBase,
-          precio: conAccesorios(conFreno(conAjusteGeneral(conExtra(conLista, pctExtra)))),
+          precio: conAccesorios(conAjusteGeneral(conExtra(conLista, pctExtra))),
         };
       });
       const nuevoPrecio =
@@ -330,57 +316,86 @@ export default function useCocinaPlacard({
       const conLista = aplicarPorcentaje(fila.precioBase);
       return {
         ...fila,
-        precio: conAccesorios(conFreno(conAjusteGeneral(conExtra(conLista, fila.porcentaje1)))),
+        precio: conAccesorios(conAjusteGeneral(conExtra(conLista, fila.porcentaje1))),
       };
     }
     return fila;
   };
 
   // ── Freno ────────────────────────────────────────────────
-  // Carga el mismo valor de freno ($/m²) a TODOS los ítems de una sección
-  // (Cocina o Placard, de forma independiente entre sí — no toca la otra
-  // sección). Cada ítem conserva su propio campo `freno`, así que después
-  // de "aplicar a todos" el usuario puede seguir editando el valor de un
-  // ítem puntual sin afectar al resto.
-  const aplicarFrenoATodosCocina = (valor) => {
-    const val = parseFloat(valor);
-    if (isNaN(val)) return;
+  // "Aplicar freno" NO es un cargo $/m² aparte: es pegarle a cada ítem el
+  // accesorio "autofreno" que le corresponde según su tipo (bisagra si es
+  // puerta, corredera si es cajonera), tomado de accesoriosDisponibles por
+  // codartint. La cantidad (cantacc) sale del área del ítem (columna AREA
+  // de la tabla articulos, ya guardada en fila.area) — se resuelve recién
+  // al guardar (handleGuardar en PresupuestoNuevo.jsx arma cantacc = área),
+  // acá solo hace falta que el nombre del accesorio quede en
+  // fila.accesorios, igual que si se tildara a mano desde el popover 🔧.
+  const CODARTINT_FRENO_PUERTA = "EH35C0SCB";
+  const CODARTINT_FRENO_CAJONERA = "EHCTSC500B";
+
+  // Determina el codartint de freno que corresponde según el nombre del
+  // ítem: "CAJONERA" -> freno de cajonera, "PTA" (puerta) -> freno de
+  // puerta. null si el nombre no matchea ninguno de los dos (no se le
+  // aplica nada a ese ítem).
+  const codartintFrenoParaItem = (fila) => {
+    const nombre = `${fila.nombreart ?? ""} ${fila.articulo ?? ""}`.toUpperCase();
+    if (nombre.includes("CAJONERA")) return CODARTINT_FRENO_CAJONERA;
+    if (nombre.includes("PTA")) return CODARTINT_FRENO_PUERTA;
+    return null;
+  };
+
+  // Agrega (sin duplicar) el accesorio de freno correspondiente a
+  // fila.accesorios. Si el ítem no matchea PTA/CAJONERA, o el codartint no
+  // se encuentra en accesoriosDisponibles (todavía no cargó, o no existe
+  // en la BD), devuelve la fila sin tocar.
+  const conAccesorioFreno = (fila) => {
+    const codartint = codartintFrenoParaItem(fila);
+    if (!codartint) return fila;
+    const art = accesoriosDisponibles.find(
+      (a) => String(a.codartint) === String(codartint),
+    );
+    if (!art) return fila;
+    if ((fila.accesorios ?? []).includes(art.articulo)) return fila;
+    return { ...fila, accesorios: [...(fila.accesorios ?? []), art.articulo] };
+  };
+
+  const aplicarFrenoATodosCocina = () => {
     setCocinaItems((prev) => {
       const next = {};
       for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map((f) => recalcFila({ ...f, freno: val }));
+        next[familia] = filas.map((f) => recalcFila(conAccesorioFreno(f)));
       }
       return next;
     });
   };
 
-  const aplicarFrenoATodosPlacard = (valor) => {
-    const val = parseFloat(valor);
-    if (isNaN(val)) return;
+  const aplicarFrenoATodosPlacard = () => {
     setPlacardItems((prev) => {
       const next = {};
       for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map((f) => recalcFila({ ...f, freno: val }));
+        next[familia] = filas.map((f) => recalcFila(conAccesorioFreno(f)));
       }
       return next;
     });
   };
 
-  // Aplica/edita el freno de un único ítem (cocina o placard) por índice.
-  const setFrenoItemCocina = (familia, idx, valor) => {
+  // Aplica el accesorio de freno a un único ítem (cocina o placard) por
+  // índice, misma lógica que "aplicar a todos" pero puntual.
+  const setFrenoItemCocina = (familia, idx) => {
     setCocinaItems((prev) => ({
       ...prev,
       [familia]: (prev[familia] ?? []).map((f, i) =>
-        i === idx ? recalcFila({ ...f, freno: valor }) : f,
+        i === idx ? recalcFila(conAccesorioFreno(f)) : f,
       ),
     }));
   };
 
-  const setFrenoItemPlacard = (familia, idx, valor) => {
+  const setFrenoItemPlacard = (familia, idx) => {
     setPlacardItems((prev) => ({
       ...prev,
       [familia]: (prev[familia] ?? []).map((f, i) =>
-        i === idx ? recalcFila({ ...f, freno: valor }) : f,
+        i === idx ? recalcFila(conAccesorioFreno(f)) : f,
       ),
     }));
   };
@@ -389,8 +404,8 @@ export default function useCocinaPlacard({
   // Cada ítem de Cocina/Placard puede tener accesorios extra (autofreno,
   // led, etc), tomados de los artículos con area = 'accesorio'. Se guardan
   // en `fila.accesorios` (array de nombres de artículo, ej: ["AUTOFRENO"]).
-  // No modifican el precio del ítem (a diferencia del freno) — son solo una
-  // lista de agregados que viaja con el ítem hasta el backend.
+  // Se suman al precio del ítem (ver conAccesorios en recalcFila) y viajan
+  // con el ítem hasta el backend.
   const [accesoriosDisponibles, setAccesoriosDisponibles] = useState([]);
   useEffect(() => {
     authFetch(`${API}/articulos/accesorios`)
@@ -477,7 +492,7 @@ export default function useCocinaPlacard({
 
   // Confirma la selección de accesorios de un ítem YA guardado (fila de
   // vista): recalcula el precio desde cero (precioBase + %lista + %item +
-  // ajuste + freno + accesorios), para que el total de accesorios elegido
+  // ajuste + accesorios), para que el total de accesorios elegido
   // quede sumado al valor del ítem. Se llama al pinchar "Ingresar" en el
   // popover.
   const confirmarAccesoriosItem = (tipo, familia, idx) => {
@@ -586,7 +601,6 @@ export default function useCocinaPlacard({
           valor3: f.valor3 ?? null,
           porcentaje3: f.porcentaje3 ?? null,
           area: f.area ?? null,
-          freno: f.freno ?? null,
           accesorios: f.accesorios ?? [],
           grupo: f.grupo && f.grupo.trim() ? f.grupo.trim() : null,
         })),
