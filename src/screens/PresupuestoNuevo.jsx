@@ -824,6 +824,26 @@ export default function PresupuestoNuevo({
     }
   };
 
+  // Persiste leyenda/observaciones/texto de seña de este presupuesto
+  // (tabla presupuesto_info, key = numeropres — se pisa en cada guardado,
+  // no depende de la revisión).
+  const guardarInfoPresupuesto = async (numPres) => {
+    try {
+      await authFetch(`${API}/presupuesto-info/${numPres}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leyenda,
+          observaciones,
+          texto_sena: textoSena,
+          incluir_texto_sena: incluirTextoSena,
+        }),
+      });
+    } catch (err) {
+      console.error("Error guardando info del presupuesto:", err);
+    }
+  };
+
   const cargarMetaPresupuesto = async (numPres, rev) => {
     try {
       const r = await authFetch(
@@ -834,6 +854,26 @@ export default function PresupuestoNuevo({
     } catch (err) {
       console.error("Error cargando metadata del presupuesto:", err);
       setMetaPresupuesto(null);
+    }
+  };
+
+  // Info del presupuesto (tabla nueva presupuesto_info, key = numeropres):
+  // leyenda, observaciones y el texto de seña/condiciones tal como quedaron
+  // guardados la última vez para ESTE presupuesto puntual.
+  const cargarInfoPresupuesto = async (numPres) => {
+    try {
+      const r = await authFetch(`${API}/presupuesto-info/${numPres}`);
+      const data = await r.json();
+      if (data) {
+        setLeyenda(data.leyenda ?? "");
+        setObservaciones(data.observaciones ?? "");
+        if (data.texto_sena) setTextoSena(data.texto_sena);
+        setIncluirTextoSena(
+          data.incluir_texto_sena != null ? !!data.incluir_texto_sena : true,
+        );
+      }
+    } catch (err) {
+      console.error("Error cargando info del presupuesto:", err);
     }
   };
 
@@ -1402,6 +1442,18 @@ export default function PresupuestoNuevo({
           if (d?.proximo != null) setNumero(String(d.proximo).padStart(4, "0"));
         })
         .catch(() => {});
+      // Precargar el texto de seña/condiciones tal como quedó la última vez
+      // que se editó en CUALQUIER presupuesto — así un cambio hecho hoy
+      // queda como punto de partida de todos los presupuestos siguientes,
+      // en vez de volver siempre al TEXTO_SENA_DEFAULT fijo del código.
+      authFetch(`${API}/presupuesto-info/ultimo-texto-sena`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.texto_sena) setTextoSena(d.texto_sena);
+          if (d?.incluir_texto_sena != null)
+            setIncluirTextoSena(!!d.incluir_texto_sena);
+        })
+        .catch(() => {});
     }
     // Líneas disponibles desde BD (columna linea de articulos)
     authFetch(`${API}/articulos/lineas`)
@@ -1494,6 +1546,7 @@ export default function PresupuestoNuevo({
       setNumero(String(num).padStart(4, "0"));
       cargarImagenesPresupuesto(num, rev);
       cargarMetaPresupuesto(num, rev);
+      cargarInfoPresupuesto(num);
       setCliente(pres.nombre ?? pres.NOMBRE ?? "");
       const codclienteRestaurado = pres.codcliente ?? pres.CODCLIENTE ?? null;
       setCodcliente(codclienteRestaurado);
@@ -2146,6 +2199,9 @@ export default function PresupuestoNuevo({
         // copiadas ahí — la revisión anterior conserva las suyas intactas,
         // sin verse afectada.
         guardarImagenesPresupuesto(numAsignado, Number(revAsignada));
+
+        // ── Persistir leyenda/observaciones/texto de seña ──
+        guardarInfoPresupuesto(numAsignado);
 
         // ── Refrescar quién/cuándo guardó, para mostrar en pantalla ──
         cargarMetaPresupuesto(numAsignado, Number(revAsignada));
