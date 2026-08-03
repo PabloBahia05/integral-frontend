@@ -338,12 +338,12 @@ export default function useCocinaPlacard({
   const CODARTINT_FRENO_CAJONERA = "EHCTSC500B";
 
   // Determina el codartint de freno que corresponde según el nombre del
-  // ítem: "CAJONERA" -> freno de cajonera, "PTA" (puerta) -> freno de
-  // puerta. null si el nombre no matchea ninguno de los dos (no se le
-  // aplica nada a ese ítem).
+  // ítem: "CAJ" (cajonera o correderas) -> freno de cajonera, "PTA"
+  // (puerta) -> freno de puerta. null si el nombre no matchea ninguno de
+  // los dos (no se le aplica nada a ese ítem).
   const codartintFrenoParaItem = (fila) => {
     const nombre = `${fila.nombreart ?? ""} ${fila.articulo ?? ""}`.toUpperCase();
-    if (nombre.includes("CAJONERA")) return CODARTINT_FRENO_CAJONERA;
+    if (nombre.includes("CAJ")) return CODARTINT_FRENO_CAJONERA;
     if (nombre.includes("PTA")) return CODARTINT_FRENO_PUERTA;
     return null;
   };
