@@ -1199,7 +1199,6 @@ export default function PresupuestoNuevo({
     getPrecioParaLinea,
     resolverPrecioBasePlacard,
     productosFiltrados,
-    articulosFamilia,
     recalcFila,
     handleActualizar,
     placardAgregarFila,
