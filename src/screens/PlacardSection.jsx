@@ -25,6 +25,7 @@ export default function PlacardSection({
   placardIniciarEdit,
   placard_total,
   productosFiltrados,
+  articulosFamilia = [],
   resolverPrecioBasePlacard,
   aplicarPorcentaje,
   listaPorcentaje,
@@ -45,6 +46,20 @@ export default function PlacardSection({
   confirmarAccesoriosItem,
   recalcFila,
 }) {
+  // Para ítems ya guardados sin `area` (guardados antes de que se
+  // empezara a persistir esa columna): busca el área del artículo por
+  // nombre en articulosFamilia (la lista completa de la familia, sin
+  // filtrar por texto de búsqueda — a diferencia de productosFiltrados),
+  // para poder calcular el precio del accesorio al toque, sin depender
+  // de un guardado/recarga previo.
+  const resolverAreaItem = (fila) => {
+    if (fila.area != null) return fila.area;
+    const match = articulosFamilia.find(
+      (a) => a.articulo === fila.articulo || a.nombreart === fila.nombreart,
+    );
+    return match ? (match.area ?? match.AREA ?? null) : null;
+  };
+
   // ── Freno general (toda la sección Placard) ───────────────
   const hayItemsPlacard =
     (placardItems.placard?.length ?? 0) > 0 ||
@@ -840,7 +855,8 @@ export default function PlacardSection({
                                   (a) => a.articulo === nombre,
                                 );
                                 const precioUn = parseFloat(art?.precio) || 0;
-                                const area = parseFloat(fila.area) || 1;
+                                const areaItem = resolverAreaItem(fila);
+                                const area = parseFloat(areaItem) || 1;
                                 const total = precioUn * area;
                                 return (
                                   <div
@@ -851,7 +867,7 @@ export default function PlacardSection({
                                       marginTop: 2,
                                     }}
                                   >
-                                    🔧 {nombre} — cant: {fila.area ?? "-"} · +
+                                    🔧 {nombre} — cant: {areaItem ?? "-"} · +
                                     {total.toLocaleString("es-AR", {
                                       style: "currency",
                                       currency: "ARS",
@@ -893,6 +909,7 @@ export default function PlacardSection({
                                       "placard",
                                       placardFamilia,
                                       idx,
+                                      resolverAreaItem(fila),
                                     ),
                                   e,
                                 )

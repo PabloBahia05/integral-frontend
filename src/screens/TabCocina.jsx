@@ -95,6 +95,19 @@ export default function TabCocina({
     )
     .slice(0, 10);
 
+  // Para ítems ya guardados sin `area` (guardados antes de que se
+  // empezara a persistir esa columna): busca el área del artículo por
+  // nombre en articulosFamilia (ya cargada para la familia actual), para
+  // poder calcular el precio del accesorio al toque, sin depender de un
+  // guardado/recarga previo.
+  const resolverAreaItem = (fila) => {
+    if (fila.area != null) return fila.area;
+    const match = articulosFamilia.find(
+      (a) => a.articulo === fila.articulo || a.nombreart === fila.nombreart,
+    );
+    return match ? (match.area ?? match.AREA ?? null) : null;
+  };
+
   const resetFila = () => {
     // Conserva el grupo elegido para que el usuario pueda agregar varios
     // artículos seguidos al mismo grupo sin tener que retipearlo.
@@ -872,7 +885,8 @@ export default function TabCocina({
                           (a) => a.articulo === nombre,
                         );
                         const precioUn = parseFloat(art?.precio) || 0;
-                        const area = parseFloat(fila.area) || 1;
+                        const areaItem = resolverAreaItem(fila);
+                        const area = parseFloat(areaItem) || 1;
                         const total = precioUn * area;
                         return (
                           <div
@@ -883,7 +897,7 @@ export default function TabCocina({
                               marginTop: 2,
                             }}
                           >
-                            🔧 {nombre} — cant: {fila.area ?? "-"} · +
+                            🔧 {nombre} — cant: {areaItem ?? "-"} · +
                             {total.toLocaleString("es-AR", {
                               style: "currency",
                               currency: "ARS",
@@ -925,6 +939,7 @@ export default function TabCocina({
                               "cocina",
                               cocinaFamilia,
                               idx,
+                              resolverAreaItem(fila),
                             ),
                           e,
                         )

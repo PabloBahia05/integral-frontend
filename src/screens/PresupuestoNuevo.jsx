@@ -1199,6 +1199,7 @@ export default function PresupuestoNuevo({
     getPrecioParaLinea,
     resolverPrecioBasePlacard,
     productosFiltrados,
+    articulosFamilia,
     recalcFila,
     handleActualizar,
     placardAgregarFila,
@@ -3242,6 +3243,7 @@ export default function PresupuestoNuevo({
             placardIniciarEdit={placardIniciarEdit}
             placard_total={placard_total}
             productosFiltrados={productosFiltrados}
+            articulosFamilia={articulosFamilia}
             resolverPrecioBasePlacard={resolverPrecioBasePlacard}
             aplicarPorcentaje={aplicarPorcentaje}
             listaPorcentaje={listaPorcentaje}
