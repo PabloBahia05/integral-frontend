@@ -878,6 +878,29 @@ export default function PlacardSection({
                             }}
                           >
                             {fila.articulo}
+                            {fila.accesorios?.length > 0 &&
+                              fila.accesorios.map((nombre) => {
+                                const art = accesoriosDisponibles.find(
+                                  (a) => a.articulo === nombre,
+                                );
+                                const precio = parseFloat(art?.precio) || 0;
+                                return (
+                                  <div
+                                    key={nombre}
+                                    style={{
+                                      fontSize: 11,
+                                      color: "#6699bb",
+                                      marginTop: 2,
+                                    }}
+                                  >
+                                    🔧 {nombre} — cant: {fila.area ?? "-"} · +
+                                    {precio.toLocaleString("es-AR", {
+                                      style: "currency",
+                                      currency: "ARS",
+                                    })}
+                                  </div>
+                                );
+                              })}
                           </td>
                           <td
                             style={{
