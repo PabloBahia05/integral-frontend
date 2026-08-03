@@ -283,14 +283,17 @@ export default function useCocinaPlacard({
 
     // Accesorios: suma el precio de cada artículo "extra" tildado para
     // este ítem (fila.accesorios, nombres de artículos con area =
-    // 'accesorio') al precio del ítem. Se suma después de %lista, %item y
-    // ajuste general, igual para todas las líneas. Se recalcula siempre
-    // desde cero (no es acumulativo) así que confirmar el popover de
-    // accesorios varias veces no duplica el cargo.
+    // 'accesorio'), multiplicado por el área del ítem (misma cantidad que
+    // se manda como cantacc al guardar), al precio del ítem. Se suma
+    // después de %lista, %item y ajuste general, igual para todas las
+    // líneas. Se recalcula siempre desde cero (no es acumulativo) así que
+    // confirmar el popover de accesorios varias veces no duplica el cargo.
     const totalAccesorios = (fila.accesorios ?? []).reduce((acc, nombre) => {
       const art = accesoriosDisponibles.find((a) => a.articulo === nombre);
       const p = parseFloat(art?.precio);
-      return acc + (isNaN(p) ? 0 : p);
+      if (isNaN(p)) return acc;
+      const area = parseFloat(fila.area) || 1;
+      return acc + p * area;
     }, 0);
     const conAccesorios = (precio) => {
       if (!totalAccesorios) return precio;
