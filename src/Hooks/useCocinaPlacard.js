@@ -518,20 +518,124 @@ export default function useCocinaPlacard({
   };
 
   // Actualiza todo el front con los parámetros actuales del encabezado — sin tocar el backend
+  // Mapea familia interna (la que usa el front) -> familia como está
+  // guardada en la BD (columna `familia` de la tabla articulos). Mismo
+  // mapeo que usa el efecto de abajo (alinearPreciosBaseConLineas) — se
+  // repite acá en vez de compartirse para no tocar ese efecto ya probado.
+  const familiaMapCocinaRef2 = { bajomesadas: "Bajomesada", alacenas: "Alacena" };
+  const familiaMapPlacardRef2 = {
+    bajomesadas: "Bajomesada",
+    alacenas: "Alacena",
+    placard: "PLACARD",
+    frente: "FRENTE DE PLACARD",
+    auxiliares: "Auxiliares",
+    accesorios: "Accesorios",
+  };
+
+  // Refresca preciosBase/precioBase de una fila contra el artículo fresco
+  // de la BD, SOLO si cambiaron. El endpoint /articulos/por-familia agrupa
+  // varias filas físicas (una por Nº de línea, cada una con su propio
+  // codartint) bajo un mismo nombre de artículo, así que recorremos cada
+  // línea de preciosBase por separado: cada una corresponde a un codartint
+  // distinto en la tabla `articulos`, no hay un único codartint por ítem.
+  // No toca %item, %lista, ajuste general ni accesorios — eso lo vuelve a
+  // aplicar recalcFila después, igual que siempre.
+  const refrescarPreciosBaseFila = (fila, mapaArticulos) => {
+    const art = mapaArticulos.get(fila.articulo);
+    if (!art) return fila; // artículo ya no existe / cambió de nombre en la BD: no tocar
+
+    let nuevaFila = fila;
+
+    if (fila.preciosBase && fila.preciosBase.length > 0) {
+      let cambio = false;
+      const preciosBaseNuevos = fila.preciosBase.map((pb) => {
+        const fresco = art.precios?.[String(pb.linea)];
+        if (fresco == null || fresco === "" || String(fresco) === String(pb.precioBase)) {
+          return pb;
+        }
+        cambio = true;
+        return { ...pb, precioBase: fresco };
+      });
+      if (cambio) nuevaFila = { ...nuevaFila, preciosBase: preciosBaseNuevos };
+    }
+
+    // precioBase (singular) es el respaldo que usa recalcFila cuando
+    // preciosBase viene vacío (ver resolverPrecioBasePlacard). Mismo
+    // criterio acá: línea activa -> si no hay, línea 15 fija.
+    if (fila.precioBase != null && fila.precioBase !== "") {
+      let frescoBase = art.precios?.[String(fila.preciosBase?.[0]?.linea)];
+      if (frescoBase == null || frescoBase === "") {
+        frescoBase = art.precios?.[LINEA_FIJA_PLACARD];
+      }
+      if (
+        frescoBase != null &&
+        frescoBase !== "" &&
+        String(frescoBase) !== String(fila.precioBase)
+      ) {
+        nuevaFila = { ...nuevaFila, precioBase: frescoBase };
+      }
+    }
+
+    return nuevaFila;
+  };
+
   const handleActualizar = () => {
-    setCocinaItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map(recalcFila);
-      }
-      return next;
-    });
-    setPlacardItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map(recalcFila);
-      }
-      return next;
+    const familiasConItems = (itemsObj, familiaMap) =>
+      Object.entries(itemsObj)
+        .filter(([, filas]) => filas?.length)
+        .map(([familia]) => familiaMap[familia] ?? familia);
+
+    const familiasBDNecesarias = new Set([
+      ...familiasConItems(cocinaItemsRef.current, familiaMapCocinaRef2),
+      ...familiasConItems(placardItemsRef.current, familiaMapPlacardRef2),
+    ]);
+
+    // Sin ítems cargados: solo recalcula (comportamiento previo)
+    if (familiasBDNecesarias.size === 0) {
+      setCocinaItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) next[familia] = filas.map(recalcFila);
+        return next;
+      });
+      setPlacardItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) next[familia] = filas.map(recalcFila);
+        return next;
+      });
+      return;
+    }
+
+    Promise.all(
+      [...familiasBDNecesarias].map((familiaBD) =>
+        authFetch(`${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`)
+          .then((r) => r.json())
+          .then((data) => [familiaBD, Array.isArray(data) ? data : []])
+          .catch(() => [familiaBD, []]),
+      ),
+    ).then((resultados) => {
+      const mapaPorFamiliaBD = new Map(resultados);
+      const mapaArticulosDe = (familiaInterna, familiaMap) => {
+        const familiaBD = familiaMap[familiaInterna] ?? familiaInterna;
+        const lista = mapaPorFamiliaBD.get(familiaBD) ?? [];
+        return new Map(lista.map((a) => [a.articulo, a]));
+      };
+
+      setCocinaItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          const mapa = mapaArticulosDe(familia, familiaMapCocinaRef2);
+          next[familia] = filas.map((f) => recalcFila(refrescarPreciosBaseFila(f, mapa)));
+        }
+        return next;
+      });
+      setPlacardItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          const mapa = mapaArticulosDe(familia, familiaMapPlacardRef2);
+          next[familia] = filas.map((f) => recalcFila(refrescarPreciosBaseFila(f, mapa)));
+        }
+        return next;
+      });
     });
   };
 
