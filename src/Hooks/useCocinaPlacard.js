@@ -518,19 +518,6 @@ export default function useCocinaPlacard({
   };
 
   // Actualiza todo el front con los parámetros actuales del encabezado — sin tocar el backend
-  // Mapea familia interna (la que usa el front) -> familia como está
-  // guardada en la BD (columna `familia` de la tabla articulos). Mismo
-  // mapeo que usa el efecto de abajo (alinearPreciosBaseConLineas) — se
-  // repite acá en vez de compartirse para no tocar ese efecto ya probado.
-  const familiaMapCocinaRef2 = { bajomesadas: "Bajomesada", alacenas: "Alacena" };
-  const familiaMapPlacardRef2 = {
-    bajomesadas: "Bajomesada",
-    alacenas: "Alacena",
-    placard: "PLACARD",
-    frente: "FRENTE DE PLACARD",
-    auxiliares: "Auxiliares",
-    accesorios: "Accesorios",
-  };
 
   // Refresca preciosBase/precioBase de una fila contra el artículo fresco
   // de la BD, SOLO si cambiaron. El endpoint /articulos/por-familia agrupa
@@ -580,22 +567,11 @@ export default function useCocinaPlacard({
   };
 
   const handleActualizar = () => {
-    const familiasConItems = (itemsObj, familiaMap) =>
-      Object.entries(itemsObj)
-        .filter(([, filas]) => filas?.length)
-        .map(([familia]) => familiaMap[familia] ?? familia);
-
-    const familiasBDNecesarias = new Set([
-      ...familiasConItems(cocinaItemsRef.current, familiaMapCocinaRef2),
-      ...familiasConItems(placardItemsRef.current, familiaMapPlacardRef2),
-    ]);
-    // TEMP DEBUG — sacar cuando se resuelva el issue de "Actualizar no modifica"
-    console.log("[Actualizar] familias a consultar en BD:", [...familiasBDNecesarias]);
-    console.log("[Actualizar] cocinaItems:", cocinaItemsRef.current);
-    console.log("[Actualizar] placardItems:", placardItemsRef.current);
+    const hayCocina = Object.values(cocinaItemsRef.current).some((filas) => filas?.length);
+    const hayPlacard = Object.values(placardItemsRef.current).some((filas) => filas?.length);
 
     // Sin ítems cargados: solo recalcula (comportamiento previo)
-    if (familiasBDNecesarias.size === 0) {
+    if (!hayCocina && !hayPlacard) {
       setCocinaItems((prev) => {
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) next[familia] = filas.map(recalcFila);
@@ -609,39 +585,49 @@ export default function useCocinaPlacard({
       return;
     }
 
+    // Traemos TODAS las familias posibles de una, en vez de derivar la
+    // familia BD a partir de la clave interna donde vive cada ítem. Un
+    // ítem puede estar guardado bajo la clave interna "placard" pero
+    // pertenecer en la BD a la familia "FRENTE DE PLACARD" (el grupo
+    // visual "FRENTE DE PLACARD COLOR/BLANCO" es solo la etiqueta `grupo`
+    // del ítem, no una familia interna separada — comprobado con logs:
+    // placardItems.placard traía los 3 ítems, frente/auxiliares/accesorios
+    // vacíos). Armamos UN mapa combinado por nombre de artículo y
+    // matcheamos contra ese único mapa, sin depender de la clave interna.
+    const familiasBD = [
+      "Bajomesada",
+      "Alacena",
+      "PLACARD",
+      "FRENTE DE PLACARD",
+      "Auxiliares",
+      "Accesorios",
+    ];
+
     Promise.all(
-      [...familiasBDNecesarias].map((familiaBD) =>
+      familiasBD.map((familiaBD) =>
         authFetch(`${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`)
           .then((r) => r.json())
-          .then((data) => [familiaBD, Array.isArray(data) ? data : []])
-          .catch(() => [familiaBD, []]),
+          .then((data) => (Array.isArray(data) ? data : []))
+          .catch(() => []),
       ),
     ).then((resultados) => {
-      // TEMP DEBUG
-      console.log("[Actualizar] resultados crudos de /articulos/por-familia:", resultados);
-
-      const mapaPorFamiliaBD = new Map(resultados);
-      const mapaArticulosDe = (familiaInterna, familiaMap) => {
-        const familiaBD = familiaMap[familiaInterna] ?? familiaInterna;
-        const lista = mapaPorFamiliaBD.get(familiaBD) ?? [];
-        return new Map(lista.map((a) => [a.articulo, a]));
-      };
+      const mapaArticulos = new Map();
+      for (const lista of resultados) {
+        for (const a of lista) mapaArticulos.set(a.articulo, a);
+      }
+      // TEMP DEBUG — sacar cuando se confirme que el fix funciona
+      console.log("[Actualizar] mapa combinado de artículos (BD):", mapaArticulos);
 
       setCocinaItems((prev) => {
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
-          const mapa = mapaArticulosDe(familia, familiaMapCocinaRef2);
           next[familia] = filas.map((f) => {
-            const art = mapa.get(f.articulo);
+            const art = mapaArticulos.get(f.articulo);
             console.log(
               `[Actualizar][cocina/${familia}] "${f.articulo}" -> match en BD:`,
               art ?? "NO ENCONTRADO",
-              "| preciosBase actuales:",
-              f.preciosBase,
-              "| precioBase actual:",
-              f.precioBase,
             );
-            return recalcFila(refrescarPreciosBaseFila(f, mapa));
+            return recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
           });
         }
         return next;
@@ -649,18 +635,13 @@ export default function useCocinaPlacard({
       setPlacardItems((prev) => {
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
-          const mapa = mapaArticulosDe(familia, familiaMapPlacardRef2);
           next[familia] = filas.map((f) => {
-            const art = mapa.get(f.articulo);
+            const art = mapaArticulos.get(f.articulo);
             console.log(
               `[Actualizar][placard/${familia}] "${f.articulo}" -> match en BD:`,
               art ?? "NO ENCONTRADO",
-              "| preciosBase actuales:",
-              f.preciosBase,
-              "| precioBase actual:",
-              f.precioBase,
             );
-            return recalcFila(refrescarPreciosBaseFila(f, mapa));
+            return recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
           });
         }
         return next;
