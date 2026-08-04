@@ -616,17 +616,41 @@ export default function useCocinaPlacard({
         for (const a of lista) mapaArticulos.set(a.articulo, a);
       }
       // TEMP DEBUG — sacar cuando se confirme que el fix funciona
-      console.log("[Actualizar] mapa combinado de artículos (BD):", mapaArticulos);
+      console.log("[Actualizar] mapa combinado de artículos (BD), total:", mapaArticulos.size);
+
+      const normalizarDebug = (s) =>
+        String(s ?? "")
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, " ")
+          .trim();
+
+      const logMatch = (seccion, familia, f) => {
+        const art = mapaArticulos.get(f.articulo);
+        if (art) {
+          console.log(`[Actualizar][${seccion}/${familia}] "${f.articulo}" -> match EXACTO en BD:`, art);
+          return;
+        }
+        // No hubo match exacto: buscamos candidatos parecidos para ver la diferencia real
+        const objetivo = normalizarDebug(f.articulo);
+        const candidatos = [...mapaArticulos.keys()]
+          .filter((k) => {
+            const nk = normalizarDebug(k);
+            return nk === objetivo || nk.includes(objetivo) || objetivo.includes(nk);
+          })
+          .slice(0, 5);
+        console.log(
+          `[Actualizar][${seccion}/${familia}] "${f.articulo}" -> NO ENCONTRADO (exacto). Candidatos parecidos en BD:`,
+          candidatos.length ? candidatos : "(ninguno)",
+        );
+      };
 
       setCocinaItems((prev) => {
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
           next[familia] = filas.map((f) => {
-            const art = mapaArticulos.get(f.articulo);
-            console.log(
-              `[Actualizar][cocina/${familia}] "${f.articulo}" -> match en BD:`,
-              art ?? "NO ENCONTRADO",
-            );
+            logMatch("cocina", familia, f);
             return recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
           });
         }
@@ -636,11 +660,7 @@ export default function useCocinaPlacard({
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
           next[familia] = filas.map((f) => {
-            const art = mapaArticulos.get(f.articulo);
-            console.log(
-              `[Actualizar][placard/${familia}] "${f.articulo}" -> match en BD:`,
-              art ?? "NO ENCONTRADO",
-            );
+            logMatch("placard", familia, f);
             return recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
           });
         }
