@@ -10,6 +10,7 @@ const makeColumns = (onVer) => [
   {
     key: "__ver__",
     label: "",
+    width: 60,
     render: (_, row) => (
       <button
         title="Ver detalle"
@@ -32,12 +33,13 @@ const makeColumns = (onVer) => [
       </button>
     ),
   },
-  { key: "codartint", label: "Código Interno" },
-  { key: "articulo", label: "Artículo" },
-  { key: "proveedor", label: "Proveedor" },
+  { key: "codartint", label: "Código Interno", width: 140 },
+  { key: "articulo", label: "Artículo", width: 200 },
+  { key: "proveedor", label: "Proveedor", width: 150 },
   {
     key: "codartprov",
     label: "Cód. Prov.",
+    width: 110,
     render: (v) =>
       v ? (
         <span
@@ -52,6 +54,7 @@ const makeColumns = (onVer) => [
   {
     key: "prod_prov",
     label: "Prod. Proveedor",
+    width: 160,
     render: (v) =>
       v ? (
         <span style={{ color: "#0a3a5c", fontSize: 12 }}>{v}</span>
@@ -59,69 +62,78 @@ const makeColumns = (onVer) => [
         <span style={{ color: "#bbb" }}>—</span>
       ),
   },
-  { key: "rubro", label: "Rubro" },
-  { key: "familia", label: "Familia" },
-  { key: "unidad", label: "Unidad" },
+  { key: "rubro", label: "Rubro", width: 110 },
+  { key: "familia", label: "Familia", width: 110 },
+  { key: "unidad", label: "Unidad", width: 80 },
   {
     key: "valorlista",
     label: "Val. Lista",
+    width: 110,
     render: (v) =>
       v != null ? `$${parseFloat(v).toLocaleString("es-AR")}` : "-",
   },
   {
     key: "fecha_precio",
     label: "Fecha Precio",
+    width: 110,
     render: (v) => (v ? String(v).slice(0, 10) : "-"),
   },
   {
     key: "costosi",
     label: "Costo s/imp.",
+    width: 110,
     render: (v) =>
       v != null ? `$${parseFloat(v).toLocaleString("es-AR")}` : "-",
   },
   {
     key: "costosicf",
     label: "Costo s/imp. c/flete",
+    width: 150,
     render: (v) =>
       v != null ? `$${parseFloat(v).toLocaleString("es-AR")}` : "-",
   },
   {
     key: "costocicf",
     label: "Costo c/imp. c/flete",
+    width: 150,
     render: (v) =>
       v != null ? `$${parseFloat(v).toLocaleString("es-AR")}` : "-",
   },
   {
     key: "precio",
     label: "Precio",
+    width: 100,
     render: (v) =>
       v != null ? `${parseFloat(v).toLocaleString("es-AR")}` : "-",
   },
   {
     key: "precio_un",
     label: "Precio UN",
+    width: 100,
     render: (v) =>
       v != null ? `${parseFloat(v).toLocaleString("es-AR")}` : "-",
   },
   {
     key: "descuento",
     label: "Descuento %",
+    width: 110,
     render: (v) => (v != null ? `${parseFloat(v)}%` : "-"),
   },
   {
     key: "flete",
     label: "Flete",
+    width: 100,
     render: (v) =>
       v != null ? `$${parseFloat(v).toLocaleString("es-AR")}` : "-",
   },
-  { key: "cantidad", label: "Cantidad" },
-  { key: "ancho", label: "Ancho" },
-  { key: "alto", label: "Alto" },
-  { key: "prof", label: "Prof." },
-  { key: "linea", label: "Línea" },
-  { key: "color", label: "Color" },
-  { key: "area", label: "Área" },
-  { key: "mca", label: "MCA" },
+  { key: "cantidad", label: "Cantidad", width: 90 },
+  { key: "ancho", label: "Ancho", width: 80 },
+  { key: "alto", label: "Alto", width: 80 },
+  { key: "prof", label: "Prof.", width: 80 },
+  { key: "linea", label: "Línea", width: 90 },
+  { key: "color", label: "Color", width: 90 },
+  { key: "area", label: "Área", width: 80 },
+  { key: "mca", label: "MCA", width: 80 },
 ];
 
 const EMPTY = {
