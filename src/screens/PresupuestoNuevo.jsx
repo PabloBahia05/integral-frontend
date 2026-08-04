@@ -3027,6 +3027,29 @@ export default function PresupuestoNuevo({
           >
             🔄 Actualizar
           </button>
+          {(cocinaItems.bajomesadas.length > 0 ||
+            cocinaItems.alacenas.length > 0 ||
+            (placardItems.placard?.length ?? 0) > 0 ||
+            (placardItems.frente?.length ?? 0) > 0 ||
+            (placardItems.auxiliares?.length ?? 0) > 0 ||
+            (placardItems.accesorios?.length ?? 0) > 0) && (
+            <button
+              className="pn-tool-btn"
+              onClick={() => {
+                aplicarFrenoATodosCocina?.();
+                aplicarFrenoATodosPlacard?.();
+              }}
+              title="Le pega el accesorio de freno que corresponda (bisagra en puertas, corredera en cajones) a todos los ítems de Cocina (Bajomesada/Alacena) y Placard (Placard/Frente/Auxiliares/Accesorios)."
+              style={{
+                background: "#0a3a5c",
+                borderColor: "#0a3a5c",
+                color: "#fff",
+                fontWeight: 700,
+              }}
+            >
+              🛑 Aplicar freno a toda la obra
+            </button>
+          )}
           <button
             className="pn-tool-btn save"
             onClick={() => handleGuardar(false)}
