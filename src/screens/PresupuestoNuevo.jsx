@@ -1470,17 +1470,20 @@ export default function PresupuestoNuevo({
             setListaPrecio(listaPendienteRef.current);
             listaPendienteRef.current = null;
           } else if (!presupuestoInicial) {
-            // Default: la lista de menor número (normalmente "LISTA 1"), sin
-            // depender del orden en que /lista devuelva las filas — antes
-            // se tomaba directamente data[0], y si el backend no las traía
-            // ordenadas quedaba precargada, por ejemplo, LISTA 3.
+            // Default: "LISTA 3". Se busca por número (no por posición en el
+            // array, que puede venir en cualquier orden desde el backend).
+            // Si por algún motivo no existe una LISTA 3 en la BD, cae a la
+            // de menor número como antes (para no dejar el selector vacío).
             const porNumero = [...data].sort((a, b) => {
               const na = parseInt(String(a.lista).match(/\d+/)?.[0], 10);
               const nb = parseInt(String(b.lista).match(/\d+/)?.[0], 10);
               if (Number.isNaN(na) || Number.isNaN(nb)) return 0;
               return na - nb;
             });
-            setListaPrecio(porNumero[0].lista);
+            const lista3 = porNumero.find(
+              (l) => parseInt(String(l.lista).match(/\d+/)?.[0], 10) === 3,
+            );
+            setListaPrecio((lista3 ?? porNumero[0]).lista);
           }
         }
       })
