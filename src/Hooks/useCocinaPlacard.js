@@ -589,6 +589,10 @@ export default function useCocinaPlacard({
       ...familiasConItems(cocinaItemsRef.current, familiaMapCocinaRef2),
       ...familiasConItems(placardItemsRef.current, familiaMapPlacardRef2),
     ]);
+    // TEMP DEBUG — sacar cuando se resuelva el issue de "Actualizar no modifica"
+    console.debug("[Actualizar] familias a consultar en BD:", [...familiasBDNecesarias]);
+    console.debug("[Actualizar] cocinaItems:", cocinaItemsRef.current);
+    console.debug("[Actualizar] placardItems:", placardItemsRef.current);
 
     // Sin ítems cargados: solo recalcula (comportamiento previo)
     if (familiasBDNecesarias.size === 0) {
@@ -613,6 +617,9 @@ export default function useCocinaPlacard({
           .catch(() => [familiaBD, []]),
       ),
     ).then((resultados) => {
+      // TEMP DEBUG
+      console.debug("[Actualizar] resultados crudos de /articulos/por-familia:", resultados);
+
       const mapaPorFamiliaBD = new Map(resultados);
       const mapaArticulosDe = (familiaInterna, familiaMap) => {
         const familiaBD = familiaMap[familiaInterna] ?? familiaInterna;
@@ -624,7 +631,18 @@ export default function useCocinaPlacard({
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
           const mapa = mapaArticulosDe(familia, familiaMapCocinaRef2);
-          next[familia] = filas.map((f) => recalcFila(refrescarPreciosBaseFila(f, mapa)));
+          next[familia] = filas.map((f) => {
+            const art = mapa.get(f.articulo);
+            console.debug(
+              `[Actualizar][cocina/${familia}] "${f.articulo}" -> match en BD:`,
+              art ?? "NO ENCONTRADO",
+              "| preciosBase actuales:",
+              f.preciosBase,
+              "| precioBase actual:",
+              f.precioBase,
+            );
+            return recalcFila(refrescarPreciosBaseFila(f, mapa));
+          });
         }
         return next;
       });
@@ -632,7 +650,18 @@ export default function useCocinaPlacard({
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
           const mapa = mapaArticulosDe(familia, familiaMapPlacardRef2);
-          next[familia] = filas.map((f) => recalcFila(refrescarPreciosBaseFila(f, mapa)));
+          next[familia] = filas.map((f) => {
+            const art = mapa.get(f.articulo);
+            console.debug(
+              `[Actualizar][placard/${familia}] "${f.articulo}" -> match en BD:`,
+              art ?? "NO ENCONTRADO",
+              "| preciosBase actuales:",
+              f.preciosBase,
+              "| precioBase actual:",
+              f.precioBase,
+            );
+            return recalcFila(refrescarPreciosBaseFila(f, mapa));
+          });
         }
         return next;
       });
