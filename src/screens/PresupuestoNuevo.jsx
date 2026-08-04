@@ -1470,7 +1470,17 @@ export default function PresupuestoNuevo({
             setListaPrecio(listaPendienteRef.current);
             listaPendienteRef.current = null;
           } else if (!presupuestoInicial) {
-            setListaPrecio(data[0].lista);
+            // Default: la lista de menor número (normalmente "LISTA 1"), sin
+            // depender del orden en que /lista devuelva las filas — antes
+            // se tomaba directamente data[0], y si el backend no las traía
+            // ordenadas quedaba precargada, por ejemplo, LISTA 3.
+            const porNumero = [...data].sort((a, b) => {
+              const na = parseInt(String(a.lista).match(/\d+/)?.[0], 10);
+              const nb = parseInt(String(b.lista).match(/\d+/)?.[0], 10);
+              if (Number.isNaN(na) || Number.isNaN(nb)) return 0;
+              return na - nb;
+            });
+            setListaPrecio(porNumero[0].lista);
           }
         }
       })
