@@ -140,31 +140,21 @@ export default function ActualizarPreciosExcel() {
             </div>
 
             {resultado.noEncontrados?.length > 0 && (
-              <div style={{ fontSize: 13, color: "#a1662a", marginBottom: 8 }}>
-                <strong>{resultado.noEncontrados.length}</strong> código(s) no
-                encontrado(s) en la base:
-                <div
-                  style={{
-                    fontFamily: "monospace",
-                    fontSize: 12,
-                    marginTop: 4,
-                    maxHeight: 100,
-                    overflowY: "auto",
-                    background: "#fbf4e8",
-                    padding: "6px 10px",
-                    borderRadius: 4,
-                  }}
-                >
-                  {resultado.noEncontrados.join(", ")}
-                </div>
-              </div>
+              <DetalleFallos
+                titulo={`${resultado.noEncontrados.length} código(s) no encontrado(s) en la base`}
+                color="#a1662a"
+                bg="#fbf4e8"
+                items={resultado.noEncontrados}
+              />
             )}
 
             {resultado.invalidos?.length > 0 && (
-              <div style={{ fontSize: 13, color: "#a12525" }}>
-                <strong>{resultado.invalidos.length}</strong> fila(s) con datos
-                inválidos (código o precio vacío/mal formado).
-              </div>
+              <DetalleFallos
+                titulo={`${resultado.invalidos.length} fila(s) con datos inválidos`}
+                color="#a12525"
+                bg="#fdecec"
+                items={resultado.invalidos}
+              />
             )}
           </div>
         )}
@@ -172,6 +162,91 @@ export default function ActualizarPreciosExcel() {
     </>
   );
 }
+
+function DetalleFallos({ titulo, color, bg, items }) {
+  // Soporta tanto el formato viejo (array de strings, solo código) como el
+  // nuevo (array de objetos con fila, bloque, codigo, precio y motivo).
+  const esObjeto = items.length > 0 && typeof items[0] === "object";
+
+  return (
+    <div style={{ fontSize: 13, color, marginBottom: 14 }}>
+      <strong>{titulo}:</strong>
+
+      {esObjeto ? (
+        <div
+          style={{
+            marginTop: 6,
+            maxHeight: 220,
+            overflowY: "auto",
+            border: `1px solid ${color}33`,
+            borderRadius: 4,
+          }}
+        >
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: 12,
+              fontFamily: "monospace",
+            }}
+          >
+            <thead>
+              <tr style={{ background: bg }}>
+                <th style={thStyle}>Fila</th>
+                <th style={thStyle}>Bloque</th>
+                <th style={thStyle}>Código</th>
+                <th style={thStyle}>Precio</th>
+                <th style={thStyle}>Motivo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, i) => (
+                <tr key={i} style={{ background: i % 2 ? bg : "transparent" }}>
+                  <td style={tdStyle}>{it.fila ?? "-"}</td>
+                  <td style={tdStyle}>{it.bloque ?? "-"}</td>
+                  <td style={tdStyle}>{it.codigo ?? "-"}</td>
+                  <td style={tdStyle}>{String(it.precio ?? "-")}</td>
+                  <td style={{ ...tdStyle, fontFamily: "inherit" }}>
+                    {it.motivo ?? "-"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div
+          style={{
+            fontFamily: "monospace",
+            fontSize: 12,
+            marginTop: 4,
+            maxHeight: 100,
+            overflowY: "auto",
+            background: bg,
+            padding: "6px 10px",
+            borderRadius: 4,
+          }}
+        >
+          {items.join(", ")}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const thStyle = {
+  textAlign: "left",
+  padding: "5px 8px",
+  borderBottom: "1px solid #d0dde8",
+  position: "sticky",
+  top: 0,
+};
+
+const tdStyle = {
+  padding: "5px 8px",
+  borderBottom: "1px solid #eef3f8",
+  whiteSpace: "nowrap",
+};
 
 const labelStyle = {
   display: "block",
