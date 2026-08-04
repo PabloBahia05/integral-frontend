@@ -594,79 +594,84 @@ export default function useCocinaPlacard({
     // placardItems.placard traía los 3 ítems, frente/auxiliares/accesorios
     // vacíos). Armamos UN mapa combinado por nombre de artículo y
     // matcheamos contra ese único mapa, sin depender de la clave interna.
-    const familiasBD = [
-      "Bajomesada",
-      "Alacena",
-      "PLACARD",
-      "FRENTE DE PLACARD",
-      "Auxiliares",
-      "Accesorios",
-    ];
-
-    Promise.all(
-      familiasBD.map((familiaBD) =>
-        authFetch(`${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`)
-          .then((r) => r.json())
-          .then((data) => (Array.isArray(data) ? data : []))
-          .catch(() => []),
-      ),
-    ).then((resultados) => {
-      const mapaArticulos = new Map();
-      for (const lista of resultados) {
-        for (const a of lista) mapaArticulos.set(a.articulo, a);
-      }
-      // TEMP DEBUG — sacar cuando se confirme que el fix funciona
-      console.log("[Actualizar] mapa combinado de artículos (BD), total:", mapaArticulos.size);
-
-      const normalizarDebug = (s) =>
-        String(s ?? "")
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-z0-9]+/g, " ")
-          .trim();
-
-      const logMatch = (seccion, familia, f) => {
-        const art = mapaArticulos.get(f.articulo);
-        if (art) {
-          console.log(`[Actualizar][${seccion}/${familia}] "${f.articulo}" -> match EXACTO en BD:`, art);
-          return;
-        }
-        // No hubo match exacto: buscamos candidatos parecidos para ver la diferencia real
-        const objetivo = normalizarDebug(f.articulo);
-        const candidatos = [...mapaArticulos.keys()]
-          .filter((k) => {
-            const nk = normalizarDebug(k);
-            return nk === objetivo || nk.includes(objetivo) || objetivo.includes(nk);
-          })
-          .slice(0, 5);
-        console.log(
-          `[Actualizar][${seccion}/${familia}] "${f.articulo}" -> NO ENCONTRADO (exacto). Candidatos parecidos en BD:`,
-          candidatos.length ? candidatos : "(ninguno)",
+    // En vez de adivinar los nombres de familia (frágil: "FRENTE DE
+    // PLACARD" podía no ser el string exacto guardado en la BD), pedimos
+    // primero la lista REAL de familias existentes y traemos los
+    // artículos de todas — así el matcheo por nombre no depende de que
+    // adivinemos bien el nombre de la familia.
+    authFetch(`${API}/articulos/familias-todas`)
+      .then((r) => r.json())
+      .then((data) => (Array.isArray(data) ? data : []))
+      .catch(() => [])
+      .then((familiasBD) => {
+        // TEMP DEBUG — sacar cuando se confirme que el fix funciona
+        console.log("[Actualizar] familias reales en BD:", familiasBD);
+        return Promise.all(
+          familiasBD.map((familiaBD) =>
+            authFetch(`${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`)
+              .then((r) => r.json())
+              .then((data) => (Array.isArray(data) ? data : []))
+              .catch(() => []),
+          ),
         );
-      };
+      })
+      .then((resultados) => {
+        const mapaArticulos = new Map();
+        for (const lista of resultados) {
+          for (const a of lista) mapaArticulos.set(a.articulo, a);
+        }
+        // TEMP DEBUG — sacar cuando se confirme que el fix funciona
+        console.log("[Actualizar] mapa combinado de artículos (BD), total:", mapaArticulos.size);
 
-      setCocinaItems((prev) => {
-        const next = {};
-        for (const [familia, filas] of Object.entries(prev)) {
-          next[familia] = filas.map((f) => {
-            logMatch("cocina", familia, f);
-            return recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
-          });
-        }
-        return next;
+        const normalizarDebug = (s) =>
+          String(s ?? "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, " ")
+            .trim();
+
+        const logMatch = (seccion, familia, f) => {
+          const art = mapaArticulos.get(f.articulo);
+          if (art) {
+            console.log(`[Actualizar][${seccion}/${familia}] "${f.articulo}" -> match EXACTO en BD:`, art);
+            return;
+          }
+          // No hubo match exacto: buscamos candidatos parecidos para ver la diferencia real
+          const objetivo = normalizarDebug(f.articulo);
+          const candidatos = [...mapaArticulos.keys()]
+            .filter((k) => {
+              const nk = normalizarDebug(k);
+              return nk === objetivo || nk.includes(objetivo) || objetivo.includes(nk);
+            })
+            .slice(0, 5);
+          console.log(
+            `[Actualizar][${seccion}/${familia}] "${f.articulo}" -> NO ENCONTRADO (exacto). Candidatos parecidos en BD:`,
+            candidatos.length ? candidatos : "(ninguno)",
+          );
+        };
+
+        setCocinaItems((prev) => {
+          const next = {};
+          for (const [familia, filas] of Object.entries(prev)) {
+            next[familia] = filas.map((f) => {
+              logMatch("cocina", familia, f);
+              return recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
+            });
+          }
+          return next;
+        });
+        setPlacardItems((prev) => {
+          const next = {};
+          for (const [familia, filas] of Object.entries(prev)) {
+            next[familia] = filas.map((f) => {
+              logMatch("placard", familia, f);
+              return recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
+            });
+          }
+          return next;
+        });
       });
-      setPlacardItems((prev) => {
-        const next = {};
-        for (const [familia, filas] of Object.entries(prev)) {
-          next[familia] = filas.map((f) => {
-            logMatch("placard", familia, f);
-            return recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
-          });
-        }
-        return next;
-      });
-    });
   };
 
   // Recalcular precios cuando cambia la lista de precios o el ajuste general.
