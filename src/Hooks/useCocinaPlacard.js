@@ -590,9 +590,9 @@ export default function useCocinaPlacard({
       ...familiasConItems(placardItemsRef.current, familiaMapPlacardRef2),
     ]);
     // TEMP DEBUG — sacar cuando se resuelva el issue de "Actualizar no modifica"
-    console.debug("[Actualizar] familias a consultar en BD:", [...familiasBDNecesarias]);
-    console.debug("[Actualizar] cocinaItems:", cocinaItemsRef.current);
-    console.debug("[Actualizar] placardItems:", placardItemsRef.current);
+    console.log("[Actualizar] familias a consultar en BD:", [...familiasBDNecesarias]);
+    console.log("[Actualizar] cocinaItems:", cocinaItemsRef.current);
+    console.log("[Actualizar] placardItems:", placardItemsRef.current);
 
     // Sin ítems cargados: solo recalcula (comportamiento previo)
     if (familiasBDNecesarias.size === 0) {
@@ -618,7 +618,7 @@ export default function useCocinaPlacard({
       ),
     ).then((resultados) => {
       // TEMP DEBUG
-      console.debug("[Actualizar] resultados crudos de /articulos/por-familia:", resultados);
+      console.log("[Actualizar] resultados crudos de /articulos/por-familia:", resultados);
 
       const mapaPorFamiliaBD = new Map(resultados);
       const mapaArticulosDe = (familiaInterna, familiaMap) => {
@@ -633,7 +633,7 @@ export default function useCocinaPlacard({
           const mapa = mapaArticulosDe(familia, familiaMapCocinaRef2);
           next[familia] = filas.map((f) => {
             const art = mapa.get(f.articulo);
-            console.debug(
+            console.log(
               `[Actualizar][cocina/${familia}] "${f.articulo}" -> match en BD:`,
               art ?? "NO ENCONTRADO",
               "| preciosBase actuales:",
@@ -652,7 +652,7 @@ export default function useCocinaPlacard({
           const mapa = mapaArticulosDe(familia, familiaMapPlacardRef2);
           next[familia] = filas.map((f) => {
             const art = mapa.get(f.articulo);
-            console.debug(
+            console.log(
               `[Actualizar][placard/${familia}] "${f.articulo}" -> match en BD:`,
               art ?? "NO ENCONTRADO",
               "| preciosBase actuales:",
