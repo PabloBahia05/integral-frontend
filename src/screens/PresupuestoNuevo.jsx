@@ -84,6 +84,27 @@ const formatFechaHora = (dt) => {
   });
 };
 
+// ── Helpers de comparación de cliente (nombre/telefono en sus 3 casillas) ──
+// Compara ignorando mayúsculas/tildes/espacios
+const normTexto = (s) =>
+  String(s ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const nombresDeCliente = (c) => [
+  c.nombre ?? c.NOMBRE ?? "",
+  c.nombre1 ?? c.NOMBRE1 ?? "",
+  c.nombre2 ?? c.NOMBRE2 ?? "",
+];
+
+const telefonosDeCliente = (c) => [
+  c.telefono1 ?? c.TELEFONO1 ?? "",
+  c.telefono2 ?? c.TELEFONO2 ?? "",
+  c.wapp ?? c.WAPP ?? "",
+];
+
 // ── Componente reutilizable: formulario de medidas para Especiales ──────────
 function EspecialesMedidasForm({
   tipo,
@@ -624,6 +645,13 @@ export default function PresupuestoNuevo({
   // y si no existe lo da de alta solo, sin que el usuario elija de una lista.
   const [resolviendoCliente, setResolviendoCliente] = useState(false);
   const [clienteAutoResuelto, setClienteAutoResuelto] = useState(null); // "existente" | "nuevo" | null
+
+  // Candidato encontrado en clientes (por nombre o teléfono) pendiente de que
+  // el usuario confirme si continúa con ese cliente o carga uno nuevo.
+  const [candidatoCliente, setCandidatoCliente] = useState(null);
+  const [candidatoViaNombre, setCandidatoViaNombre] = useState(false);
+  const [candidatoNombreVal, setCandidatoNombreVal] = useState("");
+  const [candidatoTelVal, setCandidatoTelVal] = useState("");
   const [localidad, setLocalidad] = useState("Bahía Blanca");
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [leyenda, setLeyenda] = useState("");
@@ -1879,51 +1907,11 @@ export default function PresupuestoNuevo({
   useEffect(() => {
     if (cargandoPresupuestoRef.current) return; // no autoresolver mientras se está cargando un presupuesto existente
     if (codcliente) return; // ya está vinculado a un cliente (elegido o ya resuelto)
+    if (candidatoCliente) return; // ya hay un candidato esperando confirmación del usuario
 
     const nombreVal = cliente.trim();
     const telVal = telefonoSearch.trim();
     if (!nombreVal || !telVal) return; // esperamos nombre Y teléfono
-
-    // Compara ignorando mayúsculas/tildes/espacios
-    const norm = (s) =>
-      String(s ?? "")
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-
-    const nombresDe = (c) => [
-      c.nombre ?? c.NOMBRE ?? "",
-      c.nombre1 ?? c.NOMBRE1 ?? "",
-      c.nombre2 ?? c.NOMBRE2 ?? "",
-    ];
-    const telefonosDe = (c) => [
-      c.telefono1 ?? c.TELEFONO1 ?? "",
-      c.telefono2 ?? c.TELEFONO2 ?? "",
-      c.wapp ?? c.WAPP ?? "",
-    ];
-
-    // Actualiza en el cliente encontrado el primer campo vacío de una lista dada
-    const completarCasillaVacia = async (encontrado, campos, valor) => {
-      const idCliente = encontrado.id ?? encontrado.codcliente ?? encontrado.CODCLIENTE;
-      if (idCliente == null) return;
-      const actual = {};
-      campos.forEach((campo) => {
-        actual[campo] = encontrado[campo] ?? encontrado[campo.toUpperCase()] ?? "";
-      });
-      const campoVacio = campos.find((campo) => !String(actual[campo] ?? "").trim());
-      if (!campoVacio) return; // las 3 casillas ya están ocupadas, no forzamos nada
-      try {
-        await authFetch(`${API}/clientes/${idCliente}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ [campoVacio]: valor }),
-        });
-      } catch (e) {
-        console.error(`[autoresolverCliente] no se pudo completar ${campoVacio}:`, e);
-      }
-      return campoVacio;
-    };
 
     const timer = setTimeout(async () => {
       setResolviendoCliente(true);
@@ -1939,7 +1927,7 @@ export default function PresupuestoNuevo({
           const dNombre = await rNombre.json();
           if (Array.isArray(dNombre)) {
             encontrado = dNombre.find((c) =>
-              nombresDe(c).some((n) => n && norm(n) === norm(nombreVal)),
+              nombresDeCliente(c).some((n) => n && normTexto(n) === normTexto(nombreVal)),
             );
           }
         } catch (e) {
@@ -1957,7 +1945,7 @@ export default function PresupuestoNuevo({
             if (Array.isArray(dTel)) {
               encontrado =
                 dTel.find((c) =>
-                  telefonosDe(c).some((t) => t && norm(t) === norm(telVal)),
+                  telefonosDeCliente(c).some((t) => t && normTexto(t) === normTexto(telVal)),
                 ) ?? dTel[0] ?? null;
             }
           } catch (e) {
@@ -1966,49 +1954,15 @@ export default function PresupuestoNuevo({
         }
 
         if (encontrado) {
-          if (viaNombre) {
-            // Encontrado por nombre → si el teléfono no está en ninguna de
-            // sus 3 casillas, lo agregamos en la primera vacía.
-            const telCoincide = telefonosDe(encontrado).some(
-              (t) => t && norm(t) === norm(telVal),
-            );
-            if (!telCoincide) {
-              await completarCasillaVacia(
-                encontrado,
-                ["telefono1", "telefono2", "wapp"],
-                telVal,
-              );
-            }
-          } else {
-            // Encontrado por teléfono → si el nombre no está en ninguna de
-            // sus 3 casillas, lo agregamos en nombre1/nombre2 (no tocamos "nombre").
-            const nombreCoincide = nombresDe(encontrado).some(
-              (n) => n && norm(n) === norm(nombreVal),
-            );
-            if (!nombreCoincide) {
-              await completarCasillaVacia(
-                encontrado,
-                ["nombre1", "nombre2"],
-                nombreVal,
-              );
-            }
-          }
-
-          // Vinculamos el cliente encontrado sin pisar lo que el usuario ya escribió
-          setCodcliente(encontrado.codcliente ?? encontrado.CODCLIENTE ?? null);
-          setTelefono1(encontrado.telefono1 ?? encontrado.TELEFONO1 ?? telVal);
-          setTelefono2(encontrado.telefono2 ?? encontrado.TELEFONO2 ?? "");
-          setWapp(encontrado.wapp ?? encontrado.WAPP ?? "");
-          setDomicilio(encontrado.domrem ?? encontrado.DOMREM ?? "");
-          setDomicilioFiscal(
-            encontrado.domiciliofiscal ??
-              encontrado["domicilio fiscal"] ??
-              encontrado.DOMICILIO_FISCAL ??
-              "",
-          );
-          setClienteAutoResuelto("existente");
+          // Hay coincidencia (por nombre o por teléfono): en vez de vincular
+          // directo, mostramos un modal con los datos encontrados y dejamos
+          // que el usuario decida si continúa con ese cliente o carga uno nuevo.
+          setCandidatoCliente(encontrado);
+          setCandidatoViaNombre(viaNombre);
+          setCandidatoNombreVal(nombreVal);
+          setCandidatoTelVal(telVal);
         } else {
-          // 3) No existe ni por nombre ni por teléfono → alta automática
+          // No existe ni por nombre ni por teléfono → alta automática
           const rNuevo = await authFetch(`${API}/clientes`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2031,7 +1985,125 @@ export default function PresupuestoNuevo({
     }, 900); // esperamos a que el usuario termine de tipear ambos campos
 
     return () => clearTimeout(timer);
-  }, [cliente, telefonoSearch, codcliente, numeroPres]);
+  }, [cliente, telefonoSearch, codcliente, candidatoCliente, numeroPres]);
+
+  // Actualiza en el cliente encontrado el primer campo vacío de una lista dada
+  const completarCasillaVaciaCliente = async (encontrado, campos, valor) => {
+    const idCliente = encontrado.id ?? encontrado.codcliente ?? encontrado.CODCLIENTE;
+    if (idCliente == null) return;
+    const actual = {};
+    campos.forEach((campo) => {
+      actual[campo] = encontrado[campo] ?? encontrado[campo.toUpperCase()] ?? "";
+    });
+    const campoVacio = campos.find((campo) => !String(actual[campo] ?? "").trim());
+    if (!campoVacio) return; // las 3 casillas ya están ocupadas, no forzamos nada
+    try {
+      await authFetch(`${API}/clientes/${idCliente}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [campoVacio]: valor }),
+      });
+    } catch (e) {
+      console.error(`[autoresolverCliente] no se pudo completar ${campoVacio}:`, e);
+    }
+    return campoVacio;
+  };
+
+  // Limpia el candidato pendiente (cierra el modal de confirmación de cliente)
+  const cerrarModalCandidatoCliente = () => {
+    setCandidatoCliente(null);
+    setCandidatoViaNombre(false);
+    setCandidatoNombreVal("");
+    setCandidatoTelVal("");
+  };
+
+  // El usuario eligió CONTINUAR con el cliente encontrado (mismo codcliente)
+  const confirmarUsarClienteEncontrado = async () => {
+    const encontrado = candidatoCliente;
+    if (!encontrado) return;
+    const viaNombre = candidatoViaNombre;
+    const nombreVal = candidatoNombreVal;
+    const telVal = candidatoTelVal;
+
+    setResolviendoCliente(true);
+    try {
+      if (viaNombre) {
+        // Encontrado por nombre → si el teléfono no está en ninguna de sus 3
+        // casillas, lo agregamos en la primera vacía.
+        const telCoincide = telefonosDeCliente(encontrado).some(
+          (t) => t && normTexto(t) === normTexto(telVal),
+        );
+        if (!telCoincide) {
+          await completarCasillaVaciaCliente(
+            encontrado,
+            ["telefono1", "telefono2", "wapp"],
+            telVal,
+          );
+        }
+      } else {
+        // Encontrado por teléfono → si el nombre no está en ninguna de sus 3
+        // casillas, lo agregamos en nombre1/nombre2 (no tocamos "nombre").
+        const nombreCoincide = nombresDeCliente(encontrado).some(
+          (n) => n && normTexto(n) === normTexto(nombreVal),
+        );
+        if (!nombreCoincide) {
+          await completarCasillaVaciaCliente(
+            encontrado,
+            ["nombre1", "nombre2"],
+            nombreVal,
+          );
+        }
+      }
+
+      // Vinculamos el cliente encontrado sin pisar lo que el usuario ya escribió
+      setCodcliente(encontrado.codcliente ?? encontrado.CODCLIENTE ?? null);
+      setTelefono1(encontrado.telefono1 ?? encontrado.TELEFONO1 ?? telVal);
+      setTelefono2(encontrado.telefono2 ?? encontrado.TELEFONO2 ?? "");
+      setWapp(encontrado.wapp ?? encontrado.WAPP ?? "");
+      setDomicilio(encontrado.domrem ?? encontrado.DOMREM ?? "");
+      setDomicilioFiscal(
+        encontrado.domiciliofiscal ??
+          encontrado["domicilio fiscal"] ??
+          encontrado.DOMICILIO_FISCAL ??
+          "",
+      );
+      setClienteAutoResuelto("existente");
+    } finally {
+      setResolviendoCliente(false);
+      cerrarModalCandidatoCliente();
+    }
+  };
+
+  // El usuario eligió NO usar el cliente encontrado y dar de alta uno nuevo
+  const confirmarClienteNuevo = async () => {
+    const nombreVal = candidatoNombreVal;
+    const telVal = candidatoTelVal;
+    if (!nombreVal || !telVal) {
+      cerrarModalCandidatoCliente();
+      return;
+    }
+
+    setResolviendoCliente(true);
+    try {
+      const rNuevo = await authFetch(`${API}/clientes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: nombreVal, telefono1: telVal }),
+      });
+      const dNuevo = await rNuevo.json();
+      if (rNuevo.ok) {
+        setCodcliente(dNuevo.codcliente ?? dNuevo.CODCLIENTE ?? dNuevo.id ?? null);
+        setTelefono1(telVal);
+        setClienteAutoResuelto("nuevo");
+      } else {
+        console.error("[autoresolverCliente] no se pudo crear el cliente:", dNuevo);
+        setError("No se pudo crear el cliente nuevo. Intentá de nuevo.");
+      }
+    } finally {
+      setResolviendoCliente(false);
+      cerrarModalCandidatoCliente();
+    }
+  };
 
   const setLinea = (idx, field, val) => {
     setLineas((prev) =>
@@ -2418,6 +2490,120 @@ export default function PresupuestoNuevo({
                   }}
                 >
                   Listo
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Confirmación: cliente existente encontrado por nombre/teléfono ── */}
+        {candidatoCliente && (
+          <>
+            <div className="pn-popover-backdrop" />
+            <div
+              style={{
+                position: "fixed",
+                top: "8%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: "min(480px, 92vw)",
+                background: "#fff",
+                borderRadius: 10,
+                boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
+                padding: 18,
+                zIndex: 1100,
+              }}
+            >
+              <strong style={{ fontSize: 15 }}>
+                Ya existe un cliente con {candidatoViaNombre ? "ese nombre" : "ese teléfono"}
+              </strong>
+              <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>
+                Encontramos este cliente en la base. ¿Continuás con este cliente
+                o preferís cargar uno nuevo?
+              </div>
+
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: 12,
+                  borderRadius: 6,
+                  background: "#f7f7f7",
+                  border: "1px solid #ddd",
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                }}
+              >
+                <div>
+                  <strong>Código:</strong>{" "}
+                  {candidatoCliente.codcliente ?? candidatoCliente.CODCLIENTE ?? "-"}
+                </div>
+                <div>
+                  <strong>Nombre:</strong>{" "}
+                  {candidatoCliente.nombre ?? candidatoCliente.NOMBRE ?? "-"}
+                  {(candidatoCliente.nombre1 ?? candidatoCliente.NOMBRE1) && (
+                    <> / {candidatoCliente.nombre1 ?? candidatoCliente.NOMBRE1}</>
+                  )}
+                  {(candidatoCliente.nombre2 ?? candidatoCliente.NOMBRE2) && (
+                    <> / {candidatoCliente.nombre2 ?? candidatoCliente.NOMBRE2}</>
+                  )}
+                </div>
+                <div>
+                  <strong>Teléfono 1:</strong>{" "}
+                  {candidatoCliente.telefono1 ?? candidatoCliente.TELEFONO1 ?? "-"}
+                </div>
+                {(candidatoCliente.telefono2 ?? candidatoCliente.TELEFONO2) && (
+                  <div>
+                    <strong>Teléfono 2:</strong>{" "}
+                    {candidatoCliente.telefono2 ?? candidatoCliente.TELEFONO2}
+                  </div>
+                )}
+                {(candidatoCliente.wapp ?? candidatoCliente.WAPP) && (
+                  <div>
+                    <strong>WhatsApp:</strong>{" "}
+                    {candidatoCliente.wapp ?? candidatoCliente.WAPP}
+                  </div>
+                )}
+                {(candidatoCliente.domrem ?? candidatoCliente.DOMREM) && (
+                  <div>
+                    <strong>Domicilio:</strong>{" "}
+                    {candidatoCliente.domrem ?? candidatoCliente.DOMREM}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ fontSize: 12, color: "#555", marginTop: 10 }}>
+                Estás cargando: <strong>{candidatoNombreVal}</strong> /{" "}
+                <strong>{candidatoTelVal}</strong>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  marginTop: 16,
+                  justifyContent: "flex-end",
+                }}
+              >
+                <button
+                  className="pn-tool-btn"
+                  onClick={confirmarClienteNuevo}
+                  disabled={resolviendoCliente}
+                  style={{ minWidth: 130 }}
+                >
+                  Cargar como nuevo
+                </button>
+                <button
+                  className="pn-tool-btn"
+                  onClick={confirmarUsarClienteEncontrado}
+                  disabled={resolviendoCliente}
+                  style={{
+                    fontWeight: 700,
+                    background: "#e6f7ff",
+                    borderColor: "#1890ff",
+                    minWidth: 130,
+                  }}
+                >
+                  Continuar con este
                 </button>
               </div>
             </div>
