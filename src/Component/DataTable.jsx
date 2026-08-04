@@ -1,32 +1,56 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 
 const MIN_COL_WIDTH = 40;
+const DEFAULT_COL_WIDTH = 120;
 
 export default function DataTable({ columns, rows, selectedId, onSelect }) {
-  // Anchos por columna (key -> px). Si una columna no está acá, usa auto.
-  const [widths, setWidths] = useState({});
+  // Anchos por columna (key -> px). Arranca con col.width si viene definido
+  // en la columna, o DEFAULT_COL_WIDTH si no. A partir de ahí, cada drag
+  // actualiza el valor puntual de esa columna.
+  const [widths, setWidths] = useState(() => {
+    const initial = {};
+    columns.forEach((col) => {
+      initial[col.key] = col.width ?? DEFAULT_COL_WIDTH;
+    });
+    return initial;
+  });
+
+  // Si cambia el set de columnas (nuevas keys), les asigna ancho default
+  // sin pisar los anchos ya ajustados manualmente.
+  useEffect(() => {
+    setWidths((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      columns.forEach((col) => {
+        if (next[col.key] === undefined) {
+          next[col.key] = col.width ?? DEFAULT_COL_WIDTH;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columns.map((c) => c.key).join("|")]);
+
   const tableRef = useRef(null);
   const resizing = useRef(null); // { key, startX, startWidth }
 
-  const onMouseDown = useCallback(
-    (e, col) => {
-      e.preventDefault();
-      e.stopPropagation();
+  const onMouseDown = useCallback((e, col) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-      const th = e.currentTarget.closest("th");
-      const startWidth = th ? th.offsetWidth : 100;
+    const th = e.currentTarget.closest("th");
+    const startWidth = th ? th.offsetWidth : DEFAULT_COL_WIDTH;
 
-      resizing.current = {
-        key: col.key,
-        startX: e.clientX,
-        startWidth,
-      };
+    resizing.current = {
+      key: col.key,
+      startX: e.clientX,
+      startWidth,
+    };
 
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    },
-    [],
-  );
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
 
   useEffect(() => {
     const onMouseMove = (e) => {
@@ -54,12 +78,16 @@ export default function DataTable({ columns, rows, selectedId, onSelect }) {
 
   return (
     <div className="table-wrap">
-      <table className="data-table" ref={tableRef} style={{ tableLayout: "fixed" }}>
+      <table
+        className="data-table"
+        ref={tableRef}
+        style={{ tableLayout: "fixed" }}
+      >
         <colgroup>
           {columns.map((col) => (
             <col
               key={col.key}
-              style={widths[col.key] ? { width: widths[col.key] } : undefined}
+              style={{ width: widths[col.key] ?? col.width ?? DEFAULT_COL_WIDTH }}
             />
           ))}
         </colgroup>
@@ -67,7 +95,18 @@ export default function DataTable({ columns, rows, selectedId, onSelect }) {
           <tr>
             {columns.map((col) => (
               <th key={col.key} style={{ position: "relative" }}>
-                {col.label}
+                <span
+                  title={typeof col.label === "string" ? col.label : undefined}
+                  style={{
+                    display: "block",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    paddingRight: 8,
+                  }}
+                >
+                  {col.label}
+                </span>
                 <span
                   onMouseDown={(e) => onMouseDown(e, col)}
                   style={{
