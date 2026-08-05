@@ -80,6 +80,12 @@ export default function useCocinaPlacard({
   const cocinaItemsRef = useRef({});
   const placardItemsRef = useRef({});
 
+  // ids de presupuestoItems (ej. "cocina-bajomesadas-0") cuyo precio cambió
+  // en el último click de "Actualizar", para resaltarlos en verde en la
+  // tabla de Presupuesto. Se limpia solo, a los pocos segundos.
+  const [idsPrecioActualizado, setIdsPrecioActualizado] = useState(new Set());
+  const limpiarResaltadoRef = useRef(null);
+
   // ── Cocina ───────────────────────────────────────────────
   // familiaActiva: null | "bajomesadas" | "alacenas"
   const [cocinaFamilia, setCocinaFamilia] = useState(null);
@@ -552,7 +558,7 @@ export default function useCocinaPlacard({
   // No toca %item, %lista, ajuste general ni accesorios — eso lo vuelve a
   // aplicar recalcFila después, igual que siempre.
   const refrescarPreciosBaseFila = (fila, mapaArticulos) => {
-    const art = buscarArticuloNormalizado(mapaArticulos, fila.articulo);
+    const art = buscarArticuloNormalizado(mapaArticulos, fila.nombreart || fila.articulo);
     if (!art) return fila; // artículo ya no existe / cambió de nombre en la BD: no tocar
 
     let nuevaFila = fila;
@@ -650,13 +656,19 @@ export default function useCocinaPlacard({
         const normalizarDebug = normalizarArticulo;
 
         const logMatch = (seccion, familia, f) => {
-          const art = buscarArticuloNormalizado(mapaArticulos, f.articulo);
+          // El match real se hace por nombreart (nombre real del catálogo,
+          // ej. con rango de ancho "180 a 200"), no por f.articulo (texto
+          // compuesto para mostrar en el presupuesto, ej. con ancho literal
+          // "200" y cantidad de puertas) — ese texto casi nunca existe tal
+          // cual en la tabla articulos.
+          const clave = f.nombreart || f.articulo;
+          const art = buscarArticuloNormalizado(mapaArticulos, clave);
           if (art) {
-            console.log(`[Actualizar][${seccion}/${familia}] "${f.articulo}" -> match EXACTO en BD:`, art);
+            console.log(`[Actualizar][${seccion}/${familia}] "${clave}" -> match EXACTO en BD:`, art);
             return;
           }
           // No hubo match exacto: buscamos candidatos parecidos para ver la diferencia real
-          const objetivo = normalizarDebug(f.articulo);
+          const objetivo = normalizarDebug(clave);
           const candidatos = [...mapaArticulos.keys()]
             .filter((k) => {
               const nk = normalizarDebug(k);
@@ -664,17 +676,23 @@ export default function useCocinaPlacard({
             })
             .slice(0, 5);
           console.log(
-            `[Actualizar][${seccion}/${familia}] "${f.articulo}" -> NO ENCONTRADO (exacto). Candidatos parecidos en BD:`,
+            `[Actualizar][${seccion}/${familia}] "${clave}" -> NO ENCONTRADO (exacto). Candidatos parecidos en BD:`,
             candidatos.length ? candidatos : "(ninguno)",
           );
         };
 
+        const idsCambiados = [];
+
         setCocinaItems((prev) => {
           const next = {};
           for (const [familia, filas] of Object.entries(prev)) {
-            next[familia] = filas.map((f) => {
+            next[familia] = filas.map((f, i) => {
               logMatch("cocina", familia, f);
-              return recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
+              const actualizada = recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
+              if (parseFloat(actualizada.precio) !== parseFloat(f.precio)) {
+                idsCambiados.push(`cocina-${familia}-${i}`);
+              }
+              return actualizada;
             });
           }
           return next;
@@ -682,13 +700,25 @@ export default function useCocinaPlacard({
         setPlacardItems((prev) => {
           const next = {};
           for (const [familia, filas] of Object.entries(prev)) {
-            next[familia] = filas.map((f) => {
+            next[familia] = filas.map((f, i) => {
               logMatch("placard", familia, f);
-              return recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
+              const actualizada = recalcFila(refrescarPreciosBaseFila(f, mapaArticulos));
+              if (parseFloat(actualizada.precio) !== parseFloat(f.precio)) {
+                idsCambiados.push(`placard-${familia}-${i}`);
+              }
+              return actualizada;
             });
           }
           return next;
         });
+
+        // Resalta en verde, en la tabla de Presupuesto, los ítems cuyo
+        // precio efectivamente cambió — y lo saca solo a los pocos segundos.
+        if (limpiarResaltadoRef.current) clearTimeout(limpiarResaltadoRef.current);
+        setIdsPrecioActualizado(new Set(idsCambiados));
+        limpiarResaltadoRef.current = setTimeout(() => {
+          setIdsPrecioActualizado(new Set());
+        }, 6000);
       });
   };
 
@@ -842,7 +872,7 @@ export default function useCocinaPlacard({
       );
       if (tieneTodas) return fila;
 
-      const art = buscarArticuloNormalizado(mapaArticulos, fila.articulo);
+      const art = buscarArticuloNormalizado(mapaArticulos, fila.nombreart || fila.articulo);
       const combinado = lineasActivas.map((l) => {
         const existente = actuales.find((pb) => pb.linea === l.linea);
         if (existente) return existente;
@@ -1019,6 +1049,7 @@ export default function useCocinaPlacard({
     productosFiltrados,
     recalcFila,
     handleActualizar,
+    idsPrecioActualizado,
     // CRUD placard
     placardAgregarFila,
     placardEliminarFila,
