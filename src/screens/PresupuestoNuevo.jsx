@@ -896,6 +896,7 @@ export default function PresupuestoNuevo({
         setLeyenda(data.leyenda ?? "");
         setObservaciones(data.observaciones ?? "");
         if (data.texto_sena) setTextoSena(data.texto_sena);
+        else setTextoSena(TEXTO_SENA_DEFAULT);
         setIncluirTextoSena(
           data.incluir_texto_sena != null ? !!data.incluir_texto_sena : true,
         );
