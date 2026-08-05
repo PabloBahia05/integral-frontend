@@ -886,8 +886,11 @@ export default function PresupuestoNuevo({
   };
 
   // Info del presupuesto (tabla nueva presupuesto_info, key = numeropres):
-  // leyenda, observaciones y el texto de seña/condiciones tal como quedaron
-  // guardados la última vez para ESTE presupuesto puntual.
+  // leyenda y observaciones son específicas de ESTE presupuesto puntual.
+  // El texto de seña/condiciones, en cambio, es un estándar compartido: no
+  // se lee el texto_sena guardado para este numeropres (puede haber quedado
+  // viejo) sino siempre el último editado en CUALQUIER presupuesto — mismo
+  // criterio que al crear uno nuevo (ver fetch a ultimo-texto-sena más abajo).
   const cargarInfoPresupuesto = async (numPres) => {
     try {
       const r = await authFetch(`${API}/presupuesto-info/${numPres}`);
@@ -895,14 +898,20 @@ export default function PresupuestoNuevo({
       if (data) {
         setLeyenda(data.leyenda ?? "");
         setObservaciones(data.observaciones ?? "");
-        if (data.texto_sena) setTextoSena(data.texto_sena);
-        else setTextoSena(TEXTO_SENA_DEFAULT);
         setIncluirTextoSena(
           data.incluir_texto_sena != null ? !!data.incluir_texto_sena : true,
         );
       }
     } catch (err) {
       console.error("Error cargando info del presupuesto:", err);
+    }
+    try {
+      const r2 = await authFetch(`${API}/presupuesto-info/ultimo-texto-sena`);
+      const d2 = await r2.json();
+      setTextoSena(d2?.texto_sena || TEXTO_SENA_DEFAULT);
+    } catch (err) {
+      console.error("Error cargando último texto de seña:", err);
+      setTextoSena(TEXTO_SENA_DEFAULT);
     }
   };
 
