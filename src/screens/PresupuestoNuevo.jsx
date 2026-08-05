@@ -2283,13 +2283,25 @@ export default function PresupuestoNuevo({
         // revAsignada (el nuevo número de revisión), esas fotos quedan
         // copiadas ahí — la revisión anterior conserva las suyas intactas,
         // sin verse afectada.
-        guardarImagenesPresupuesto(numAsignado, Number(revAsignada));
-
+        //
         // ── Persistir leyenda/observaciones/texto de seña ──
-        guardarInfoPresupuesto(numAsignado);
+        // IMPORTANTE: se espera (await) a que estos dos PUT terminen ANTES
+        // de avisar que el guardado terminó (onGuardado / liberar el botón
+        // "guardando"). Antes se disparaban sin esperar y el componente
+        // podía quedar "guardado" mientras el PUT a presupuesto_info
+        // todavía estaba en vuelo — si el usuario generaba el PDF (u otra
+        // pantalla releía el presupuesto) en ese instante, se corría el
+        // riesgo de leer el valor viejo de la BD porque el PUT todavía no
+        // había commiteado. Esperando acá, cuando el botón se vuelve a
+        // habilitar la leyenda/observaciones/texto de seña ya están
+        // guardados de verdad.
+        await Promise.all([
+          guardarImagenesPresupuesto(numAsignado, Number(revAsignada)),
+          guardarInfoPresupuesto(numAsignado),
+        ]);
 
         // ── Refrescar quién/cuándo guardó, para mostrar en pantalla ──
-        cargarMetaPresupuesto(numAsignado, Number(revAsignada));
+        await cargarMetaPresupuesto(numAsignado, Number(revAsignada));
       }
       setRevision(Number(revAsignada));
 
