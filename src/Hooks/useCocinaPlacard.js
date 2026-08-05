@@ -2,6 +2,30 @@ import { useState, useEffect, useRef } from "react";
 
 const API = "https://integral-backend-production.up.railway.app";
 
+// Normaliza un nombre de artículo para poder matchear "Frente de Placard (2
+// Puerta corrediza) Nature 200"" contra lo que devuelve /articulos-por-familia
+// aunque difieran en mayúsculas, tildes, comillas, o espacios extra. Antes el
+// matching era por string EXACTO (mapaArticulos.get(fila.articulo)), lo que
+// hacía que "Actualizar" no encontrara casi ningún ítem con nombre compuesto
+// (solo matcheaban los artículos con nombre simple, sin variaciones).
+const normalizarArticulo = (s) =>
+  String(s ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+// Arma un Map keyed por nombre normalizado a partir de una lista de
+// artículos de la BD (cada uno con .articulo).
+const armarMapaArticulosNormalizado = (lista) =>
+  new Map(lista.map((a) => [normalizarArticulo(a.articulo), a]));
+
+// Busca un artículo en un mapa armado con armarMapaArticulosNormalizado,
+// normalizando también la clave de búsqueda.
+const buscarArticuloNormalizado = (mapa, nombre) =>
+  mapa.get(normalizarArticulo(nombre));
+
 // ────────────────────────────────────────────────────────────────────────
 // useCocinaPlacard
 // ────────────────────────────────────────────────────────────────────────
@@ -528,7 +552,7 @@ export default function useCocinaPlacard({
   // No toca %item, %lista, ajuste general ni accesorios — eso lo vuelve a
   // aplicar recalcFila después, igual que siempre.
   const refrescarPreciosBaseFila = (fila, mapaArticulos) => {
-    const art = mapaArticulos.get(fila.articulo);
+    const art = buscarArticuloNormalizado(mapaArticulos, fila.articulo);
     if (!art) return fila; // artículo ya no existe / cambió de nombre en la BD: no tocar
 
     let nuevaFila = fila;
@@ -618,21 +642,15 @@ export default function useCocinaPlacard({
       .then((resultados) => {
         const mapaArticulos = new Map();
         for (const lista of resultados) {
-          for (const a of lista) mapaArticulos.set(a.articulo, a);
+          for (const a of lista) mapaArticulos.set(normalizarArticulo(a.articulo), a);
         }
         // TEMP DEBUG — sacar cuando se confirme que el fix funciona
         console.log("[Actualizar] mapa combinado de artículos (BD), total:", mapaArticulos.size);
 
-        const normalizarDebug = (s) =>
-          String(s ?? "")
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9]+/g, " ")
-            .trim();
+        const normalizarDebug = normalizarArticulo;
 
         const logMatch = (seccion, familia, f) => {
-          const art = mapaArticulos.get(f.articulo);
+          const art = buscarArticuloNormalizado(mapaArticulos, f.articulo);
           if (art) {
             console.log(`[Actualizar][${seccion}/${familia}] "${f.articulo}" -> match EXACTO en BD:`, art);
             return;
@@ -824,7 +842,7 @@ export default function useCocinaPlacard({
       );
       if (tieneTodas) return fila;
 
-      const art = mapaArticulos.get(fila.articulo);
+      const art = buscarArticuloNormalizado(mapaArticulos, fila.articulo);
       const combinado = lineasActivas.map((l) => {
         const existente = actuales.find((pb) => pb.linea === l.linea);
         if (existente) return existente;
@@ -859,7 +877,7 @@ export default function useCocinaPlacard({
       const mapaArticulosDe = (familiaInterna, familiaMap) => {
         const familiaBD = familiaMap[familiaInterna] ?? familiaInterna;
         const lista = mapaPorFamiliaBD.get(familiaBD) ?? [];
-        return new Map(lista.map((a) => [a.articulo, a]));
+        return armarMapaArticulosNormalizado(lista);
       };
 
       setCocinaItems((prev) => {
