@@ -31,6 +31,9 @@ export default function TablaArticulos({
   revision,
   // Panel de ajuste
   presupuestoItems,
+  // ids ("cocina-familia-idx" / "placard-familia-idx") de los ítems cuyo
+  // precio cambió en el último click de "Actualizar" — se resaltan en verde.
+  idsPrecioActualizado,
   ajusteModo,
   setAjusteModo,
   ajusteValor,
@@ -488,9 +491,17 @@ export default function TablaArticulos({
                   </tr>,
                   // Filas de ítems
                   ...items.map((item) => {
-                    const bg = rowIdx++ % 2 === 0 ? "#fff" : "#f5f9fc";
+                    const zebra = rowIdx++ % 2 === 0 ? "#fff" : "#f5f9fc";
+                    const actualizado = idsPrecioActualizado?.has(item.id);
+                    const bg = actualizado ? "#bdf3cd" : zebra;
                     return (
-                      <tr key={item.id} style={{ background: bg }}>
+                      <tr
+                        key={item.id}
+                        style={{
+                          background: bg,
+                          transition: "background-color 1.5s ease",
+                        }}
+                      >
                         <td
                           style={{
                             padding: "4px 6px",
