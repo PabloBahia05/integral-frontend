@@ -1269,6 +1269,7 @@ export default function PresupuestoNuevo({
     productosFiltrados,
     recalcFila,
     handleActualizar,
+    idsPrecioActualizado,
     placardAgregarFila,
     placardEliminarFila,
     placardGuardarEdit,
@@ -3610,6 +3611,7 @@ export default function PresupuestoNuevo({
               numero={numero}
               revision={revision}
               presupuestoItems={presupuestoItems}
+              idsPrecioActualizado={idsPrecioActualizado}
               ajusteModo={ajusteModo}
               setAjusteModo={setAjusteModo}
               ajusteValor={ajusteValor}
