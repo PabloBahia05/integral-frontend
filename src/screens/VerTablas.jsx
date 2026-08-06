@@ -24,6 +24,7 @@ import Selector from "./Selector";
 import {
   TEXTO_SENA_DEFAULT,
   getTextoSena,
+  fetchTextoSena,
   setTextoSenaGlobal,
 } from "./textoSenaStore";
 
@@ -232,12 +233,33 @@ function GestorPermisos({ onBack, token }) {
 // ── Componente Texto de Seña ─────────────────────────────────────────────────
 function TextoSenaEditor({ onBack }) {
   const [texto, setTexto] = useState(getTextoSena());
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const guardar = () => {
-    setTextoSenaGlobal(texto);
-    setMsg("✅ Guardado (solo en este navegador, hasta recargar la página)");
-    setTimeout(() => setMsg(""), 3000);
+  useEffect(() => {
+    let vivo = true;
+    fetchTextoSena().then((valor) => {
+      if (vivo) setTexto(valor);
+      setCargando(false);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  const guardar = async () => {
+    setGuardando(true);
+    setMsg("");
+    try {
+      await setTextoSenaGlobal(texto);
+      setMsg("✅ Guardado — ya está disponible para todos los presupuestos nuevos");
+    } catch {
+      setMsg("❌ No se pudo guardar, probá de nuevo");
+    } finally {
+      setGuardando(false);
+      setTimeout(() => setMsg(""), 3000);
+    }
   };
 
   const restaurarEstandar = () => {
@@ -267,21 +289,22 @@ function TextoSenaEditor({ onBack }) {
       </div>
       <div className="tsena-note">
         Texto estándar de seña/condiciones que se muestra en el PDF de
-        Presupuesto (recuadro amarillo). Vive solo en el navegador: no se
-        guarda en el backend y se pierde al recargar la página. No se edita
-        desde la pantalla de Presupuesto.
+        Presupuesto (recuadro amarillo). Se guarda en el backend y es
+        compartido por todas las PCs/usuarios. No se edita desde la pantalla
+        de Presupuesto.
       </div>
       <textarea
         className="tsena-textarea"
         rows={14}
         value={texto}
+        disabled={cargando}
         onChange={(e) => setTexto(e.target.value)}
       />
       <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-        <button className="tsena-btn" onClick={guardar}>
-          💾 Guardar
+        <button className="tsena-btn" onClick={guardar} disabled={cargando || guardando}>
+          {guardando ? "Guardando..." : "💾 Guardar"}
         </button>
-        <button className="tsena-btn sec" onClick={restaurarEstandar}>
+        <button className="tsena-btn sec" onClick={restaurarEstandar} disabled={cargando}>
           Restaurar estándar
         </button>
       </div>
