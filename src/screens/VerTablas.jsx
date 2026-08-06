@@ -21,6 +21,11 @@ import UsuariosApp from "./UsuariosApp";
 import Anviz from "./Anviz";
 import Usuarios from "./Usuarios";
 import Selector from "./Selector";
+import {
+  TEXTO_SENA_DEFAULT,
+  getTextoSena,
+  setTextoSenaGlobal,
+} from "./textoSenaStore";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -224,6 +229,66 @@ function GestorPermisos({ onBack, token }) {
   );
 }
 
+// ── Componente Texto de Seña ─────────────────────────────────────────────────
+function TextoSenaEditor({ onBack }) {
+  const [texto, setTexto] = useState(getTextoSena());
+  const [msg, setMsg] = useState("");
+
+  const guardar = () => {
+    setTextoSenaGlobal(texto);
+    setMsg("✅ Guardado (solo en este navegador, hasta recargar la página)");
+    setTimeout(() => setMsg(""), 3000);
+  };
+
+  const restaurarEstandar = () => {
+    setTexto(TEXTO_SENA_DEFAULT);
+  };
+
+  const TS = `
+    .tsena-wrap { padding: 24px; font-family: 'Space Mono', monospace; max-width: 720px; }
+    .tsena-header { display:flex; align-items:center; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+    .tsena-title { font-size:20px; font-weight:800; color:#0a3a5c; }
+    .tsena-btn { padding:7px 16px; border:1px solid #4361ee; border-radius:4px; background:#4361ee;
+      color:#fff; font-family:inherit; font-size:12px; cursor:pointer; }
+    .tsena-btn.sec { background:#fff; color:#4361ee; }
+    .tsena-note { font-size:12px; color:#6699bb; margin-bottom:12px; }
+    .tsena-textarea { width:100%; font-family:'Space Mono','Courier New',monospace; font-size:12px;
+      padding:10px; border-radius:6px; border:1px solid #ccc; resize:vertical; }
+    .tsena-msg { font-size:12px; margin-left:auto; }
+  `;
+
+  return (
+    <div className="tsena-wrap">
+      <style>{TS}</style>
+      <div className="tsena-header">
+        <button className="tsena-btn sec" onClick={onBack}>← Volver</button>
+        <span className="tsena-title">✍️ Texto de Seña</span>
+        {msg && <span className="tsena-msg">{msg}</span>}
+      </div>
+      <div className="tsena-note">
+        Texto estándar de seña/condiciones que se muestra en el PDF de
+        Presupuesto (recuadro amarillo). Vive solo en el navegador: no se
+        guarda en el backend y se pierde al recargar la página. No se edita
+        desde la pantalla de Presupuesto.
+      </div>
+      <textarea
+        className="tsena-textarea"
+        rows={14}
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+      />
+      <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+        <button className="tsena-btn" onClick={guardar}>
+          💾 Guardar
+        </button>
+        <button className="tsena-btn sec" onClick={restaurarEstandar}>
+          Restaurar estándar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const TABLAS = [
   { id: "clientes", label: "Clientes", icon: "👥", color: "#eb56d7" },
   { id: "productos", label: "Productos", icon: "🛒", color: "#ff6b6b" },
@@ -275,6 +340,7 @@ const TABLAS = [
   { id: "anviz",        label: "Accesos Anviz",   icon: "🕐", color: "#0a7a3c" },
   { id: "permisos",     label: "Permisos por Rol", icon: "🛡️", color: "#6366f1" },
   { id: "selector",     label: "Selector",         icon: "🎛️", color: "#118ab2" },
+  { id: "texto-sena",   label: "Texto de Seña",    icon: "✍️", color: "#ff9f1c" },
 ];
 
 export default function VerTablas({
@@ -610,6 +676,10 @@ export default function VerTablas({
   // ── permisos ──
   if (tablaActiva === "permisos")
     return <GestorPermisos onBack={volver} token={token} />;
+
+  // ── texto de seña ──
+  if (tablaActiva === "texto-sena")
+    return <TextoSenaEditor onBack={volver} />;
 
   // ── selector ──
   if (tablaActiva === "selector")
