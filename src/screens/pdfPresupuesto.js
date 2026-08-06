@@ -302,7 +302,7 @@ export async function generarPresupuestoPDF({
     /* Evita que html2pdf corte una imagen a la mitad entre dos hojas A4:
        si no entra completa en lo que queda de página, la empuja entera a
        la siguiente. */
-    img, .sec-fotos, .adjunto-imagen, .mampara-foto, .texto-sena, .cierre-final { page-break-inside: avoid; break-inside: avoid; }
+    img, .sec-fotos, .adjunto-imagen, .mampara-foto, .texto-sena { page-break-inside: avoid; break-inside: avoid; }
     `;
 
     const pageHTML = `
@@ -319,6 +319,8 @@ export async function generarPresupuestoPDF({
   </div>
 
   <div class="body">
+    ${leyenda ? `<div class="leyenda">${leyenda.replace(/\n/g, "<br/>")}</div>` : ""}
+
     ${seccionesHTML}
 
     ${
@@ -360,11 +362,8 @@ export async function generarPresupuestoPDF({
       .join("")}
 
     ${
-      leyenda || (incluirTextoSena && textoSena)
-        ? `<div class="cierre-final">
-        ${leyenda ? `<div class="leyenda">${leyenda.replace(/\n/g, "<br/>")}</div>` : ""}
-        ${incluirTextoSena && textoSena ? `<div class="texto-sena">${textoSena.replace(/\n/g, "<br/>")}</div>` : ""}
-      </div>`
+      incluirTextoSena && textoSena
+        ? `<div class="texto-sena">${textoSena.replace(/\n/g, "<br/>")}</div>`
         : ""
     }
   </div>
@@ -448,7 +447,7 @@ export async function generarPresupuestoPDF({
         },
         pagebreak: {
           mode: ["css", "legacy"],
-          avoid: ["img", ".sec-fotos", ".adjunto-imagen", ".mampara-foto", ".texto-sena", ".cierre-final"],
+          avoid: ["img", ".sec-fotos", ".adjunto-imagen", ".mampara-foto", ".texto-sena"],
         },
       };
 
