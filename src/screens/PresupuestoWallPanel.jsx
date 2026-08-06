@@ -109,6 +109,8 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
               const data = await res.json();
               const row = Array.isArray(data) ? data[0] : data;
               const campos = [
+                "PRECIO_UN",
+                "precio_un",
                 "PRECIO1",
                 "precio1",
                 "PRECIO",
@@ -751,11 +753,23 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                         justifyContent: "space-between",
                         alignItems: "center",
                       }}
-                      onMouseDown={() => {
+                      onMouseDown={async () => {
                         set("materialVarilla", p.articulo);
-                        set("materialVarillaPrecio", parseFloat(p.precio) || 0);
                         setVarillaSearch("");
                         setVarillaDropdown(false);
+                        try {
+                          const r = await authFetch(
+                            `${API}/articulos/${encodeURIComponent(p.codartint ?? p.codart ?? "")}`,
+                          );
+                          const d = await r.json();
+                          const row = Array.isArray(d) ? d[0] : d;
+                          const pu = parseFloat(
+                            row?.precio_un ?? row?.PRECIO_UN ?? p.precio ?? 0,
+                          );
+                          set("materialVarillaPrecio", pu);
+                        } catch {
+                          set("materialVarillaPrecio", parseFloat(p.precio) || 0);
+                        }
                       }}
                     >
                       <span>
