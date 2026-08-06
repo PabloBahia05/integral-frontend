@@ -887,10 +887,9 @@ export default function PresupuestoNuevo({
 
   // Info del presupuesto (tabla nueva presupuesto_info, key = numeropres):
   // leyenda y observaciones son específicas de ESTE presupuesto puntual.
-  // El texto de seña/condiciones, en cambio, es un estándar compartido: no
-  // se lee el texto_sena guardado para este numeropres (puede haber quedado
-  // viejo) sino siempre el último editado en CUALQUIER presupuesto — mismo
-  // criterio que al crear uno nuevo (ver fetch a ultimo-texto-sena más abajo).
+  // El texto de seña/condiciones YA NO se trae del backend acá: se deja
+  // tal cual esté en el estado del front (textoSena), sea el default con el
+  // que arrancó o lo que el usuario haya tipeado en esta sesión.
   const cargarInfoPresupuesto = async (numPres) => {
     try {
       const r = await authFetch(`${API}/presupuesto-info/${numPres}`);
@@ -904,14 +903,6 @@ export default function PresupuestoNuevo({
       }
     } catch (err) {
       console.error("Error cargando info del presupuesto:", err);
-    }
-    try {
-      const r2 = await authFetch(`${API}/presupuesto-info/ultimo-texto-sena`);
-      const d2 = await r2.json();
-      setTextoSena(d2?.texto_sena || TEXTO_SENA_DEFAULT);
-    } catch (err) {
-      console.error("Error cargando último texto de seña:", err);
-      setTextoSena(TEXTO_SENA_DEFAULT);
     }
   };
 
@@ -1479,18 +1470,6 @@ export default function PresupuestoNuevo({
         .then((r) => r.json())
         .then((d) => {
           if (d?.proximo != null) setNumero(String(d.proximo).padStart(4, "0"));
-        })
-        .catch(() => {});
-      // Precargar el texto de seña/condiciones tal como quedó la última vez
-      // que se editó en CUALQUIER presupuesto — así un cambio hecho hoy
-      // queda como punto de partida de todos los presupuestos siguientes,
-      // en vez de volver siempre al TEXTO_SENA_DEFAULT fijo del código.
-      authFetch(`${API}/presupuesto-info/ultimo-texto-sena`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (d?.texto_sena) setTextoSena(d.texto_sena);
-          if (d?.incluir_texto_sena != null)
-            setIncluirTextoSena(!!d.incluir_texto_sena);
         })
         .catch(() => {});
     }
