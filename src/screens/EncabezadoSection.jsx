@@ -289,7 +289,7 @@ export default function EncabezadoSection({
               onClick={onAbrirTextoSena}
               style={{ fontSize: 12, padding: "2px 10px" }}
             >
-              ✏️ Ver/editar texto
+              👁️ Ver texto
             </button>
           </div>
         </div>
