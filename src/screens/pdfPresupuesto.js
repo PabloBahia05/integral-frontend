@@ -302,7 +302,7 @@ export async function generarPresupuestoPDF({
     /* Evita que html2pdf corte una imagen a la mitad entre dos hojas A4:
        si no entra completa en lo que queda de página, la empuja entera a
        la siguiente. */
-    img, .sec-fotos, .adjunto-imagen, .mampara-foto { page-break-inside: avoid; break-inside: avoid; }
+    img, .sec-fotos, .adjunto-imagen, .mampara-foto, .texto-sena { page-break-inside: avoid; break-inside: avoid; }
     `;
 
     const pageHTML = `
@@ -353,12 +353,6 @@ export async function generarPresupuestoPDF({
         : ""
     }
 
-    ${
-      incluirTextoSena && textoSena
-        ? `<div class="texto-sena">${textoSena.replace(/\n/g, "<br/>")}</div>`
-        : ""
-    }
-
     ${imagenesFinal
       .filter((im) => im.tipo === "imagen" && !im.grupo)
       .map(
@@ -366,6 +360,12 @@ export async function generarPresupuestoPDF({
           `<div class="adjunto-imagen" style="margin-top:18px;"><img src="${im.url}" style="max-width:100%; display:block;" /></div>`,
       )
       .join("")}
+
+    ${
+      incluirTextoSena && textoSena
+        ? `<div class="texto-sena">${textoSena.replace(/\n/g, "<br/>")}</div>`
+        : ""
+    }
   </div>
   <div class="footer">
     <div>Daniel Roque S.R.L. — Bahía Blanca</div>
@@ -447,7 +447,7 @@ export async function generarPresupuestoPDF({
         },
         pagebreak: {
           mode: ["css", "legacy"],
-          avoid: ["img", ".sec-fotos", ".adjunto-imagen", ".mampara-foto"],
+          avoid: ["img", ".sec-fotos", ".adjunto-imagen", ".mampara-foto", ".texto-sena"],
         },
       };
 
