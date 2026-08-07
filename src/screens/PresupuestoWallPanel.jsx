@@ -63,6 +63,13 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
   const [varillaSearch, setVarillaSearch] = useState("");
   const [varillaDropdown, setVarillaDropdown] = useState(false);
 
+  // Resultados de las fórmulas asociadas, resueltas contra el backend
+  // ({ [codform]: { resultado, parciales, error } })
+  const [resultadosFormulas, setResultadosFormulas] = useState({});
+  const [calculandoFormulas, setCalculandoFormulas] = useState(false);
+  const [errorFormulas, setErrorFormulas] = useState("");
+  const [parcialesExpandidos, setParcialesExpandidos] = useState({});
+
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   // Cache de precios traídos de BD (precio_XXXX)
@@ -236,27 +243,122 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
     valorMO,
   };
 
-  const evalFormula = (formula) => {
-    if (!formula) return 0;
+  // Cada slot de "asociados" trae en `formula` (form1..form10) el CODIGO de
+  // una fórmula guardada en la tabla `formulas` (ej: SUPERFIC, VARILLAS,
+  // FMANOOBRA) — no una expresión matemática literal. Hay que resolverla
+  // contra el backend (/formulas/calcular), igual que en PresupuestoMamparas,
+  // incluyendo el soporte de fórmulas anidadas (FORM_XXX) por si alguna
+  // depende de otra.
+  const calcularFormulas = async () => {
+    const codforms = [
+      ...new Set(
+        asociados
+          .map((a) => a.codform ?? a.CODFORM ?? a.formula ?? a.FORMULA)
+          .filter(Boolean),
+      ),
+    ];
+    if (codforms.length === 0) {
+      setResultadosFormulas({});
+      return;
+    }
+
+    setCalculandoFormulas(true);
+    setErrorFormulas("");
+
     try {
-      const allVars = { ...ctxVars, ...preciosBD.current };
-      const expr = formula.replace(/[a-zA-Z_][a-zA-Z0-9_]*/g, (match) =>
-        Object.prototype.hasOwnProperty.call(allVars, match)
-          ? allVars[match]
-          : match,
-      );
-      // eslint-disable-next-line no-new-func
-      const result = new Function(`"use strict"; return (${expr});`)();
-      return isFinite(result) ? result : 0;
-    } catch {
-      return 0;
+      const resFormulas = await authFetch(`${API}/formulas`)
+        .then((r) => r.json())
+        .catch(() => []);
+      const formulasTexto = {};
+      if (Array.isArray(resFormulas))
+        resFormulas.forEach((f) => {
+          formulasTexto[f.codform] = f.formula ?? "";
+        });
+
+      const getDeps = (cf) =>
+        (formulasTexto[cf] ?? "")
+          .match(/FORM_([A-Z0-9]+)/g)
+          ?.map((m) => m.replace("FORM_", "")) ?? [];
+
+      // Orden topológico para poder pasarle FORM_XXX ya resuelto a las que dependen
+      const ordenados = [];
+      const visitados = new Set();
+      const visitar = (cf) => {
+        if (visitados.has(cf)) return;
+        visitados.add(cf);
+        getDeps(cf).forEach((dep) => {
+          if (codforms.includes(dep)) visitar(dep);
+        });
+        ordenados.push(cf);
+      };
+      codforms.forEach((cf) => visitar(cf));
+
+      const nuevosResultados = {};
+      for (const codform of ordenados) {
+        const variables = {
+          ...ctxVars,
+          ...Object.fromEntries(
+            Object.entries(nuevosResultados).map(([cf, r]) => [
+              `FORM_${cf}`,
+              r.resultado,
+            ]),
+          ),
+        };
+
+        const res = await authFetch(`${API}/formulas/calcular`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            codform,
+            codart_modelo: "WALLPANEL",
+            variables,
+          }),
+        })
+          .then((r) => r.json())
+          .catch((err) => ({ error: err.message }));
+
+        nuevosResultados[codform] = res.error
+          ? { resultado: 0, parciales: {}, error: res.error }
+          : {
+              resultado: res.resultado ?? 0,
+              parciales: res.parciales ?? {},
+              error: "",
+            };
+      }
+
+      setResultadosFormulas(nuevosResultados);
+    } catch (err) {
+      setErrorFormulas(err.message);
+    } finally {
+      setCalculandoFormulas(false);
     }
   };
 
-  const asociadosConValor = asociados.map((a) => ({
-    ...a,
-    valorCalculado: evalFormula(a.formula ?? a.FORMULA ?? ""),
-  }));
+  useEffect(() => {
+    if (asociados.length === 0) return;
+    calcularFormulas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    asociados,
+    form.ancho,
+    form.alto,
+    form.anchoVarilla,
+    form.espacioEntreVarillas,
+    form.materialBasePrecio,
+    form.materialVarillaPrecio,
+  ]);
+
+  const asociadosConValor = asociados.map((a) => {
+    const codform = a.codform ?? a.CODFORM ?? a.formula ?? a.FORMULA ?? null;
+    const r = codform ? resultadosFormulas[codform] : null;
+    return {
+      ...a,
+      codform,
+      valorCalculado: r?.resultado ?? 0,
+      parciales: r?.parciales ?? {},
+      errorFormula: r?.error ?? "",
+    };
+  });
 
   const totalAsociados = asociadosConValor.reduce(
     (s, a) => s + a.valorCalculado,
@@ -877,6 +979,7 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
             >
               {asociadosConValor.length} ítem
               {asociadosConValor.length !== 1 ? "s" : ""}
+              {calculandoFormulas && " · calculando..."}
             </span>
           )}
         </div>
@@ -896,12 +999,28 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
           </p>
         )}
 
+        {/* Error general al resolver fórmulas */}
+        {errorFormulas && (
+          <p
+            style={{
+              fontSize: 11,
+              color: "#c0392b",
+              padding: "4px 2px",
+              margin: "0 0 6px",
+            }}
+          >
+            ⚠️ {errorFormulas}
+          </p>
+        )}
+
         {/* Filas de slots */}
         {asociadosConValor.map((a, i) => {
           const nombre =
             a.titulo ?? a.TITULO ?? a.nombre ?? a.NOMBRE ?? `Fórmula ${i + 1}`;
-          const codform = a.codform ?? a.CODFORM ?? a.id ?? null;
-          const expresion = a.formula ?? a.FORMULA ?? a.expresion ?? "";
+          const codform = a.codform ?? null;
+          const tieneParciales =
+            a.parciales && Object.keys(a.parciales).length > 0;
+          const expandido = parcialesExpandidos[codform ?? i];
           return (
             <div
               key={codform ?? i}
@@ -920,7 +1039,15 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                   alignItems: "center",
                   justifyContent: "space-between",
                   gap: 8,
+                  cursor: tieneParciales ? "pointer" : "default",
                 }}
+                onClick={() =>
+                  tieneParciales &&
+                  setParcialesExpandidos((prev) => ({
+                    ...prev,
+                    [codform ?? i]: !prev[codform ?? i],
+                  }))
+                }
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
@@ -933,6 +1060,17 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                       textOverflow: "ellipsis",
                     }}
                   >
+                    {tieneParciales && (
+                      <span
+                        style={{
+                          marginRight: 5,
+                          color: "#2d7fc1",
+                          fontSize: 11,
+                        }}
+                      >
+                        {expandido ? "▾" : "▸"}
+                      </span>
+                    )}
                     {nombre}
                   </div>
                   {codform && (
@@ -960,39 +1098,53 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                     flexShrink: 0,
                   }}
                 >
-                  {fmt(a.valorCalculado)}
+                  {calculandoFormulas ? "…" : fmt(a.valorCalculado)}
                 </div>
               </div>
-              {/* Expresión */}
-              {expresion && (
+
+              {/* Error puntual de esta fórmula */}
+              {a.errorFormula && (
                 <div
                   style={{
                     marginTop: 7,
-                    padding: "4px 8px",
+                    fontSize: 11,
+                    color: "#c0392b",
+                  }}
+                >
+                  ⚠️ {a.errorFormula}
+                </div>
+              )}
+
+              {/* Desglose de parciales devuelto por /formulas/calcular */}
+              {tieneParciales && expandido && (
+                <div
+                  style={{
+                    marginTop: 7,
+                    padding: "6px 8px",
                     background: "#eaf3fb",
                     border: "1px solid #b8d6ef",
                     borderRadius: 5,
                     fontSize: 11,
-                    fontFamily: "monospace",
+                    fontFamily: "'Space Mono',monospace",
                     color: "#1a4a70",
-                    wordBreak: "break-all",
-                    lineHeight: 1.5,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: 9,
-                      fontWeight: 700,
-                      letterSpacing: "0.1em",
-                      color: "#4a8ab5",
-                      textTransform: "uppercase",
-                      fontFamily: "'Space Mono',monospace",
-                      marginRight: 4,
-                    }}
-                  >
-                    expr ·
-                  </span>
-                  {expresion}
+                  {Object.entries(a.parciales).map(([clave, valor]) => (
+                    <div
+                      key={clave}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        padding: "2px 0",
+                      }}
+                    >
+                      <span>{clave}</span>
+                      <span>
+                        {typeof valor === "number" ? fmt(valor) : String(valor)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
