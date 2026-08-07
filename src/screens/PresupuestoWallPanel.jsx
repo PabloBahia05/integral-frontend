@@ -108,11 +108,13 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
             const t = f[`titulo${i}`] ?? f[`TITULO${i}`];
             const c = f[`codf${i}`] ?? f[`CODF${i}`];
             const fm = f[`form${i}`] ?? f[`FORM${i}`];
+            const ca = f[`cant${i}`] ?? f[`CANT${i}`];
             if (fm)
               slots.push({
                 titulo: t ?? `Fórmula ${i}`,
                 codform: c,
                 formula: fm,
+                cantidad: parseFloat(ca) || 1,
               });
           }
           return slots;
@@ -356,10 +358,14 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
   const asociadosConValor = asociados.map((a) => {
     const codform = a.codform ?? a.CODFORM ?? a.formula ?? a.FORMULA ?? null;
     const r = codform ? resultadosFormulas[codform] : null;
+    const cantidad = parseFloat(a.cantidad ?? a.cant) || 1;
+    const resultadoUnitario = r?.resultado ?? 0;
     return {
       ...a,
       codform,
-      valorCalculado: r?.resultado ?? 0,
+      cantidad,
+      resultadoUnitario,
+      valorCalculado: resultadoUnitario * cantidad,
       parciales: r?.parciales ?? {},
       errorFormula: r?.error ?? "",
     };
@@ -1086,7 +1092,7 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                     )}
                     {nombre}
                   </div>
-                  {codform && (
+                  {(codform || a.cantidad > 1) && (
                     <div
                       style={{
                         fontSize: 10,
@@ -1096,7 +1102,9 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                         letterSpacing: "0.04em",
                       }}
                     >
-                      #{codform}
+                      {codform && `#${codform}`}
+                      {a.cantidad > 1 &&
+                        ` · ${fmt(a.resultadoUnitario)} ✕${a.cantidad}`}
                     </div>
                   )}
                 </div>
