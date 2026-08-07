@@ -14,6 +14,19 @@ const normalizar = (p) => ({
 const fmt = (v) =>
   `$${Number(v).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+// Resuelve el precio unitario a usar tras elegir un material: prioriza
+// precio_un de la fila fresca de BD, pero SOLO si es un número > 0 — un
+// precio_un en 0 (o NaN) en la BD no debe pisar el precio ya conocido y
+// mostrado en el listado (p.precio), que es el que realmente tiene el dato.
+const resolverPrecioUnitario = (row, p) => {
+  const candidatos = [row?.precio_un, row?.PRECIO_UN, p?.precio];
+  for (const c of candidatos) {
+    const v = parseFloat(c);
+    if (!isNaN(v) && v > 0) return v;
+  }
+  return 0;
+};
+
 export default function PresupuestoWallPanel({ onVolver, token }) {
   const authFetch = (url, options = {}) => {
     const headers = { ...(options.headers || {}) };
@@ -601,9 +614,7 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                           );
                           const d = await r.json();
                           const row = Array.isArray(d) ? d[0] : d;
-                          const pu = parseFloat(
-                            row?.precio_un ?? row?.PRECIO_UN ?? p.precio ?? 0,
-                          );
+                          const pu = resolverPrecioUnitario(row, p);
                           set("materialBasePrecio", pu);
                           set("precio_un", pu);
                         } catch {
@@ -763,9 +774,7 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                           );
                           const d = await r.json();
                           const row = Array.isArray(d) ? d[0] : d;
-                          const pu = parseFloat(
-                            row?.precio_un ?? row?.PRECIO_UN ?? p.precio ?? 0,
-                          );
+                          const pu = resolverPrecioUnitario(row, p);
                           set("materialVarillaPrecio", pu);
                         } catch {
                           set("materialVarillaPrecio", parseFloat(p.precio) || 0);
