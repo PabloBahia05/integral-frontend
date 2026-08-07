@@ -979,18 +979,57 @@ export default function PlacardSection({
                                 minimumFractionDigits: 2,
                               })}
                             </span>
-                            {listaPorcentaje !== 0 && (
+                            {fila.porcentaje1 != null ? (
                               <span
                                 style={{
                                   marginLeft: 5,
                                   fontSize: 9,
-                                  color: "#2277bb",
                                   fontWeight: 700,
                                   verticalAlign: "middle",
                                 }}
                               >
-                                +{listaPorcentaje}%
+                                {listaPorcentaje !== 0 && (
+                                  <span
+                                    style={{
+                                      color: "#2277bb",
+                                      marginRight: 2,
+                                    }}
+                                  >
+                                    +{listaPorcentaje}%
+                                  </span>
+                                )}
+                                <span
+                                  style={{
+                                    color:
+                                      fila.porcentaje1 >= 0
+                                        ? "#0a7a3a"
+                                        : "#c0392b",
+                                    background:
+                                      fila.porcentaje1 >= 0
+                                        ? "#e6f5eb"
+                                        : "#fdecea",
+                                    borderRadius: 3,
+                                    padding: "1px 4px",
+                                  }}
+                                >
+                                  {fila.porcentaje1 > 0 ? "+" : ""}
+                                  {fila.porcentaje1}%
+                                </span>
                               </span>
+                            ) : (
+                              listaPorcentaje !== 0 && (
+                                <span
+                                  style={{
+                                    marginLeft: 5,
+                                    fontSize: 9,
+                                    color: "#2277bb",
+                                    fontWeight: 700,
+                                    verticalAlign: "middle",
+                                  }}
+                                >
+                                  +{listaPorcentaje}%
+                                </span>
+                              )
                             )}
                           </td>
                           <td
