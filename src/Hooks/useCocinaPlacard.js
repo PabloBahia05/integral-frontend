@@ -26,6 +26,12 @@ const armarMapaArticulosNormalizado = (lista) =>
 const buscarArticuloNormalizado = (mapa, nombre) =>
   mapa.get(normalizarArticulo(nombre));
 
+// Placard tiene su propia línea de precios fija en la base de datos (línea 15),
+// independiente de las líneas que se hayan elegido en el Encabezado (16, 21, etc.).
+// Si el artículo no tiene precio cargado para ninguna de las líneas activas,
+// se usa la línea 15 como respaldo — sin necesidad de activarla en Encabezado.
+const LINEA_FIJA_PLACARD = "15";
+
 // ────────────────────────────────────────────────────────────────────────
 // useCocinaPlacard
 // ────────────────────────────────────────────────────────────────────────
@@ -865,7 +871,10 @@ export default function useCocinaPlacard({
 
     // Alinea preciosBase de una fila con lineasActivas, completando solo
     // las líneas que le falten (no toca las que ya tenía).
-    const alinearPreciosBaseConLineas = (fila, mapaArticulos) => {
+    // esPlacard: si el artículo no tiene precio cargado para la línea activa,
+    // cae a la línea fija 15 (ver resolverPrecioBasePlacard) en vez de dejar
+    // "" — que es lo que producía precio $0 al activar una línea nueva.
+    const alinearPreciosBaseConLineas = (fila, mapaArticulos, esPlacard) => {
       const actuales = fila.preciosBase ?? [];
       const tieneTodas = lineasActivas.every((l) =>
         actuales.some((pb) => pb.linea === l.linea),
@@ -876,10 +885,12 @@ export default function useCocinaPlacard({
       const combinado = lineasActivas.map((l) => {
         const existente = actuales.find((pb) => pb.linea === l.linea);
         if (existente) return existente;
-        return {
-          linea: l.linea,
-          precioBase: art?.precios?.[String(l.linea)] ?? "",
-        };
+        let precioBase = art?.precios?.[String(l.linea)] ?? "";
+        if (esPlacard && (precioBase == null || precioBase === "")) {
+          const p15 = art?.precios?.[LINEA_FIJA_PLACARD];
+          precioBase = p15 != null && p15 !== "" ? p15 : "";
+        }
+        return { linea: l.linea, precioBase };
       });
       return recalcFila({ ...fila, preciosBase: combinado });
     };
@@ -914,7 +925,7 @@ export default function useCocinaPlacard({
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
           const mapa = mapaArticulosDe(familia, familiaMapCocina);
-          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa));
+          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa, false));
         }
         return next;
       });
@@ -922,7 +933,7 @@ export default function useCocinaPlacard({
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
           const mapa = mapaArticulosDe(familia, familiaMapPlacard);
-          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa));
+          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa, true));
         }
         return next;
       });
@@ -940,12 +951,15 @@ export default function useCocinaPlacard({
   // independiente de las líneas que se hayan elegido en el Encabezado (16, 21, etc.).
   // Si el artículo no tiene precio cargado para ninguna de las líneas activas,
   // se usa la línea 15 como respaldo — sin necesidad de activarla en Encabezado.
-  const LINEA_FIJA_PLACARD = "15";
   const resolverPrecioBasePlacard = (articuloBD) => {
-    const preciosBase = lineasActivas.map((l) => ({
-      linea: l.linea,
-      precioBase: articuloBD.precios?.[String(l.linea)] ?? "",
-    }));
+    const preciosBase = lineasActivas.map((l) => {
+      let precioBase = articuloBD.precios?.[String(l.linea)] ?? "";
+      if (precioBase == null || precioBase === "") {
+        const p15 = articuloBD.precios?.[LINEA_FIJA_PLACARD];
+        precioBase = p15 != null && p15 !== "" ? p15 : "";
+      }
+      return { linea: l.linea, precioBase };
+    });
     let precioBaseUsar = preciosBase[0]?.precioBase;
     if (precioBaseUsar == null || precioBaseUsar === "") {
       const p15 = articuloBD.precios?.[LINEA_FIJA_PLACARD];
