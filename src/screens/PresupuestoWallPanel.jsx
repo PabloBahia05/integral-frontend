@@ -9,17 +9,21 @@ const normalizar = (p) => ({
   articulo: p.articulo ?? p.ARTICULO ?? "",
   codart: p.codartint ?? p.CODARTINT ?? p.codart ?? "",
   precio: parseFloat(p.precio ?? p.PRECIO ?? 0) || 0,
+  precio_un: parseFloat(p.precio_un ?? p.PRECIO_UN ?? 0) || 0,
 });
 
 const fmt = (v) =>
   `$${Number(v).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// Resuelve el precio unitario a usar tras elegir un material: prioriza
-// precio_un de la fila fresca de BD, pero SOLO si es un número > 0 — un
-// precio_un en 0 (o NaN) en la BD no debe pisar el precio ya conocido y
-// mostrado en el listado (p.precio), que es el que realmente tiene el dato.
+// Resuelve el precio unitario a usar tras elegir un material: SIEMPRE debe
+// ser precio_un, nunca precio (son dos columnas distintas en la BD, con
+// valores distintos — precio es el precio de venta del artículo completo,
+// precio_un es el valor por unidad que necesita este cálculo). Prioriza el
+// precio_un de la fila fresca de /articulos/:codart; si esa fila no lo trae
+// (o llega como null/undefined), cae al precio_un ya normalizado que vino
+// en el listado de /productos/wall-panel.
 const resolverPrecioUnitario = (row, p) => {
-  const candidatos = [row?.precio_un, row?.PRECIO_UN, p?.precio];
+  const candidatos = [row?.precio_un, row?.PRECIO_UN, p?.precio_un];
   for (const c of candidatos) {
     const v = parseFloat(c);
     if (!isNaN(v) && v > 0) return v;
@@ -618,8 +622,8 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                           set("materialBasePrecio", pu);
                           set("precio_un", pu);
                         } catch {
-                          set("materialBasePrecio", parseFloat(p.precio) || 0);
-                          set("precio_un", parseFloat(p.precio) || 0);
+                          set("materialBasePrecio", parseFloat(p.precio_un) || 0);
+                          set("precio_un", parseFloat(p.precio_un) || 0);
                         }
                       }}
                     >
@@ -637,7 +641,7 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                         ) : null}
                         {p.articulo}
                       </span>
-                      {p.precio != null && (
+                      {p.precio_un != null && p.precio_un > 0 && (
                         <span
                           style={{
                             color: "#2d7fc1",
@@ -646,7 +650,7 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                             marginLeft: 8,
                           }}
                         >
-                          ${parseFloat(p.precio).toLocaleString("es-AR")}
+                          ${parseFloat(p.precio_un).toLocaleString("es-AR")}
                         </span>
                       )}
                     </div>
@@ -777,7 +781,7 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                           const pu = resolverPrecioUnitario(row, p);
                           set("materialVarillaPrecio", pu);
                         } catch {
-                          set("materialVarillaPrecio", parseFloat(p.precio) || 0);
+                          set("materialVarillaPrecio", parseFloat(p.precio_un) || 0);
                         }
                       }}
                     >
@@ -795,7 +799,7 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                         ) : null}
                         {p.articulo}
                       </span>
-                      {p.precio != null && (
+                      {p.precio_un != null && p.precio_un > 0 && (
                         <span
                           style={{
                             color: "#2d7fc1",
@@ -804,7 +808,7 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
                             marginLeft: 8,
                           }}
                         >
-                          ${parseFloat(p.precio).toLocaleString("es-AR")}
+                          ${parseFloat(p.precio_un).toLocaleString("es-AR")}
                         </span>
                       )}
                     </div>
