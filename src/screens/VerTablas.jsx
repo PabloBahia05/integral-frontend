@@ -231,7 +231,7 @@ function GestorPermisos({ onBack, token }) {
 }
 
 // ── Componente Texto de Seña ─────────────────────────────────────────────────
-function TextoSenaEditor({ onBack }) {
+function TextoSenaEditor({ onBack, token }) {
   const [texto, setTexto] = useState(getTextoSena());
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -239,20 +239,20 @@ function TextoSenaEditor({ onBack }) {
 
   useEffect(() => {
     let vivo = true;
-    fetchTextoSena().then((valor) => {
+    fetchTextoSena(token).then((valor) => {
       if (vivo) setTexto(valor);
       setCargando(false);
     });
     return () => {
       vivo = false;
     };
-  }, []);
+  }, [token]);
 
   const guardar = async () => {
     setGuardando(true);
     setMsg("");
     try {
-      await setTextoSenaGlobal(texto);
+      await setTextoSenaGlobal(texto, token);
       setMsg("✅ Guardado — ya está disponible para todos los presupuestos nuevos");
     } catch {
       setMsg("❌ No se pudo guardar, probá de nuevo");
@@ -702,7 +702,7 @@ export default function VerTablas({
 
   // ── texto de seña ──
   if (tablaActiva === "texto-sena")
-    return <TextoSenaEditor onBack={volver} />;
+    return <TextoSenaEditor onBack={volver} token={token} />;
 
   // ── selector ──
   if (tablaActiva === "selector")

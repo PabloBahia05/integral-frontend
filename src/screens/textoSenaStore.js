@@ -20,8 +20,10 @@ LA EMPRESA NO SE HACE CARGO DE LA OMISION U OLVIDO DE DICHOS DATOS`;
 
 const CLAVE = "texto_sena";
 
-// Ajustar si el backend corre en otro host/puerto o detrás de un proxy.
-const API_BASE = import.meta.env?.VITE_API_URL ?? "";
+// Misma base que usa Productos.jsx — este proyecto no usa variables de
+// entorno (VITE_API_URL) para esto, así que va hardcodeada igual que el
+// resto del código existente.
+const API = "https://integral-backend-production.up.railway.app";
 
 const listeners = new Set();
 
@@ -46,9 +48,13 @@ export function getTextoSena() {
 // Pega al backend y devuelve el valor actual. Además actualiza el caché y
 // notifica a todos los componentes suscriptos (otras pestañas/instancias
 // montadas de useTextoSena en esta misma página).
-export async function fetchTextoSena() {
+// `token` = JWT del usuario logueado (igual que authFetch en Productos.jsx);
+// si el endpoint no requiere auth, pasar undefined no rompe nada.
+export async function fetchTextoSena(token) {
   try {
-    const resp = await fetch(`${API_BASE}/textos/${CLAVE}`);
+    const resp = await fetch(`${API}/textos/${CLAVE}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     if (!resp.ok) throw new Error(`GET /textos/${CLAVE} → ${resp.status}`);
     const data = await resp.json();
     const valor = data?.valor ?? TEXTO_SENA_DEFAULT;
@@ -66,14 +72,17 @@ export async function fetchTextoSena() {
 
 // Guarda el nuevo texto en el backend (tabla textos) y actualiza a todos los
 // componentes montados. Se usa desde Ver Tablas → "Texto de Seña".
-export async function setTextoSenaGlobal(nuevoTexto) {
+export async function setTextoSenaGlobal(nuevoTexto, token) {
   // Actualización optimista: se ve el cambio al instante en esta pestaña,
   // aunque el guardado en backend todavía esté en vuelo.
   notificar(nuevoTexto);
   try {
-    const resp = await fetch(`${API_BASE}/textos/${CLAVE}`, {
+    const resp = await fetch(`${API}/textos/${CLAVE}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ valor: nuevoTexto }),
     });
     if (!resp.ok) throw new Error(`PUT /textos/${CLAVE} → ${resp.status}`);
@@ -96,18 +105,19 @@ export function subscribeTextoSena(fn) {
 // al backend; si ya se pidió antes, arranca directo con el último valor
 // conocido (moduleCache) y se re-renderiza si otro componente lo cambia
 // mientras sigue montado (vía subscribeTextoSena).
-export function useTextoSena() {
+// `token` = JWT del usuario logueado, se lo pasa a fetchTextoSena.
+export function useTextoSena(token) {
   const [valor, setValor] = useState(getTextoSena());
 
   useEffect(() => {
     const unsub = subscribeTextoSena(setValor);
 
     if (!yaSeCargoUnaVez) {
-      fetchTextoSena();
+      fetchTextoSena(token);
     }
 
     return unsub;
-  }, []);
+  }, [token]);
 
   return valor;
 }
