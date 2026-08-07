@@ -66,6 +66,7 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
   // Resultados de las fórmulas asociadas, resueltas contra el backend
   // ({ [codform]: { resultado, parciales, error } })
   const [resultadosFormulas, setResultadosFormulas] = useState({});
+  const [descripcionesFormulas, setDescripcionesFormulas] = useState({});
   const [calculandoFormulas, setCalculandoFormulas] = useState(false);
   const [errorFormulas, setErrorFormulas] = useState("");
   const [parcialesExpandidos, setParcialesExpandidos] = useState({});
@@ -270,10 +271,14 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
         .then((r) => r.json())
         .catch(() => []);
       const formulasTexto = {};
+      const formulasDescripcion = {};
       if (Array.isArray(resFormulas))
         resFormulas.forEach((f) => {
           formulasTexto[f.codform] = f.formula ?? "";
+          formulasDescripcion[f.codform] =
+            f.descripcion ?? f.DESCRIPCION ?? "";
         });
+      setDescripcionesFormulas(formulasDescripcion);
 
       const getDeps = (cf) =>
         (formulasTexto[cf] ?? "")
@@ -1015,9 +1020,17 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
 
         {/* Filas de slots */}
         {asociadosConValor.map((a, i) => {
-          const nombre =
-            a.titulo ?? a.TITULO ?? a.nombre ?? a.NOMBRE ?? `Fórmula ${i + 1}`;
           const codform = a.codform ?? null;
+          const descripcionFormula = codform
+            ? descripcionesFormulas[codform]
+            : "";
+          const nombre =
+            descripcionFormula ||
+            a.titulo ||
+            a.TITULO ||
+            a.nombre ||
+            a.NOMBRE ||
+            `Fórmula ${i + 1}`;
           const tieneParciales =
             a.parciales && Object.keys(a.parciales).length > 0;
           const expandido = parcialesExpandidos[codform ?? i];
