@@ -4,6 +4,7 @@ import Clientes from "./screens/Clientes";
 import Productos from "./screens/Productos";
 import PresupuestoMuebles from "./screens/PresupuestoMuebles";
 import PresupuestoMamparas from "./screens/PresupuestoMamparas";
+import PresupuestoInfo from "./screens/PresupuestoInfo";
 import VerTablas from "./screens/VerTablas";
 import Margen from "./screens/Margen";
 import Lista from "./screens/Lista";
@@ -37,6 +38,7 @@ const SCREENS = {
   "lista-margenes": { label: "LISTA DE MÁRGENES", icon: "📊" },
   "presupuestos-nuevo-tabla": { label: "PRESUPUESTOS", icon: "📋" },
   "mueble-especial": { label: "MUEBLE ESPECIAL", icon: "🪚" },
+  "presupuesto-info": { label: "PRESUPUESTO INFO", icon: "🧾" },
   facturas: { label: "FACTURAS", icon: "🧾" },
   "historial-facturas": { label: "HISTORIAL FACTURAS", icon: "📋" },
   anviz: { label: "ASISTENCIA", icon: "🕐" },
@@ -61,13 +63,6 @@ const buttons = [
     screen: "productos",
   },
   {
-    id: 5,
-    label: "PRESUPUESTO MAMPARAS",
-    icon: "🪟",
-    color: "#c77dff",
-    screen: "presupuesto-mamparas",
-  },
-  {
     id: 6,
     label: "PRESUP. NUEVO",
     icon: "📝",
@@ -82,13 +77,6 @@ const buttons = [
     screen: "ver-tablas",
   },
   {
-    id: 8,
-    label: "PRESUP. MAMPARAS",
-    icon: "📋",
-    color: "#4361ee",
-    screen: "presupuestos-tabla",
-  },
-  {
     id: 11,
     label: "LISTA PRESUPUESTOS",
     icon: "🪑",
@@ -101,6 +89,13 @@ const buttons = [
     icon: "🪚",
     color: "#e67e22",
     screen: "mueble-especial",
+  },
+  {
+    id: 13,
+    label: "PRESUPUESTO INFO",
+    icon: "🧾",
+    color: "#00b4d8",
+    screen: "presupuesto-info",
   },
 ];
 
@@ -754,15 +749,36 @@ function App() {
           .log-mini-item { font-size: 11px; color: #99bbcc; }
           .log-mini-item:first-of-type { color: #2277bb; }
 
+          .mobile-menu-btn { display: none; }
+          .screen-sidebar-overlay { display: none; }
+
           @media (max-width: 600px) {
             .screen-layout { flex-direction: column; }
-            .screen-sidebar { width: 100% !important; height: auto; padding: 10px 12px !important; flex-direction: row; flex-wrap: wrap; gap: 4px; overflow-x: auto; }
-            .screen-sidebar h3 { display: none; }
-            .screen-sidebar.collapsed { width: 100% !important; padding: 10px 12px !important; }
+            .mobile-menu-btn {
+              display: flex; align-items: center; justify-content: center;
+              position: sticky; top: 10px; left: 10px; margin: 10px 0 0 10px;
+              width: 40px; height: 40px; z-index: 101;
+              background: #0a3a5c; color: #60efff; border: 1px solid #1a4a6c;
+              border-radius: 4px; font-size: 18px; cursor: pointer;
+            }
+            .screen-sidebar-overlay {
+              display: block; position: fixed; inset: 0; background: #00000055;
+              z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+            }
+            .screen-sidebar-overlay.open { opacity: 1; pointer-events: auto; }
+            .screen-sidebar {
+              position: fixed; top: 0; left: 0; height: 100vh; width: 240px;
+              max-width: 82vw; flex-direction: column; flex-wrap: nowrap;
+              overflow-y: auto; overflow-x: hidden; padding: 24px 14px !important;
+              transform: translateX(-100%); transition: transform 0.25s ease; z-index: 100;
+            }
+            .screen-sidebar.mobile-open { transform: translateX(0); }
+            .screen-sidebar.collapsed { width: 240px !important; padding: 24px 14px !important; }
             .screen-sidebar.collapsed .btn-label { opacity: 1; max-width: none; }
-            .side-btn { width: auto; padding: 8px 12px; font-size: 11px; flex-shrink: 0; }
+            .screen-sidebar h3 { display: block; }
+            .side-btn { width: 100%; padding: 10px 11px; font-size: 12px; flex-shrink: 0; }
             .collapse-btn { display: none; }
-            .side-divider { width: 1px; height: 28px; margin: 0 4px; }
+            .side-divider { width: auto; height: 1px; margin: 6px 0; }
             .screen-main { padding: 16px 12px; }
           }
         `}
@@ -770,7 +786,18 @@ function App() {
 
         <div className="screen-layout">
           <div
-            className={`screen-sidebar${sidebarCollapsed ? " collapsed" : ""}`}
+            className={`screen-sidebar-overlay ${sidebarOpen ? "open" : ""}`}
+            onClick={() => setSidebarOpen(false)}
+          />
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setSidebarOpen(true)}
+            title="Menú"
+          >
+            ☰
+          </button>
+          <div
+            className={`screen-sidebar${sidebarCollapsed ? " collapsed" : ""}${sidebarOpen ? " mobile-open" : ""}`}
           >
             <button
               className="collapse-btn"
@@ -781,7 +808,10 @@ function App() {
             </button>
             <button
               className="side-btn"
-              onClick={() => setScreen(null)}
+              onClick={() => {
+                setScreen(null);
+                setSidebarOpen(false);
+              }}
               title="Inicio"
               style={{
                 background: "#ffffff18",
@@ -825,6 +855,7 @@ function App() {
                   if (s === "presupuestos-tabla") fetchPresupuestosMamparas();
                   if (s === "lista-margenes") fetchListas();
                   if (s === "ver-tablas") setTablaInicialVerTablas(null);
+                  setSidebarOpen(false);
                 }}
                 title={SCREENS[s].label}
               >
@@ -837,7 +868,13 @@ function App() {
               <>
                 <h3 style={{ marginTop: 8 }}>Acciones rápidas</h3>
                 {puedo(screen, "crear") && (
-                  <button className="side-btn" onClick={() => setModal("nuevo")}>
+                  <button
+                    className="side-btn"
+                    onClick={() => {
+                      setModal("nuevo");
+                      setSidebarOpen(false);
+                    }}
+                  >
                     <span>＋</span>
                     <span className="btn-label">&nbsp;Nuevo registro</span>
                   </button>
@@ -846,7 +883,12 @@ function App() {
                   <button
                     className="side-btn"
                     style={{ opacity: sel ? 1 : 0.4 }}
-                    onClick={() => sel && setModal("editar")}
+                    onClick={() => {
+                      if (sel) {
+                        setModal("editar");
+                        setSidebarOpen(false);
+                      }
+                    }}
                   >
                     <span>✏️</span>
                     <span className="btn-label">&nbsp;Editar seleccionado</span>
@@ -859,7 +901,12 @@ function App() {
                       opacity: sel ? 1 : 0.4,
                       color: sel ? "#ff9999" : undefined,
                     }}
-                    onClick={() => sel && setModal("eliminar")}
+                    onClick={() => {
+                      if (sel) {
+                        setModal("eliminar");
+                        setSidebarOpen(false);
+                      }
+                    }}
                   >
                     <span>🗑</span>
                     <span className="btn-label">&nbsp;Eliminar seleccionado</span>
@@ -931,6 +978,7 @@ function App() {
                 token={token}
               />
             )}
+            {screen === "presupuesto-info" && <PresupuestoInfo />}
             {screen === "presupuestos-nuevo-tabla" && (
               <PresupuestosNuevoTabla
                 onAbrirPresupuesto={(row) => {
