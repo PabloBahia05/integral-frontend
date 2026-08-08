@@ -865,6 +865,10 @@ export default function PresupuestoNuevo({
           observaciones,
           texto_sena: textoSena,
           incluir_texto_sena: incluirTextoSena,
+          // Respaldo del upsert que ya hace POST /tabla-presupuestos — con
+          // el COALESCE del backend, esto nunca pisa un codcliente ya
+          // guardado con null.
+          codcliente: codcliente ?? null,
         }),
       });
     } catch (err) {
