@@ -204,8 +204,15 @@ export default function useCocinaPlacard({
       return Math.round(b * (1 + val / 100) * 100) / 100;
     };
 
-    // Devuelve { valor: "N", porcentaje: N|null } para guardar en valorN/porcentajeN
-    const calcPersist = (base) => {
+    // Devuelve { valor: "N", porcentaje: N|null } para guardar en valorN/porcentajeN.
+    // En modo "porcentaje" SIEMPRE se calcula sobre basePct (precio de BD,
+    // ya con %lista aplicado pero SIN ningún %item previo) — así aplicar
+    // 20% y después 35% reemplaza el ajuste anterior en vez de acumularse
+    // sobre él (20% y luego 35% deben dar ambos sobre el precio de BD, no
+    // 35% sobre el resultado de +20%). En modo "valor" seguimos partiendo
+    // de baseActual (el precio mostrado hoy), como antes.
+    const calcPersist = (baseActual, basePct) => {
+      const base = popoverModo === "porcentaje" ? basePct : baseActual;
       const nuevo = calcNuevo(base);
       return {
         valor: nuevo,
@@ -225,8 +232,14 @@ export default function useCocinaPlacard({
         if (i !== idx) return fila;
 
         if (campo === "precio") {
-          // Sin líneas activas: precio único — guardamos en valor1/porcentaje1
-          const { valor, porcentaje } = calcPersist(fila.precio);
+          // Sin líneas activas: precio único — guardamos en valor1/porcentaje1.
+          // basePct = precio de BD con %lista aplicado (sin %item), fijo,
+          // para que el %item siempre parta del mismo punto.
+          const basePct =
+            fila.precioBase != null && fila.precioBase !== ""
+              ? aplicarPorcentaje(fila.precioBase)
+              : fila.precio;
+          const { valor, porcentaje } = calcPersist(fila.precio, basePct);
           return {
             ...fila,
             precio: String(valor),
@@ -237,9 +250,15 @@ export default function useCocinaPlacard({
 
         // campo es índice de línea (número)
         const lineaIdx = campo; // 0-based
+        const pbLinea = fila.preciosBase?.[lineaIdx]?.precioBase;
+        const basePctLinea =
+          pbLinea != null && pbLinea !== ""
+            ? aplicarPorcentaje(pbLinea)
+            : (fila.precios?.[lineaIdx]?.precio ?? fila.precio);
+
         const precios = (fila.precios ?? []).map((p, li) => {
           if (li !== lineaIdx) return p;
-          const { valor } = calcPersist(p.precio);
+          const { valor } = calcPersist(p.precio, basePctLinea);
           return { ...p, precio: String(valor) };
         });
         const nuevoPrecio = precios[0]?.precio ?? fila.precio;
@@ -248,6 +267,7 @@ export default function useCocinaPlacard({
         const slot = CAMPOS_POR_IDX[lineaIdx];
         const { valor, porcentaje } = calcPersist(
           (fila.precios?.[lineaIdx]?.precio ?? fila.precio) || 0,
+          basePctLinea,
         );
 
         const extra = slot ? { [slot.v]: valor, [slot.p]: porcentaje } : {};
