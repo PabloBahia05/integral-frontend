@@ -620,6 +620,10 @@ export default function PresupuestoNuevo({
   // Quién creó / actualizó por última vez esta revisión, y cuándo (para
   // mostrar en pantalla). null mientras es un presupuesto nuevo sin guardar.
   const [metaPresupuesto, setMetaPresupuesto] = useState(null);
+  // Estado "Final de Obra": true solo si TODOS los ítems de la revisión
+  // actual ya fueron confirmados (columna confirmado en tabla_presupuestos).
+  const [confirmado, setConfirmado] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const [presmv, setPresmv] = useState(null); // id de presupuesto_mampara vinculado
   const [mamparaAEditar, setMamparaAEditar] = useState(null); // datos para editar mampara existente
   const [prespv, setPrespv] = useState(null); // id de presupuesto_puerta vinculado
@@ -878,6 +882,41 @@ export default function PresupuestoNuevo({
     } catch (err) {
       console.error("Error cargando metadata del presupuesto:", err);
       setMetaPresupuesto(null);
+    }
+  };
+
+  // Estado de confirmación (Final de Obra) de la revisión actual.
+  const cargarEstadoConfirmado = async (numPres, rev) => {
+    try {
+      const r = await authFetch(
+        `${API}/tabla-presupuestos/confirmado/${numPres}/${rev}`,
+      );
+      const data = await r.json();
+      setConfirmado(!!data?.confirmado);
+    } catch (err) {
+      console.error("Error cargando estado de confirmación:", err);
+      setConfirmado(false);
+    }
+  };
+
+  // Confirma TODOS los ítems de la revisión actual (botón en solapa
+  // Presupuesto). A partir de acá, esta revisión queda disponible para
+  // avanzar a Final de Obra.
+  const confirmarPresupuesto = async () => {
+    if (numeroPres == null) return;
+    setConfirmando(true);
+    try {
+      const r = await authFetch(
+        `${API}/tabla-presupuestos/confirmar/${numeroPres}/${revision}`,
+        { method: "PUT" },
+      );
+      if (!r.ok) throw new Error("Error al confirmar");
+      setConfirmado(true);
+    } catch (err) {
+      console.error("Error confirmando presupuesto:", err);
+      setError("No se pudo confirmar el presupuesto. Probá de nuevo.");
+    } finally {
+      setConfirmando(false);
     }
   };
 
@@ -1573,6 +1612,7 @@ export default function PresupuestoNuevo({
       setNumero(String(num).padStart(4, "0"));
       cargarImagenesPresupuesto(num, rev);
       cargarMetaPresupuesto(num, rev);
+      cargarEstadoConfirmado(num, rev);
       cargarInfoPresupuesto(num);
       setCliente(pres.nombre ?? pres.NOMBRE ?? "");
       const codclienteRestaurado = pres.codcliente ?? pres.CODCLIENTE ?? null;
@@ -2288,6 +2328,9 @@ export default function PresupuestoNuevo({
 
         // ── Refrescar quién/cuándo guardó, para mostrar en pantalla ──
         await cargarMetaPresupuesto(numAsignado, Number(revAsignada));
+        // Cada guardado reinserta los ítems (confirmado vuelve a 'no' por
+        // default), así que siempre hay que re-consultar el estado real.
+        await cargarEstadoConfirmado(numAsignado, Number(revAsignada));
       }
       setRevision(Number(revAsignada));
 
@@ -3370,6 +3413,50 @@ export default function PresupuestoNuevo({
           {error && <div className="pn-error">⚠️ {error}</div>}
           {guardadoOk && (
             <div className="pn-ok">✅ Presupuesto guardado correctamente</div>
+          )}
+
+          {tab === "presupuesto" && numeroPres != null && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 10,
+                padding: "8px 10px",
+                borderRadius: 6,
+                border: confirmado ? "1px solid #7cd992" : "1px solid #e5e5e5",
+                background: confirmado ? "#eafbee" : "#f5f5f5",
+              }}
+            >
+              {confirmado ? (
+                <span style={{ color: "#1a7d34", fontWeight: 600 }}>
+                  ✅ Presupuesto confirmado (Rev. {revision})
+                </span>
+              ) : (
+                <>
+                  <span style={{ fontSize: 13, color: "#555" }}>
+                    Esta revisión todavía no fue confirmada.
+                  </span>
+                  <button
+                    type="button"
+                    className="pn-btn"
+                    onClick={confirmarPresupuesto}
+                    disabled={confirmando}
+                    style={{
+                      background: "#2e9e4f",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 6,
+                      padding: "6px 14px",
+                      cursor: confirmando ? "default" : "pointer",
+                      opacity: confirmando ? 0.7 : 1,
+                    }}
+                  >
+                    {confirmando ? "Confirmando..." : "✅ Confirmar presupuesto"}
+                  </button>
+                </>
+              )}
+            </div>
           )}
 
           {metaPresupuesto &&
