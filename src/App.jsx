@@ -4,7 +4,6 @@ import Clientes from "./screens/Clientes";
 import Productos from "./screens/Productos";
 import PresupuestoMuebles from "./screens/PresupuestoMuebles";
 import PresupuestoMamparas from "./screens/PresupuestoMamparas";
-import PresupuestoInfo from "./screens/PresupuestoInfo";
 import VerTablas from "./screens/VerTablas";
 import Margen from "./screens/Margen";
 import Lista from "./screens/Lista";
@@ -38,7 +37,7 @@ const SCREENS = {
   "lista-margenes": { label: "LISTA DE MÁRGENES", icon: "📊" },
   "lista-presupuestos-2": { label: "LISTA PRESUPUESTOS", icon: "⚡" },
   "mueble-especial": { label: "MUEBLE ESPECIAL", icon: "🪚" },
-  "presupuesto-info": { label: "PRESUPUESTO INFO", icon: "🧾" },
+  "obras-confirmadas": { label: "OBRAS CONFIRMADAS", icon: "✅" },
   facturas: { label: "FACTURAS", icon: "🧾" },
   "historial-facturas": { label: "HISTORIAL FACTURAS", icon: "📋" },
   anviz: { label: "ASISTENCIA", icon: "🕐" },
@@ -92,10 +91,10 @@ const buttons = [
   },
   {
     id: 13,
-    label: "PRESUPUESTO INFO",
-    icon: "🧾",
+    label: "OBRAS CONFIRMADAS",
+    icon: "✅",
     color: "#00b4d8",
-    screen: "presupuesto-info",
+    screen: "obras-confirmadas",
   },
 ];
 
@@ -978,9 +977,18 @@ function App() {
                 token={token}
               />
             )}
-            {screen === "presupuesto-info" && <PresupuestoInfo />}
             {screen === "lista-presupuestos-2" && (
               <ListaPresupuestos2
+                onAbrirPresupuesto={(row) => {
+                  setPresupuestoAbierto(row);
+                  setScreen("presupuesto-nuevo");
+                }}
+                authFetch={authFetch}
+              />
+            )}
+            {screen === "obras-confirmadas" && (
+              <ListaPresupuestos2
+                soloConfirmadas
                 onAbrirPresupuesto={(row) => {
                   setPresupuestoAbierto(row);
                   setScreen("presupuesto-nuevo");
