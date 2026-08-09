@@ -12,7 +12,6 @@ import PresupuestosMamparasTabla from "./screens/PresupuestosMamparasTabla";
 import PresupuestosVanitoryTabla from "./screens/PresupuestosVanitoryTabla";
 import PresupuestoAmoblamiento from "./screens/PresupuestoAmoblamiento";
 import PresupuestoNuevo from "./screens/PresupuestoNuevo";
-import PresupuestosNuevoTabla from "./screens/PresupuestosNuevoTabla";
 import ListaPresupuestos2 from "./screens/ListaPresupuestos2";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
@@ -37,8 +36,7 @@ const SCREENS = {
   "presupuesto-amoblamiento": { label: "PRESUPUESTO AMOBLAMIENTO", icon: "🪑" },
   "presupuesto-nuevo": { label: "PRESUPUESTO NUEVO", icon: "📝" },
   "lista-margenes": { label: "LISTA DE MÁRGENES", icon: "📊" },
-  "presupuestos-nuevo-tabla": { label: "PRESUPUESTOS", icon: "📋" },
-  "lista-presupuestos-2": { label: "LISTA PRESUPUESTOS 2", icon: "⚡" },
+  "lista-presupuestos-2": { label: "LISTA PRESUPUESTOS", icon: "⚡" },
   "mueble-especial": { label: "MUEBLE ESPECIAL", icon: "🪚" },
   "presupuesto-info": { label: "PRESUPUESTO INFO", icon: "🧾" },
   facturas: { label: "FACTURAS", icon: "🧾" },
@@ -79,15 +77,8 @@ const buttons = [
     screen: "ver-tablas",
   },
   {
-    id: 11,
-    label: "LISTA PRESUPUESTOS",
-    icon: "🪑",
-    color: "#7b61ff",
-    screen: "presupuestos-nuevo-tabla",
-  },
-  {
     id: 14,
-    label: "LISTA PRESUPUESTOS 2",
+    label: "LISTA PRESUPUESTOS",
     icon: "⚡",
     color: "#7b61ff",
     screen: "lista-presupuestos-2",
@@ -843,7 +834,6 @@ function App() {
               "presupuestos-vanitory-tabla",
               "presupuesto-amoblamiento",
               "presupuesto-nuevo",
-              "presupuestos-nuevo-tabla",
               "lista-presupuestos-2",
               "ver-tablas",
               "lista-margenes",
@@ -977,7 +967,7 @@ function App() {
                     setScreen("ver-tablas");
                   } else {
                     setTablaInicialVerTablas(null);
-                    setScreen("presupuestos-nuevo-tabla");
+                    setScreen("lista-presupuestos-2");
                   }
                 }}
                 presupuestoInicial={presupuestoAbierto}
@@ -989,15 +979,6 @@ function App() {
               />
             )}
             {screen === "presupuesto-info" && <PresupuestoInfo />}
-            {screen === "presupuestos-nuevo-tabla" && (
-              <PresupuestosNuevoTabla
-                onAbrirPresupuesto={(row) => {
-                  setPresupuestoAbierto(row);
-                  setScreen("presupuesto-nuevo");
-                }}
-                authFetch={authFetch}
-              />
-            )}
             {screen === "lista-presupuestos-2" && (
               <ListaPresupuestos2
                 onAbrirPresupuesto={(row) => {
@@ -1010,7 +991,7 @@ function App() {
             {screen === "presupuesto-amoblamiento" &&
               amoblamientoVista === "selector" && (
                 <PresupuestoAmoblamiento
-                  onBuscar={() => setScreen("presupuestos-nuevo-tabla")}
+                  onBuscar={() => setScreen("lista-presupuestos-2")}
                   onNuevo={() => {
                     setPresupuestoAbierto(null);
                     setScreen("presupuesto-nuevo");
