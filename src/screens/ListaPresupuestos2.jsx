@@ -357,7 +357,7 @@ export default function ListaPresupuestos2({ onAbrirPresupuesto, authFetch }) {
 
       <ScreenHeader
         icon="⚡"
-        title="Lista Presupuestos 2"
+        title="Lista Presupuestos"
         subtitle="Registro de presupuestos"
       />
 
