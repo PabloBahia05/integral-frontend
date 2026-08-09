@@ -73,6 +73,27 @@ const COLS_ENCABEZADO = [
     label: "Lista",
     render: (v) => (v != null && v !== "" ? String(v) : "—"),
   },
+  {
+    key: "confirmado",
+    label: "Estado",
+    render: (v) => (
+      <span
+        style={{
+          display: "inline-block",
+          background: v ? "#e8f5e9" : "#f5f5f5",
+          color: v ? "#1b5e20" : "#888",
+          border: `1px solid ${v ? "#a5d6a7" : "#ddd"}`,
+          borderRadius: "4px",
+          padding: "1px 8px",
+          fontSize: "11px",
+          fontWeight: 700,
+          fontFamily: "'Space Mono', monospace",
+        }}
+      >
+        {v ? "✅ Confirmada" : "— Pendiente"}
+      </span>
+    ),
+  },
   { key: "actualizado_en", label: "Última modificación", render: (v) => formatFecha(v) },
   { key: "actualizado_por", label: "Por", render: (v) => v ?? "—" },
 ];
@@ -129,7 +150,11 @@ const COLS_HISTORIAL = [
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export default function ListaPresupuestos2({ onAbrirPresupuesto, authFetch }) {
+export default function ListaPresupuestos2({
+  onAbrirPresupuesto,
+  authFetch,
+  soloConfirmadas = false,
+}) {
   // Encabezados — de presupuesto_info (liviano, 1 fila por presupuesto)
   const [encabezados, setEncabezados] = useState([]);
   const [loadingEnc, setLoadingEnc] = useState(true);
@@ -230,13 +255,15 @@ export default function ListaPresupuestos2({ onAbrirPresupuesto, authFetch }) {
   // ── Filtro ────────────────────────────────────────────────────────────────
 
   const q = search.toLowerCase();
-  const filtered = encabezados.filter(
-    (e) =>
-      (e.nombre ?? "").toLowerCase().includes(q) ||
-      String(e.numeropres ?? "").includes(q) ||
-      (e.telefono1 ?? "").toLowerCase().includes(q) ||
-      (e.telefono2 ?? "").toLowerCase().includes(q),
-  );
+  const filtered = encabezados
+    .filter((e) => !soloConfirmadas || !!e.confirmado)
+    .filter(
+      (e) =>
+        (e.nombre ?? "").toLowerCase().includes(q) ||
+        String(e.numeropres ?? "").includes(q) ||
+        (e.telefono1 ?? "").toLowerCase().includes(q) ||
+        (e.telefono2 ?? "").toLowerCase().includes(q),
+    );
 
   // Total del presupuesto seleccionado — se calcula acá, a partir de los
   // ítems recién traídos (consulta puntual de 1 presupuesto), NO se guarda
@@ -356,14 +383,23 @@ export default function ListaPresupuestos2({ onAbrirPresupuesto, authFetch }) {
       `}</style>
 
       <ScreenHeader
-        icon="⚡"
-        title="Lista Presupuestos"
-        subtitle="Registro de presupuestos"
+        icon={soloConfirmadas ? "✅" : "⚡"}
+        title={soloConfirmadas ? "Obras Confirmadas" : "Lista Presupuestos"}
+        subtitle={
+          soloConfirmadas
+            ? "Presupuestos confirmados"
+            : "Registro de presupuestos"
+        }
       />
 
       <StatCards
         stats={[
-          { label: "Total presupuestos", value: encabezados.length },
+          {
+            label: soloConfirmadas ? "Total confirmadas" : "Total presupuestos",
+            value: soloConfirmadas
+              ? encabezados.filter((e) => !!e.confirmado).length
+              : encabezados.length,
+          },
           { label: "Filtrados", value: filtered.length },
         ]}
       />
