@@ -13,6 +13,7 @@ import PresupuestosVanitoryTabla from "./screens/PresupuestosVanitoryTabla";
 import PresupuestoAmoblamiento from "./screens/PresupuestoAmoblamiento";
 import PresupuestoNuevo from "./screens/PresupuestoNuevo";
 import PresupuestosNuevoTabla from "./screens/PresupuestosNuevoTabla";
+import ListaPresupuestos2 from "./screens/ListaPresupuestos2";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
 import HistorialFacturas from "./screens/HistorialFacturas";
@@ -37,6 +38,7 @@ const SCREENS = {
   "presupuesto-nuevo": { label: "PRESUPUESTO NUEVO", icon: "📝" },
   "lista-margenes": { label: "LISTA DE MÁRGENES", icon: "📊" },
   "presupuestos-nuevo-tabla": { label: "PRESUPUESTOS", icon: "📋" },
+  "lista-presupuestos-2": { label: "LISTA PRESUPUESTOS 2", icon: "⚡" },
   "mueble-especial": { label: "MUEBLE ESPECIAL", icon: "🪚" },
   "presupuesto-info": { label: "PRESUPUESTO INFO", icon: "🧾" },
   facturas: { label: "FACTURAS", icon: "🧾" },
@@ -82,6 +84,13 @@ const buttons = [
     icon: "🪑",
     color: "#7b61ff",
     screen: "presupuestos-nuevo-tabla",
+  },
+  {
+    id: 14,
+    label: "LISTA PRESUPUESTOS 2",
+    icon: "⚡",
+    color: "#7b61ff",
+    screen: "lista-presupuestos-2",
   },
   {
     id: 12,
@@ -835,6 +844,7 @@ function App() {
               "presupuesto-amoblamiento",
               "presupuesto-nuevo",
               "presupuestos-nuevo-tabla",
+              "lista-presupuestos-2",
               "ver-tablas",
               "lista-margenes",
               "mueble-especial",
@@ -986,6 +996,15 @@ function App() {
                   setScreen("presupuesto-nuevo");
                 }}
                 authFetch={authFetch}
+              />
+            )}
+            {screen === "lista-presupuestos-2" && (
+              <ListaPresupuestos2
+                onAbrirPresupuesto={(row) => {
+                  setPresupuestoAbierto(row);
+                  setScreen("presupuesto-nuevo");
+                }}
+                token={token}
               />
             )}
             {screen === "presupuesto-amoblamiento" &&
