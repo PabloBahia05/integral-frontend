@@ -63,6 +63,16 @@ const COLS_ENCABEZADO = [
     label: "Teléfono",
     render: (_, row) => row.telefono1 || row.telefono2 || "—",
   },
+  {
+    key: "linea1",
+    label: "Línea",
+    render: (_, row) => formatLineas(row),
+  },
+  {
+    key: "lista",
+    label: "Lista",
+    render: (v) => (v != null && v !== "" ? String(v) : "—"),
+  },
   { key: "actualizado_en", label: "Última modificación", render: (v) => formatFecha(v) },
   { key: "actualizado_por", label: "Por", render: (v) => v ?? "—" },
 ];
