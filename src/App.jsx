@@ -1004,7 +1004,7 @@ function App() {
                   setPresupuestoAbierto(row);
                   setScreen("presupuesto-nuevo");
                 }}
-                token={token}
+                authFetch={authFetch}
               />
             )}
             {screen === "presupuesto-amoblamiento" &&
