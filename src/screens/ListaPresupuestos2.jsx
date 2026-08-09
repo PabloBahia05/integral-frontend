@@ -8,10 +8,10 @@ const API = "https://integral-backend-production.up.railway.app";
 // tabla_presupuestos ítem por ítem. Por eso NO muestra totales ($) — solo
 // cabecera: número, cliente, última revisión y fecha.
 //
-// onAbrir(numeropres, revision) — se llama al hacer click en una fila, para
-// que el componente padre (App.jsx) abra ese presupuesto en PresupuestoNuevo,
-// igual que hace la lista vieja.
-export default function ListaPresupuestos2({ onAbrir, token }) {
+// onAbrirPresupuesto(row) — se llama al hacer click en una fila, con el
+// mismo shape de objeto (numeropres/revision) que ya usa PresupuestosNuevoTabla,
+// para que App.jsx lo pueda pasar tal cual como presupuestoInicial.
+export default function ListaPresupuestos2({ onAbrirPresupuesto, token }) {
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -99,7 +99,7 @@ export default function ListaPresupuestos2({ onAbrir, token }) {
               <tr
                 key={it.numeropres}
                 style={{ borderBottom: "1px solid #eee", cursor: "pointer" }}
-                onClick={() => onAbrir?.(it.numeropres, it.revision)}
+                onClick={() => onAbrirPresupuesto?.(it)}
               >
                 <td style={{ padding: "8px 10px" }}>{it.numeropres}</td>
                 <td style={{ padding: "8px 10px" }}>{it.revision ?? "—"}</td>
