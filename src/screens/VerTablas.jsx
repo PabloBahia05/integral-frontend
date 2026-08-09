@@ -41,6 +41,7 @@ const MODULOS = [
   { id: "presupuesto-amoblamiento",  label: "Presup. Amoblamiento",   acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "mueble-especial",           label: "Mueble Especial",        acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "presupuestos-nuevo-tabla",  label: "Lista Presupuestos",     acciones: ["ver", "crear", "editar", "eliminar"] },
+  { id: "lista-presupuestos-2",      label: "Lista Presupuestos 2",   acciones: ["ver"] },
   { id: "facturas",                  label: "Facturas",               acciones: ["ver", "subir", "eliminar"] },
   { id: "historial-facturas",        label: "Historial Facturas",     acciones: ["ver"] },
   { id: "ver-tablas",                label: "Ver Tablas",             acciones: ["ver", "editar"] },
