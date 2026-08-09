@@ -141,6 +141,12 @@ export default function ListaPresupuestos2({ onAbrirPresupuesto, authFetch }) {
   const [revisionAEliminar, setRevisionAEliminar] = useState(null);
   const [eliminandoRevision, setEliminandoRevision] = useState(false);
 
+  // Presupuesto completo a borrar (desde el botón "Eliminar" de la
+  // ActionBar — borra TODAS las revisiones + el fantasma en
+  // presupuesto_info, vía DELETE /tabla-indice/:numeropres)
+  const [presupuestoAEliminar, setPresupuestoAEliminar] = useState(null);
+  const [eliminandoPresupuesto, setEliminandoPresupuesto] = useState(false);
+
   // ── Fetch encabezados (endpoint liviano nuevo) ────────────────────────────
 
   const fetchEncabezados = () => {
@@ -255,6 +261,34 @@ export default function ListaPresupuestos2({ onAbrirPresupuesto, authFetch }) {
     }
   };
 
+  // ── DELETE presupuesto completo (botón "Eliminar" de la ActionBar —
+  // borra TODAS las revisiones, vía /tabla-indice/:numeropres, que ya
+  // limpia el fantasma de presupuesto_info en el backend) ────────────────
+
+  const handleDeletePresupuesto = async () => {
+    if (!presupuestoAEliminar) return;
+    setEliminandoPresupuesto(true);
+    try {
+      const res = await authFetch(
+        `${API}/tabla-indice/${presupuestoAEliminar.numeropres}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setEncabezados((prev) =>
+        prev.filter((e) => e.numeropres !== presupuestoAEliminar.numeropres),
+      );
+      if (selected?.numeropres === presupuestoAEliminar.numeropres) {
+        setSelected(null);
+      }
+      setPresupuestoAEliminar(null);
+    } catch (e) {
+      console.error("Error borrando presupuesto:", e);
+      alert("No se pudo borrar el presupuesto. Revisá la consola.");
+    } finally {
+      setEliminandoPresupuesto(false);
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -330,7 +364,9 @@ export default function ListaPresupuestos2({ onAbrirPresupuesto, authFetch }) {
           selected={selected}
           onNew={null}
           onEdit={null}
-          onDelete={null}
+          onDelete={
+            selected ? () => setPresupuestoAEliminar(selected) : null
+          }
           search={search}
           onSearch={setSearch}
         />
@@ -483,6 +519,30 @@ export default function ListaPresupuestos2({ onAbrirPresupuesto, authFetch }) {
           item={revisionAEliminar}
           onConfirm={handleDeleteRevision}
           onClose={() => !eliminandoRevision && setRevisionAEliminar(null)}
+        />
+      )}
+
+      {/* ── Confirmación: borrar el presupuesto completo (todas las
+          revisiones + fantasma en presupuesto_info) ────────────────── */}
+      {presupuestoAEliminar && (
+        <ConfirmDelete
+          item={presupuestoAEliminar}
+          title="¿Eliminar presupuesto completo?"
+          message={
+            <>
+              Vas a eliminar el presupuesto{" "}
+              <strong>
+                N° {String(presupuestoAEliminar.numeropres).padStart(4, "0")}
+              </strong>{" "}
+              ({presupuestoAEliminar.nombre ?? "sin cliente"}) y{" "}
+              <strong>TODAS sus revisiones</strong>. Esta acción no se puede
+              deshacer.
+            </>
+          }
+          onConfirm={handleDeletePresupuesto}
+          onClose={() =>
+            !eliminandoPresupuesto && setPresupuestoAEliminar(null)
+          }
         />
       )}
     </>
