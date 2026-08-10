@@ -99,6 +99,19 @@ export async function generarPresupuestoPDF({
           ? numero
           : "----";
 
+    // Nombre de archivo para la descarga: NOMBRE-P(numero)-REV(revision).
+    // Se limpia el nombre del cliente (sin tildes, solo letras/números/
+    // espacios, mayúsculas, espacios → guion bajo) para que sea un nombre
+    // de archivo válido en cualquier sistema operativo.
+    const nombreClienteArchivo = (cliente || "SIN_CLIENTE")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // saca acentos
+      .toUpperCase()
+      .replace(/[^A-Z0-9\s-]/g, "") // saca caracteres inválidos (/, \, :, etc.)
+      .trim()
+      .replace(/\s+/g, "_");
+    const nombreArchivo = `${nombreClienteArchivo}-P${nro}-REV${revision ?? 0}.pdf`;
+
     // Cantidad de columnas de la tabla según qué se decida incluir
     // Si hay líneas cargadas, se muestra una columna de precio por cada línea
     // (igual que en la tabla "Presupuesto" en pantalla). Si no hay líneas, se
@@ -519,7 +532,7 @@ export async function generarPresupuestoPDF({
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `Presupuesto_${nro}.pdf`;
+            a.download = nombreArchivo;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -527,7 +540,7 @@ export async function generarPresupuestoPDF({
           } else {
             await window
               .html2pdf()
-              .set({ ...opcionesPDF, filename: `Presupuesto_${nro}.pdf` })
+              .set({ ...opcionesPDF, filename: nombreArchivo })
               .from(paginaEl)
               .toPdf()
               .get("pdf")
