@@ -152,6 +152,7 @@ const COLS_HISTORIAL = [
 
 export default function ListaPresupuestos2({
   onAbrirPresupuesto,
+  onNuevoPresupuesto,
   authFetch,
   soloConfirmadas = false,
 }) {
@@ -408,7 +409,7 @@ export default function ListaPresupuestos2({
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <ActionBar
           selected={selected}
-          onNew={null}
+          onNew={onNuevoPresupuesto ?? null}
           onEdit={null}
           onDelete={
             selected ? () => setPresupuestoAEliminar(selected) : null
