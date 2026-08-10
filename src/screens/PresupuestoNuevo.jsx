@@ -788,7 +788,17 @@ export default function PresupuestoNuevo({
           // Las imágenes se suben directo a la nube: se persisten como URL
           // (no como base64), que es lo que viaja a presupuesto_imagenes.
           const url = await uploadImageToCloud(file, token);
-          return { id, tipo: "imagen", nombre: file.name, url, grupo: grupoFinal };
+          // anchoPct: ancho de la imagen en el PDF, en % del contenedor
+          // (ver actualizarAnchoImagen / selector en el gestor de imágenes).
+          // 100 = comportamiento de siempre (ancho completo).
+          return {
+            id,
+            tipo: "imagen",
+            nombre: file.name,
+            url,
+            grupo: grupoFinal,
+            anchoPct: 100,
+          };
         }),
       );
       setImagenesFinal((prev) => [...prev, ...nuevas]);
@@ -825,6 +835,19 @@ export default function PresupuestoNuevo({
 
   const eliminarImagen = (id) => {
     setImagenesFinal((prev) => prev.filter((im) => im.id !== id));
+  };
+
+  // Cambia el ancho con el que se inserta esa imagen en el PDF (ver
+  // im.anchoPct, usado en pdfPresupuesto.js como max-width en %). No
+  // deforma la imagen: solo cambia el tope de ancho, el alto sigue
+  // proporcional (mismo principio que ya usaba el PDF, ahora configurable).
+  const actualizarAnchoImagen = (id, pct) => {
+    const val = parseInt(pct, 10);
+    setImagenesFinal((prev) =>
+      prev.map((im) =>
+        im.id === id ? { ...im, anchoPct: isNaN(val) ? 100 : val } : im,
+      ),
+    );
   };
 
   // ── Persistencia de imágenes (tabla presupuesto_imagenes) ──────────────
@@ -966,6 +989,12 @@ export default function PresupuestoNuevo({
             nombre: `imagen-${i + 1}.jpg`,
             url,
             grupo,
+            // anchoPct no se persiste todavía en presupuesto_imagenes (solo
+            // guarda grupo + urls) — al recargar un presupuesto siempre
+            // vuelve a 100%, aunque se haya elegido otro tamaño antes de
+            // guardar. Si hace falta que sobreviva al reload, hay que
+            // agregar una columna en esa tabla.
+            anchoPct: 100,
           });
         });
       });
@@ -2932,6 +2961,30 @@ export default function PresupuestoNuevo({
                             marginTop: 4,
                           }}
                         />
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 12,
+                            color: "#333",
+                            marginTop: 6,
+                          }}
+                        >
+                          Tamaño en el PDF:
+                          <select
+                            value={im.anchoPct ?? 100}
+                            onChange={(e) =>
+                              actualizarAnchoImagen(im.id, e.target.value)
+                            }
+                            style={{ fontSize: 12, padding: "3px 5px" }}
+                          >
+                            <option value={25}>25%</option>
+                            <option value={50}>50%</option>
+                            <option value={75}>75%</option>
+                            <option value={100}>100% (completo)</option>
+                          </select>
+                        </label>
                       </>
                     ) : (
                       <div style={{ fontSize: 11, color: "#888" }}>

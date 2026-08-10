@@ -217,7 +217,13 @@ export async function generarPresupuestoPDF({
         const sinColumnaMonto = !celdasSubtotalLinea;
 
         // Fotos asignadas manualmente a este grupo — se pegan justo debajo
-        // del detalle/tabla del grupo correspondiente.
+        // del detalle/tabla del grupo correspondiente. Cada imagen puede
+        // tener su propio ancho (im.anchoPct, elegido en el gestor de
+        // imágenes de PresupuestoNuevo.jsx) — sigue el mismo principio de
+        // siempre (max-width, sin forzar height, para no deformar la
+        // imagen), pero el tope ahora es configurable por imagen en vez de
+        // fijo en 100%. Sin im.anchoPct definido, se mantiene el 100% de
+        // siempre (compatibilidad con presupuestos ya guardados).
         const fotosSec = imagenesFinal.filter(
           (im) => im.tipo === "imagen" && im.grupo === sec,
         );
@@ -225,7 +231,7 @@ export async function generarPresupuestoPDF({
           ? `<div class="sec-fotos" style="margin-top:10px;">${fotosSec
               .map(
                 (im) =>
-                  `<img src="${im.url}" style="max-width:100%; display:block; margin-top:8px;" />`,
+                  `<img src="${im.url}" style="max-width:${im.anchoPct ?? 100}%; display:block; margin-top:8px;" />`,
               )
               .join("")}</div>`
           : "";
@@ -393,7 +399,7 @@ export async function generarPresupuestoPDF({
       .filter((im) => im.tipo === "imagen" && !im.grupo)
       .map(
         (im) =>
-          `<div class="adjunto-imagen" style="margin-top:18px;"><img src="${im.url}" style="max-width:100%; display:block;" /></div>`,
+          `<div class="adjunto-imagen" style="margin-top:18px;"><img src="${im.url}" style="max-width:${im.anchoPct ?? 100}%; display:block;" /></div>`,
       )
       .join("")}
 
