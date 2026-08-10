@@ -256,8 +256,17 @@ export default function ListaPresupuestos2({
   // ── Filtro ────────────────────────────────────────────────────────────────
 
   const q = search.toLowerCase();
+
+  // Presupuestos (numeropres) que tienen AL MENOS UNA revisión confirmada.
+  // Una vez que un presupuesto quedó confirmado, todas sus revisiones
+  // (incluidas las nuevas que se generen después, aunque su propio flag
+  // "confirmado" todavía esté en 0) deben verse en Obras Cerradas.
+  const numeroprosConfirmados = new Set(
+    encabezados.filter((e) => !!e.confirmado).map((e) => e.numeropres),
+  );
+
   const filtered = encabezados
-    .filter((e) => !soloConfirmadas || !!e.confirmado)
+    .filter((e) => !soloConfirmadas || numeroprosConfirmados.has(e.numeropres))
     .filter(
       (e) =>
         (e.nombre ?? "").toLowerCase().includes(q) ||
@@ -398,7 +407,7 @@ export default function ListaPresupuestos2({
           {
             label: soloConfirmadas ? "Total confirmadas" : "Total presupuestos",
             value: soloConfirmadas
-              ? encabezados.filter((e) => !!e.confirmado).length
+              ? numeroprosConfirmados.size
               : encabezados.length,
           },
           { label: "Filtrados", value: filtered.length },
