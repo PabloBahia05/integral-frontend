@@ -282,7 +282,7 @@ export default function ListaPresupuestos2({
     encabezados.filter((e) => !!e.confirmado).map((e) => e.numeropres),
   );
 
-  const filtered = encabezados
+  const filtradosBase = encabezados
     .filter((e) => !soloConfirmadas || numeroprosConfirmados.has(e.numeropres))
     .filter(
       (e) =>
@@ -291,6 +291,25 @@ export default function ListaPresupuestos2({
         (e.telefono1 ?? "").toLowerCase().includes(q) ||
         (e.telefono2 ?? "").toLowerCase().includes(q),
     );
+
+  // En "Obras Confirmadas" el endpoint (/revisiones-confirmadas) trae 1 fila
+  // por CADA revisión confirmada, no 1 por presupuesto — así, si un
+  // presupuesto tiene varias revisiones ya confirmadas, aparecía repetido en
+  // la tabla. Acá lo colapsamos a la última revisión de cada numeropres,
+  // igual que en "Lista Presupuestos"; el historial completo sigue
+  // disponible con el botón "Revisiones". El SELECT del backend ya viene
+  // ordenado numeropres DESC, revision DESC, así que la primera ocurrencia
+  // de cada numeropres en el array ya es la más nueva.
+  const filtered = soloConfirmadas
+    ? Array.from(
+        filtradosBase
+          .reduce((map, e) => {
+            if (!map.has(e.numeropres)) map.set(e.numeropres, e);
+            return map;
+          }, new Map())
+          .values(),
+      )
+    : filtradosBase;
 
   // Total del presupuesto seleccionado — se calcula acá, a partir de los
   // ítems recién traídos (consulta puntual de 1 presupuesto), NO se guarda
