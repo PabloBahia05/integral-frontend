@@ -98,6 +98,15 @@ const COLS_ENCABEZADO = [
   { key: "actualizado_por", label: "Por", render: (v) => v ?? "—" },
 ];
 
+// En "Obras Confirmadas" cada fila es una revisión puntual (viene de
+// /tabla-presupuestos/revisiones-confirmadas, que sí trae total1 calculado
+// en SQL) — agregamos la columna Total al set de columnas normal.
+const COLS_ENCABEZADO_CONFIRMADAS = [
+  ...COLS_ENCABEZADO.slice(0, -2),
+  { key: "total1", label: "Total", render: (v) => formatPeso(v) },
+  ...COLS_ENCABEZADO.slice(-2),
+];
+
 // ── Columnas ítems (panel de detalle al seleccionar una fila — acá sí se
 // consulta tabla_presupuestos, pero puntual, para un solo presupuesto) ─────
 
@@ -185,9 +194,17 @@ export default function ListaPresupuestos2({
 
   // ── Fetch encabezados (endpoint liviano nuevo) ────────────────────────────
 
+  // "Obras Confirmadas" necesita 1 fila POR REVISIÓN confirmada (una obra
+  // puede tener varias revisiones ya cerradas), así que usa un endpoint
+  // distinto al de "Lista Presupuestos" (que trae solo 1 fila por
+  // numeropres — la última revisión guardada, ver presupuesto_info PK).
+  const endpointEncabezados = soloConfirmadas
+    ? `${API}/tabla-presupuestos/revisiones-confirmadas`
+    : `${API}/presupuesto-info/lista-presupuestos`;
+
   const fetchEncabezados = () => {
     setLoadingEnc(true);
-    authFetch(`${API}/presupuesto-info/lista-presupuestos`)
+    authFetch(endpointEncabezados)
       .then((r) => r.json())
       .then((data) =>
         setEncabezados(
@@ -206,7 +223,7 @@ export default function ListaPresupuestos2({
   useEffect(() => {
     fetchEncabezados();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [soloConfirmadas]);
 
   // ── Fetch ítems al seleccionar (idéntico a la lista actual) ──────────────
 
@@ -459,11 +476,15 @@ export default function ListaPresupuestos2({
         </p>
       ) : (
         <DataTable
-          columns={COLS_ENCABEZADO}
+          columns={soloConfirmadas ? COLS_ENCABEZADO_CONFIRMADAS : COLS_ENCABEZADO}
           rows={filtered}
           selectedId={selected?.id}
           onSelect={handleSelect}
-          storageKey="lista-presupuestos-encabezados"
+          storageKey={
+            soloConfirmadas
+              ? "lista-presupuestos-confirmadas"
+              : "lista-presupuestos-encabezados"
+          }
         />
       )}
 
