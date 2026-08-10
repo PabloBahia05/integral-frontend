@@ -453,6 +453,7 @@ export default function ListaPresupuestos2({
           rows={filtered}
           selectedId={selected?.id}
           onSelect={handleSelect}
+          storageKey="lista-presupuestos-encabezados"
         />
       )}
 
@@ -478,6 +479,7 @@ export default function ListaPresupuestos2({
               rows={itemsDetalle}
               selectedId={null}
               onSelect={null}
+              storageKey="lista-presupuestos-items"
             />
           )}
         </div>
@@ -546,6 +548,7 @@ export default function ListaPresupuestos2({
               rows={revisiones}
               selectedId={null}
               onSelect={null}
+              storageKey="lista-presupuestos-historial"
             />
           )}
           <div className="form-actions" style={{ marginTop: "16px" }}>
