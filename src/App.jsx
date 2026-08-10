@@ -983,6 +983,10 @@ function App() {
                   setPresupuestoAbierto(row);
                   setScreen("presupuesto-nuevo");
                 }}
+                onNuevoPresupuesto={() => {
+                  setPresupuestoAbierto(null);
+                  setScreen("presupuesto-nuevo");
+                }}
                 authFetch={authFetch}
               />
             )}
@@ -991,6 +995,10 @@ function App() {
                 soloConfirmadas
                 onAbrirPresupuesto={(row) => {
                   setPresupuestoAbierto(row);
+                  setScreen("presupuesto-nuevo");
+                }}
+                onNuevoPresupuesto={() => {
+                  setPresupuestoAbierto(null);
                   setScreen("presupuesto-nuevo");
                 }}
                 authFetch={authFetch}
