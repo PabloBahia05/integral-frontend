@@ -220,7 +220,7 @@ export async function generarPresupuestoPDF({
           : "";
 
         return `
-      <div class="sec-block">
+      <div class="tabla-block">
         <div class="sec-title">${sec}:</div>
         <table>
           <thead>
@@ -253,8 +253,8 @@ export async function generarPresupuestoPDF({
             </tr>
           </tbody>
         </table>
-        ${fotosSecHTML}
-      </div>`;
+      </div>
+      ${fotosSecHTML}`;
       })
       .join("");
 
@@ -289,7 +289,8 @@ export async function generarPresupuestoPDF({
     .info-line.right-only { justify-content: flex-end; }
     .body { flex: 1; margin-top: 18px; }
     .leyenda { font-size: 11px; font-style: italic; margin-bottom: 18px; }
-    .sec-block { margin-bottom: 20px; }
+    .tabla-block { margin-bottom: 20px; }
+    .sec-fotos { margin-bottom: 20px; }
     .sec-title { font-style: italic; font-weight: 700; text-transform: uppercase; font-size: 12px; margin-bottom: 3px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     thead th { text-align: left; font-weight: 700; border-bottom: 1px solid #111; padding: 1px 8px 3px 0; }
@@ -314,11 +315,13 @@ export async function generarPresupuestoPDF({
     .footer { margin-top: auto; border-top: 1px solid #111; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #333; }
     /* Evita que html2pdf corte una imagen a la mitad entre dos hojas A4:
        si no entra completa en lo que queda de página, la empuja entera a
-       la siguiente. Se agrega también .sec-block: cada grupo (título +
-       tabla de ítems + total) debe quedar entero en una misma hoja — si no
-       entra completo en lo que queda de la página actual, se empuja el
-       grupo completo a la siguiente en vez de cortarlo a la mitad. */
-    img, .sec-fotos, .adjunto-imagen, .mampara-foto, .texto-sena, .sec-block { page-break-inside: avoid; break-inside: avoid; }
+       la siguiente. Se agrega también .tabla-block: título + tabla de
+       ítems + total debe quedar entero en una misma hoja (este bloque es
+       chico, así que casi siempre entra). Las fotos de la sección
+       (.sec-fotos) van en un bloque HERMANO aparte, no anidado dentro de
+       .tabla-block: así, si la tabla entra pero la foto no, la foto se
+       empuja sola a la página siguiente sin arrastrar (ni cortar) la tabla. */
+    img, .sec-fotos, .adjunto-imagen, .mampara-foto, .texto-sena, .tabla-block { page-break-inside: avoid; break-inside: avoid; }
     `;
 
     const pageHTML = `
@@ -463,7 +466,7 @@ export async function generarPresupuestoPDF({
         },
         pagebreak: {
           mode: ["css", "legacy"],
-          avoid: ["img", ".sec-fotos", ".adjunto-imagen", ".mampara-foto", ".texto-sena", ".sec-block"],
+          avoid: ["img", ".sec-fotos", ".adjunto-imagen", ".mampara-foto", ".texto-sena", ".tabla-block"],
         },
       };
 
