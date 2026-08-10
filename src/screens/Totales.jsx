@@ -19,9 +19,16 @@ export default function Totales({ presupuestoItems, lineasActivas }) {
       </td>
       {lineasActivas.length > 0
         ? lineasActivas.map((l, li) => {
+            // Placard tiene precio único, independiente de la línea (ver
+            // esPlacardSec en TablaArticulos.jsx / pdfPresupuesto.js): para
+            // esos ítems SIEMPRE se usa it.precio, nunca it.precios[li],
+            // para que el total de cada línea coincida con el importe que
+            // efectivamente se ve impreso en la sección de Placard.
             const total = presupuestoItems.reduce((s, it) => {
-              const pr =
-                parseFloat(it.precios?.[li]?.precio ?? it.precio ?? 0) || 0;
+              const esPlacard = (it.seccion || "").startsWith("Placard / ");
+              const pr = esPlacard
+                ? parseFloat(it.precio ?? 0) || 0
+                : parseFloat(it.precios?.[li]?.precio ?? it.precio ?? 0) || 0;
               return s + pr * (parseFloat(it.cantidad) || 1);
             }, 0);
             return (

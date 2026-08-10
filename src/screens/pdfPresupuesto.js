@@ -274,12 +274,18 @@ export async function generarPresupuestoPDF({
       0,
     );
 
-    // Total por cada línea presupuestada (1, 2 o 3), igual que el TOTAL GENERAL en pantalla
+    // Total por cada línea presupuestada (1, 2 o 3), igual que el TOTAL GENERAL en pantalla.
+    // Placard tiene precio único, independiente de la línea (ver esPlacardSec
+    // más arriba): para esos ítems SIEMPRE se usa it.precio, nunca
+    // it.precios[li], para que el total de cada línea coincida con el
+    // importe que efectivamente se ve impreso en la sección de Placard.
+    const esItemPlacard = (it) => (it.seccion || "").startsWith("Placard / ");
     const totalesPorLinea = mostrarLineas
       ? lineasActivas.map((l, li) =>
           presupuestoItems.reduce((s, it) => {
-            const pr =
-              parseFloat(it.precios?.[li]?.precio ?? it.precio ?? 0) || 0;
+            const pr = esItemPlacard(it)
+              ? parseFloat(it.precio ?? 0) || 0
+              : parseFloat(it.precios?.[li]?.precio ?? it.precio ?? 0) || 0;
             return s + pr * (parseFloat(it.cantidad) || 1);
           }, 0),
         )
