@@ -429,16 +429,6 @@ export default function TablaArticulos({
                   Precio unit.
                 </th>
               )}
-              <th
-                style={{
-                  padding: "9px 14px",
-                  textAlign: "right",
-                  fontWeight: 700,
-                  width: 140,
-                }}
-              >
-                Subtotal
-              </th>
               <th style={{ padding: "9px 8px", width: 36 }}></th>
             </tr>
           </thead>
@@ -452,9 +442,19 @@ export default function TablaArticulos({
                 const items = presupuestoItems.filter(
                   (p) => grupoDe(p) === sec,
                 );
+                // Placard tiene su propia línea de precios fija en la BD
+                // (línea 15, ver LINEA_FIJA_PLACARD en useCocinaPlacard.js),
+                // independiente de las líneas elegidas en el Encabezado —
+                // por eso el mismo importe queda duplicado bajo cada columna
+                // "Línea X". Para estos grupos mostramos el precio en una
+                // sola columna (fusionando las columnas de línea con
+                // colSpan) en vez de repetir el mismo monto en cada una.
+                const esPlacardSec =
+                  items.length > 0 &&
+                  items.every((it) => (it.seccion || "").startsWith("Placard / "));
                 // Subtotal por línea para la sección
                 const subtotalesSec =
-                  lineasActivas.length > 0
+                  lineasActivas.length > 0 && !esPlacardSec
                     ? lineasActivas.map((l, li) =>
                         items.reduce((s, it) => {
                           const pr =
@@ -470,7 +470,7 @@ export default function TablaArticulos({
                   0,
                 );
                 const totalCols =
-                  6 + (lineasActivas.length > 0 ? lineasActivas.length : 1) + 1; // sección+prod+desc+cant+ancho+alto + líneas + subtotal
+                  6 + (lineasActivas.length > 0 ? lineasActivas.length : 1); // sección+prod+desc+cant+ancho+alto + líneas
 
                 return [
                   // Fila de sección
@@ -644,7 +644,88 @@ export default function TablaArticulos({
                             : "—"}
                         </td>
                         {lineasActivas.length > 0 ? (
-                          lineasActivas.map((l, li) => {
+                          esPlacardSec ? (
+                            (() => {
+                              const li = 0;
+                              const pr = item.precios?.[li]?.precio ?? item.precio ?? 0;
+                              const pctItem = item[`porcentaje${li + 1}`];
+                              return (
+                                <td
+                                  colSpan={lineasActivas.length}
+                                  style={{
+                                    padding: "7px 14px",
+                                    border: "1px solid #e8f0f7",
+                                    textAlign: "right",
+                                  }}
+                                >
+                                  <span
+                                    className="pn-precio-cell"
+                                    onClick={(e) =>
+                                      abrirPresItemPopover(
+                                        item.id,
+                                        li,
+                                        parseFloat(pr) || 0,
+                                        e,
+                                      )
+                                    }
+                                  >
+                                    $
+                                    {Number(pr).toLocaleString("es-AR", {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </span>
+                                  {pctItem != null ? (
+                                    <span
+                                      style={{
+                                        marginLeft: 5,
+                                        fontSize: 9,
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      {listaPorcentaje !== 0 && (
+                                        <span
+                                          style={{ color: "#2277bb", marginRight: 2 }}
+                                        >
+                                          +{listaPorcentaje}%
+                                        </span>
+                                      )}
+                                      <span
+                                        style={{
+                                          color:
+                                            pctItem >= 0
+                                              ? "#0a7a3a"
+                                              : "#c0392b",
+                                          background:
+                                            pctItem >= 0
+                                              ? "#e6f5eb"
+                                              : "#fdecea",
+                                          borderRadius: 3,
+                                          padding: "1px 4px",
+                                        }}
+                                      >
+                                        {pctItem > 0 ? "+" : ""}
+                                        {pctItem}%
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    listaPorcentaje !== 0 && (
+                                      <span
+                                        style={{
+                                          marginLeft: 5,
+                                          fontSize: 9,
+                                          color: "#2277bb",
+                                          fontWeight: 700,
+                                        }}
+                                      >
+                                        +{listaPorcentaje}%
+                                      </span>
+                                    )
+                                  )}
+                                </td>
+                              );
+                            })()
+                          ) : (
+                            lineasActivas.map((l, li) => {
                             const pr = item.precios?.[li]?.precio ?? item.precio ?? 0;
                             const pctItem = item[`porcentaje${li + 1}`];
                             return (
@@ -721,7 +802,8 @@ export default function TablaArticulos({
                                 )}
                               </td>
                             );
-                          })
+                            })
+                          )
                         ) : (
                           <td
                             style={{
@@ -785,19 +867,6 @@ export default function TablaArticulos({
                             )}
                           </td>
                         )}
-                        <td
-                          style={{
-                            padding: "7px 14px",
-                            border: "1px solid #e8f0f7",
-                            textAlign: "right",
-                            fontWeight: 700,
-                          }}
-                        >
-                          $
-                          {Number(item.subtotal).toLocaleString("es-AR", {
-                            minimumFractionDigits: 2,
-                          })}
-                        </td>
                         <td
                           style={{
                             padding: "7px 4px",
@@ -892,8 +961,25 @@ export default function TablaArticulos({
                     >
                       Subtotal {sec}
                     </td>
-                    {lineasActivas.length > 0
-                      ? subtotalesSec.map((st, li) => (
+                    {lineasActivas.length > 0 ? (
+                      esPlacardSec ? (
+                        <td
+                          colSpan={lineasActivas.length}
+                          style={{
+                            padding: "6px 14px",
+                            textAlign: "right",
+                            fontWeight: 700,
+                            color: "#0a5c3a",
+                            border: "1px solid #c8dae8",
+                          }}
+                        >
+                          $
+                          {subtotalSecSimple.toLocaleString("es-AR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                      ) : (
+                        subtotalesSec.map((st, li) => (
                           <td
                             key={li}
                             style={{
@@ -910,21 +996,23 @@ export default function TablaArticulos({
                             })}
                           </td>
                         ))
-                      : null}
-                    <td
-                      style={{
-                        padding: "6px 14px",
-                        textAlign: "right",
-                        fontWeight: 700,
-                        color: "#0a5c3a",
-                        border: "1px solid #c8dae8",
-                      }}
-                    >
-                      $
-                      {subtotalSecSimple.toLocaleString("es-AR", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </td>
+                      )
+                    ) : (
+                      <td
+                        style={{
+                          padding: "6px 14px",
+                          textAlign: "right",
+                          fontWeight: 700,
+                          color: "#0a5c3a",
+                          border: "1px solid #c8dae8",
+                        }}
+                      >
+                        $
+                        {subtotalSecSimple.toLocaleString("es-AR", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                    )}
                     <td style={{ border: "1px solid #c8dae8" }}></td>
                   </tr>,
                 ];

@@ -17,7 +17,7 @@ export const MEMBRETE_DANIEL_ROQUE_B64 ="data:image/png;base64,iVBORw0KGgoAAAANS
 //  - lineasActivas: líneas de precio activas (1 a 3)
 //  - presupuestoItems: ítems del presupuesto
 //  - grupoDe: función (item) => nombre de sección/grupo
-//  - mostrarCosto, incluirPrecio, incluirSubtotalItem, incluirTotal, agregarIVA, incluirTextoColoc: flags de armado
+//  - mostrarCosto, incluirPrecio, incluirTotal, agregarIVA, incluirTextoColoc: flags de armado
 //  - incluirTextoSena: bool, si se agrega el recuadro de seña/condiciones (fondo amarillo)
 //  - textoSena: texto libre de ese recuadro, editable desde el Encabezado
 //  - imagenesFinal: fotos y PDFs adjuntos
@@ -40,7 +40,6 @@ export async function generarPresupuestoPDF({
   grupoDe,
   mostrarCosto,
   incluirPrecio,
-  incluirSubtotalItem,
   incluirTotal,
   agregarIVA,
   incluirTextoColoc,
@@ -131,7 +130,19 @@ export async function generarPresupuestoPDF({
       .map((sec) => {
         const items = presupuestoItems.filter((p) => grupoDe(p) === sec);
         const subtotalSec = items.reduce((s, it) => s + (it.subtotal || 0), 0);
-        const subtotalesLineaSec = mostrarLineas
+
+        // Placard tiene su propia línea de precios fija en la BD (línea 15,
+        // ver LINEA_FIJA_PLACARD en useCocinaPlacard.js), independiente de
+        // las líneas elegidas en el Encabezado — por eso el mismo importe
+        // termina duplicado bajo cada columna "Línea X". Para estos grupos
+        // mostramos una sola columna de precio en vez de repetir el monto.
+        const esPlacardSec =
+          items.length > 0 &&
+          items.every((it) => (it.seccion || "").startsWith("Placard / "));
+        const mostrarLineasSec = mostrarLineas && !esPlacardSec;
+        const usarColumnaUnicaPlacard = mostrarLineas && esPlacardSec;
+
+        const subtotalesLineaSec = mostrarLineasSec
           ? lineasActivas.map((l, li) =>
               items.reduce((s, it) => {
                 const pr =
@@ -166,7 +177,7 @@ export async function generarPresupuestoPDF({
             // Precio por ítem: SOLO se muestra si incluirPrecio está activo.
             // Por defecto queda oculto (igual que el formato clásico), y solo
             // se ven los totales por sección/grupo al final de cada tabla.
-            const celdasPrecio = mostrarLineas
+            const celdasPrecio = mostrarLineasSec
               ? lineasActivas
                   .map((l, li) => {
                     if (!incluirPrecio) return `<td class="right"></td>`;
@@ -174,36 +185,36 @@ export async function generarPresupuestoPDF({
                     return `<td class="right">${formatPeso(pr)}</td>`;
                   })
                   .join("")
-              : incluirPrecio
-                ? `<td class="right">${formatPeso(item.precio)}</td>`
-                : "";
+              : usarColumnaUnicaPlacard
+                ? `<td class="right">${incluirPrecio ? formatPeso(item.precio) : ""}</td>`
+                : incluirPrecio
+                  ? `<td class="right">${formatPeso(item.precio)}</td>`
+                  : "";
             return `
         <tr>
           <td class="cant">${item.cantidad ?? 1}</td>
           <td>${item.nombreart ?? ""}${medida}${descripcionHTML}${fotoMamparaHTML}</td>
           ${mostrarCosto ? `<td class="right">${item.costo != null ? formatPeso(item.costo) : "—"}</td>` : ""}
           ${celdasPrecio}
-          ${incluirSubtotalItem ? `<td class="right"><strong>${formatPeso(item.subtotal)}</strong></td>` : ""}
         </tr>`;
           })
           .join("");
 
         const labelColspan = 2 + (mostrarCosto ? 1 : 0);
-        const celdasSubtotalLinea = mostrarLineas
+        const celdasSubtotalLinea = mostrarLineasSec
           ? subtotalesLineaSec
               .map((st) => `<td class="right">${formatPeso(st)}</td>`)
               .join("")
-          : incluirPrecio
+          : usarColumnaUnicaPlacard
             ? `<td class="right">${formatPeso(subtotalSec)}</td>`
-            : "";
-        const celdaSubtotalItem = incluirSubtotalItem
-          ? `<td class="right">${formatPeso(subtotalSec)}</td>`
-          : "";
-        // Si no hay ninguna columna de precio/línea/subtotal visible (caso del
-        // formato clásico: solo Cant/Detalle), no queda dónde poner el monto
-        // del parcial y se pierde. En ese caso lo mostramos igual, dentro de
-        // la misma celda del label "Total XXX:", alineado a la derecha.
-        const sinColumnaMonto = !celdasSubtotalLinea && !celdaSubtotalItem;
+            : incluirPrecio
+              ? `<td class="right">${formatPeso(subtotalSec)}</td>`
+              : "";
+        // Si no hay ninguna columna de precio/línea visible (caso del formato
+        // clásico: solo Cant/Detalle), no queda dónde poner el monto del
+        // parcial y se pierde. En ese caso lo mostramos igual, dentro de la
+        // misma celda del label "Total XXX:", alineado a la derecha.
+        const sinColumnaMonto = !celdasSubtotalLinea;
 
         // Fotos asignadas manualmente a este grupo — se pegan justo debajo
         // del detalle/tabla del grupo correspondiente.
@@ -229,15 +240,16 @@ export async function generarPresupuestoPDF({
               <th>Detalle</th>
               ${mostrarCosto ? `<th class="right">Costo</th>` : ""}
               ${
-                mostrarLineas
+                mostrarLineasSec
                   ? lineasActivas
                       .map((l) => `<th class="right">Línea ${l.linea}</th>`)
                       .join("")
-                  : incluirPrecio
-                    ? `<th class="right">Precio unit.</th>`
-                    : ""
+                  : usarColumnaUnicaPlacard
+                    ? `<th class="right">Precio</th>`
+                    : incluirPrecio
+                      ? `<th class="right">Precio unit.</th>`
+                      : ""
               }
-              ${incluirSubtotalItem ? `<th class="right">Subtotal</th>` : ""}
             </tr>
           </thead>
           <tbody>
@@ -247,8 +259,7 @@ export async function generarPresupuestoPDF({
                 sinColumnaMonto
                   ? `<td colspan="${labelColspan}" class="subtotal-cell"><span>Total:</span><span>${formatPeso(subtotalSec)}</span></td>`
                   : `<td colspan="${labelColspan}">Total:</td>
-              ${celdasSubtotalLinea}
-              ${celdaSubtotalItem}`
+              ${celdasSubtotalLinea}`
               }
             </tr>
           </tbody>
