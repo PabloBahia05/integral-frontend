@@ -301,8 +301,11 @@ export async function generarPresupuestoPDF({
     .footer { margin-top: auto; border-top: 1px solid #111; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #333; }
     /* Evita que html2pdf corte una imagen a la mitad entre dos hojas A4:
        si no entra completa en lo que queda de página, la empuja entera a
-       la siguiente. */
-    img, .sec-fotos, .adjunto-imagen, .mampara-foto, .texto-sena { page-break-inside: avoid; break-inside: avoid; }
+       la siguiente. Se agrega también .sec-block: cada grupo (título +
+       tabla de ítems + total) debe quedar entero en una misma hoja — si no
+       entra completo en lo que queda de la página actual, se empuja el
+       grupo completo a la siguiente en vez de cortarlo a la mitad. */
+    img, .sec-fotos, .adjunto-imagen, .mampara-foto, .texto-sena, .sec-block { page-break-inside: avoid; break-inside: avoid; }
     `;
 
     const pageHTML = `
@@ -447,7 +450,7 @@ export async function generarPresupuestoPDF({
         },
         pagebreak: {
           mode: ["css", "legacy"],
-          avoid: ["img", ".sec-fotos", ".adjunto-imagen", ".mampara-foto", ".texto-sena"],
+          avoid: ["img", ".sec-fotos", ".adjunto-imagen", ".mampara-foto", ".texto-sena", ".sec-block"],
         },
       };
 
