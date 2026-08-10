@@ -777,6 +777,20 @@ export default function TabEspeciales({
       <PresupuestoWallPanel
         token={token}
         onVolver={() => setVista("selector")}
+        onAgregarAPresupuesto={(data) => {
+          if (!data) return;
+          agregarAPresupuesto?.({
+            id: `wallpanel-${Date.now()}`,
+            seccion: "Wall Panel",
+            descripcion: "Wall Panel",
+            nombreart: `${data.materialBase || "Wall Panel"} ${data.ancho}x${data.alto}cm`,
+            cantidad: 1,
+            precio: Number(data.totalConMargen ?? 0),
+            subtotal: Number(data.totalConMargen ?? 0),
+            ancho: data.ancho ?? null,
+            alto: data.alto ?? null,
+          });
+        }}
       />
     );
   }

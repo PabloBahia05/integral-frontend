@@ -31,7 +31,7 @@ const resolverPrecioUnitario = (row, p) => {
   return 0;
 };
 
-export default function PresupuestoWallPanel({ onVolver, token }) {
+export default function PresupuestoWallPanel({ onVolver, token, onAgregarAPresupuesto }) {
   const authFetch = (url, options = {}) => {
     const headers = { ...(options.headers || {}) };
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -70,6 +70,10 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
   const [calculandoFormulas, setCalculandoFormulas] = useState(false);
   const [errorFormulas, setErrorFormulas] = useState("");
   const [parcialesExpandidos, setParcialesExpandidos] = useState({});
+  // Confirmación visual al mandar el cálculo a la solapa Presupuesto (Wall
+  // Panel no tiene tabla propia en BD como Vanitory/Despensero — no hay
+  // "guardado" contra el backend, se manda directo con lo ya calculado).
+  const [agregadoOk, setAgregadoOk] = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -388,6 +392,23 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
     valorVarillas ||
     valorCanto ||
     valorMO;
+
+  // Arma el ítem y lo manda a la solapa Presupuesto (mismo patrón que
+  // Vanitory/Despensero vía agregarAPresupuesto, pero sin paso de guardado
+  // en BD previo: Wall Panel no tiene tabla propia, se manda directo con
+  // el resultado ya calculado en pantalla).
+  const handleAgregarAPresupuesto = () => {
+    if (!hayResultado || !totalConMargen) return;
+    onAgregarAPresupuesto?.({
+      ancho: form.ancho,
+      alto: form.alto,
+      materialBase: form.materialBase,
+      materialVarilla: form.materialVarilla,
+      totalConMargen,
+    });
+    setAgregadoOk(true);
+    setTimeout(() => setAgregadoOk(false), 3000);
+  };
 
   const inputStyle = {
     width: "100%",
@@ -1310,6 +1331,43 @@ export default function PresupuestoWallPanel({ onVolver, token }) {
               {fmt(totalConMargen)}
             </span>
           </div>
+        </div>
+      )}
+
+      {/* ── Enviar a la solapa Presupuesto (mismo patrón que los demás
+           cotizadores de Especiales) ── */}
+      {hayResultado && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 24,
+          }}
+        >
+          {agregadoOk && (
+            <span style={{ color: "#16a34a", fontSize: 12 }}>
+              ✅ Agregado a Presupuesto
+            </span>
+          )}
+          <button
+            onClick={handleAgregarAPresupuesto}
+            style={{
+              padding: "10px 22px",
+              background: "#2ec4b6",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              fontFamily: "'Space Mono', monospace",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              letterSpacing: "0.04em",
+            }}
+          >
+            ➕ Agregar al presupuesto
+          </button>
         </div>
       )}
 
