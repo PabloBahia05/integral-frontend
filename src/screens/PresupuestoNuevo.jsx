@@ -1568,6 +1568,13 @@ export default function PresupuestoNuevo({
       // mismo ítem con la misma revisión. El backend las devuelve
       // ordenadas por id ASC, así que nos quedamos con la ÚLTIMA (id más
       // alto = el guardado más reciente) por cada ítem lógico.
+      //
+      // La clave incluye también cantidad + nombreart + porcentaje1/2/3
+      // además de articulo/tipo/ancho/alto/presmv/presp/grupo: dos filas
+      // solo se consideran "la misma" (duplicado por error) si TODOS esos
+      // campos coinciden. Si difiere la cantidad (ej: 3 vs 1 unidades del
+      // mismo artículo) u otro de estos campos, son líneas distintas
+      // agregadas a propósito y no se deben pisar entre sí.
       const dedupKey = (it) =>
         [
           it.articulo ?? it.ARTICULO ?? "",
@@ -1577,6 +1584,11 @@ export default function PresupuestoNuevo({
           it.presmv ?? it.PRESMV ?? "",
           it.presp ?? it.PRESP ?? "",
           it.grupo ?? it.GRUPO ?? "",
+          it.cantidad ?? it.CANTIDAD ?? "",
+          it.nombreart ?? it.NOMBREART ?? "",
+          it.porcentaje1 ?? it.PORCENTAJE1 ?? "",
+          it.porcentaje2 ?? it.PORCENTAJE2 ?? "",
+          it.porcentaje3 ?? it.PORCENTAJE3 ?? "",
         ].join("||");
       const itemsPorKey = new Map();
       items.forEach((it) => {
