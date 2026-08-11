@@ -1905,9 +1905,6 @@ export default function PresupuestoMamparas({
 
                 {/* Acciones */}
                 <div className="actions">
-                  <button className="btn btn-cancel" onClick={handleNuevo}>
-                    + Nuevo
-                  </button>
                   {errorCalc && (
                     <p
                       style={{
@@ -1943,12 +1940,6 @@ export default function PresupuestoMamparas({
                     disabled={guardando}
                   >
                     {guardando ? "⏳ Agregando..." : "➕ Agregar al presupuesto"}
-                  </button>
-                  <button className="btn btn-pdf" onClick={handlePDF}>
-                    📄 PDF
-                  </button>
-                  <button className="btn btn-print" onClick={handlePrint}>
-                    🖨️ Imprimir
                   </button>
                 </div>
               </div>
