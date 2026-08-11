@@ -200,25 +200,31 @@ const FIELDS_RIGHT = [
   { field: "mca", label: "MCA", placeholder: "Ej: MCA-001" },
 ];
 
-// Recalcula costosi -> costosicf -> costocicf -> precio a partir de
-// valorlista, descuento y margen. Función pura para poder reutilizarla
-// tanto al tipear en el formulario como al abrir "Editar" (para que el
-// precio mostrado nunca quede desincronizado del costo/margen guardado).
+// Recalcula costosi -> costosicf -> costocicf -> precio (y precio_un) a
+// partir de valorlista, descuento y margen. Función pura para poder
+// reutilizarla tanto al tipear en el formulario como al abrir "Editar"
+// (para que lo mostrado nunca quede desincronizado del costo/margen
+// guardado).
+// `precio` = costocicf, el precio de costo TAL CUAL, sin margen aplicado.
+// El margen se aplica sobre `precio_un` = precio * (1 + margen%).
 const recalcularCostosYPrecio = (valorlista, descuento, margen) => {
   const r2 = (v) => Math.round(v * 100) / 100;
   const vl = parseFloat(valorlista) || 0;
   const dto = parseFloat(descuento) || 0;
   const mg = parseFloat(margen) || 0;
-  if (!vl) return { costosi: "", costosicf: "", costocicf: "", precio: "" };
+  if (!vl)
+    return { costosi: "", costosicf: "", costocicf: "", precio: "", precio_un: "" };
   const costosi = r2(vl * (1 - dto / 100));
   const costosicf = r2(costosi * 1.1);
   const costocicf = r2(costosicf * 1.21);
-  const precio = r2(costocicf * (1 + mg / 100));
+  const precio = costocicf;
+  const precio_un = r2(precio * (1 + mg / 100));
   return {
     costosi: String(costosi),
     costosicf: String(costosicf),
     costocicf: String(costocicf),
     precio: String(precio),
+    precio_un: String(precio_un),
   };
 };
 
@@ -715,7 +721,7 @@ export default function Productos({
       codartprov: s(art.codartprov),
       prod_prov: s(art.prod_prov),
       mca: s(art.mca),
-      precio_un: s(art.precio_un),
+      precio_un: recalculado.precio_un || s(art.precio_un),
     });
     setError("");
     setFamiliaEsNueva(false);
@@ -1353,12 +1359,12 @@ export default function Productos({
                       />
                     </div>
 
-                    {/* Precio — calculado */}
+                    {/* Precio — calculado: precio de costo, SIN margen aplicado */}
                     <div className="form-group">
                       <label className="form-label">
                         Precio ($){" "}
                         <small style={{ color: "#6699bb" }}>
-                          (c/imp. c/flete × (1 + margen%))
+                          (costo c/imp. c/flete, sin margen)
                         </small>
                       </label>
                       <input
@@ -1370,9 +1376,14 @@ export default function Productos({
                       />
                     </div>
 
-                    {/* Precio UN — columna generada, solo lectura */}
+                    {/* Precio UN — con el margen aplicado sobre el precio de costo */}
                     <div className="form-group">
-                      <label className="form-label">Precio UN ($)</label>
+                      <label className="form-label">
+                        Precio UN ($){" "}
+                        <small style={{ color: "#6699bb" }}>
+                          (precio × (1 + margen%))
+                        </small>
+                      </label>
                       <input
                         className="form-input"
                         style={readonlyStyle}
