@@ -65,6 +65,9 @@ export default function TablaArticulos({
   // accesorios: lista de artículos "extra" (area='accesorio'), para poder
   // saber si un accesorio pegado a un ítem es "de freno" por su codartint
   accesoriosDisponibles,
+  // Línea de precio elegida por grupo (ver estado en PresupuestoNuevo.jsx)
+  lineaPorGrupo,
+  setLineaPorGrupo,
 }) {
   // Grupo efectivo de un ítem: el personalizado si el usuario le asignó uno,
   // si no la sección automática de siempre.
@@ -561,6 +564,47 @@ export default function TablaArticulos({
                         </button>
                       </span>
                       {sec}
+                      {/* Línea de precio elegida para este grupo, usada en
+                          el TOTAL COMBINADO al pie de la tabla (Totales.jsx).
+                          No aplica a Placard: esos grupos tienen precio único
+                          fijo (LINEA_FIJA_PLACARD), independiente de la línea
+                          elegida en el Encabezado. */}
+                      {lineasActivas.length > 1 && !esPlacardSec && (
+                        <select
+                          value={lineaPorGrupo?.[sec] ?? ""}
+                          onChange={(e) =>
+                            setLineaPorGrupo?.((prev) => {
+                              const next = { ...prev };
+                              if (e.target.value === "") delete next[sec];
+                              else next[sec] = Number(e.target.value);
+                              return next;
+                            })
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          title="Línea de precio para este grupo (se usa en el total combinado)"
+                          style={{
+                            marginLeft: 4,
+                            fontSize: 10,
+                            fontWeight: 400,
+                            textTransform: "none",
+                            letterSpacing: "normal",
+                            fontFamily: "'Space Mono',monospace",
+                            border: "1px solid #7aaac8",
+                            borderRadius: 2,
+                            padding: "1px 3px",
+                            background: lineaPorGrupo?.[sec] != null ? "#ffe58a" : "#fff",
+                            color: "#0a3a5c",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <option value="">Línea del grupo...</option>
+                          {lineasActivas.map((l, li) => (
+                            <option key={l.linea} value={li}>
+                              Línea {l.linea}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                   </tr>,
                   // Filas de ítems
@@ -802,6 +846,7 @@ export default function TablaArticulos({
                             lineasActivas.map((l, li) => {
                             const pr = item.precios?.[li]?.precio ?? item.precio ?? 0;
                             const pctItem = item[`porcentaje${li + 1}`];
+                            const esElegida = lineaPorGrupo?.[sec] === li;
                             return (
                               <td
                                 key={l.linea}
@@ -809,6 +854,7 @@ export default function TablaArticulos({
                                   padding: "7px 14px",
                                   border: "1px solid #e8f0f7",
                                   textAlign: "right",
+                                  background: esElegida ? "#fff6da" : undefined,
                                 }}
                               >
                                 <span
@@ -1062,6 +1108,8 @@ export default function TablaArticulos({
                               fontWeight: 700,
                               color: "#0a5c3a",
                               border: "1px solid #c8dae8",
+                              background:
+                                lineaPorGrupo?.[sec] === li ? "#ffe58a" : undefined,
                             }}
                           >
                             $
@@ -1092,10 +1140,12 @@ export default function TablaArticulos({
                 ];
               });
             })()}
-            {/* TOTAL GENERAL */}
+            {/* TOTAL GENERAL (+ TOTAL COMBINADO si hay líneas por grupo elegidas) */}
             <Totales
               presupuestoItems={presupuestoItems}
               lineasActivas={lineasActivas}
+              lineaPorGrupo={lineaPorGrupo}
+              grupoDe={grupoDe}
             />
           </tbody>
         </table>

@@ -1113,6 +1113,15 @@ export default function PresupuestoNuevo({
   // de aparición en presupuestoItems, el de siempre). No se persiste en el
   // backend — mismo criterio que gruposCustom, es reordenamiento de vista.
   const [ordenGrupos, setOrdenGrupos] = useState([]);
+  // Línea de precio elegida por grupo (ej: Bajomesadas -> Línea 21,
+  // Cocina/Alacenas -> Línea 22), para poder armar un total combinado que
+  // mezcle, por grupo, solo el valor de la línea que el cliente eligió para
+  // ese grupo. Se guarda el ÍNDICE dentro de lineasActivas (no el número de
+  // línea), igual que se usa "li" en el resto del código (it.precios[li]).
+  // { [grupo]: índice en lineasActivas } — grupos sin entrada acá usan la
+  // primera línea activa como default. No se persiste en el backend, mismo
+  // criterio que gruposCustom/ordenGrupos (es una preferencia de vista).
+  const [lineaPorGrupo, setLineaPorGrupo] = useState({});
 
   const grupoDe = (it) => {
     const gManual = gruposCustom[it.id];
@@ -3793,6 +3802,8 @@ export default function PresupuestoNuevo({
               setOrdenGrupos={setOrdenGrupos}
               nombresGruposUsados={nombresGruposUsados}
               accesoriosDisponibles={accesoriosDisponibles}
+              lineaPorGrupo={lineaPorGrupo}
+              setLineaPorGrupo={setLineaPorGrupo}
             />
           )}
         </div>
