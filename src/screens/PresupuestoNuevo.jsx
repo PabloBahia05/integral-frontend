@@ -2381,8 +2381,10 @@ export default function PresupuestoNuevo({
 
         // ── Refrescar quién/cuándo guardó, para mostrar en pantalla ──
         await cargarMetaPresupuesto(numAsignado, Number(revAsignada));
-        // Cada guardado reinserta los ítems (confirmado vuelve a 'no' por
-        // default), así que siempre hay que re-consultar el estado real.
+        // El backend preserva el "confirmado" que la revisión ya tenía al
+        // sobrescribirla (no lo resetea), pero igual re-consultamos acá
+        // para reflejar el estado real (por ejemplo, si es una revisión
+        // nueva que nace confirmada por heredar una obra ya cerrada).
         await cargarEstadoConfirmado(numAsignado, Number(revAsignada));
       }
       setRevision(Number(revAsignada));
