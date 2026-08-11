@@ -59,6 +59,9 @@ export default function TablaArticulos({
   gruposCustom,
   setGruposCustom,
   nombresGruposUsados,
+  // Orden manual de grupos (▲▼ del encabezado de cada sección)
+  ordenGrupos,
+  setOrdenGrupos,
   // accesorios: lista de artículos "extra" (area='accesorio'), para poder
   // saber si un accesorio pegado a un ítem es "de freno" por su codartint
   accesoriosDisponibles,
@@ -82,6 +85,28 @@ export default function TablaArticulos({
       }
       return next;
     });
+  };
+
+  // Orden efectivo de los grupos: primero los que están en ordenGrupos (en
+  // ese orden), después los que falten en su orden natural de aparición.
+  // Así un grupo nuevo que se agrega después siempre aparece al final hasta
+  // que el usuario lo reordene a mano.
+  const seccionesNaturales = [
+    ...new Set(presupuestoItems.map((p) => grupoDe(p))),
+  ];
+  const secciones = [
+    ...(ordenGrupos ?? []).filter((s) => seccionesNaturales.includes(s)),
+    ...seccionesNaturales.filter((s) => !(ordenGrupos ?? []).includes(s)),
+  ];
+
+  // Mueve un grupo un lugar hacia arriba (-1) o abajo (+1) en "secciones".
+  const moverGrupo = (sec, delta) => {
+    const idx = secciones.indexOf(sec);
+    const nuevoIdx = idx + delta;
+    if (idx === -1 || nuevoIdx < 0 || nuevoIdx >= secciones.length) return;
+    const next = [...secciones];
+    [next[idx], next[nuevoIdx]] = [next[nuevoIdx], next[idx]];
+    setOrdenGrupos(next);
   };
 
   return (
@@ -434,9 +459,6 @@ export default function TablaArticulos({
           </thead>
           <tbody>
             {(() => {
-              const secciones = [
-                ...new Set(presupuestoItems.map((p) => grupoDe(p))),
-              ];
               let rowIdx = 0;
               return secciones.flatMap((sec) => {
                 const items = presupuestoItems.filter(
@@ -484,8 +506,60 @@ export default function TablaArticulos({
                         fontSize: 11,
                         letterSpacing: "0.08em",
                         textTransform: "uppercase",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
                       }}
                     >
+                      <span
+                        style={{ display: "inline-flex", gap: 2 }}
+                        // No forma parte del texto de la sección: son los
+                        // controles para reordenar grupos (ordenGrupos).
+                      >
+                        <button
+                          type="button"
+                          onClick={() => moverGrupo(sec, -1)}
+                          disabled={secciones.indexOf(sec) === 0}
+                          title="Subir grupo"
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            cursor:
+                              secciones.indexOf(sec) === 0
+                                ? "default"
+                                : "pointer",
+                            opacity: secciones.indexOf(sec) === 0 ? 0.3 : 1,
+                            fontSize: 11,
+                            padding: "0 2px",
+                            color: "#0a3a5c",
+                          }}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moverGrupo(sec, 1)}
+                          disabled={secciones.indexOf(sec) === secciones.length - 1}
+                          title="Bajar grupo"
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            cursor:
+                              secciones.indexOf(sec) === secciones.length - 1
+                                ? "default"
+                                : "pointer",
+                            opacity:
+                              secciones.indexOf(sec) === secciones.length - 1
+                                ? 0.3
+                                : 1,
+                            fontSize: 11,
+                            padding: "0 2px",
+                            color: "#0a3a5c",
+                          }}
+                        >
+                          ▼
+                        </button>
+                      </span>
                       {sec}
                     </td>
                   </tr>,
