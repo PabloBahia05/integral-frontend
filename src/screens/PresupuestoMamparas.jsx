@@ -1934,7 +1934,7 @@ export default function PresupuestoMamparas({
                       ✅{" "}
                       {modoEdicion
                         ? `Guardado como Rev. ${revision}`
-                        : "Presupuesto guardado correctamente"}
+                        : "Agregado a Presupuesto"}
                     </p>
                   )}
                   <button
@@ -1942,7 +1942,7 @@ export default function PresupuestoMamparas({
                     onClick={handleGuardar}
                     disabled={guardando}
                   >
-                    {guardando ? "⏳ Guardando..." : "💾 Guardar"}
+                    {guardando ? "⏳ Agregando..." : "➕ Agregar al presupuesto"}
                   </button>
                   <button className="btn btn-pdf" onClick={handlePDF}>
                     📄 PDF
