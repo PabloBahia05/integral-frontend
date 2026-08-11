@@ -640,33 +640,68 @@ export default function PlacardSection({
                               textAlign: "center",
                             }}
                           >
+                            {/* Antes este botón (en modo edición) tocaba
+                                solo el draft `placardFila` — local, se
+                                volcaba a placardItems recién al pinchar
+                                "Confirmar edición". Si el usuario tildaba
+                                un accesorio acá y guardaba el presupuesto
+                                (botón global "Guardar") sin confirmar la
+                                edición primero, el cambio se veía en
+                                pantalla pero nunca llegaba a
+                                placardItems/presupuestoItems: BUG
+                                reportado. Ahora el toggle escribe DOBLE:
+                                directo en placardItems (vía
+                                toggleAccesorioItem/confirmarAccesoriosItem,
+                                igual que la fila de vista, para que
+                                persista ya mismo aunque no se confirme la
+                                edición) y también en placardFila (para que
+                                si el usuario SÍ confirma la edición
+                                después, `placardGuardarEdit` — que
+                                reemplaza la fila entera por
+                                `{...placardFila}` — no pise el accesorio
+                                recién tildado con el valor viejo del
+                                draft). */}
                             <button
                               type="button"
                               onClick={(e) =>
                                 abrirAccesorioMenu?.(
-                                  placardFila.accesorios ?? [],
-                                  (nombre) =>
+                                  fila.accesorios ?? [],
+                                  (nombre) => {
+                                    toggleAccesorioItem?.(
+                                      "placard",
+                                      placardFamilia,
+                                      idx,
+                                      nombre,
+                                    );
                                     setPlacardFila((f) => ({
                                       ...f,
                                       accesorios: toggleAccesorioEnArray(
                                         f.accesorios,
                                         nombre,
                                       ),
-                                    })),
-                                  () =>
+                                    }));
+                                  },
+                                  () => {
+                                    confirmarAccesoriosItem?.(
+                                      "placard",
+                                      placardFamilia,
+                                      idx,
+                                      resolverAreaItem(fila),
+                                    );
                                     setPlacardFila((f) =>
                                       recalcFila ? recalcFila(f) : f,
-                                    ),
+                                    );
+                                  },
                                   e,
                                 )
                               }
                               title="Agregar/quitar accesorios (autofreno, led, etc)"
                               style={{
                                 padding: "4px 8px",
-                                background: placardFila.accesorios?.length
+                                background: fila.accesorios?.length
                                   ? "#0a5c3a"
                                   : "#fff",
-                                color: placardFila.accesorios?.length
+                                color: fila.accesorios?.length
                                   ? "#fff"
                                   : "#0a3a5c",
                                 border: "1px solid #7aaac8",
@@ -676,7 +711,7 @@ export default function PlacardSection({
                                 cursor: "pointer",
                               }}
                             >
-                              🔧 {placardFila.accesorios?.length ?? 0}
+                              🔧 {fila.accesorios?.length ?? 0}
                             </button>
                           </td>
                           <td

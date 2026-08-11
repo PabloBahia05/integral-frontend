@@ -675,33 +675,63 @@ export default function TabCocina({
                       textAlign: "center",
                     }}
                   >
+                    {/* Antes este botón (en modo edición) tocaba solo el
+                        draft `cocinaFila` — local, se volcaba a cocinaItems
+                        recién al pinchar "Confirmar edición". Si el usuario
+                        tildaba un accesorio acá y guardaba el presupuesto
+                        (botón global "Guardar") sin confirmar la edición
+                        primero, el cambio se veía en pantalla pero nunca
+                        llegaba a cocinaItems/presupuestoItems: BUG
+                        reportado. Ahora el toggle escribe DOBLE: directo en
+                        cocinaItems (vía toggleAccesorioItem/confirmarAcceso
+                        riosItem, igual que la fila de vista, para que
+                        persista ya mismo aunque no se confirme la edición)
+                        y también en cocinaFila (para que si el usuario SÍ
+                        confirma la edición después, `cocinaGuardarEdit` —
+                        que reemplaza la fila entera por `{...cocinaFila}` —
+                        no pise el accesorio recién tildado con el valor
+                        viejo del draft). */}
                     <button
                       type="button"
                       onClick={(e) =>
                         abrirAccesorioMenu?.(
-                          cocinaFila.accesorios ?? [],
-                          (nombre) =>
+                          fila.accesorios ?? [],
+                          (nombre) => {
+                            toggleAccesorioItem?.(
+                              "cocina",
+                              cocinaFamilia,
+                              idx,
+                              nombre,
+                            );
                             setCocinaFila((f) => ({
                               ...f,
                               accesorios: toggleAccesorioEnArray(
                                 f.accesorios,
                                 nombre,
                               ),
-                            })),
-                          () =>
+                            }));
+                          },
+                          () => {
+                            confirmarAccesoriosItem?.(
+                              "cocina",
+                              cocinaFamilia,
+                              idx,
+                              resolverAreaItem(fila),
+                            );
                             setCocinaFila((f) =>
                               recalcFila ? recalcFila(f) : f,
-                            ),
+                            );
+                          },
                           e,
                         )
                       }
                       title="Agregar/quitar accesorios (autofreno, led, etc)"
                       style={{
                         padding: "4px 8px",
-                        background: cocinaFila.accesorios?.length
+                        background: fila.accesorios?.length
                           ? "#0a5c3a"
                           : "#fff",
-                        color: cocinaFila.accesorios?.length ? "#fff" : "#0a3a5c",
+                        color: fila.accesorios?.length ? "#fff" : "#0a3a5c",
                         border: "1px solid #7aaac8",
                         borderRadius: 2,
                         fontFamily: "'Space Mono',monospace",
@@ -709,7 +739,7 @@ export default function TabCocina({
                         cursor: "pointer",
                       }}
                     >
-                      🔧 {cocinaFila.accesorios?.length ?? 0}
+                      🔧 {fila.accesorios?.length ?? 0}
                     </button>
                   </td>
                   {lineasActivas.length > 0 ? (
