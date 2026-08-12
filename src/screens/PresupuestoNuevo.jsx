@@ -641,6 +641,7 @@ export default function PresupuestoNuevo({
   const [wapp, setWapp] = useState("");
   const [domicilio, setDomicilio] = useState("");
   const [domicilioFiscal, setDomicilioFiscal] = useState("");
+  const [referencia, setReferencia] = useState("");
   // Resolución automática de cliente: busca por nombre, luego por teléfono,
   // y si no existe lo da de alta solo, sin que el usuario elija de una lista.
   const [resolviendoCliente, setResolviendoCliente] = useState(false);
@@ -890,6 +891,7 @@ export default function PresupuestoNuevo({
           observaciones,
           texto_sena: textoSena,
           incluir_texto_sena: incluirTextoSena,
+          referencia,
           // Respaldo del upsert que ya hace POST /tabla-presupuestos — con
           // el COALESCE del backend, esto nunca pisa un codcliente ya
           // guardado con null.
@@ -961,6 +963,7 @@ export default function PresupuestoNuevo({
       if (data) {
         setLeyenda(data.leyenda ?? "");
         setObservaciones(data.observaciones ?? "");
+        setReferencia(data.referencia ?? "");
         setIncluirTextoSena(
           data.incluir_texto_sena != null ? !!data.incluir_texto_sena : true,
         );
@@ -3609,6 +3612,8 @@ export default function PresupuestoNuevo({
                 setDomicilio={setDomicilio}
                 domicilioFiscal={domicilioFiscal}
                 setDomicilioFiscal={setDomicilioFiscal}
+                referencia={referencia}
+                setReferencia={setReferencia}
                 telefonoSearch={telefonoSearch}
                 setTelefonoSearch={setTelefonoSearch}
                 telefonosSugeridos={telefonosSugeridos}
