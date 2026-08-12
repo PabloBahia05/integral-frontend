@@ -29,6 +29,8 @@ export default function EncabezadoSection({
   setDomicilio,
   domicilioFiscal,
   setDomicilioFiscal,
+  referencia,
+  setReferencia,
   telefonoSearch,
   setTelefonoSearch,
   telefonosSugeridos,
@@ -114,6 +116,8 @@ export default function EncabezadoSection({
         setDomicilio={setDomicilio}
         domicilioFiscal={domicilioFiscal}
         setDomicilioFiscal={setDomicilioFiscal}
+        referencia={referencia}
+        setReferencia={setReferencia}
         telefonoSearch={telefonoSearch}
         setTelefonoSearch={setTelefonoSearch}
         telefonosSugeridos={telefonosSugeridos}
