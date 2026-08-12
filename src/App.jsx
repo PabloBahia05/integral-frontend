@@ -12,6 +12,7 @@ import PresupuestosVanitoryTabla from "./screens/PresupuestosVanitoryTabla";
 import PresupuestoAmoblamiento from "./screens/PresupuestoAmoblamiento";
 import PresupuestoNuevo from "./screens/PresupuestoNuevo";
 import ListaPresupuestos2 from "./screens/ListaPresupuestos2";
+import Produccion from "./screens/Produccion";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
 import HistorialFacturas from "./screens/HistorialFacturas";
@@ -38,6 +39,7 @@ const SCREENS = {
   "lista-presupuestos-2": { label: "LISTA PRESUPUESTOS", icon: "⚡" },
   "mueble-especial": { label: "MUEBLE ESPECIAL", icon: "🪚" },
   "obras-confirmadas": { label: "OBRAS CONFIRMADAS", icon: "✅" },
+  produccion: { label: "PRODUCCIÓN", icon: "🏭" },
   facturas: { label: "FACTURAS", icon: "🧾" },
   "historial-facturas": { label: "HISTORIAL FACTURAS", icon: "📋" },
   anviz: { label: "ASISTENCIA", icon: "🕐" },
@@ -95,6 +97,13 @@ const buttons = [
     icon: "✅",
     color: "#00b4d8",
     screen: "obras-confirmadas",
+  },
+  {
+    id: 15,
+    label: "PRODUCCIÓN",
+    icon: "🏭",
+    color: "#8d6e63",
+    screen: "produccion",
   },
 ];
 
@@ -1003,6 +1012,9 @@ function App() {
                 }}
                 authFetch={authFetch}
               />
+            )}
+            {screen === "produccion" && (
+              <Produccion authFetch={authFetch} />
             )}
             {screen === "presupuesto-amoblamiento" &&
               amoblamientoVista === "selector" && (
