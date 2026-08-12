@@ -23,6 +23,8 @@ export default function ClienteSection({
   setDomicilio,
   domicilioFiscal,
   setDomicilioFiscal,
+  referencia,
+  setReferencia,
   telefonoSearch,
   setTelefonoSearch,
   telefonosSugeridos,
@@ -274,6 +276,24 @@ export default function ClienteSection({
               })}
             </div>
           )}
+        </div>
+
+        {/* Referencia — punto de referencia de la dirección, libre */}
+        <div
+          style={{
+            flex: "1 1 150px",
+            minWidth: 140,
+          }}
+        >
+          <input
+            className="pn-field-input"
+            value={referencia}
+            onChange={(e) => setReferencia(e.target.value)}
+            placeholder="📍 Referencia..."
+            maxLength={100}
+            autoComplete="off"
+            style={{ width: "100%" }}
+          />
         </div>
 
         {/* Estado de la resolución automática de cliente */}
