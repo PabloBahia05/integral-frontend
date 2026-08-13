@@ -17,6 +17,9 @@ export const MEMBRETE_DANIEL_ROQUE_B64 ="data:image/png;base64,iVBORw0KGgoAAAANS
 //  - lineasActivas: líneas de precio activas (1 a 3)
 //  - presupuestoItems: ítems del presupuesto
 //  - grupoDe: función (item) => nombre de sección/grupo
+//  - ordenGrupos: array con el orden manual de grupos (▲▼ en TablaArticulos),
+//    igual al estado que vive en PresupuestoNuevo.jsx. Opcional: si no se
+//    pasa, se usa el orden natural de aparición (comportamiento previo).
 //  - mostrarCosto, incluirPrecio, incluirTotal, agregarIVA, incluirTextoColoc: flags de armado
 //  - incluirTextoSena: bool, si se agrega el recuadro de seña/condiciones (fondo amarillo)
 //  - textoSena: texto libre de ese recuadro, editable desde el Encabezado
@@ -38,6 +41,7 @@ export async function generarPresupuestoPDF({
   lineasActivas,
   presupuestoItems,
   grupoDe,
+  ordenGrupos,
   mostrarCosto,
   incluirPrecio,
   incluirTotal,
@@ -120,7 +124,17 @@ export async function generarPresupuestoPDF({
     // Agrupa los ítems por grupo personalizado (si el usuario le asignó uno)
     // o, en su defecto, por la sección automática de siempre. Respeta el
     // orden en que aparecen los ítems.
-    const secciones = [...new Set(presupuestoItems.map((p) => grupoDe(p)))];
+    // Mismo criterio que TablaArticulos.jsx: primero los grupos que están en
+    // ordenGrupos (respetando ese orden manual), después los que falten en
+    // su orden natural de aparición. Así el PDF queda igual a lo que el
+    // usuario ve en pantalla después de usar las flechitas ▲▼.
+    const seccionesNaturales = [
+      ...new Set(presupuestoItems.map((p) => grupoDe(p))),
+    ];
+    const secciones = [
+      ...(ordenGrupos ?? []).filter((s) => seccionesNaturales.includes(s)),
+      ...seccionesNaturales.filter((s) => !(ordenGrupos ?? []).includes(s)),
+    ];
 
     // Genera un bloque <table> independiente por sección/grupo, con su propio
     // encabezado "Cant / Detalle / Línea X" y su fila de total — igual que el
@@ -473,6 +487,12 @@ export async function generarPresupuestoPDF({
       const MARGEN_SUP_MM = 26;
       const MARGEN_IZQ_MM = 14.8; // ≈ padding-left de .page (56px)
       const LOGO_ALTO_MM = 16;
+      // Logo más grande solo en la primera hoja (pedido del usuario). Se
+      // achica el margen vertical superior del logo (de 5 a 2mm) para que,
+      // aun agrandado, siga entrando dentro del MARGEN_SUP_MM reservado
+      // (26mm) sin pisar el contenido de esa página.
+      const LOGO_ALTO_MM_PRIMERA_HOJA = 24;
+      const LOGO_Y_MM_PRIMERA_HOJA = 2;
 
       const opcionesPDF = {
         margin: [MARGEN_SUP_MM, 0, 10, 0],
@@ -498,17 +518,30 @@ export async function generarPresupuestoPDF({
       const estamparMembreteEnTodasLasPaginas = (pdf) => {
         const propsLogo = pdf.getImageProperties(MEMBRETE_DANIEL_ROQUE_B64);
         const anchoMM = (propsLogo.width * LOGO_ALTO_MM) / propsLogo.height;
+        const anchoMMPrimeraHoja =
+          (propsLogo.width * LOGO_ALTO_MM_PRIMERA_HOJA) / propsLogo.height;
         const totalPaginas = pdf.internal.getNumberOfPages();
         for (let i = 1; i <= totalPaginas; i++) {
           pdf.setPage(i);
-          pdf.addImage(
-            MEMBRETE_DANIEL_ROQUE_B64,
-            "PNG",
-            MARGEN_IZQ_MM,
-            5,
-            anchoMM,
-            LOGO_ALTO_MM,
-          );
+          if (i === 1) {
+            pdf.addImage(
+              MEMBRETE_DANIEL_ROQUE_B64,
+              "PNG",
+              MARGEN_IZQ_MM,
+              LOGO_Y_MM_PRIMERA_HOJA,
+              anchoMMPrimeraHoja,
+              LOGO_ALTO_MM_PRIMERA_HOJA,
+            );
+          } else {
+            pdf.addImage(
+              MEMBRETE_DANIEL_ROQUE_B64,
+              "PNG",
+              MARGEN_IZQ_MM,
+              5,
+              anchoMM,
+              LOGO_ALTO_MM,
+            );
+          }
         }
         return pdf;
       };

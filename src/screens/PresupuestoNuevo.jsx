@@ -2450,6 +2450,7 @@ export default function PresupuestoNuevo({
       lineasActivas,
       presupuestoItems,
       grupoDe,
+      ordenGrupos,
       mostrarCosto,
       incluirPrecio,
       incluirSubtotalItem,
