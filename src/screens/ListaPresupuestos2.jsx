@@ -64,6 +64,11 @@ const COLS_ENCABEZADO = [
     render: (_, row) => row.telefono1 || row.telefono2 || "—",
   },
   {
+    key: "referencia",
+    label: "Referencia",
+    render: (v) => v || "—",
+  },
+  {
     key: "linea1",
     label: "Línea",
     render: (_, row) => formatLineas(row),
