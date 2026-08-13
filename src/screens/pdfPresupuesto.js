@@ -277,7 +277,8 @@ export async function generarPresupuestoPDF({
             <tr class="subtotal-row">
               ${
                 sinColumnaMonto
-                  ? `<td colspan="${labelColspan}" class="subtotal-cell"><span>Total:</span><span>${formatPeso(subtotalSec)}</span></td>`
+                  ? `<td colspan="${labelColspan}">Total:</td>
+              <td class="right">${formatPeso(subtotalSec)}</td>`
                   : `<td colspan="${labelColspan}">Total:</td>
               ${celdasSubtotalLinea}`
               }
@@ -340,9 +341,6 @@ export async function generarPresupuestoPDF({
     .medida { color: #444; font-size: 11px; }
     .item-desc { color: #444; font-size: 11px; font-style: italic; margin-top: 2px; }
     tr.subtotal-row td { border-top: 1px solid #111; font-weight: 700; padding-top: 4px; }
-    tr.subtotal-row td.subtotal-cell { display: flex; justify-content: space-between; align-items: baseline; }
-    tr.subtotal-row td.subtotal-cell span:first-child { min-width: 0; }
-    tr.subtotal-row td.subtotal-cell span:last-child { white-space: nowrap; flex-shrink: 0; }
     .totals-final { margin-top: 6px; text-align: right; }
     .totals-final .t-row { font-weight: 700; font-size: 13px; padding: 3px 0; }
     .iva-note { font-size: 10px; color: #555; text-align: right; margin-top: 4px; }
