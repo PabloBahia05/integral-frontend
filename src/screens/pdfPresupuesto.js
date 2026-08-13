@@ -484,14 +484,15 @@ export async function generarPresupuestoPDF({
       // las hojas (y no solo en la primera) es reservarle este hueco fijo
       // arriba de cada página y luego "estamparlo" con jsPDF una vez que el
       // PDF ya está generado (ver estamparMembreteEnTodasLasPaginas).
-      const MARGEN_SUP_MM = 26;
+      // NOTA: este margen es compartido por TODAS las páginas (no se puede
+      // variar por página en html2pdf), así que agrandarlo para que entre
+      // el logo grande de la portada también deja más aire arriba en las
+      // páginas siguientes (que igual siguen con el logo chico de 16mm).
+      const MARGEN_SUP_MM = 38;
       const MARGEN_IZQ_MM = 14.8; // ≈ padding-left de .page (56px)
       const LOGO_ALTO_MM = 16;
-      // Logo más grande solo en la primera hoja (pedido del usuario). Se
-      // achica el margen vertical superior del logo (de 5 a 2mm) para que,
-      // aun agrandado, siga entrando dentro del MARGEN_SUP_MM reservado
-      // (26mm) sin pisar el contenido de esa página.
-      const LOGO_ALTO_MM_PRIMERA_HOJA = 24;
+      // Logo más grande solo en la primera hoja (pedido del usuario).
+      const LOGO_ALTO_MM_PRIMERA_HOJA = 35;
       const LOGO_Y_MM_PRIMERA_HOJA = 2;
 
       const opcionesPDF = {
