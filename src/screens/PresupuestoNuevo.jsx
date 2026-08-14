@@ -2252,6 +2252,26 @@ export default function PresupuestoNuevo({
     setError("");
     setGuardando(true);
 
+    // Sincroniza clientes.nombre con el texto final tipeado en este campo.
+    // El auto-alta/auto-resolución (ver useEffect de arriba) puede haber
+    // creado o vinculado el cliente con un nombre PARCIAL (capturado en una
+    // pausa de tipeo antes de que el usuario terminara de escribir); ese
+    // flujo deliberadamente no pisa la columna "nombre" principal en pasos
+    // intermedios (solo completa nombre1/nombre2), así que "nombre" puede
+    // quedar desactualizado. Acá, en el momento del Guardar definitivo, ya
+    // sabemos que "cliente" es el texto final → lo persistimos siempre.
+    if (codcliente) {
+      try {
+        await authFetch(`${API}/clientes/por-codcliente/${codcliente}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre: cliente.trim() }),
+        });
+      } catch (e) {
+        console.error("[handleGuardar] no se pudo sincronizar clientes.nombre:", e);
+      }
+    }
+
     // esEdicion ya no fuerza nueva revisión: "Guardar" ahora sobrescribe la
     // revisión actual (revisionActual) tanto si es la primera vez (rev 0)
     // como si ya se guardó antes. "Nueva Revisión" (esNuevaRev=true) es la
