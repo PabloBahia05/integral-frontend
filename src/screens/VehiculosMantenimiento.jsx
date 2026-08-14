@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 const API = "https://integral-backend-production.up.railway.app";
-const API_URL = `${API}/vehiculos-mantenimiento`;
+const API_URL = `${API}/vehiculos`;
 
 const vacio = { vehiculo: '', chofer: '', fecha: '', taller: '', costo: '' };
 
