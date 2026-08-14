@@ -18,6 +18,7 @@ import Facturas from "./screens/Facturas";
 import HistorialFacturas from "./screens/HistorialFacturas";
 import AfipIVA from "./screens/AfipIVA";
 import ActualizarPreciosExcel from "./screens/ActualizarPreciosExcel";
+import VehiculosMantenimiento from "./screens/VehiculosMantenimiento";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState } from "react";
@@ -46,6 +47,7 @@ const SCREENS = {
   "afip-iva": { label: "AFIP IVA", icon: "🏦" },
   usuarios: { label: "USUARIOS", icon: "👤" },
   "actualizar-precios": { label: "ACTUALIZAR PRECIOS", icon: "💲" },
+  "vehiculos-mantenimiento": { label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚" },
 };
 
 const buttons = [
@@ -1108,6 +1110,14 @@ function App() {
             {/* ── Mueble Especial ── */}
             {screen === "mueble-especial" && <MuebleEspecial />}
 
+            {/* ── Vehículos - Mantenimiento ── */}
+            {screen === "vehiculos-mantenimiento" && (
+              <VehiculosMantenimiento
+                token={token}
+                onBack={() => setScreen(null)}
+              />
+            )}
+
             {/* ── Facturas ── */}
             {screen === "facturas" && <Facturas proveedores={proveedores} token={token} />}
 
@@ -1217,6 +1227,7 @@ function App() {
         {puedo("anviz", "ver") && <p onClick={() => { setScreen("anviz"); setSidebarOpen(false); }}>🕐 Asistencia</p>}
         {puedo("usuarios", "ver") && <p onClick={() => { setScreen("usuarios"); setSidebarOpen(false); }}>👤 Usuarios</p>}
         {puedo("actualizar-precios", "ver") && <p onClick={() => { setScreen("actualizar-precios"); setSidebarOpen(false); }}>💲 Actualizar Precios</p>}
+        {puedo("vehiculos-mantenimiento", "ver") && <p onClick={() => { setScreen("vehiculos-mantenimiento"); setSidebarOpen(false); }}>🚚 Vehículos - Mantenimiento</p>}
         <p onClick={logout} style={{ color: "#cc3333" }}>🚪 Cerrar sesión</p>
       </div>
 
@@ -1349,6 +1360,22 @@ function App() {
                 <span className="sub-card-label">PROVEEDORES</span>
                 <span className="sub-card-desc">
                   PlacaSur, Aglolam, Cantochap
+                </span>
+              </div>
+              )}
+              {puedo("vehiculos-mantenimiento", "ver") && (
+              <div
+                className="sub-card"
+                style={{ "--sc-color": "#8d6e63" }}
+                onClick={() => {
+                  setScreen("vehiculos-mantenimiento");
+                  setHomeSection(HOME_SECTIONS.main);
+                }}
+              >
+                <span className="sub-card-icon">🚚</span>
+                <span className="sub-card-label">VEHÍCULOS - MANTENIMIENTO</span>
+                <span className="sub-card-desc">
+                  Registros de mantenimiento y costos
                 </span>
               </div>
               )}
