@@ -169,6 +169,16 @@ export default function Anviz({ onBack }) {
   const [justifList, setJustifList]             = useState([]);
   const [justifForm, setJustifForm]              = useState({ tipo: "ART", fecha_desde: "", fecha_hasta: "", dias: "", nota: "" });
   const [justifCargando, setJustifCargando]      = useState(false);
+  // ── Feriados (automáticos + control manual) ──
+  const [feriados, setFeriados]           = useState([]);
+  const [feriadosCargando, setFeriadosCargando] = useState(false);
+  const [feriadosError, setFeriadosError] = useState("");
+  const [feriadosAnio, setFeriadosAnio]   = useState(() => new Date().getFullYear());
+  const [feriadosModal, setFeriadosModal] = useState(null); // null | "nueva" | "editar"
+  const [feriadosForm, setFeriadosForm]   = useState({ fecha: "", nombre: "" });
+  const [feriadosEditId, setFeriadosEditId] = useState(null);
+  const [feriadosGuardando, setFeriadosGuardando] = useState(false);
+  const [feriadosModalError, setFeriadosModalError] = useState("");
   const [vacDesde, setVacDesde]           = useState("2026-06-08");
   const [vacHasta, setVacHasta]           = useState(hoy);
 
@@ -717,6 +727,79 @@ export default function Anviz({ onBack }) {
     }
   }
 
+  // ── Feriados (automáticos, con control manual de altas/bajas) ──
+  const cargarFeriados = useCallback(async () => {
+    setFeriadosCargando(true);
+    setFeriadosError("");
+    try {
+      const params = new URLSearchParams();
+      if (feriadosAnio) params.set("anio", feriadosAnio);
+      const data = await apiFetch(`/feriados?${params}`, token);
+      setFeriados(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setFeriadosError(e.message);
+    } finally {
+      setFeriadosCargando(false);
+    }
+  }, [feriadosAnio, token]);
+
+  useEffect(() => {
+    if (vista === "feriados") cargarFeriados();
+  }, [vista, cargarFeriados]);
+
+  function abrirNuevoFeriado() {
+    setFeriadosEditId(null);
+    setFeriadosForm({ fecha: "", nombre: "" });
+    setFeriadosModalError("");
+    setFeriadosModal("nueva");
+  }
+
+  function abrirEditarFeriado(f) {
+    setFeriadosEditId(f.id);
+    setFeriadosForm({ fecha: String(f.fecha).slice(0, 10), nombre: f.nombre || "" });
+    setFeriadosModalError("");
+    setFeriadosModal("editar");
+  }
+
+  async function guardarFeriado() {
+    if (!feriadosForm.fecha) return;
+    setFeriadosGuardando(true);
+    setFeriadosModalError("");
+    try {
+      const esEdicion = feriadosModal === "editar";
+      const res = await authFetch(
+        `${API}/feriados${esEdicion ? `/${feriadosEditId}` : ""}`,
+        {
+          method: esEdicion ? "PUT" : "POST",
+          body: JSON.stringify({
+            fecha: feriadosForm.fecha,
+            nombre: feriadosForm.nombre || null,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      setFeriadosModal(null);
+      cargarFeriados();
+    } catch (e) {
+      setFeriadosModalError(e.message);
+    } finally {
+      setFeriadosGuardando(false);
+    }
+  }
+
+  async function eliminarFeriado(id) {
+    if (!confirm("¿Eliminar este feriado? A partir de ahora ese día va a contar como día hábil en el cálculo de horas.")) return;
+    try {
+      await authFetch(`${API}/feriados/${id}`, { method: "DELETE" });
+      setFeriados(l => l.filter(f => f.id !== id));
+    } catch (e) {
+      alert("Error al eliminar: " + e.message);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div style={s.page}>
@@ -1230,6 +1313,13 @@ export default function Anviz({ onBack }) {
               <span style={s.inicioLabel}>Vacaciones y Horas</span>
               <span style={s.inicioDesc}>Resumen por empleado</span>
             </div>
+            {!esOperario && (
+              <div style={{ ...s.inicioCard, order: 4 }} onClick={() => setVista("feriados")}>
+                <span style={s.inicioIcon}>📅</span>
+                <span style={s.inicioLabel}>Feriados</span>
+                <span style={s.inicioDesc}>Días no laborables (automático + manual)</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1668,6 +1758,132 @@ export default function Anviz({ onBack }) {
         </>
       )}
 
+      {/* ── Vista Feriados ─────────────────────────────────────────────────── */}
+      {vista === "feriados" && (
+        <>
+          <div style={s.header}>
+            <div style={s.headerLeft}>
+              <button style={s.btnVolver} onClick={() => setVista("inicio")}>← Volver</button>
+              <div style={s.iconBox}><IconReloj /></div>
+              <div>
+                <h1 style={s.titulo}>Feriados</h1>
+                <span style={s.subtitulo}>Días no laborables — se excluyen del cálculo de horas esperadas</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={s.notice}>
+            Los feriados nacionales se cargan automáticamente. Si falta uno (feriado puntual,
+            provincial o trasladado) agregalo acá; si figura uno que este año/localidad no
+            corresponde tomar, eliminalo. El cambio impacta al instante en el cálculo de horas.
+          </div>
+
+          <div style={s.filtrosWrap}>
+            <div style={s.filtroFila}>
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Año</label>
+                <input
+                  type="number"
+                  value={feriadosAnio}
+                  onChange={(e) => setFeriadosAnio(e.target.value)}
+                  style={{ ...s.input, minWidth: 100 }}
+                />
+              </div>
+              <button style={s.btnBuscar} onClick={cargarFeriados}>Buscar</button>
+              <button style={{ ...s.btnNueva, marginLeft: "auto" }} onClick={abrirNuevoFeriado}>
+                ➕ Nuevo feriado
+              </button>
+            </div>
+          </div>
+
+          <div style={s.tableWrap}>
+            {feriadosError && <div style={s.errorBanner}>⚠️ {feriadosError}</div>}
+            {feriadosCargando ? (
+              <div style={s.estado}>
+                <div style={s.spinner} />
+                <span style={{ color: "#64748b", fontSize: 14 }}>Cargando feriados...</span>
+              </div>
+            ) : feriados.length === 0 ? (
+              <div style={s.estado}>
+                <span style={{ fontSize: 36 }}>📭</span>
+                <span style={{ color: "#64748b", fontSize: 14, marginTop: 8 }}>
+                  Sin feriados cargados para este año
+                </span>
+              </div>
+            ) : (
+              <table style={s.tabla}>
+                <thead>
+                  <tr>
+                    <th style={s.th}>Fecha</th>
+                    <th style={s.th}>Nombre</th>
+                    <th style={s.th}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {feriados.map((f) => (
+                    <tr key={f.id}>
+                      <td style={s.td}>{fmtFecha(f.fecha)}</td>
+                      <td style={s.td}>{f.nombre || <span style={{ color: "#475569" }}>—</span>}</td>
+                      <td style={s.td}>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button style={s.btnRowEdit} onClick={() => abrirEditarFeriado(f)} title="Editar">✏️</button>
+                          <button style={s.btnRowDel} onClick={() => eliminarFeriado(f.id)} title="Eliminar">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Modal: alta/edición de feriado ────────────────────────────────── */}
+      {feriadosModal && (
+        <div style={s.modalOverlay} onClick={() => setFeriadosModal(null)}>
+          <div style={s.modalBox} onClick={(e) => e.stopPropagation()}>
+            <h3 style={s.modalTitulo}>
+              {feriadosModal === "nueva" ? "➕ Nuevo feriado" : "✏️ Editar feriado"}
+            </h3>
+
+            <div style={s.modalGrupo}>
+              <label style={s.label}>Fecha</label>
+              <DateInput
+                value={feriadosForm.fecha}
+                onChange={(v) => setFeriadosForm((d) => ({ ...d, fecha: v }))}
+                style={s.input}
+              />
+            </div>
+
+            <div style={s.modalGrupo}>
+              <label style={s.label}>Nombre (opcional)</label>
+              <input
+                type="text"
+                value={feriadosForm.nombre}
+                onChange={(e) => setFeriadosForm((d) => ({ ...d, nombre: e.target.value }))}
+                placeholder="Ej: Día de Güemes"
+                style={s.input}
+              />
+            </div>
+
+            {feriadosModalError && <div style={s.modalError}>{feriadosModalError}</div>}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button
+                style={{ ...s.btnBuscar, flex: 1, opacity: feriadosGuardando ? 0.6 : 1 }}
+                onClick={guardarFeriado}
+                disabled={feriadosGuardando || !feriadosForm.fecha}
+              >
+                {feriadosGuardando ? "Guardando..." : "Guardar"}
+              </button>
+              <button style={s.btnPag} onClick={() => setFeriadosModal(null)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modal && (
         <div style={s.modalOverlay} onClick={() => setModal(null)}>
