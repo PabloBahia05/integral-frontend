@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { authFetch } from '../utils/authFetch'; // ajustar path según donde tengas el helper
 
-const API_URL = `${import.meta.env.VITE_API_URL}/vehiculos`; // ajustar variable de entorno si usás otro nombre
+const API = "https://integral-backend-production.up.railway.app";
+const API_URL = `${API}/vehiculos-mantenimiento`;
 
 const vacio = { vehiculo: '', chofer: '', fecha: '', taller: '', costo: '' };
 
-export default function VehiculosMantenimiento({ token }) {
+export default function VehiculosMantenimiento({ token, onBack }) {
   const [registros, setRegistros] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -14,11 +14,16 @@ export default function VehiculosMantenimiento({ token }) {
   const [form, setForm] = useState(vacio);
   const [guardando, setGuardando] = useState(false);
 
+  const authHeaders = (extra = {}) => ({
+    Authorization: `Bearer ${token}`,
+    ...extra,
+  });
+
   const cargarRegistros = async () => {
     setCargando(true);
     setError('');
     try {
-      const res = await authFetch(API_URL, {}, token);
+      const res = await fetch(API_URL, { headers: authHeaders() });
       if (!res.ok) throw new Error('No se pudieron cargar los registros');
       const data = await res.json();
       setRegistros(data);
@@ -31,8 +36,9 @@ export default function VehiculosMantenimiento({ token }) {
   };
 
   useEffect(() => {
+    if (!token) return;
     cargarRegistros();
-  }, []);
+  }, [token]);
 
   const abrirNuevo = () => {
     setEditandoId(null);
@@ -71,15 +77,11 @@ export default function VehiculosMantenimiento({ token }) {
     try {
       const url = editandoId ? `${API_URL}/${editandoId}` : API_URL;
       const method = editandoId ? 'PUT' : 'POST';
-      const res = await authFetch(
-        url,
-        {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...form, costo: Number(form.costo) }),
-        },
-        token
-      );
+      const res = await fetch(url, {
+        method,
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ ...form, costo: Number(form.costo) }),
+      });
       if (!res.ok) throw new Error('Error al guardar');
       cerrarModal();
       cargarRegistros();
@@ -94,7 +96,10 @@ export default function VehiculosMantenimiento({ token }) {
   const handleEliminar = async (id) => {
     if (!window.confirm('¿Eliminar este registro de mantenimiento?')) return;
     try {
-      const res = await authFetch(`${API_URL}/${id}`, { method: 'DELETE' }, token);
+      const res = await fetch(`${API_URL}/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
       if (!res.ok) throw new Error('Error al eliminar');
       cargarRegistros();
     } catch (err) {
@@ -120,9 +125,28 @@ export default function VehiculosMantenimiento({ token }) {
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '20px',
+          gap: '12px',
+          flexWrap: 'wrap',
         }}
       >
-        <h2 style={{ margin: 0 }}>Vehículos - Mantenimiento</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {onBack && (
+            <button
+              onClick={onBack}
+              style={{
+                border: '1px solid #a0cce8',
+                background: 'transparent',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                cursor: 'pointer',
+                fontSize: '13px',
+              }}
+            >
+              ← Volver
+            </button>
+          )}
+          <h2 style={{ margin: 0 }}>Vehículos - Mantenimiento</h2>
+        </div>
         <button
           onClick={abrirNuevo}
           style={{
