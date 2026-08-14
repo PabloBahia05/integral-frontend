@@ -53,6 +53,46 @@ export async function generarPresupuestoPDF({
   setGenerandoPDF,
   authFetch,
 }) {
+  // Agrupa una lista ordenada de imágenes en "filas": una fila es un array
+  // de 1 o más imágenes que se van a mostrar una al lado de la otra en el
+  // PDF. El encadenado se arma con im.juntarSiguiente (tildado desde el
+  // gestor de imágenes de PresupuestoNuevo.jsx): si una imagen lo tiene en
+  // true, se junta con la siguiente en la misma fila (y así se puede
+  // encadenar a 3 o más). Sin ninguna marcada, el comportamiento es el de
+  // siempre: una imagen por fila.
+  const agruparEnFilas = (fotos) => {
+    const filas = [];
+    let filaActual = [];
+    fotos.forEach((im, i) => {
+      filaActual.push(im);
+      const esUltima = i === fotos.length - 1;
+      if (!im.juntarSiguiente || esUltima) {
+        filas.push(filaActual);
+        filaActual = [];
+      }
+    });
+    if (filaActual.length) filas.push(filaActual);
+    return filas;
+  };
+
+  // Genera el HTML de una fila de fotos: una sola imagen se comporta igual
+  // que siempre (bloque a ancho im.anchoPct); 2 o más imágenes se ponen en
+  // una fila flex, cada una con su propio ancho relativo (mismo campo
+  // anchoPct, ahora interpretado como % del ancho de la fila).
+  const filaFotosHTML = (fila) => {
+    if (fila.length === 1) {
+      const im = fila[0];
+      return `<div class="adjunto-imagen" style="margin-top:8px;"><img src="${im.url}" style="max-width:${im.anchoPct ?? 100}%; display:block;" /></div>`;
+    }
+    const items = fila
+      .map(
+        (im) =>
+          `<div class="foto-individual" style="flex:0 0 ${im.anchoPct ?? 100}%; max-width:${im.anchoPct ?? 100}%;"><img src="${im.url}" style="width:100%; display:block;" /></div>`,
+      )
+      .join("");
+    return `<div class="fila-fotos" style="margin-top:8px;">${items}</div>`;
+  };
+
     const formatPeso = (v) =>
       "$" +
       Number(v || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 });
@@ -242,11 +282,10 @@ export async function generarPresupuestoPDF({
           (im) => im.tipo === "imagen" && im.grupo === sec,
         );
         const fotosSecHTML = fotosSec.length
-          ? `<div class="sec-fotos" style="margin-top:10px;">${fotosSec
-              .map(
-                (im) =>
-                  `<img src="${im.url}" style="max-width:${im.anchoPct ?? 100}%; display:block; margin-top:8px;" />`,
-              )
+          ? `<div class="sec-fotos" style="margin-top:10px;">${agruparEnFilas(
+              fotosSec,
+            )
+              .map(filaFotosHTML)
               .join("")}</div>`
           : "";
 
@@ -329,6 +368,9 @@ export async function generarPresupuestoPDF({
     .leyenda { font-size: 11px; font-style: italic; margin-bottom: 18px; }
     .tabla-block { margin-bottom: 20px; }
     .sec-fotos { margin-bottom: 20px; }
+    .fila-fotos { display: flex; gap: 10px; align-items: flex-start; }
+    .foto-individual { min-width: 0; }
+    .foto-individual img { display: block; }
     .sec-title { font-style: italic; font-weight: 700; text-transform: uppercase; font-size: 12px; margin-bottom: 3px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     thead th { text-align: left; font-weight: 700; border-bottom: 1px solid #111; padding: 1px 8px 3px 0; }
@@ -356,7 +398,7 @@ export async function generarPresupuestoPDF({
        (.sec-fotos) van en un bloque HERMANO aparte, no anidado dentro de
        .tabla-block: así, si la tabla entra pero la foto no, la foto se
        empuja sola a la página siguiente sin arrastrar (ni cortar) la tabla. */
-    img, .sec-fotos, .adjunto-imagen, .mampara-foto, .texto-sena, .tabla-block { page-break-inside: avoid; break-inside: avoid; }
+    img, .sec-fotos, .adjunto-imagen, .fila-fotos, .mampara-foto, .texto-sena, .tabla-block { page-break-inside: avoid; break-inside: avoid; }
     `;
 
     const pageHTML = `
@@ -407,12 +449,10 @@ export async function generarPresupuestoPDF({
         : ""
     }
 
-    ${imagenesFinal
-      .filter((im) => im.tipo === "imagen" && !im.grupo)
-      .map(
-        (im) =>
-          `<div class="adjunto-imagen" style="margin-top:18px;"><img src="${im.url}" style="max-width:${im.anchoPct ?? 100}%; display:block;" /></div>`,
-      )
+    ${agruparEnFilas(
+      imagenesFinal.filter((im) => im.tipo === "imagen" && !im.grupo),
+    )
+      .map(filaFotosHTML)
       .join("")}
 
     ${
@@ -508,7 +548,7 @@ export async function generarPresupuestoPDF({
         },
         pagebreak: {
           mode: ["css", "legacy"],
-          avoid: ["img", ".sec-fotos", ".adjunto-imagen", ".mampara-foto", ".texto-sena", ".tabla-block"],
+          avoid: ["img", ".sec-fotos", ".adjunto-imagen", ".fila-fotos", ".mampara-foto", ".texto-sena", ".tabla-block"],
         },
       };
 

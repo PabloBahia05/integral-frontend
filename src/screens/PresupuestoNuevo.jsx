@@ -846,9 +846,44 @@ export default function PresupuestoNuevo({
   // proporcional (mismo principio que ya usaba el PDF, ahora configurable).
   const actualizarAnchoImagen = (id, pct) => {
     const val = parseInt(pct, 10);
+    // Rango amplio (5%–100%) para dar libertad total: valores chicos sirven
+    // para poner 2 o más fotos en una misma fila (ver juntarSiguiente).
+    const clamped = isNaN(val) ? 100 : Math.min(100, Math.max(5, val));
+    setImagenesFinal((prev) =>
+      prev.map((im) => (im.id === id ? { ...im, anchoPct: clamped } : im)),
+    );
+  };
+
+  // Reordena una imagen dentro de su mismo grupo (o dentro de "sin grupo"),
+  // moviéndola un lugar hacia arriba o abajo. El orden dentro de cada grupo
+  // es el que después usa pdfPresupuesto.js para armar las filas de fotos.
+  const moverImagen = (id, direccion) => {
+    setImagenesFinal((prev) => {
+      const im = prev.find((x) => x.id === id);
+      if (!im) return prev;
+      const indicesMismoGrupo = prev
+        .map((x, i) => ({ x, i }))
+        .filter(({ x }) => x.tipo === "imagen" && x.grupo === im.grupo)
+        .map(({ i }) => i);
+      const idxActual = prev.findIndex((x) => x.id === id);
+      const pos = indicesMismoGrupo.indexOf(idxActual);
+      const nuevaPos = direccion === "up" ? pos - 1 : pos + 1;
+      if (nuevaPos < 0 || nuevaPos >= indicesMismoGrupo.length) return prev;
+      const idxA = indicesMismoGrupo[pos];
+      const idxB = indicesMismoGrupo[nuevaPos];
+      const nuevo = [...prev];
+      [nuevo[idxA], nuevo[idxB]] = [nuevo[idxB], nuevo[idxA]];
+      return nuevo;
+    });
+  };
+
+  // Marca esta imagen para que se muestre en la misma fila que la siguiente
+  // (misma tabla/grupo), una al lado de la otra en vez de una debajo de la
+  // otra. Se puede encadenar (A junta con B, B junta con C → fila de 3).
+  const toggleJuntarFila = (id) => {
     setImagenesFinal((prev) =>
       prev.map((im) =>
-        im.id === id ? { ...im, anchoPct: isNaN(val) ? 100 : val } : im,
+        im.id === id ? { ...im, juntarSiguiente: !im.juntarSiguiente } : im,
       ),
     );
   };
@@ -2883,7 +2918,22 @@ export default function PresupuestoNuevo({
                 </div>
               )}
 
-              {imagenesFinal.map((im) => (
+              {imagenesFinal.map((im) => {
+                // Posición de esta imagen dentro de su propio grupo (o
+                // dentro de "sin grupo"), para habilitar/deshabilitar los
+                // botones ▲▼ y saber si hay una "siguiente" con la que
+                // juntarla en una fila.
+                const hermanosMismoGrupo = imagenesFinal.filter(
+                  (x) => x.tipo === "imagen" && x.grupo === im.grupo,
+                );
+                const posEnGrupo = hermanosMismoGrupo.findIndex(
+                  (x) => x.id === im.id,
+                );
+                const esPrimeraDelGrupo = posEnGrupo <= 0;
+                const esUltimaDelGrupo =
+                  posEnGrupo === hermanosMismoGrupo.length - 1;
+
+                return (
                 <div
                   key={im.id}
                   style={{
@@ -2984,30 +3034,101 @@ export default function PresupuestoNuevo({
                             marginTop: 4,
                           }}
                         />
-                        <label
+                        <div
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: 6,
-                            fontSize: 12,
-                            color: "#333",
+                            gap: 10,
                             marginTop: 6,
+                            flexWrap: "wrap",
                           }}
                         >
-                          Tamaño en el PDF:
-                          <select
-                            value={im.anchoPct ?? 100}
-                            onChange={(e) =>
-                              actualizarAnchoImagen(im.id, e.target.value)
-                            }
-                            style={{ fontSize: 12, padding: "3px 5px" }}
+                          <label
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              fontSize: 12,
+                              color: "#333",
+                            }}
                           >
-                            <option value={25}>25%</option>
-                            <option value={50}>50%</option>
-                            <option value={75}>75%</option>
-                            <option value={100}>100% (completo)</option>
-                          </select>
-                        </label>
+                            Tamaño en el PDF:
+                            <input
+                              type="number"
+                              min={5}
+                              max={100}
+                              step={1}
+                              defaultValue={im.anchoPct ?? 100}
+                              key={`ancho-${im.id}-${im.anchoPct ?? 100}`}
+                              onBlur={(e) =>
+                                actualizarAnchoImagen(im.id, e.target.value)
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") e.target.blur();
+                              }}
+                              style={{
+                                fontSize: 12,
+                                padding: "3px 5px",
+                                width: 56,
+                              }}
+                            />
+                            %
+                          </label>
+
+                          <div
+                            style={{ display: "flex", gap: 4 }}
+                            title="Reordenar dentro del grupo"
+                          >
+                            <button
+                              type="button"
+                              className="pn-tool-btn"
+                              onClick={() => moverImagen(im.id, "up")}
+                              disabled={esPrimeraDelGrupo}
+                              style={{
+                                padding: "2px 7px",
+                                fontSize: 12,
+                                opacity: esPrimeraDelGrupo ? 0.35 : 1,
+                              }}
+                              title="Mover antes"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              className="pn-tool-btn"
+                              onClick={() => moverImagen(im.id, "down")}
+                              disabled={esUltimaDelGrupo}
+                              style={{
+                                padding: "2px 7px",
+                                fontSize: 12,
+                                opacity: esUltimaDelGrupo ? 0.35 : 1,
+                              }}
+                              title="Mover después"
+                            >
+                              ▼
+                            </button>
+                          </div>
+
+                          {!esUltimaDelGrupo && (
+                            <label
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 5,
+                                fontSize: 12,
+                                color: "#333",
+                              }}
+                              title="Muestra esta imagen y la siguiente una al lado de la otra en el PDF"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={!!im.juntarSiguiente}
+                                onChange={() => toggleJuntarFila(im.id)}
+                              />
+                              Poner al lado de la siguiente
+                            </label>
+                          )}
+                        </div>
                       </>
                     ) : (
                       <div style={{ fontSize: 11, color: "#888" }}>
@@ -3025,7 +3146,8 @@ export default function PresupuestoNuevo({
                     🗑️
                   </button>
                 </div>
-              ))}
+                );
+              })}
 
               <div
                 style={{
