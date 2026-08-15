@@ -1080,6 +1080,8 @@ export default function PresupuestoNuevo({
   const [guiasSearch, setGuiasSearch] = useState("");
   const [guiasFocus, setGuiasFocus] = useState(false);
   const [guiasDB, setGuiasDB] = useState([]);
+  // Melaminas (columna Color de TablaArticulos)
+  const [melaminasDB, setMelaminasDB] = useState([]);
 
   // Cargar materiales/guias desde BD al montar
   useEffect(() => {
@@ -1093,6 +1095,12 @@ export default function PresupuestoNuevo({
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setGuiasDB(data);
+      })
+      .catch(() => {});
+    authFetch(`${API}/productos/melaminas`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setMelaminasDB(data);
       })
       .catch(() => {});
   }, []);
@@ -1875,6 +1883,7 @@ export default function PresupuestoNuevo({
             )
             .filter(Boolean),
           grupo: it.grupo ?? it.GRUPO ?? "",
+          color: it.color ?? it.COLOR ?? null,
         };
         if (tipo.includes("cocina") && tipo.includes("bajomesada"))
           nuevaCocina.bajomesadas.push(fila);
@@ -1963,6 +1972,7 @@ export default function PresupuestoNuevo({
             ancho: it.ancho ?? it.ANCHO ?? null,
             alto: it.alto ?? it.ALTO ?? null,
             grupo: it.grupo ?? it.GRUPO ?? null,
+            color: it.color ?? it.COLOR ?? null,
           });
         }
       });
@@ -2364,6 +2374,9 @@ export default function PresupuestoNuevo({
             const g = grupoDe(it);
             return g && g !== it.seccion ? g : null;
           })(),
+          // Color (melamina) elegido para el ítem en la columna Color de
+          // TablaArticulos — guarda el codartint de articulos.
+          color: it.color ?? null,
         };
       }),
     };
@@ -3952,6 +3965,8 @@ export default function PresupuestoNuevo({
               accesoriosDisponibles={accesoriosDisponibles}
               lineaPorGrupo={lineaPorGrupo}
               setLineaPorGrupo={setLineaPorGrupo}
+              melaminas={melaminasDB}
+              setPresupuestoItems={setPresupuestoItems}
             />
           )}
         </div>

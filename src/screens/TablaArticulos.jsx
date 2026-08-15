@@ -805,8 +805,8 @@ export default function TablaArticulos({
                           >
                             <option value="">—</option>
                             {(melaminas ?? []).map((m) => (
-                              <option key={m.articulo ?? m.id ?? m} value={m.articulo ?? m.nombre ?? m}>
-                                {m.nombre ?? m.articulo ?? m}
+                              <option key={m.codartint} value={m.codartint}>
+                                {m.articulo}
                               </option>
                             ))}
                           </select>
