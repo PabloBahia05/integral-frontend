@@ -140,7 +140,6 @@ function App() {
 
   const [clientes, setClientes] = useState([]);
   const [productos, setProductos] = useState([]);
-  const [tiposVanitory, setTiposVanitory] = useState([]);
   const [tiposEscritorio, setTiposEscritorio] = useState([]);
   const [tiposDespensero, setTiposDespensero] = useState([]);
   const [formulas, setFormulas] = useState([]);
@@ -167,7 +166,6 @@ function App() {
   const [selectedColocacion, setSelectedColocacion] = useState(null);
   const [selectedCliente, setSelectedCliente] = useState(null);
   const [selectedProducto, setSelectedProducto] = useState(null);
-  const [selectedTipoVanitory, setSelectedTipoVanitory] = useState(null);
   const [selectedTipoEscritorio, setSelectedTipoEscritorio] = useState(null);
   const [selectedTipoDespensero, setSelectedTipoDespensero] = useState(null);
   const [selectedFormula, setSelectedFormula] = useState(null);
@@ -232,12 +230,6 @@ function App() {
     authFetch(`${API}/productos`)
       .then((r) => r.json())
       .then(setProductos)
-      .catch(console.error);
-
-  const fetchTiposVanitory = () =>
-    authFetch(`${API}/vanitory-tipos`)
-      .then((r) => r.json())
-      .then(setTiposVanitory)
       .catch(console.error);
 
   const fetchTiposEscritorio = () =>
@@ -349,7 +341,6 @@ function App() {
     if (puedeVer("clientes"))                fetchClientes();
     if (puedeVer("productos"))               fetchProductos();
     if (puedeVer("presupuesto-mamparas"))    fetchColocaciones();
-    if (puedeVer("presupuesto-nuevo"))       fetchTiposVanitory();
     if (puedeVer("ver-tablas"))              fetchTiposEscritorio();
     if (puedeVer("ver-tablas"))              fetchTiposDespensero();
     if (puedeVer("ver-tablas"))              fetchFormulas();
@@ -507,14 +498,6 @@ function App() {
     setSelectedProducto,
     fetchProductos,
     "Producto",
-  );
-  const tiposVanitoryRUD = makeCRUD(
-    "vanitory-tipos",
-    tiposVanitory,
-    setTiposVanitory,
-    setSelectedTipoVanitory,
-    fetchTiposVanitory,
-    "Tipo de vanitory",
   );
   const tiposEscritorioRUD = makeCRUD(
     "escritorio-tipos",
@@ -982,8 +965,6 @@ function App() {
                   }
                 }}
                 presupuestoInicial={presupuestoAbierto}
-                tiposVanitory={tiposVanitory}
-                tiposVanitoryRUD={tiposVanitoryRUD}
                 tiposDespensero={tiposDespensero}
                 tiposDespenseroRUD={tiposDespenseroRUD}
                 token={token}
