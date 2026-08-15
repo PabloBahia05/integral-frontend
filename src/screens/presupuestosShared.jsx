@@ -4,6 +4,7 @@
 // pantallas independientes porque manejaban listas y flujos claramente
 // distintos; lo que quedó acá es lo que sí era 100% idéntico entre ambas.
 
+import { useState } from "react";
 import DataTable from "../Component/DataTable";
 import Modal from "../Component/Modal";
 
@@ -287,6 +288,12 @@ export const PRESUPUESTOS_CSS = `
   .btn-abrir-sm:hover { background: #c8e6c9; }
 `;
 
+// Grupo efectivo de un ítem del panel de detalle: el `grupo` guardado en
+// tabla_presupuestos si existe, si no la sección (`tipo`) — mismo criterio
+// de fallback que `grupoDe()` en TablaArticulos.jsx.
+const grupoEfectivo = (it) =>
+  it.grupo && String(it.grupo).trim() ? it.grupo : (it.tipo ?? "");
+
 // ── Panel de ítems (detalle al seleccionar una fila, con la columna Color) ─
 
 export function ItemsPanel({
@@ -299,7 +306,26 @@ export function ItemsPanel({
   errorColorId,
   onChangeColor,
 }) {
+  // Color por grupo: selección local (grupo + melamina) + función que
+  // aplica ese color a todos los ítems del grupo que tengan fila de
+  // `produccion` vinculada (mismo mecanismo que el color por ítem — un PUT
+  // por cada uno, vía onChangeColor).
+  const [grupoColorSel, setGrupoColorSel] = useState("");
+  const [colorGrupoValor, setColorGrupoValor] = useState("");
+
   if (!selected) return null;
+
+  const gruposDisponibles = [
+    ...new Set(itemsConColor.map((it) => grupoEfectivo(it)).filter(Boolean)),
+  ];
+
+  const aplicarColorAGrupo = () => {
+    if (!grupoColorSel || !colorGrupoValor) return;
+    itemsConColor
+      .filter((it) => grupoEfectivo(it) === grupoColorSel && it._produccionId != null)
+      .forEach((it) => onChangeColor(it._produccionId, colorGrupoValor));
+  };
+
   return (
     <div className="items-panel">
       <div className="items-panel-header">
@@ -311,6 +337,95 @@ export function ItemsPanel({
           Total: {formatPeso(totalSeleccionado)}
         </span>
       </div>
+      {!loadingItems && itemsConColor.length > 0 && (
+        <div
+          style={{
+            background: "#f5f8fb",
+            borderBottom: "1px solid #d0e4f0",
+            padding: "10px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            fontFamily: "'Space Mono',monospace",
+            fontSize: 12,
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 700,
+              color: "#0a3a5c",
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            🎨 Color por grupo
+          </span>
+          <select
+            value={grupoColorSel}
+            onChange={(e) => setGrupoColorSel(e.target.value)}
+            style={{
+              padding: "5px 8px",
+              border: "1px solid #b8cfe0",
+              borderRadius: 2,
+              fontFamily: "'Space Mono',monospace",
+              fontSize: 11,
+              color: "#0a3a5c",
+              background: "#fff",
+              maxWidth: 180,
+            }}
+          >
+            <option value="">Grupo...</option>
+            {gruposDisponibles.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+          <select
+            value={colorGrupoValor}
+            onChange={(e) => setColorGrupoValor(e.target.value)}
+            style={{
+              padding: "5px 8px",
+              border: "1px solid #b8cfe0",
+              borderRadius: 2,
+              fontFamily: "'Space Mono',monospace",
+              fontSize: 11,
+              color: "#0a3a5c",
+              background: "#fff",
+              maxWidth: 180,
+            }}
+          >
+            <option value="">Color...</option>
+            {melaminas.map((m) => (
+              <option key={m.codartint} value={m.codartint}>
+                {m.articulo}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={aplicarColorAGrupo}
+            disabled={!grupoColorSel || !colorGrupoValor}
+            title="Aplica este color a todos los ítems del grupo elegido"
+            style={{
+              padding: "5px 14px",
+              background: grupoColorSel && colorGrupoValor ? "#0a3a5c" : "#c8dae8",
+              color: grupoColorSel && colorGrupoValor ? "#fff" : "#99aabb",
+              border: "none",
+              borderRadius: 2,
+              fontFamily: "'Space Mono',monospace",
+              fontSize: 11,
+              cursor: grupoColorSel && colorGrupoValor ? "pointer" : "default",
+              fontWeight: 700,
+              transition: "all 0.12s",
+            }}
+          >
+            Aplicar
+          </button>
+        </div>
+      )}
       {loadingItems ? (
         <p className="items-empty">⏳ Cargando ítems...</p>
       ) : itemsConColor.length === 0 ? (
