@@ -120,13 +120,18 @@ export default function TablaArticulos({
   // ── Color por grupo: selección local (grupo + melamina elegidos en el
   // panel) y función que aplica ese color a TODOS los ítems del grupo. ──
   const [grupoColorSel, setGrupoColorSel] = useState("");
+  // Sentinel distinto de "" (que significa "todavía no elegí nada" y deja
+  // el botón deshabilitado) para poder elegir explícitamente "Sin color" y
+  // así quitar el color ya asignado a los ítems del grupo.
+  const SIN_COLOR = "__SIN_COLOR__";
   const [colorGrupoValor, setColorGrupoValor] = useState("");
 
   const aplicarColorAGrupo = () => {
     if (!grupoColorSel || !colorGrupoValor) return;
+    const valor = colorGrupoValor === SIN_COLOR ? "" : colorGrupoValor;
     setPresupuestoItems((prev) =>
       prev.map((p) =>
-        grupoDe(p) === grupoColorSel ? { ...p, color: colorGrupoValor } : p,
+        grupoDe(p) === grupoColorSel ? { ...p, color: valor } : p,
       ),
     );
   };
@@ -432,6 +437,7 @@ export default function TablaArticulos({
               }}
             >
               <option value="">Color...</option>
+              <option value={SIN_COLOR}>— Sin color —</option>
               {(melaminas ?? []).map((m) => (
                 <option key={m.codartint} value={m.codartint}>
                   {m.articulo}
