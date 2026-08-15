@@ -11,7 +11,8 @@ import PresupuestosMamparasTabla from "./screens/PresupuestosMamparasTabla";
 import PresupuestosVanitoryTabla from "./screens/PresupuestosVanitoryTabla";
 import PresupuestoAmoblamiento from "./screens/PresupuestoAmoblamiento";
 import PresupuestoNuevo from "./screens/PresupuestoNuevo";
-import ListaPresupuestos2 from "./screens/ListaPresupuestos2";
+import ListaPresupuestos from "./screens/ListaPresupuestos";
+import ObrasConfirmadas from "./screens/ObrasConfirmadas";
 import Produccion from "./screens/Produccion";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
@@ -989,7 +990,7 @@ function App() {
               />
             )}
             {screen === "lista-presupuestos-2" && (
-              <ListaPresupuestos2
+              <ListaPresupuestos
                 onAbrirPresupuesto={(row) => {
                   setPresupuestoAbierto(row);
                   setScreen("presupuesto-nuevo");
@@ -1002,8 +1003,7 @@ function App() {
               />
             )}
             {screen === "obras-confirmadas" && (
-              <ListaPresupuestos2
-                soloConfirmadas
+              <ObrasConfirmadas
                 onAbrirPresupuesto={(row) => {
                   setPresupuestoAbierto(row);
                   setScreen("presupuesto-nuevo");
