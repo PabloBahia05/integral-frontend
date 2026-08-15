@@ -311,6 +311,10 @@ export function ItemsPanel({
   // `produccion` vinculada (mismo mecanismo que el color por ítem — un PUT
   // por cada uno, vía onChangeColor).
   const [grupoColorSel, setGrupoColorSel] = useState("");
+  // Sentinel distinto de "" (que significa "todavía no elegí nada" y deja
+  // el botón deshabilitado) para poder elegir explícitamente "Sin color" y
+  // así quitar el color ya asignado a los ítems del grupo.
+  const SIN_COLOR = "__SIN_COLOR__";
   const [colorGrupoValor, setColorGrupoValor] = useState("");
 
   if (!selected) return null;
@@ -321,9 +325,10 @@ export function ItemsPanel({
 
   const aplicarColorAGrupo = () => {
     if (!grupoColorSel || !colorGrupoValor) return;
+    const valor = colorGrupoValor === SIN_COLOR ? "" : colorGrupoValor;
     itemsConColor
       .filter((it) => grupoEfectivo(it) === grupoColorSel && it._produccionId != null)
-      .forEach((it) => onChangeColor(it._produccionId, colorGrupoValor));
+      .forEach((it) => onChangeColor(it._produccionId, valor));
   };
 
   return (
@@ -399,6 +404,7 @@ export function ItemsPanel({
             }}
           >
             <option value="">Color...</option>
+            <option value={SIN_COLOR}>— Sin color —</option>
             {melaminas.map((m) => (
               <option key={m.codartint} value={m.codartint}>
                 {m.articulo}
