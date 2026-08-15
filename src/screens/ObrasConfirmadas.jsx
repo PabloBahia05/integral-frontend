@@ -39,6 +39,10 @@ export default function ObrasConfirmadas({
   const [guardandoColorId, setGuardandoColorId] = useState(null);
   const [errorColorId, setErrorColorId] = useState(null);
 
+  // Línea de precio confirmada por grupo (numeropres/revision seleccionado).
+  // Formato { "ALACENAS": 0, "BAJO MESADA": 1 } — 0/1/2 → valor1/valor2/valor3.
+  const [lineaPorGrupo, setLineaPorGrupo] = useState({});
+
   const [revisiones, setRevisiones] = useState([]);
   const [loadingRev, setLoadingRev] = useState(false);
   const [modalHistorial, setModalHistorial] = useState(false);
@@ -87,6 +91,7 @@ export default function ObrasConfirmadas({
     if (!selected) {
       setItemsDetalle([]);
       setProduccionSeleccionada([]);
+      setLineaPorGrupo({});
       return;
     }
     setLoadingItems(true);
@@ -97,10 +102,14 @@ export default function ObrasConfirmadas({
       authFetch(
         `${API}/produccion?numeropres=${selected.numeropres}&revision=${selected.revision}`,
       ).then((r) => r.json()),
+      authFetch(
+        `${API}/tabla-presupuestos/linea-grupo/${selected.numeropres}/${selected.revision}`,
+      ).then((r) => r.json()),
     ])
-      .then(([items, produccion]) => {
+      .then(([items, produccion, lineaGrupo]) => {
         setItemsDetalle(Array.isArray(items) ? items : []);
         setProduccionSeleccionada(Array.isArray(produccion) ? produccion : []);
+        setLineaPorGrupo(lineaGrupo?.lineaPorGrupo ?? {});
       })
       .catch(console.error)
       .finally(() => setLoadingItems(false));
@@ -195,6 +204,31 @@ export default function ObrasConfirmadas({
       setErrorColorId(produccionId);
     } finally {
       setGuardandoColorId(null);
+    }
+  };
+
+  // Confirma qué línea de precio (0/1/2) quedó vendida para un grupo. Envía
+  // el objeto lineaPorGrupo COMPLETO (no solo el grupo tocado) — mismo
+  // patrón que ya usa el editor con este mismo estado.
+  const handleLineaGrupoChange = async (grupo, lineaIdx) => {
+    if (!selected) return;
+    const next = { ...lineaPorGrupo, [grupo]: lineaIdx };
+    setLineaPorGrupo(next);
+    try {
+      const res = await authFetch(
+        `${API}/tabla-presupuestos/linea-grupo/${selected.numeropres}/${selected.revision}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lineaPorGrupo: next }),
+        },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      console.error("Error guardando línea por grupo:", e);
+      // Revertir en caso de error, para no dejar la UI mintiendo sobre lo guardado.
+      setLineaPorGrupo(lineaPorGrupo);
+      alert("No se pudo guardar la línea confirmada para ese grupo. Probá de nuevo.");
     }
   };
 
@@ -314,6 +348,8 @@ export default function ObrasConfirmadas({
         guardandoColorId={guardandoColorId}
         errorColorId={errorColorId}
         onChangeColor={handleColorChange}
+        lineaPorGrupo={lineaPorGrupo}
+        onChangeLineaGrupo={handleLineaGrupoChange}
       />
 
       {modalHistorial && selected && (

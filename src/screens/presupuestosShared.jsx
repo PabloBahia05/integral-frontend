@@ -294,6 +294,22 @@ export const PRESUPUESTOS_CSS = `
 const grupoEfectivo = (it) =>
   it.grupo && String(it.grupo).trim() ? it.grupo : (it.tipo ?? "");
 
+// Líneas de precio ofrecidas para este presupuesto (nombres linea1/2/3 del
+// encabezado, sin las que estén vacías), cada una con la key de columna
+// (valor1/valor2/valor3) donde vive su precio en cada ítem.
+const lineasActivasDe = (selected) =>
+  [1, 2, 3]
+    .map((n) => ({ idx: n - 1, nombre: selected?.[`linea${n}`], valorKey: `valor${n}` }))
+    .filter((l) => l.nombre);
+
+// Precio de un ítem según la línea confirmada para SU grupo (lineaPorGrupo),
+// o valor1 si el grupo no tiene ninguna línea elegida todavía.
+const precioEfectivoItem = (it, lineasActivas, lineaPorGrupo) => {
+  const li = lineaPorGrupo?.[grupoEfectivo(it)];
+  const linea = li != null ? lineasActivas.find((l) => l.idx === li) : null;
+  return Number((linea ? it[linea.valorKey] : it.valor1) ?? it.valor1 ?? 0);
+};
+
 // ── Panel de ítems (detalle al seleccionar una fila, con la columna Color) ─
 
 export function ItemsPanel({
@@ -305,6 +321,11 @@ export function ItemsPanel({
   guardandoColorId,
   errorColorId,
   onChangeColor,
+  // Línea de precio confirmada por grupo — solo se usa/muestra si el
+  // llamador pasa onChangeLineaGrupo (hoy: ObrasConfirmadas.jsx). Sin este
+  // prop, ItemsPanel se comporta exactamente igual que antes.
+  lineaPorGrupo,
+  onChangeLineaGrupo,
 }) {
   // Color por grupo: selección local (grupo + melamina) + función que
   // aplica ese color a todos los ítems del grupo que tengan fila de
@@ -316,6 +337,10 @@ export function ItemsPanel({
   // así quitar el color ya asignado a los ítems del grupo.
   const SIN_COLOR = "__SIN_COLOR__";
   const [colorGrupoValor, setColorGrupoValor] = useState("");
+
+  // Línea de precio confirmada por grupo: mismo patrón de selección local.
+  const [grupoLineaSel, setGrupoLineaSel] = useState("");
+  const [lineaSelValor, setLineaSelValor] = useState("");
 
   if (!selected) return null;
 
@@ -331,6 +356,43 @@ export function ItemsPanel({
       .forEach((it) => onChangeColor(it._produccionId, valor));
   };
 
+  const lineasActivas = lineasActivasDe(selected);
+  const mostrarLineaPorGrupo =
+    typeof onChangeLineaGrupo === "function" && lineasActivas.length > 1;
+
+  const aplicarLineaAGrupo = () => {
+    if (!grupoLineaSel || lineaSelValor === "") return;
+    onChangeLineaGrupo(grupoLineaSel, Number(lineaSelValor));
+  };
+
+  const totalConLineas = mostrarLineaPorGrupo
+    ? itemsConColor.reduce(
+        (s, it) =>
+          s + precioEfectivoItem(it, lineasActivas, lineaPorGrupo) * (Number(it.cantidad) || 1),
+        0,
+      )
+    : totalSeleccionado;
+
+  // Columnas de ítems: si hay línea por grupo activa, "Precio u." y
+  // "Subtotal" pasan a leer el valor{N} de la línea elegida para el grupo
+  // de cada fila en vez de siempre valor1.
+  const columnasItems = mostrarLineaPorGrupo
+    ? COLS_ITEMS.map((c) =>
+        c.key === "valor1"
+          ? { ...c, render: (_, row) => formatPeso(precioEfectivoItem(row, lineasActivas, lineaPorGrupo)) }
+          : c.key === "_subtotal"
+            ? {
+                ...c,
+                render: (_, row) =>
+                  formatPeso(
+                    precioEfectivoItem(row, lineasActivas, lineaPorGrupo) *
+                      (Number(row.cantidad) || 1),
+                  ),
+              }
+            : c,
+      )
+    : COLS_ITEMS;
+
   return (
     <div className="items-panel">
       <div className="items-panel-header">
@@ -339,7 +401,7 @@ export function ItemsPanel({
           {selected.nombre} · Rev. {selected.revision}
         </span>
         <span className="items-panel-total">
-          Total: {formatPeso(totalSeleccionado)}
+          Total: {formatPeso(totalConLineas)}
         </span>
       </div>
       {!loadingItems && itemsConColor.length > 0 && (
@@ -432,6 +494,98 @@ export function ItemsPanel({
           </button>
         </div>
       )}
+      {mostrarLineaPorGrupo && !loadingItems && itemsConColor.length > 0 && (
+        <div
+          style={{
+            background: "#fff8e6",
+            borderBottom: "1px solid #d0e4f0",
+            padding: "10px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            fontFamily: "'Space Mono',monospace",
+            fontSize: 12,
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 700,
+              color: "#0a3a5c",
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            📐 Línea confirmada por grupo
+          </span>
+          <select
+            value={grupoLineaSel}
+            onChange={(e) => setGrupoLineaSel(e.target.value)}
+            style={{
+              padding: "5px 8px",
+              border: "1px solid #b8cfe0",
+              borderRadius: 2,
+              fontFamily: "'Space Mono',monospace",
+              fontSize: 11,
+              color: "#0a3a5c",
+              background: "#fff",
+              maxWidth: 180,
+            }}
+          >
+            <option value="">Grupo...</option>
+            {gruposDisponibles.map((g) => (
+              <option key={g} value={g}>
+                {g}
+                {lineaPorGrupo?.[g] != null
+                  ? ` (línea ${lineaPorGrupo[g] + 1})`
+                  : ""}
+              </option>
+            ))}
+          </select>
+          <select
+            value={lineaSelValor}
+            onChange={(e) => setLineaSelValor(e.target.value)}
+            style={{
+              padding: "5px 8px",
+              border: "1px solid #b8cfe0",
+              borderRadius: 2,
+              fontFamily: "'Space Mono',monospace",
+              fontSize: 11,
+              color: "#0a3a5c",
+              background: "#fff",
+              maxWidth: 200,
+            }}
+          >
+            <option value="">Línea...</option>
+            {lineasActivas.map((l) => (
+              <option key={l.idx} value={l.idx}>
+                {l.nombre}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={aplicarLineaAGrupo}
+            disabled={!grupoLineaSel || lineaSelValor === ""}
+            title="Deja esta línea de precio como la confirmada para todo el grupo"
+            style={{
+              padding: "5px 14px",
+              background: grupoLineaSel && lineaSelValor !== "" ? "#8a6d00" : "#e8d9a0",
+              color: grupoLineaSel && lineaSelValor !== "" ? "#fff" : "#b0a06a",
+              border: "none",
+              borderRadius: 2,
+              fontFamily: "'Space Mono',monospace",
+              fontSize: 11,
+              cursor: grupoLineaSel && lineaSelValor !== "" ? "pointer" : "default",
+              fontWeight: 700,
+              transition: "all 0.12s",
+            }}
+          >
+            Confirmar línea
+          </button>
+        </div>
+      )}
       {loadingItems ? (
         <p className="items-empty">⏳ Cargando ítems...</p>
       ) : itemsConColor.length === 0 ? (
@@ -439,7 +593,7 @@ export function ItemsPanel({
       ) : (
         <DataTable
           columns={[
-            ...COLS_ITEMS,
+            ...columnasItems,
             construirColColor({
               melaminas,
               guardandoColorId,
