@@ -68,6 +68,10 @@ export default function TablaArticulos({
   // Línea de precio elegida por grupo (ver estado en PresupuestoNuevo.jsx)
   lineaPorGrupo,
   setLineaPorGrupo,
+  // Color (melamina): lista de opciones + setter para actualizar el ítem
+  // local en presupuestoItems cuando se elige un color en la grilla.
+  melaminas,
+  setPresupuestoItems,
 }) {
   // Grupo efectivo de un ítem: el personalizado si el usuario le asignó uno,
   // si no la sección automática de siempre.
@@ -431,6 +435,16 @@ export default function TablaArticulos({
               >
                 Alto
               </th>
+              <th
+                style={{
+                  padding: "9px 10px",
+                  textAlign: "center",
+                  fontWeight: 700,
+                  width: 110,
+                }}
+              >
+                Color
+              </th>
               {lineasActivas.length > 0 ? (
                 lineasActivas.map((l) => (
                   <th
@@ -495,7 +509,7 @@ export default function TablaArticulos({
                   0,
                 );
                 const totalCols =
-                  6 + (lineasActivas.length > 0 ? lineasActivas.length : 1); // sección+prod+desc+cant+ancho+alto + líneas
+                  7 + (lineasActivas.length > 0 ? lineasActivas.length : 1); // sección+prod+desc+cant+ancho+alto+color + líneas
 
                 return [
                   // Fila de sección
@@ -760,6 +774,42 @@ export default function TablaArticulos({
                           {TIENE_MEDIDAS.includes(item.seccion)
                             ? (item.alto ?? "—")
                             : "—"}
+                        </td>
+                        <td
+                          style={{
+                            padding: "4px 6px",
+                            border: "1px solid #e8f0f7",
+                            textAlign: "center",
+                          }}
+                        >
+                          <select
+                            value={item.color ?? ""}
+                            onChange={(e) => {
+                              const valor = e.target.value || null;
+                              setPresupuestoItems((prev) =>
+                                prev.map((p) =>
+                                  p.id === item.id ? { ...p, color: valor } : p,
+                                ),
+                              );
+                            }}
+                            style={{
+                              width: "100%",
+                              fontSize: 11,
+                              fontFamily: "'Space Mono',monospace",
+                              border: "1px solid #c8dae8",
+                              borderRadius: 2,
+                              padding: "3px 2px",
+                              background: "#fff",
+                              color: "#0a3a5c",
+                            }}
+                          >
+                            <option value="">—</option>
+                            {(melaminas ?? []).map((m) => (
+                              <option key={m.articulo ?? m.id ?? m} value={m.articulo ?? m.nombre ?? m}>
+                                {m.nombre ?? m.articulo ?? m}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                         {lineasActivas.length > 0 ? (
                           esPlacardSec ? (
@@ -1069,7 +1119,7 @@ export default function TablaArticulos({
                   // Subtotal de sección
                   <tr key={`sub-${sec}`} style={{ background: "#e8f4ee" }}>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       style={{
                         padding: "6px 14px",
                         textAlign: "right",
