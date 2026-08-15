@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const TERMINACIONES = [
   {
@@ -63,6 +63,22 @@ const STYLE = `
   }
 
   .terminaciones-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+  .melaminas-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+  .melamina-card {
+    border: 1px solid #a0cce8;
+    border-radius: 3px;
+    padding: 10px 8px;
+    cursor: pointer;
+    text-align: center;
+    background: #fff;
+    font-size: 10px;
+    color: #0a3a5c;
+    transition: all 0.15s;
+  }
+  .melamina-card:hover { border-color: #4ab0e8; }
+  .melamina-card.selected { border: 2px solid #4ab0e8; background: #e8f5fd; font-weight: 700; }
+  .melaminas-vacio { font-size: 11px; color: #88aacc; padding: 10px 0; }
   .terminacion-card {
     border: 2px solid transparent;
     border-radius: 3px;
@@ -127,14 +143,28 @@ const STYLE = `
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 `;
 
-export default function PresupuestoPlacard({ onVolver }) {
+export default function PresupuestoPlacard({ onVolver, authFetch, API }) {
   const [vista, setVista] = useState("principal");
   const [terminacion, setTerminacion] = useState(null);
   const [ancho, setAncho] = useState("");
   const [alto, setAlto] = useState("");
   const [guardado, setGuardado] = useState(false);
+  // Melaminas reales (de articulos, area='melamina') para cuando se elige
+  // la terminación "COLOR" — ver /productos/melaminas en articulos_controller.js
+  const [melaminas, setMelaminas] = useState([]);
+  const [melaminaElegida, setMelaminaElegida] = useState(null);
 
-  const listo = terminacion && ancho && alto;
+  useEffect(() => {
+    if (terminacion !== "color" || melaminas.length > 0 || !authFetch || !API) return;
+    authFetch(`${API}/productos/melaminas`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setMelaminas(data);
+      })
+      .catch(() => {});
+  }, [terminacion, authFetch, API, melaminas.length]);
+
+  const listo = terminacion && ancho && alto && (terminacion !== "color" || melaminaElegida);
 
   const handleConfirmar = () => {
     if (!listo) return;
@@ -142,8 +172,12 @@ export default function PresupuestoPlacard({ onVolver }) {
     setVista("principal");
   };
 
-  const resumenBadge = terminacion && ancho && alto
-    ? `${terminacion.toUpperCase()} · ${ancho}×${alto} cm`
+  const nombreMelaminaElegida = melaminaElegida
+    ? (melaminas.find((m) => m.codartint === melaminaElegida)?.articulo ?? melaminaElegida)
+    : null;
+
+  const resumenBadge = listo
+    ? `${terminacion.toUpperCase()}${nombreMelaminaElegida ? ` (${nombreMelaminaElegida})` : ""} · ${ancho}×${alto} cm`
     : "Sin configurar";
 
   return (
@@ -199,7 +233,8 @@ export default function PresupuestoPlacard({ onVolver }) {
 
             {guardado && (
               <div className="guardado-msg">
-                ✅ Frente configurado: <strong>{terminacion?.toUpperCase()}</strong> — {ancho} × {alto} cm
+                ✅ Frente configurado: <strong>{terminacion?.toUpperCase()}</strong>
+                {nombreMelaminaElegida ? ` (${nombreMelaminaElegida})` : ""} — {ancho} × {alto} cm
               </div>
             )}
 
@@ -280,7 +315,10 @@ export default function PresupuestoPlacard({ onVolver }) {
                 <div
                   key={t.id}
                   className={`terminacion-card${terminacion === t.id ? " selected" : ""}`}
-                  onClick={() => setTerminacion(t.id)}
+                  onClick={() => {
+                    setTerminacion(t.id);
+                    if (t.id !== "color") setMelaminaElegida(null);
+                  }}
                 >
                   <div
                     className="terminacion-muestra"
@@ -292,6 +330,27 @@ export default function PresupuestoPlacard({ onVolver }) {
               ))}
             </div>
 
+            {/* Selector de melamina real (solo si la terminación es COLOR) */}
+            {terminacion === "color" && (
+              <>
+                {melaminas.length > 0 ? (
+                  <div className="melaminas-grid">
+                    {melaminas.map((m) => (
+                      <div
+                        key={m.codartint}
+                        className={`melamina-card${melaminaElegida === m.codartint ? " selected" : ""}`}
+                        onClick={() => setMelaminaElegida(m.codartint)}
+                      >
+                        {m.articulo}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="melaminas-vacio">Cargando melaminas…</p>
+                )}
+              </>
+            )}
+
             {/* Resumen */}
             {(terminacion || ancho || alto) && (
               <>
@@ -301,6 +360,16 @@ export default function PresupuestoPlacard({ onVolver }) {
                     <span className="resumen-key">Terminación</span>
                     <span className="resumen-val">{terminacion ? terminacion.toUpperCase() : "—"}</span>
                   </div>
+                  {terminacion === "color" && (
+                    <div className="resumen-row">
+                      <span className="resumen-key">Melamina</span>
+                      <span className="resumen-val">
+                        {melaminaElegida
+                          ? (melaminas.find((m) => m.codartint === melaminaElegida)?.articulo ?? melaminaElegida)
+                          : "—"}
+                      </span>
+                    </div>
+                  )}
                   <div className="resumen-row">
                     <span className="resumen-key">Ancho</span>
                     <span className="resumen-val">{ancho ? `${ancho} cm` : "—"}</span>
