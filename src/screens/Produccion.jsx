@@ -30,6 +30,19 @@ export default function Produccion({ authFetch }) {
   const [aEliminar, setAEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
 
+  // Melaminas disponibles para el desplegable de `color` (ver
+  // GET /productos/melaminas en articulos_controller.js — filtra
+  // articulos por rubro "melamina"/"MELAMINA"). Se guarda el `codartint`
+  // en produccion.color, pero en pantalla siempre se muestra `articulo`
+  // (el nombre), vía este mapa.
+  const [melaminas, setMelaminas] = useState([]);
+  const nombreMelamina = (codartint) =>
+    melaminas.find((m) => m.codartint === codartint)?.articulo ?? codartint;
+
+  // Guardado de `color` por fila: mismo patrón de feedback que `modulo`.
+  const [guardandoColorId, setGuardandoColorId] = useState(null);
+  const [errorColorId, setErrorColorId] = useState(null);
+
   // ── Fetch ──────────────────────────────────────────────────────────────
 
   const fetchProduccion = () => {
@@ -43,6 +56,10 @@ export default function Produccion({ authFetch }) {
 
   useEffect(() => {
     fetchProduccion();
+    authFetch(`${API}/productos/melaminas`)
+      .then((r) => r.json())
+      .then((data) => setMelaminas(Array.isArray(data) ? data : []))
+      .catch(console.error);
   }, []);
 
   // ── Edición de `modulo` (inline, se guarda al salir del campo) ─────────
@@ -71,16 +88,39 @@ export default function Produccion({ authFetch }) {
     }
   };
 
+  const handleColorChange = async (row, valor) => {
+    setRows((prev) =>
+      prev.map((r) => (r.id === row.id ? { ...r, color: valor } : r)),
+    );
+    setGuardandoColorId(row.id);
+    setErrorColorId(null);
+    try {
+      const res = await authFetch(`${API}/produccion/${row.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color: valor || null }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      console.error("Error guardando color:", e);
+      setErrorColorId(row.id);
+    } finally {
+      setGuardandoColorId(null);
+    }
+  };
+
   // ── Filtro ────────────────────────────────────────────────────────────
 
   const q = search.toLowerCase();
   const filtered = rows.filter(
     (r) =>
+      (r.codpro ?? "").toLowerCase().includes(q) ||
       (r.cliente_nombre ?? "").toLowerCase().includes(q) ||
       String(r.numeropres ?? "").includes(q) ||
       (r.grupo ?? "").toLowerCase().includes(q) ||
       (r.producto ?? "").toLowerCase().includes(q) ||
-      (r.modulo ?? "").toLowerCase().includes(q),
+      (r.modulo ?? "").toLowerCase().includes(q) ||
+      nombreMelamina(r.color).toLowerCase().includes(q),
   );
 
   const pendientes = rows.filter((r) => !r.modulo || !r.modulo.trim()).length;
@@ -115,6 +155,27 @@ export default function Produccion({ authFetch }) {
   // ── Columnas ──────────────────────────────────────────────────────────
 
   const columns = [
+    {
+      key: "codpro",
+      label: "Cód.",
+      render: (v) => (
+        <span
+          style={{
+            display: "inline-block",
+            background: "#0a3a5c",
+            color: "#fff",
+            borderRadius: "4px",
+            padding: "1px 8px",
+            fontSize: "11px",
+            fontWeight: 700,
+            letterSpacing: "0.5px",
+            fontFamily: "'Space Mono', monospace",
+          }}
+        >
+          {v ?? "—"}
+        </span>
+      ),
+    },
     {
       key: "numeropres",
       label: "N°",
@@ -174,6 +235,37 @@ export default function Produccion({ authFetch }) {
             color: "#0a3a5c",
           }}
         />
+      ),
+    },
+    {
+      key: "color",
+      label: "Color",
+      render: (v, row) => (
+        <select
+          value={row.color ?? ""}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => handleColorChange(row, e.target.value)}
+          style={{
+            width: "100%",
+            maxWidth: "200px",
+            padding: "4px 8px",
+            fontSize: "12px",
+            fontFamily: "'Space Mono',monospace",
+            border: `1.5px solid ${
+              errorColorId === row.id ? "#e57373" : "#b8d6ef"
+            }`,
+            borderRadius: "4px",
+            background: guardandoColorId === row.id ? "#fffbe6" : "#fff",
+            color: "#0a3a5c",
+          }}
+        >
+          <option value="">Sin color</option>
+          {melaminas.map((m) => (
+            <option key={m.codartint} value={m.codartint}>
+              {m.articulo}
+            </option>
+          ))}
+        </select>
       ),
     },
   ];
