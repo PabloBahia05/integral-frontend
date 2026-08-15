@@ -131,6 +131,79 @@ const COLS_ITEMS = [
   },
 ];
 
+// Columna "Color" para el panel de ítems — se agrega dinámicamente (no va
+// en el array COLS_ITEMS de arriba) porque necesita closures sobre
+// melaminas/handleColorChange/estado de guardado, que viven dentro del
+// componente.
+const construirColColor = ({
+  melaminas,
+  guardandoColorId,
+  errorColorId,
+  onChangeColor,
+}) => ({
+  key: "_color",
+  label: "Color",
+  render: (_, row) => {
+    // Ítems sin fila de producción vinculada (ej. presupuesto todavía no
+    // confirmado, o no se encontró el match por grupo+producto) no
+    // muestran el desplegable.
+    if (row._produccionId == null) return "—";
+    return (
+      <select
+        value={row._produccionColor ?? ""}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => onChangeColor(row._produccionId, e.target.value)}
+        style={{
+          width: "100%",
+          maxWidth: "200px",
+          padding: "4px 8px",
+          fontSize: "12px",
+          fontFamily: "'Space Mono',monospace",
+          border: `1.5px solid ${
+            errorColorId === row._produccionId ? "#e57373" : "#b8d6ef"
+          }`,
+          borderRadius: "4px",
+          background:
+            guardandoColorId === row._produccionId ? "#fffbe6" : "#fff",
+          color: "#0a3a5c",
+        }}
+      >
+        <option value="">Sin color</option>
+        {melaminas.map((m) => (
+          <option key={m.codartint} value={m.codartint}>
+            {m.articulo}
+          </option>
+        ))}
+      </select>
+    );
+  },
+});
+
+// Cruza los ítems de tabla_presupuestos (itemsDetalle) con las filas de
+// `produccion` de ese mismo numeropres+revision, para poder editar
+// `color` acá. No hay id compartido entre ambas tablas — se matchea por
+// grupo+producto, en el mismo orden en que aparecen (produccion se puebla
+// en el mismo orden que tabla_presupuestos al confirmar), consumiendo cada
+// fila de producción una sola vez para no repetirla si hay ítems iguales.
+const cruzarConProduccion = (items, produccionRows) => {
+  const colas = new Map();
+  produccionRows.forEach((p) => {
+    const key = `${p.grupo ?? ""}|${p.producto ?? ""}`;
+    if (!colas.has(key)) colas.set(key, []);
+    colas.get(key).push(p);
+  });
+  return items.map((it) => {
+    const key = `${it.grupo ?? ""}|${it.nombreart ?? ""}`;
+    const cola = colas.get(key);
+    const prod = cola && cola.length ? cola.shift() : null;
+    return {
+      ...it,
+      _produccionId: prod?.id ?? null,
+      _produccionColor: prod?.color ?? null,
+    };
+  });
+};
+
 // ── Columnas historial (modal "Revisiones" — igual que en la lista actual,
 // trae totales reales porque sí agrega tabla_presupuestos, pero solo para
 // ESE numeropres puntual, no para toda la lista) ────────────────────────────
@@ -177,6 +250,14 @@ export default function ListaPresupuestos2({
   // Ítems del presupuesto seleccionado (bajo demanda, igual que la lista actual)
   const [itemsDetalle, setItemsDetalle] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
+
+  // Filas de `produccion` del numeropres+revision seleccionado (para poder
+  // editar `color` desde acá — ver cruzarConProduccion) y catálogo de
+  // melaminas para el desplegable (mismo endpoint que Producción.jsx).
+  const [produccionSeleccionada, setProduccionSeleccionada] = useState([]);
+  const [melaminas, setMelaminas] = useState([]);
+  const [guardandoColorId, setGuardandoColorId] = useState(null);
+  const [errorColorId, setErrorColorId] = useState(null);
 
   // Revisiones del numeropres seleccionado (mismo endpoint que la lista actual)
   const [revisiones, setRevisiones] = useState([]);
@@ -227,6 +308,10 @@ export default function ListaPresupuestos2({
 
   useEffect(() => {
     fetchEncabezados();
+    authFetch(`${API}/productos/melaminas`)
+      .then((r) => r.json())
+      .then((data) => setMelaminas(Array.isArray(data) ? data : []))
+      .catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [soloConfirmadas]);
 
@@ -235,14 +320,22 @@ export default function ListaPresupuestos2({
   useEffect(() => {
     if (!selected) {
       setItemsDetalle([]);
+      setProduccionSeleccionada([]);
       return;
     }
     setLoadingItems(true);
-    authFetch(
-      `${API}/tabla-presupuestos?numeropres=${selected.numeropres}&revision=${selected.revision}`,
-    )
-      .then((r) => r.json())
-      .then((data) => setItemsDetalle(Array.isArray(data) ? data : []))
+    Promise.all([
+      authFetch(
+        `${API}/tabla-presupuestos?numeropres=${selected.numeropres}&revision=${selected.revision}`,
+      ).then((r) => r.json()),
+      authFetch(
+        `${API}/produccion?numeropres=${selected.numeropres}&revision=${selected.revision}`,
+      ).then((r) => r.json()),
+    ])
+      .then(([items, produccion]) => {
+        setItemsDetalle(Array.isArray(items) ? items : []);
+        setProduccionSeleccionada(Array.isArray(produccion) ? produccion : []);
+      })
       .catch(console.error)
       .finally(() => setLoadingItems(false));
   }, [selected]);
@@ -316,6 +409,10 @@ export default function ListaPresupuestos2({
       )
     : filtradosBase;
 
+  // Ítems del panel de detalle, cruzados con su fila de `produccion`
+  // correspondiente (para poder mostrar/editar `color` acá).
+  const itemsConColor = cruzarConProduccion(itemsDetalle, produccionSeleccionada);
+
   // Total del presupuesto seleccionado — se calcula acá, a partir de los
   // ítems recién traídos (consulta puntual de 1 presupuesto), NO se guarda
   // ni se agrega en el listado general.
@@ -323,6 +420,27 @@ export default function ListaPresupuestos2({
     (s, it) => s + Number(it.valor1 ?? 0) * (Number(it.cantidad) || 1),
     0,
   );
+
+  const handleColorChange = async (produccionId, valor) => {
+    setProduccionSeleccionada((prev) =>
+      prev.map((p) => (p.id === produccionId ? { ...p, color: valor } : p)),
+    );
+    setGuardandoColorId(produccionId);
+    setErrorColorId(null);
+    try {
+      const res = await authFetch(`${API}/produccion/${produccionId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color: valor || null }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      console.error("Error guardando color:", e);
+      setErrorColorId(produccionId);
+    } finally {
+      setGuardandoColorId(null);
+    }
+  };
 
   // ── DELETE revisión individual (desde el modal "Revisiones" — idéntico a
   // la lista actual) ─────────────────────────────────────────────────────
@@ -530,8 +648,16 @@ export default function ListaPresupuestos2({
             <p className="items-empty">Sin ítems registrados.</p>
           ) : (
             <DataTable
-              columns={COLS_ITEMS}
-              rows={itemsDetalle}
+              columns={[
+                ...COLS_ITEMS,
+                construirColColor({
+                  melaminas,
+                  guardandoColorId,
+                  errorColorId,
+                  onChangeColor: handleColorChange,
+                }),
+              ]}
+              rows={itemsConColor}
               selectedId={null}
               onSelect={null}
               storageKey="lista-presupuestos-items"
