@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Totales from "./Totales";
 
 // Secciones cuyos ítems llevan medidas de ancho/alto.
@@ -114,6 +115,20 @@ export default function TablaArticulos({
     const next = [...secciones];
     [next[idx], next[nuevoIdx]] = [next[nuevoIdx], next[idx]];
     setOrdenGrupos(next);
+  };
+
+  // ── Color por grupo: selección local (grupo + melamina elegidos en el
+  // panel) y función que aplica ese color a TODOS los ítems del grupo. ──
+  const [grupoColorSel, setGrupoColorSel] = useState("");
+  const [colorGrupoValor, setColorGrupoValor] = useState("");
+
+  const aplicarColorAGrupo = () => {
+    if (!grupoColorSel || !colorGrupoValor) return;
+    setPresupuestoItems((prev) =>
+      prev.map((p) =>
+        grupoDe(p) === grupoColorSel ? { ...p, color: colorGrupoValor } : p,
+      ),
+    );
   };
 
   return (
@@ -353,6 +368,99 @@ export default function TablaArticulos({
                 {ajusteModo === "porcentaje" ? "%" : "$"}
               </span>
             )}
+
+            {/* Separador */}
+            <span
+              style={{
+                width: 1,
+                alignSelf: "stretch",
+                background: "#c8dae8",
+                margin: "0 2px",
+              }}
+            />
+
+            {/* Etiqueta color por grupo */}
+            <span
+              style={{
+                fontWeight: 700,
+                color: "#0a3a5c",
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              🎨 Color por grupo
+            </span>
+
+            {/* Selector de grupo */}
+            <select
+              value={grupoColorSel}
+              onChange={(e) => setGrupoColorSel(e.target.value)}
+              style={{
+                padding: "5px 8px",
+                border: "1px solid #b8cfe0",
+                borderRadius: 2,
+                fontFamily: "'Space Mono',monospace",
+                fontSize: 11,
+                color: "#0a3a5c",
+                background: "#fff",
+                maxWidth: 180,
+              }}
+            >
+              <option value="">Grupo...</option>
+              {secciones.map((sec) => (
+                <option key={sec} value={sec}>
+                  {sec}
+                </option>
+              ))}
+            </select>
+
+            {/* Selector de color (melamina) */}
+            <select
+              value={colorGrupoValor}
+              onChange={(e) => setColorGrupoValor(e.target.value)}
+              style={{
+                padding: "5px 8px",
+                border: "1px solid #b8cfe0",
+                borderRadius: 2,
+                fontFamily: "'Space Mono',monospace",
+                fontSize: 11,
+                color: "#0a3a5c",
+                background: "#fff",
+                maxWidth: 180,
+              }}
+            >
+              <option value="">Color...</option>
+              {(melaminas ?? []).map((m) => (
+                <option key={m.codartint} value={m.codartint}>
+                  {m.articulo}
+                </option>
+              ))}
+            </select>
+
+            {/* Botón aplicar color a grupo */}
+            <button
+              onClick={aplicarColorAGrupo}
+              disabled={!grupoColorSel || !colorGrupoValor}
+              title="Aplica este color a todos los ítems del grupo elegido"
+              style={{
+                padding: "5px 14px",
+                background:
+                  grupoColorSel && colorGrupoValor ? "#0a3a5c" : "#c8dae8",
+                color: grupoColorSel && colorGrupoValor ? "#fff" : "#99aabb",
+                border: "none",
+                borderRadius: 2,
+                fontFamily: "'Space Mono',monospace",
+                fontSize: 11,
+                cursor:
+                  grupoColorSel && colorGrupoValor ? "pointer" : "default",
+                fontWeight: 700,
+                transition: "all 0.12s",
+              }}
+            >
+              Aplicar
+            </button>
           </div>
         </div>
       )}
