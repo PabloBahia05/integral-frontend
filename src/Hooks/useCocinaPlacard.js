@@ -827,6 +827,7 @@ export default function useCocinaPlacard({
           area: f.area ?? null,
           accesorios: f.accesorios ?? [],
           grupo: f.grupo && f.grupo.trim() ? f.grupo.trim() : null,
+          color: f.color ?? null,
         })),
       );
 
