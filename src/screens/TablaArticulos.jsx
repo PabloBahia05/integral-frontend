@@ -605,6 +605,15 @@ export default function TablaArticulos({
                 const esPlacardSec =
                   items.length > 0 &&
                   items.every((it) => (it.seccion || "").startsWith("Placard / "));
+                // Línea elegida para este grupo (selector "Línea del grupo...").
+                // Cuando hay una elegida, igual que con Placard, fusionamos las
+                // columnas de línea en una sola (colSpan) mostrando solo el
+                // precio de esa línea — así se ve "confirmado" y no repetido
+                // en cada columna.
+                const lineaElegidaSec = lineaPorGrupo?.[sec];
+                const usarColMerged =
+                  esPlacardSec || (lineasActivas.length > 1 && lineaElegidaSec != null);
+                const liMerged = esPlacardSec ? 0 : lineaElegidaSec;
                 // Subtotal por línea para la sección
                 const subtotalesSec =
                   lineasActivas.length > 0 && !esPlacardSec
@@ -926,9 +935,9 @@ export default function TablaArticulos({
                           </select>
                         </td>
                         {lineasActivas.length > 0 ? (
-                          esPlacardSec ? (
+                          usarColMerged ? (
                             (() => {
-                              const li = 0;
+                              const li = liMerged;
                               const pr = item.precios?.[li]?.precio ?? item.precio ?? 0;
                               const pctItem = item[`porcentaje${li + 1}`];
                               return (
@@ -1246,7 +1255,7 @@ export default function TablaArticulos({
                       Subtotal {sec}
                     </td>
                     {lineasActivas.length > 0 ? (
-                      esPlacardSec ? (
+                      usarColMerged ? (
                         <td
                           colSpan={lineasActivas.length}
                           style={{
@@ -1258,7 +1267,10 @@ export default function TablaArticulos({
                           }}
                         >
                           $
-                          {subtotalSecSimple.toLocaleString("es-AR", {
+                          {(esPlacardSec
+                            ? subtotalSecSimple
+                            : subtotalesSec[liMerged]
+                          ).toLocaleString("es-AR", {
                             minimumFractionDigits: 2,
                           })}
                         </td>
