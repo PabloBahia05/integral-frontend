@@ -965,6 +965,22 @@ export default function PresupuestoNuevo({
     }
   };
 
+  // Línea de precio confirmada por grupo, guardada en
+  // presupuesto_meta.linea_por_grupo (se escribe en cada "Guardar", ver
+  // payload de handleGuardar). Mismo endpoint que usa Obras Confirmadas.
+  const cargarLineaPorGrupo = async (numPres, rev) => {
+    try {
+      const r = await authFetch(
+        `${API}/tabla-presupuestos/linea-grupo/${numPres}/${rev}`,
+      );
+      const data = await r.json();
+      setLineaPorGrupo(data?.lineaPorGrupo ?? {});
+    } catch (err) {
+      console.error("Error cargando línea por grupo:", err);
+      setLineaPorGrupo({});
+    }
+  };
+
   // Confirma TODOS los ítems de la revisión actual (botón en solapa
   // Presupuesto). A partir de acá, esta revisión queda disponible para
   // avanzar a Final de Obra.
@@ -1721,6 +1737,7 @@ export default function PresupuestoNuevo({
       cargarImagenesPresupuesto(num, rev);
       cargarMetaPresupuesto(num, rev);
       cargarEstadoConfirmado(num, rev);
+      cargarLineaPorGrupo(num, rev);
       cargarInfoPresupuesto(num);
       setCliente(pres.nombre ?? pres.NOMBRE ?? "");
       const codclienteRestaurado = pres.codcliente ?? pres.CODCLIENTE ?? null;
@@ -2304,6 +2321,10 @@ export default function PresupuestoNuevo({
       prespv: prespv ?? null,
       ajusteValor: ajusteAplicado ? parseFloat(ajusteValor) || null : null,
       ajusteModo: ajusteAplicado ? ajusteModo : null,
+      // Línea de precio confirmada por grupo (selector "Línea del grupo..."
+      // en TablaArticulos.jsx) — se guarda en presupuesto_meta.linea_por_grupo,
+      // así queda registrada en la BD como parte del camino a producción.
+      lineaPorGrupo,
       items: presupuestoItems.map((it) => {
         const v1 =
           parseFloat(it.precios?.[0]?.precio ?? it.valor1 ?? it.precio) || null;
