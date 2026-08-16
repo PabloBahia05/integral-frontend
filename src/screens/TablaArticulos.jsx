@@ -949,6 +949,23 @@ export default function TablaArticulos({
                                     textAlign: "right",
                                   }}
                                 >
+                                  {!esPlacardSec && lineasActivas[li] && (
+                                    <span
+                                      style={{
+                                        display: "inline-block",
+                                        fontSize: 9,
+                                        fontWeight: 700,
+                                        color: "#8a6d00",
+                                        background: "#ffe58a",
+                                        borderRadius: 3,
+                                        padding: "1px 5px",
+                                        marginRight: 6,
+                                        verticalAlign: "middle",
+                                      }}
+                                    >
+                                      Línea {lineasActivas[li].linea}
+                                    </span>
+                                  )}
                                   <span
                                     className="pn-precio-cell"
                                     onClick={(e) =>
@@ -1266,6 +1283,23 @@ export default function TablaArticulos({
                             border: "1px solid #c8dae8",
                           }}
                         >
+                          {!esPlacardSec && lineasActivas[liMerged] && (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                fontSize: 9,
+                                fontWeight: 700,
+                                color: "#8a6d00",
+                                background: "#ffe58a",
+                                borderRadius: 3,
+                                padding: "1px 5px",
+                                marginRight: 6,
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              Línea {lineasActivas[liMerged].linea}
+                            </span>
+                          )}
                           $
                           {(esPlacardSec
                             ? subtotalSecSimple
