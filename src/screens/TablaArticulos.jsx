@@ -136,6 +136,28 @@ export default function TablaArticulos({
     );
   };
 
+  // ── Header unificado: la fila de encabezado azul (Grupo/Producto/.../
+  // Línea N) es UNA sola para toda la tabla, así que solo puede mostrar
+  // "solo la línea elegida" cuando TODOS los grupos con ítems (salvo
+  // Placard, que tiene su propia línea fija y no participa de esta
+  // elección) coincidieron en la MISMA línea. En ese caso el header colapsa
+  // de "Línea 21 | Línea 22" a una sola columna "Línea 21", y cada fila deja
+  // de mostrar la etiqueta amarilla por celda (ya no hace falta: no hay
+  // ambigüedad posible). Si los grupos difieren o falta alguno por elegir,
+  // el header se queda como está hoy (todas las líneas, una por columna).
+  const seccionesConItemsNoPlacard = secciones.filter((sec) => {
+    const items = presupuestoItems.filter((p) => grupoDe(p) === sec);
+    if (items.length === 0) return false;
+    return !items.every((it) => (it.seccion || "").startsWith("Placard / "));
+  });
+  const lineaUnificadaIdx =
+    lineasActivas.length > 1 &&
+    seccionesConItemsNoPlacard.length > 0 &&
+    seccionesConItemsNoPlacard.every((sec) => lineaPorGrupo?.[sec] != null) &&
+    new Set(seccionesConItemsNoPlacard.map((sec) => lineaPorGrupo[sec])).size === 1
+      ? lineaPorGrupo[seccionesConItemsNoPlacard[0]]
+      : null;
+
   return (
     <div>
       {/* Encabezado cliente */}
@@ -560,9 +582,8 @@ export default function TablaArticulos({
                 Color
               </th>
               {lineasActivas.length > 0 ? (
-                lineasActivas.map((l) => (
+                lineaUnificadaIdx != null ? (
                   <th
-                    key={l.linea}
                     style={{
                       padding: "9px 14px",
                       textAlign: "right",
@@ -570,9 +591,23 @@ export default function TablaArticulos({
                       width: 130,
                     }}
                   >
-                    Línea {l.linea}
+                    Línea {lineasActivas[lineaUnificadaIdx].linea}
                   </th>
-                ))
+                ) : (
+                  lineasActivas.map((l) => (
+                    <th
+                      key={l.linea}
+                      style={{
+                        padding: "9px 14px",
+                        textAlign: "right",
+                        fontWeight: 700,
+                        width: 130,
+                      }}
+                    >
+                      Línea {l.linea}
+                    </th>
+                  ))
+                )
               ) : (
                 <th
                   style={{
@@ -632,7 +667,12 @@ export default function TablaArticulos({
                   0,
                 );
                 const totalCols =
-                  7 + (lineasActivas.length > 0 ? lineasActivas.length : 1); // sección+prod+desc+cant+ancho+alto+color + líneas
+                  7 +
+                  (lineasActivas.length > 0
+                    ? lineaUnificadaIdx != null
+                      ? 1
+                      : lineasActivas.length
+                    : 1); // sección+prod+desc+cant+ancho+alto+color + líneas
 
                 return [
                   // Fila de sección
@@ -942,14 +982,14 @@ export default function TablaArticulos({
                               const pctItem = item[`porcentaje${li + 1}`];
                               return (
                                 <td
-                                  colSpan={lineasActivas.length}
+                                  colSpan={lineaUnificadaIdx != null ? 1 : lineasActivas.length}
                                   style={{
                                     padding: "7px 14px",
                                     border: "1px solid #e8f0f7",
                                     textAlign: "right",
                                   }}
                                 >
-                                  {!esPlacardSec && lineasActivas[li] && (
+                                  {!esPlacardSec && lineaUnificadaIdx == null && lineasActivas[li] && (
                                     <span
                                       style={{
                                         display: "inline-block",
@@ -1274,7 +1314,7 @@ export default function TablaArticulos({
                     {lineasActivas.length > 0 ? (
                       usarColMerged ? (
                         <td
-                          colSpan={lineasActivas.length}
+                          colSpan={lineaUnificadaIdx != null ? 1 : lineasActivas.length}
                           style={{
                             padding: "6px 14px",
                             textAlign: "right",
@@ -1283,7 +1323,7 @@ export default function TablaArticulos({
                             border: "1px solid #c8dae8",
                           }}
                         >
-                          {!esPlacardSec && lineasActivas[liMerged] && (
+                          {!esPlacardSec && lineaUnificadaIdx == null && lineasActivas[liMerged] && (
                             <span
                               style={{
                                 display: "inline-block",
@@ -1356,6 +1396,7 @@ export default function TablaArticulos({
               lineasActivas={lineasActivas}
               lineaPorGrupo={lineaPorGrupo}
               grupoDe={grupoDe}
+              lineaUnificadaIdx={lineaUnificadaIdx}
             />
           </tbody>
         </table>
