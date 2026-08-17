@@ -17,6 +17,18 @@ const tieneFreno = (accesorios, accesoriosDisponibles) =>
     return art && CODARTINT_FRENO.includes(String(art.codartint));
   });
 
+// Accesorios "normales" (no autofreno): se listan como texto chico con el
+// nombre del artículo, porque el badge "c/freno" de arriba solo cubre
+// bisagra/corredera autofreno y para el resto (estantes, herrajes varios,
+// etc.) hoy no había ninguna pista visual en esta pestaña.
+const nombresAccesoriosNoFreno = (accesorios, accesoriosDisponibles) =>
+  (accesorios ?? []).filter((nombre) => {
+    const art = accesoriosDisponibles?.find(
+      (a) => a.articulo === String(nombre),
+    );
+    return !(art && CODARTINT_FRENO.includes(String(art.codartint)));
+  });
+
 // Contenido completo del tab "Presupuesto": resumen de cliente, panel de
 // ajuste de precios, y la tabla de ítems agrupados por sección con
 // subtotales y el total general.
@@ -852,6 +864,29 @@ export default function TablaArticulos({
                               </span>
                             )}
                           </div>
+                          {(() => {
+                            const otros = nombresAccesoriosNoFreno(
+                              item.accesorios,
+                              accesoriosDisponibles,
+                            );
+                            if (otros.length === 0) return null;
+                            return (
+                              <div
+                                title={otros.join(", ")}
+                                style={{
+                                  fontSize: 10,
+                                  color: "#6699bb",
+                                  marginTop: 2,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  maxWidth: 220,
+                                }}
+                              >
+                                🔧 {otros.join(", ")}
+                              </div>
+                            );
+                          })()}
                           {item.seccion === "Puerta" && item.codherraje && (
                             <div
                               style={{
