@@ -560,7 +560,7 @@ export default function TablaArticulos({
                 Color
               </th>
               {lineasActivas.length > 0 ? (
-                lineasActivas.map((l) => (
+                lineasActivas.map((l, li) => (
                   <th
                     key={l.linea}
                     style={{
@@ -570,7 +570,7 @@ export default function TablaArticulos({
                       width: 130,
                     }}
                   >
-                    Línea {l.linea}
+                    Opción {li + 1}
                   </th>
                 ))
               ) : (
@@ -638,7 +638,7 @@ export default function TablaArticulos({
                   // Fila de sección
                   <tr key={`sec-${sec}`} style={{ background: "#ddeefa" }}>
                     <td
-                      colSpan={totalCols + 1}
+                      colSpan={7}
                       style={{
                         padding: "6px 14px",
                         fontWeight: 700,
@@ -743,6 +743,49 @@ export default function TablaArticulos({
                         </select>
                       )}
                     </td>
+                    {/* Mini-header de línea, alineado con las columnas de
+                        precio de más abajo: si el grupo ya eligió una
+                        línea, muestra solo esa (fusionada, igual que las
+                        celdas de precio); si no, repite el nombre de cada
+                        línea activa — mismo criterio que el header general,
+                        pero acá "por grupo". */}
+                    {lineasActivas.length > 0 &&
+                      (usarColMerged ? (
+                        <td
+                          colSpan={lineasActivas.length}
+                          style={{
+                            padding: "6px 14px",
+                            textAlign: "right",
+                            fontWeight: 700,
+                            color: "#0a3a5c",
+                            fontSize: 10,
+                            letterSpacing: "0.06em",
+                            textTransform: "uppercase",
+                            background: "#c8dae8",
+                          }}
+                        >
+                          Línea {lineasActivas[liMerged]?.linea}
+                        </td>
+                      ) : (
+                        lineasActivas.map((l) => (
+                          <td
+                            key={l.linea}
+                            style={{
+                              padding: "6px 14px",
+                              textAlign: "right",
+                              fontWeight: 700,
+                              color: "#0a3a5c",
+                              fontSize: 10,
+                              letterSpacing: "0.06em",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            Línea {l.linea}
+                          </td>
+                        ))
+                      ))}
+                    {lineasActivas.length === 0 && <td></td>}
+                    <td></td>
                   </tr>,
                   // Filas de ítems
                   ...items.map((item) => {
