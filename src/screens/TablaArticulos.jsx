@@ -569,9 +569,7 @@ export default function TablaArticulos({
                       fontWeight: 700,
                       width: 130,
                     }}
-                  >
-                    Opción {li + 1}
-                  </th>
+                  ></th>
                 ))
               ) : (
                 <th
