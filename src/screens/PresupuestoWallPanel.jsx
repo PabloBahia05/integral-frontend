@@ -10,6 +10,7 @@ const normalizar = (p) => ({
   codart: p.codartint ?? p.CODARTINT ?? p.codart ?? "",
   precio: parseFloat(p.precio ?? p.PRECIO ?? 0) || 0,
   precio_un: parseFloat(p.precio_un ?? p.PRECIO_UN ?? 0) || 0,
+  area: (p.area ?? p.AREA ?? "").toString().trim().toUpperCase(),
 });
 
 const fmt = (v) =>
@@ -455,9 +456,10 @@ export default function PresupuestoWallPanel({ onVolver, token, onAgregarAPresup
 
   const baseFiltrados = materiales.filter(
     (p) =>
-      !baseSearch ||
-      (p.articulo ?? "").toLowerCase().includes(baseSearch.toLowerCase()) ||
-      (p.codart ?? "").toLowerCase().includes(baseSearch.toLowerCase()),
+      (p.area === "FONDO" || p.area === "MELAMINA") &&
+      (!baseSearch ||
+        (p.articulo ?? "").toLowerCase().includes(baseSearch.toLowerCase()) ||
+        (p.codart ?? "").toLowerCase().includes(baseSearch.toLowerCase())),
   );
   const varillaFiltrados = materiales.filter(
     (p) =>
