@@ -658,6 +658,14 @@ export default function PresupuestoNuevo({
   const [leyenda, setLeyenda] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [guardando, setGuardando] = useState(false);
+  // Guard sincrónico contra doble click en "Guardar"/"Nueva Revisión": el
+  // `disabled={guardando}` del botón depende de que React re-renderice, y
+  // hay una ventana chica (dos clicks casi simultáneos) donde el segundo
+  // click puede disparar handleGuardar antes de que el botón se deshabilite
+  // en el DOM. Este ref se chequea y setea de forma sincrónica al toque de
+  // entrar a handleGuardar, así que corta el segundo llamado sin depender
+  // del ciclo de render.
+  const guardandoRef = useRef(false);
   const [guardadoOk, setGuardadoOk] = useState(false);
   const [error, setError] = useState("");
 
@@ -2265,6 +2273,10 @@ export default function PresupuestoNuevo({
   };
 
   const handleGuardar = async (esNuevaRev = false) => {
+    // Corta acá mismo un segundo click (doble click, doble tap, etc.) que
+    // llegue mientras el guardado anterior todavía está en vuelo — ver
+    // comentario en la declaración de guardandoRef más arriba.
+    if (guardandoRef.current) return;
     const nombreOk = cliente.trim().length > 0;
     const telefonoOk = telefono1.trim().length > 0;
     if (!nombreOk || !telefonoOk) {
@@ -2276,6 +2288,7 @@ export default function PresupuestoNuevo({
       );
       return;
     }
+    guardandoRef.current = true;
     setError("");
     setGuardando(true);
 
@@ -2496,6 +2509,7 @@ export default function PresupuestoNuevo({
     } catch (err) {
       setError(err.message);
     } finally {
+      guardandoRef.current = false;
       setGuardando(false);
     }
   };
