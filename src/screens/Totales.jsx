@@ -11,19 +11,12 @@ export default function Totales({
   // línea "pura" como las columnas de arriba).
   lineaPorGrupo,
   grupoDe,
-  // Si TODOS los grupos (salvo Placard) coincidieron en la misma línea, el
-  // header de la tabla colapsa a una sola columna "Línea N" — este índice
-  // es cuál (mismo cálculo que TablaArticulos.jsx). Con esto, TOTAL GENERAL
-  // colapsa también a una sola columna para no desalinearse del resto de
-  // la tabla, y la fila "TOTAL SEGÚN LÍNEA ELEGIDA POR GRUPO" (que en ese
-  // caso sería un número idéntico al de TOTAL GENERAL) se oculta.
-  lineaUnificadaIdx = null,
 }) {
   const hayElecciones =
     lineaPorGrupo && Object.keys(lineaPorGrupo).length > 0;
 
   const totalCombinado =
-    lineasActivas.length > 1 && grupoDe && lineaUnificadaIdx == null
+    lineasActivas.length > 1 && grupoDe
       ? presupuestoItems.reduce((s, it) => {
           const esPlacard = (it.seccion || "").startsWith("Placard / ");
           let pr;
@@ -46,18 +39,6 @@ export default function Totales({
         }, 0)
       : null;
 
-  // Total de una línea puntual (mismo cálculo que se usaba por columna,
-  // reutilizado tanto para las columnas normales como para la columna
-  // única cuando hay unificación).
-  const totalDeLinea = (li) =>
-    presupuestoItems.reduce((s, it) => {
-      const esPlacard = (it.seccion || "").startsWith("Placard / ");
-      const pr = esPlacard
-        ? parseFloat(it.precio ?? 0) || 0
-        : parseFloat(it.precios?.[li]?.precio ?? it.precio ?? 0) || 0;
-      return s + pr * (parseFloat(it.cantidad) || 1);
-    }, 0);
-
   return (
     <>
     <tr style={{ background: "#0a3a5c" }}>
@@ -74,39 +55,36 @@ export default function Totales({
       >
         TOTAL GENERAL
       </td>
-      {lineasActivas.length > 0 ? (
-        lineaUnificadaIdx != null ? (
-          <td
-            style={{
-              padding: "10px 14px",
-              textAlign: "right",
-              fontWeight: 700,
-              color: "#fff",
-              fontSize: 14,
-            }}
-          >
-            $
-            {totalDeLinea(lineaUnificadaIdx).toLocaleString("es-AR", {
-              minimumFractionDigits: 2,
-            })}
-          </td>
-        ) : (
-          lineasActivas.map((l, li) => (
-            <td
-              key={l.linea}
-              style={{
-                padding: "10px 14px",
-                textAlign: "right",
-                fontWeight: 700,
-                color: "#fff",
-                fontSize: 14,
-              }}
-            >
-              ${totalDeLinea(li).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-            </td>
-          ))
-        )
-      ) : null}
+      {lineasActivas.length > 0
+        ? lineasActivas.map((l, li) => {
+            // Placard tiene precio único, independiente de la línea (ver
+            // esPlacardSec en TablaArticulos.jsx / pdfPresupuesto.js): para
+            // esos ítems SIEMPRE se usa it.precio, nunca it.precios[li],
+            // para que el total de cada línea coincida con el importe que
+            // efectivamente se ve impreso en la sección de Placard.
+            const total = presupuestoItems.reduce((s, it) => {
+              const esPlacard = (it.seccion || "").startsWith("Placard / ");
+              const pr = esPlacard
+                ? parseFloat(it.precio ?? 0) || 0
+                : parseFloat(it.precios?.[li]?.precio ?? it.precio ?? 0) || 0;
+              return s + pr * (parseFloat(it.cantidad) || 1);
+            }, 0);
+            return (
+              <td
+                key={l.linea}
+                style={{
+                  padding: "10px 14px",
+                  textAlign: "right",
+                  fontWeight: 700,
+                  color: "#fff",
+                  fontSize: 14,
+                }}
+              >
+                ${total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+              </td>
+            );
+          })
+        : null}
       <td
         style={{
           padding: "10px 14px",
@@ -175,4 +153,3 @@ export default function Totales({
     </>
   );
 }
-
