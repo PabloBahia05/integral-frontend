@@ -228,6 +228,15 @@ export async function generarPresupuestoPDF({
               item.seccion === "Mampara" && fotosMamparaPorModelo[item.descripcion]
                 ? `<div class="mampara-foto"><img src="${fotosMamparaPorModelo[item.descripcion]}" style="max-width:220px; max-height:220px; display:block; margin-top:6px; border:1px solid #ddd; border-radius:4px;" /></div>`
                 : "";
+            // Accesorios tildados en el ítem (hasta 3, ya resueltos a nombre
+            // en PresupuestoNuevo.jsx — item.accesorios es un array de
+            // strings, igual que se muestra en pantalla). Se listan debajo
+            // del nombre del artículo, sin depender de querDescripcion (los
+            // accesorios no son la "descripción", van siempre que existan).
+            const accesoriosHTML =
+              Array.isArray(item.accesorios) && item.accesorios.length > 0
+                ? `<div class="item-accesorios">Accesorios: ${item.accesorios.join(", ")}</div>`
+                : "";
             // Precio por ítem: SOLO se muestra si incluirPrecio está activo.
             // Por defecto queda oculto (igual que el formato clásico), y solo
             // se ven los totales por sección/grupo al final de cada tabla.
@@ -247,7 +256,7 @@ export async function generarPresupuestoPDF({
             return `
         <tr>
           <td class="cant">${item.cantidad ?? 1}</td>
-          <td>${item.nombreart ?? ""}${medida}${descripcionHTML}${fotoMamparaHTML}</td>
+          <td>${item.nombreart ?? ""}${medida}${descripcionHTML}${accesoriosHTML}${fotoMamparaHTML}</td>
           ${mostrarCosto ? `<td class="right">${item.costo != null ? formatPeso(item.costo) : "—"}</td>` : ""}
           ${celdasPrecio}
         </tr>`;
@@ -382,6 +391,7 @@ export async function generarPresupuestoPDF({
     tbody td.center { text-align: center; }
     .medida { color: #444; font-size: 11px; }
     .item-desc { color: #444; font-size: 11px; font-style: italic; margin-top: 2px; }
+    .item-accesorios { color: #555; font-size: 10.5px; margin-top: 2px; }
     tr.subtotal-row td { border-top: 1px solid #111; font-weight: 700; padding-top: 4px; }
     .totals-final { margin-top: 6px; text-align: right; }
     .totals-final .t-row { font-weight: 700; font-size: 13px; padding: 3px 0; }
