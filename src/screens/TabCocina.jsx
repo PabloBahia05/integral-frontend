@@ -932,6 +932,19 @@ export default function TabCocina({
                         const precioUn = parseFloat(art?.precio) || 0;
                         const areaItem = resolverAreaItem(fila);
                         const area = parseFloat(areaItem) || 1;
+                        // Cantidad total de juegos/bisagras a mostrar: el
+                        // "área" del artículo es cuántos corresponden a UNA
+                        // unidad de este ítem (ej: cajonera de 2 caj. ->
+                        // area=2), así que hay que multiplicarla por
+                        // fila.cantidad (columna "Cant." — unidades iguales
+                        // en este renglón) para que el badge muestre el
+                        // total real a comprar/cortar, no solo el de una
+                        // unidad. El precio ($) sigue siendo por unidad
+                        // (precioUn × area) porque el subtotal de la fila ya
+                        // se multiplica por fila.cantidad más abajo — acá
+                        // solo se corrige la CANTIDAD mostrada, no el $.
+                        const cantidadFila = parseFloat(fila.cantidad) || 1;
+                        const cantAccTotal = area * cantidadFila;
                         const total = precioUn * area;
                         return (
                           <div
@@ -942,7 +955,7 @@ export default function TabCocina({
                               marginTop: 2,
                             }}
                           >
-                            🔧 {nombre} — cant: {areaItem ?? "-"} · +
+                            🔧 {nombre} — cant: {areaItem != null ? cantAccTotal : "-"} · +
                             {total.toLocaleString("es-AR", {
                               style: "currency",
                               currency: "ARS",
