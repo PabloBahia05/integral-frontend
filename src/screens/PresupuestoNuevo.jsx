@@ -2372,13 +2372,25 @@ export default function PresupuestoNuevo({
           // abajo, nunca se mandaba como campo propio del ítem).
           area: parseFloat(it.area) || null,
           // Hasta 3 accesorios por ítem: cada uno se manda como su
-          // codartint (columnas accesorio/accesorio1/accesorio2) + el área
-          // del artículo del ítem (columnas cantacc/cantacc1/cantacc2 —
-          // el área del ítem, no una cantidad de accesorios). Slots sin
-          // usar quedan en null.
+          // codartint (columnas accesorio/accesorio1/accesorio2) + la
+          // cantidad física total de ese accesorio (columnas
+          // cantacc/cantacc1/cantacc2). Esa cantidad sale de multiplicar
+          // el área del artículo (columna AREA en tabla articulos —
+          // repurpuesta para guardar cuántos juegos/bisagras corresponden
+          // a UNA unidad del ítem, ej: cajonera de 2 cajones -> area=2)
+          // por la cantidad de unidades iguales del ítem (it.cantidad,
+          // columna "Cant." en pantalla). Antes solo se mandaba el área
+          // sin multiplicar por cantidad, así que una fila con Cant.=3 y
+          // área=2 guardaba cantacc=2 en vez de 6 (el precio ya salía
+          // bien porque precio-por-unidad × cantidad se multiplica aparte
+          // al calcular el subtotal; lo que estaba mal era solo esta
+          // cantidad física, usada para producción/compras).
           ...(() => {
             const nombres = (it.accesorios ?? []).slice(0, 3);
             const areaItem = parseFloat(it.area) || null;
+            const cantidadItem = parseFloat(it.cantidad) || 1;
+            const cantAccTotal =
+              areaItem != null ? areaItem * cantidadItem : null;
             const cods = nombres.map((nombre) => {
               const art = accesoriosDisponibles.find(
                 (a) => a.articulo === nombre,
@@ -2387,11 +2399,11 @@ export default function PresupuestoNuevo({
             });
             return {
               accesorio: cods[0] ?? null,
-              cantacc: cods[0] != null ? areaItem : null,
+              cantacc: cods[0] != null ? cantAccTotal : null,
               accesorio1: cods[1] ?? null,
-              cantacc1: cods[1] != null ? areaItem : null,
+              cantacc1: cods[1] != null ? cantAccTotal : null,
               accesorio2: cods[2] ?? null,
-              cantacc2: cods[2] != null ? areaItem : null,
+              cantacc2: cods[2] != null ? cantAccTotal : null,
             };
           })(),
           // Vinculación vanitory
