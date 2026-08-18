@@ -1644,20 +1644,6 @@ export default function PresupuestoVanitory({
                 </div>
               </div>
 
-              {/* Cantidad */}
-              <div className="field">
-                <span className="label-text">CANTIDAD</span>
-                <input
-                  className="input"
-                  type="number"
-                  min="1"
-                  value={form.cantidad}
-                  onChange={(e) =>
-                    setForm({ ...form, cantidad: Number(e.target.value) })
-                  }
-                />
-              </div>
-
               {/* Cajones verticales */}
               <div className="field">
                 <span className="label-text">CANTIDAD DE CAJONES VERTICALES</span>
