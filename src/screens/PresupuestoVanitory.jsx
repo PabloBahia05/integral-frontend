@@ -576,6 +576,7 @@ export default function PresupuestoVanitory({
       codartint: p.codartint ?? p.CODARTINT ?? p.codart ?? "",
       precio: parseFloat(p.precio ?? p.PRECIO ?? 0) || 0,
       precio_un: parseFloat(p.precio_un ?? p.PRECIO_UN ?? p.precio ?? 0) || 0,
+      area: (p.area ?? p.AREA ?? "").toString().trim().toUpperCase(),
     });
 
     Promise.all([
@@ -1100,13 +1101,14 @@ export default function PresupuestoVanitory({
                         {insumosMuebles
                           .filter(
                             (p) =>
-                              !materialSearch ||
-                              (p.articulo ?? "")
-                                .toLowerCase()
-                                .includes(materialSearch.toLowerCase()) ||
-                              (p.codart ?? "")
-                                .toLowerCase()
-                                .includes(materialSearch.toLowerCase()),
+                              p.area === "MELAMINA" &&
+                              (!materialSearch ||
+                                (p.articulo ?? "")
+                                  .toLowerCase()
+                                  .includes(materialSearch.toLowerCase()) ||
+                                (p.codart ?? "")
+                                  .toLowerCase()
+                                  .includes(materialSearch.toLowerCase())),
                           )
                           .slice(0, 60)
                           .map((p, i) => (
@@ -1169,13 +1171,14 @@ export default function PresupuestoVanitory({
                           ))}
                         {insumosMuebles.filter(
                           (p) =>
-                            !materialSearch ||
-                            (p.articulo ?? "")
-                              .toLowerCase()
-                              .includes(materialSearch.toLowerCase()) ||
-                            (p.codart ?? "")
-                              .toLowerCase()
-                              .includes(materialSearch.toLowerCase()),
+                            p.area === "MELAMINA" &&
+                            (!materialSearch ||
+                              (p.articulo ?? "")
+                                .toLowerCase()
+                                .includes(materialSearch.toLowerCase()) ||
+                              (p.codart ?? "")
+                                .toLowerCase()
+                                .includes(materialSearch.toLowerCase())),
                         ).length === 0 && (
                           <div
                             style={{
