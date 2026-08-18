@@ -463,9 +463,10 @@ export default function PresupuestoWallPanel({ onVolver, token, onAgregarAPresup
   );
   const varillaFiltrados = materiales.filter(
     (p) =>
-      !varillaSearch ||
-      (p.articulo ?? "").toLowerCase().includes(varillaSearch.toLowerCase()) ||
-      (p.codart ?? "").toLowerCase().includes(varillaSearch.toLowerCase()),
+      p.area === "MELAMINA" &&
+      (!varillaSearch ||
+        (p.articulo ?? "").toLowerCase().includes(varillaSearch.toLowerCase()) ||
+        (p.codart ?? "").toLowerCase().includes(varillaSearch.toLowerCase())),
   );
 
   return (
