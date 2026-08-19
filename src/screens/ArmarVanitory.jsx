@@ -80,7 +80,7 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
   // Colocación desde BD
   useEffect(() => {
     if (!modelo?.codart) return;
-    fetch(
+    authFetch(
       `${API}/colocacion/buscar?codart=${encodeURIComponent(modelo.codart)}`,
     )
       .then((r) => r.json())
@@ -122,11 +122,11 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
       // criterio que PresupuestoVanitory.jsx (antes cada uno filtraba
       // distinto: acá por rubro/familia INSUMOS, allá por LIKE %PLACA% en
       // /productos/placas-vanitory).
-      fetch(`${API}/productos?area=${encodeURIComponent("MELAMINA")}&limit=500`)
+      authFetch(`${API}/productos?area=${encodeURIComponent("MELAMINA")}&limit=500`)
         .then((r) => r.json())
         .then((d) => (Array.isArray(d) ? d : []))
         .catch(() => []),
-      fetch(
+      authFetch(
         `${API}/productos?familia=${encodeURIComponent("HERRAJES")}&limit=500`,
       )
         .then((r) => r.json())
