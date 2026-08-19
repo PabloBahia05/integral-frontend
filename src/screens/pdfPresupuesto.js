@@ -20,12 +20,13 @@ export const MEMBRETE_DANIEL_ROQUE_B64 ="data:image/png;base64,iVBORw0KGgoAAAANS
 //  - ordenGrupos: array con el orden manual de grupos (▲▼ en TablaArticulos),
 //    igual al estado que vive en PresupuestoNuevo.jsx. Opcional: si no se
 //    pasa, se usa el orden natural de aparición (comportamiento previo).
-//  - lineaPorGrupo: objeto { [nombreGrupo]: numeroDeLinea }, igual al estado
-//    que vive en PresupuestoNuevo.jsx (selector "Línea del grupo..." en
-//    TablaArticulos.jsx). Si un grupo tiene línea elegida, el PDF muestra
-//    UNA sola columna de precio con esa línea (en vez de todas las líneas
-//    activas repetidas). Opcional: si un grupo no tiene línea elegida, se
-//    usa la primera de lineasActivas como default.
+//  - lineaPorGrupo: objeto { [nombreGrupo]: índice en lineasActivas }, igual
+//    al estado que vive en PresupuestoNuevo.jsx (selector "Línea del
+//    grupo..." en TablaArticulos.jsx — el <option value={li}> guarda el
+//    ÍNDICE dentro de lineasActivas, no el número de línea). Si un grupo
+//    tiene línea elegida, el PDF muestra UNA sola columna de precio con esa
+//    línea (en vez de todas las líneas activas repetidas). Opcional: si un
+//    grupo no tiene línea elegida, se usa la primera de lineasActivas.
 //  - mostrarCosto, incluirPrecio, incluirTotal, agregarIVA, incluirTextoColoc: flags de armado
 //  - incluirTextoSena: bool, si se agrega el recuadro de seña/condiciones (fondo amarillo)
 //  - textoSena: texto libre de ese recuadro, editable desde el Encabezado
@@ -211,10 +212,10 @@ export async function generarPresupuestoPDF({
         // de lineasActivas como default.
         const lineaIdxSec = mostrarLineasSec
           ? (() => {
-              const idx = lineasActivas.findIndex(
-                (l) => String(l.linea) === String(lineaPorGrupo?.[sec]),
-              );
-              return idx >= 0 ? idx : 0;
+              const idx = lineaPorGrupo?.[sec];
+              return idx != null && idx >= 0 && idx < lineasActivas.length
+                ? idx
+                : 0;
             })()
           : 0;
         const lineaElegidaSec = mostrarLineasSec
@@ -375,10 +376,8 @@ export async function generarPresupuestoPDF({
             return s + (parseFloat(it.precio ?? 0) || 0) * (parseFloat(it.cantidad) || 1);
           }
           const sec = grupoDe(it);
-          const idx = lineasActivas.findIndex(
-            (l) => String(l.linea) === String(lineaPorGrupo?.[sec]),
-          );
-          const li = idx >= 0 ? idx : 0;
+          const idx = lineaPorGrupo?.[sec];
+          const li = idx != null && idx >= 0 && idx < lineasActivas.length ? idx : 0;
           const pr = parseFloat(it.precios?.[li]?.precio ?? it.precio ?? 0) || 0;
           return s + pr * (parseFloat(it.cantidad) || 1);
         }, 0)
