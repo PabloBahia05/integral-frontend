@@ -2566,6 +2566,7 @@ export default function PresupuestoNuevo({
       presupuestoItems,
       grupoDe,
       ordenGrupos,
+      lineaPorGrupo,
       mostrarCosto,
       incluirPrecio,
       incluirSubtotalItem,
@@ -3393,10 +3394,7 @@ export default function PresupuestoNuevo({
                   )}
                   <button
                     type="button"
-                    onClick={() => {
-                      accesorioMenu.onConfirm?.();
-                      cerrarAccesorioMenu();
-                    }}
+                    onClick={cerrarAccesorioMenu}
                     style={{
                       marginTop: 8,
                       width: "100%",
@@ -3410,7 +3408,7 @@ export default function PresupuestoNuevo({
                       cursor: "pointer",
                     }}
                   >
-                    Ingresar
+                    Cerrar
                   </button>
                 </div>
               </>
