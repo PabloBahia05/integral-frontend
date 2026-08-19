@@ -580,8 +580,12 @@ export default function PresupuestoVanitory({
     });
 
     Promise.all([
-      // Placas: articulo LIKE %PLACA% AND proveedor != DANIEL ROQUE SRL
-      authFetch(`${API}/productos/placas-vanitory`)
+      // Material: tabla articulos filtrada por AREA='MELAMINA' — mismo
+      // criterio que ArmarVanitory.jsx (antes acá era /productos/placas-vanitory,
+      // que filtraba por LIKE %PLACA%, un criterio distinto).
+      authFetch(
+        `${API}/productos?area=${encodeURIComponent("MELAMINA")}&limit=500`,
+      )
         .then((r) => r.json())
         .then((data) => (Array.isArray(data) ? data : []).map(normalizar))
         .catch(() => []),

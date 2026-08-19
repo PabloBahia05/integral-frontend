@@ -118,9 +118,11 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
   useEffect(() => {
     setCargandoInsumos(true);
     Promise.all([
-      fetch(
-        `${API}/productos?rubro=${encodeURIComponent("MUEBLES")}&familia=${encodeURIComponent("INSUMOS")}&limit=500`,
-      )
+      // Material: tabla articulos filtrada por AREA='MELAMINA' — mismo
+      // criterio que PresupuestoVanitory.jsx (antes cada uno filtraba
+      // distinto: acá por rubro/familia INSUMOS, allá por LIKE %PLACA% en
+      // /productos/placas-vanitory).
+      fetch(`${API}/productos?area=${encodeURIComponent("MELAMINA")}&limit=500`)
         .then((r) => r.json())
         .then((d) => (Array.isArray(d) ? d : []))
         .catch(() => []),
