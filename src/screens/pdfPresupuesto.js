@@ -23,10 +23,17 @@ export const MEMBRETE_DANIEL_ROQUE_B64 ="data:image/png;base64,iVBORw0KGgoAAAANS
 //  - lineaPorGrupo: objeto { [nombreGrupo]: índice en lineasActivas }, igual
 //    al estado que vive en PresupuestoNuevo.jsx (selector "Línea del
 //    grupo..." en TablaArticulos.jsx — el <option value={li}> guarda el
-//    ÍNDICE dentro de lineasActivas, no el número de línea). Si un grupo
-//    tiene línea elegida, el PDF muestra UNA sola columna de precio con esa
-//    línea (en vez de todas las líneas activas repetidas). Opcional: si un
-//    grupo no tiene línea elegida, se usa la primera de lineasActivas.
+//    ÍNDICE dentro de lineasActivas, no el número de línea). Solo se usa
+//    cuando confirmado=true (ver más abajo).
+//  - confirmado: bool. Define qué caso es este presupuesto:
+//      · true  (obra confirmada): cada grupo YA tiene una línea asignada.
+//        El PDF muestra UNA sola columna de precio por grupo, con la línea
+//        elegida en lineaPorGrupo[sec] (o la primera de lineasActivas si el
+//        grupo no tiene línea guardada). Es el caso particular.
+//      · false (todavía en etapa de presupuesto, default): puede haber
+//        varias líneas disponibles. El PDF imprime TODAS las opciones: una
+//        columna por cada línea de lineasActivas, igual que la tabla
+//        "Presupuesto" en pantalla, con un "TOTAL LÍNEA X" por cada una.
 //  - mostrarCosto, incluirPrecio, incluirTotal, agregarIVA, incluirTextoColoc: flags de armado
 //  - incluirTextoSena: bool, si se agrega el recuadro de seña/condiciones (fondo amarillo)
 //  - textoSena: texto libre de ese recuadro, editable desde el Encabezado
@@ -50,6 +57,7 @@ export async function generarPresupuestoPDF({
   grupoDe,
   ordenGrupos,
   lineaPorGrupo,
+  confirmado = false,
   mostrarCosto,
   incluirPrecio,
   incluirTotal,
@@ -204,33 +212,36 @@ export async function generarPresupuestoPDF({
         const mostrarLineasSec = mostrarLineas && !esPlacardSec;
         const usarColumnaUnicaPlacard = mostrarLineas && esPlacardSec;
 
-        // Línea elegida para ESTE grupo (selector "Línea del grupo..." en
-        // TablaArticulos.jsx, guardado en lineaPorGrupo[sec]). El PDF ya no
-        // repite una columna por cada línea activa: muestra solo la que el
-        // usuario eligió para ese grupo. Si el grupo no tiene línea elegida
-        // (o la guardada ya no está entre las activas), se usa la primera
-        // de lineasActivas como default.
-        const lineaIdxSec = mostrarLineasSec
-          ? (() => {
-              const idx = lineaPorGrupo?.[sec];
-              return idx != null && idx >= 0 && idx < lineasActivas.length
-                ? idx
-                : 0;
-            })()
-          : 0;
-        const lineaElegidaSec = mostrarLineasSec
-          ? lineasActivas[lineaIdxSec]
-          : null;
+        // Columnas de línea a mostrar para ESTE grupo.
+        // - confirmado=true: una sola columna, con la línea elegida en el
+        //   selector "Línea del grupo..." de TablaArticulos.jsx (guardada en
+        //   lineaPorGrupo[sec] como ÍNDICE dentro de lineasActivas). Si el
+        //   grupo no tiene línea elegida, se usa la primera de lineasActivas
+        //   como default.
+        // - confirmado=false: todas las líneas activas, una columna por
+        //   cada una (mismo criterio que la tabla "Presupuesto" en pantalla).
+        const columnasLineaSec = mostrarLineasSec
+          ? confirmado
+            ? (() => {
+                const idx = lineaPorGrupo?.[sec];
+                const li =
+                  idx != null && idx >= 0 && idx < lineasActivas.length
+                    ? idx
+                    : 0;
+                return [{ idx: li, linea: lineasActivas[li] }];
+              })()
+            : lineasActivas.map((linea, idx) => ({ idx, linea }))
+          : [];
 
-        const subtotalSecLinea = mostrarLineasSec
-          ? items.reduce((s, it) => {
-              const pr =
-                parseFloat(
-                  it.precios?.[lineaIdxSec]?.precio ?? it.precio ?? 0,
-                ) || 0;
-              return s + pr * (parseFloat(it.cantidad) || 1);
-            }, 0)
-          : 0;
+        const subtotalesPorColumnaSec = columnasLineaSec.map((col) => {
+          const subtotal = items.reduce((s, it) => {
+            const pr =
+              parseFloat(it.precios?.[col.idx]?.precio ?? it.precio ?? 0) ||
+              0;
+            return s + pr * (parseFloat(it.cantidad) || 1);
+          }, 0);
+          return { ...col, subtotal };
+        });
 
         const filasItems = items
           .map((item) => {
@@ -267,12 +278,14 @@ export async function generarPresupuestoPDF({
             // Por defecto queda oculto (igual que el formato clásico), y solo
             // se ven los totales por sección/grupo al final de cada tabla.
             const celdasPrecio = mostrarLineasSec
-              ? (() => {
-                  if (!incluirPrecio) return `<td class="right"></td>`;
-                  const pr =
-                    item.precios?.[lineaIdxSec]?.precio ?? item.precio ?? 0;
-                  return `<td class="right">${formatPeso(pr)}</td>`;
-                })()
+              ? columnasLineaSec
+                  .map((col) => {
+                    if (!incluirPrecio) return `<td class="right"></td>`;
+                    const pr =
+                      item.precios?.[col.idx]?.precio ?? item.precio ?? 0;
+                    return `<td class="right">${formatPeso(pr)}</td>`;
+                  })
+                  .join("")
               : usarColumnaUnicaPlacard
                 ? `<td class="right">${incluirPrecio ? formatPeso(item.precio) : ""}</td>`
                 : incluirPrecio
@@ -290,7 +303,9 @@ export async function generarPresupuestoPDF({
 
         const labelColspan = 2 + (mostrarCosto ? 1 : 0);
         const celdasSubtotalLinea = mostrarLineasSec
-          ? `<td class="right">${formatPeso(subtotalSecLinea)}</td>`
+          ? subtotalesPorColumnaSec
+              .map((col) => `<td class="right">${formatPeso(col.subtotal)}</td>`)
+              .join("")
           : usarColumnaUnicaPlacard
             ? `<td class="right">${formatPeso(subtotalSec)}</td>`
             : incluirPrecio
@@ -332,7 +347,12 @@ export async function generarPresupuestoPDF({
               ${mostrarCosto ? `<th class="right">Costo</th>` : ""}
               ${
                 mostrarLineasSec
-                  ? `<th class="right">Línea ${lineaElegidaSec.linea}</th>`
+                  ? columnasLineaSec
+                      .map(
+                        (col) =>
+                          `<th class="right">Línea ${col.linea.linea}</th>`,
+                      )
+                      .join("")
                   : usarColumnaUnicaPlacard
                     ? `<th class="right">Precio</th>`
                     : incluirPrecio
@@ -364,13 +384,14 @@ export async function generarPresupuestoPDF({
       0,
     );
 
-    // Total general usando, para cada grupo, la línea que el usuario eligió
-    // ahí (lineaPorGrupo) — igual que las columnas que se ven arriba, en
-    // vez de un total separado por cada una de las líneas activas. Placard
-    // tiene precio único, independiente de la línea (ver esPlacardSec más
-    // arriba): para esos ítems SIEMPRE se usa it.precio.
+    // Placard tiene precio único, independiente de la línea (ver esPlacardSec
+    // más arriba): para esos ítems SIEMPRE se usa it.precio.
     const esItemPlacard = (it) => (it.seccion || "").startsWith("Placard / ");
-    const totalGeneralLineaElegida = mostrarLineas
+
+    // Caso confirmado=true: total general usando, para cada grupo, la línea
+    // que el usuario eligió ahí (lineaPorGrupo) — un único monto, igual que
+    // las columnas que se ven arriba (en vez de un total por cada línea).
+    const totalGeneralLineaElegida = mostrarLineas && confirmado
       ? presupuestoItems.reduce((s, it) => {
           if (esItemPlacard(it)) {
             return s + (parseFloat(it.precio ?? 0) || 0) * (parseFloat(it.cantidad) || 1);
@@ -382,6 +403,24 @@ export async function generarPresupuestoPDF({
           return s + pr * (parseFloat(it.cantidad) || 1);
         }, 0)
       : 0;
+
+    // Caso confirmado=false (etapa de presupuesto, todas las líneas
+    // disponibles): un total separado por cada línea activa — "TOTAL LÍNEA
+    // 21", "TOTAL LÍNEA 22", etc. Los ítems de Placard usan siempre su
+    // precio único, así que ese monto queda igual (duplicado) bajo cada
+    // línea — mismo criterio que las columnas por ítem de más arriba.
+    const totalesPorLinea = mostrarLineas && !confirmado
+      ? lineasActivas.map((linea, idx) => {
+          const total = presupuestoItems.reduce((s, it) => {
+            if (esItemPlacard(it)) {
+              return s + (parseFloat(it.precio ?? 0) || 0) * (parseFloat(it.cantidad) || 1);
+            }
+            const pr = parseFloat(it.precios?.[idx]?.precio ?? it.precio ?? 0) || 0;
+            return s + pr * (parseFloat(it.cantidad) || 1);
+          }, 0);
+          return { linea, total };
+        })
+      : [];
 
     // Estilo "clásico" tipo máquina de escribir (mismo aspecto que los
     // presupuestos históricos de Daniel Roque S.R.L.): monoespaciado, blanco
@@ -457,7 +496,14 @@ export async function generarPresupuestoPDF({
         ? `<div class="totals-final">
         ${
           mostrarLineas
-            ? `<div class="t-row">TOTAL: ${formatPeso(totalGeneralLineaElegida)}</div>`
+            ? confirmado
+              ? `<div class="t-row">TOTAL: ${formatPeso(totalGeneralLineaElegida)}</div>`
+              : totalesPorLinea
+                  .map(
+                    (t) =>
+                      `<div class="t-row">TOTAL LÍNEA ${t.linea.linea}: ${formatPeso(t.total)}</div>`,
+                  )
+                  .join("")
             : `<div class="t-row">TOTAL: ${formatPeso(totalGeneral)}</div>`
         }
         ${agregarIVA ? `<div class="iva-note">Precios con IVA incluido, sujetos a reajustes</div>` : ""}
