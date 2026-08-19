@@ -419,44 +419,69 @@ export default function useCocinaPlacard({
     return { ...fila, accesorios: [...(fila.accesorios ?? []), art.articulo] };
   };
 
+  // "Aplicar freno" recorre TODAS las familias de Cocina/Placard, no solo
+  // la familia activa del tab — por eso necesita el mapa combinado
+  // (construirMapaArticulosCompleto) para resolver fila.area en ítems
+  // sin área persistida, en vez de depender de articulosFamilia (que solo
+  // conoce la familia que se está mirando). Sin esto, recalcFila caía en
+  // su fallback `area || 1` y el cargo del accesorio de freno quedaba a
+  // mitad de precio en cualquier ítem con área > 1 (ej. cajoneras de 2
+  // cajones) cuya fila todavía no tenía `area` seteada.
   const aplicarFrenoATodosCocina = () => {
-    setCocinaItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map((f) => recalcFila(conAccesorioFreno(f)));
-      }
-      return next;
+    construirMapaArticulosCompleto().then((mapaArticulos) => {
+      setCocinaItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          next[familia] = filas.map((f) =>
+            recalcFila(conAccesorioFreno(resolverAreaConMapa(f, mapaArticulos))),
+          );
+        }
+        return next;
+      });
     });
   };
 
   const aplicarFrenoATodosPlacard = () => {
-    setPlacardItems((prev) => {
-      const next = {};
-      for (const [familia, filas] of Object.entries(prev)) {
-        next[familia] = filas.map((f) => recalcFila(conAccesorioFreno(f)));
-      }
-      return next;
+    construirMapaArticulosCompleto().then((mapaArticulos) => {
+      setPlacardItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          next[familia] = filas.map((f) =>
+            recalcFila(conAccesorioFreno(resolverAreaConMapa(f, mapaArticulos))),
+          );
+        }
+        return next;
+      });
     });
   };
 
   // Aplica el accesorio de freno a un único ítem (cocina o placard) por
-  // índice, misma lógica que "aplicar a todos" pero puntual.
+  // índice, misma lógica que "aplicar a todos" pero puntual — mismo
+  // motivo para pasar por el mapa combinado (ver comentario arriba).
   const setFrenoItemCocina = (familia, idx) => {
-    setCocinaItems((prev) => ({
-      ...prev,
-      [familia]: (prev[familia] ?? []).map((f, i) =>
-        i === idx ? recalcFila(conAccesorioFreno(f)) : f,
-      ),
-    }));
+    construirMapaArticulosCompleto().then((mapaArticulos) => {
+      setCocinaItems((prev) => ({
+        ...prev,
+        [familia]: (prev[familia] ?? []).map((f, i) =>
+          i === idx
+            ? recalcFila(conAccesorioFreno(resolverAreaConMapa(f, mapaArticulos)))
+            : f,
+        ),
+      }));
+    });
   };
 
   const setFrenoItemPlacard = (familia, idx) => {
-    setPlacardItems((prev) => ({
-      ...prev,
-      [familia]: (prev[familia] ?? []).map((f, i) =>
-        i === idx ? recalcFila(conAccesorioFreno(f)) : f,
-      ),
-    }));
+    construirMapaArticulosCompleto().then((mapaArticulos) => {
+      setPlacardItems((prev) => ({
+        ...prev,
+        [familia]: (prev[familia] ?? []).map((f, i) =>
+          i === idx
+            ? recalcFila(conAccesorioFreno(resolverAreaConMapa(f, mapaArticulos)))
+            : f,
+        ),
+      }));
+    });
   };
 
   // ── Accesorios ───────────────────────────────────────────
@@ -622,6 +647,58 @@ export default function useCocinaPlacard({
     return nuevaFila;
   };
 
+  // Trae TODAS las familias posibles de una y arma un mapa combinado
+  // artículo->registro BD, en vez de derivar la familia BD a partir de la
+  // clave interna donde vive cada ítem. Un ítem puede estar guardado bajo
+  // la clave interna "placard" pero pertenecer en la BD a la familia
+  // "FRENTE DE PLACARD" (el grupo visual "FRENTE DE PLACARD COLOR/BLANCO"
+  // es solo la etiqueta `grupo` del ítem, no una familia interna separada
+  // — comprobado con logs: placardItems.placard traía los 3 ítems,
+  // frente/auxiliares/accesorios vacíos). En vez de adivinar los nombres
+  // de familia (frágil: "FRENTE DE PLACARD" podía no ser el string exacto
+  // guardado en la BD), pedimos primero la lista REAL de familias
+  // existentes y traemos los artículos de todas — así el matcheo por
+  // nombre no depende de que adivinemos bien el nombre de la familia.
+  // Extraído de handleActualizar para reusarlo también al resolver
+  // fila.area en las funciones de freno (ver aplicarFrenoATodosCocina /
+  // aplicarFrenoATodosPlacard más abajo), que igual que acá recorren
+  // TODAS las familias y no solo la familia activa del tab (por eso no
+  // alcanza con articulosFamilia/resolverAreaItem de TabCocina, que solo
+  // conoce la familia que estás mirando en ese momento).
+  const construirMapaArticulosCompleto = () =>
+    authFetch(`${API}/articulos/familias-todas`)
+      .then((r) => r.json())
+      .then((data) => (Array.isArray(data) ? data : []))
+      .catch(() => [])
+      .then((familiasBD) =>
+        Promise.all(
+          familiasBD.map((familiaBD) =>
+            authFetch(`${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`)
+              .then((r) => r.json())
+              .then((data) => (Array.isArray(data) ? data : []))
+              .catch(() => []),
+          ),
+        ),
+      )
+      .then((resultados) => {
+        const mapaArticulos = new Map();
+        for (const lista of resultados) {
+          for (const a of lista) mapaArticulos.set(normalizarArticulo(a.articulo), a);
+        }
+        return mapaArticulos;
+      });
+
+  // Resuelve fila.area contra el mapa combinado cuando la fila todavía no
+  // la tiene persistida (mismo caso que resolverAreaItem en TabCocina,
+  // pero cubriendo TODAS las familias). Devuelve la fila sin tocar si ya
+  // tenía área o si no hubo match.
+  const resolverAreaConMapa = (fila, mapaArticulos) => {
+    if (fila.area != null) return fila;
+    const art = buscarArticuloNormalizado(mapaArticulos, fila.nombreart || fila.articulo);
+    const area = art ? (art.area ?? art.AREA ?? null) : null;
+    return area != null ? { ...fila, area } : fila;
+  };
+
   const handleActualizar = () => {
     const hayCocina = Object.values(cocinaItemsRef.current).some((filas) => filas?.length);
     const hayPlacard = Object.values(placardItemsRef.current).some((filas) => filas?.length);
@@ -641,41 +718,7 @@ export default function useCocinaPlacard({
       return;
     }
 
-    // Traemos TODAS las familias posibles de una, en vez de derivar la
-    // familia BD a partir de la clave interna donde vive cada ítem. Un
-    // ítem puede estar guardado bajo la clave interna "placard" pero
-    // pertenecer en la BD a la familia "FRENTE DE PLACARD" (el grupo
-    // visual "FRENTE DE PLACARD COLOR/BLANCO" es solo la etiqueta `grupo`
-    // del ítem, no una familia interna separada — comprobado con logs:
-    // placardItems.placard traía los 3 ítems, frente/auxiliares/accesorios
-    // vacíos). Armamos UN mapa combinado por nombre de artículo y
-    // matcheamos contra ese único mapa, sin depender de la clave interna.
-    // En vez de adivinar los nombres de familia (frágil: "FRENTE DE
-    // PLACARD" podía no ser el string exacto guardado en la BD), pedimos
-    // primero la lista REAL de familias existentes y traemos los
-    // artículos de todas — así el matcheo por nombre no depende de que
-    // adivinemos bien el nombre de la familia.
-    authFetch(`${API}/articulos/familias-todas`)
-      .then((r) => r.json())
-      .then((data) => (Array.isArray(data) ? data : []))
-      .catch(() => [])
-      .then((familiasBD) => {
-        // TEMP DEBUG — sacar cuando se confirme que el fix funciona
-        console.log("[Actualizar] familias reales en BD:", familiasBD);
-        return Promise.all(
-          familiasBD.map((familiaBD) =>
-            authFetch(`${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`)
-              .then((r) => r.json())
-              .then((data) => (Array.isArray(data) ? data : []))
-              .catch(() => []),
-          ),
-        );
-      })
-      .then((resultados) => {
-        const mapaArticulos = new Map();
-        for (const lista of resultados) {
-          for (const a of lista) mapaArticulos.set(normalizarArticulo(a.articulo), a);
-        }
+    construirMapaArticulosCompleto().then((mapaArticulos) => {
         // TEMP DEBUG — sacar cuando se confirme que el fix funciona
         console.log("[Actualizar] mapa combinado de artículos (BD), total:", mapaArticulos.size);
 
