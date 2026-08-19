@@ -157,6 +157,7 @@ export default function Proveedores({
   const [rubros, setRubros] = useState([]);
   const [rubroEsNuevo, setRubroEsNuevo] = useState(false);
   const [nuevoRubro, setNuevoRubro] = useState("");
+  const [recalculando, setRecalculando] = useState(false);
 
   const API = "https://integral-backend-production.up.railway.app";
 
@@ -197,15 +198,58 @@ export default function Proveedores({
     setRubroEsNuevo(false);
   };
 
-  const handleGuardar = () => {
+  // Recalcula en lote costosi/costosicf/costocicf (y precio/precio_un donde
+  // corresponda) de todos los artículos de este proveedor. Necesario porque
+  // el backend solo aplica flete/descuento del proveedor cuando el artículo
+  // en sí se guarda — si acá cambiás flete o descuento, los artículos ya
+  // cargados quedan con los costos viejos hasta que se re-guardan.
+  const recalcularArticulosDelProveedor = async (provnombre) => {
+    if (!provnombre) return;
+    setRecalculando(true);
+    try {
+      const r = await fetch(`${API}/articulos/recalcular-por-proveedor`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proveedor: provnombre }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || "Error al recalcular");
+      alert(
+        `Precios recalculados: ${data.actualizados} de ${data.total} artículos` +
+          (data.sinValorlista
+            ? ` (${data.sinValorlista} sin valor de lista, no se tocaron)`
+            : ""),
+      );
+    } catch (e) {
+      alert(`No se pudieron recalcular los precios del proveedor: ${e.message}`);
+    } finally {
+      setRecalculando(false);
+    }
+  };
+
+  const handleGuardar = async () => {
     if (!form.provnombre?.trim())
       return alert("El nombre del proveedor es obligatorio.");
     const payload = {
       ...form,
       cuit: form.cuit || null,
     };
-    if (modal === "crear") onAdd(payload);
-    else onEdit({ ...selected, ...payload });
+    // Si cambió el flete o el descuento del proveedor, los artículos ya
+    // guardados quedan con costos viejos hasta que se re-guardan — se
+    // recalculan automáticamente acá, después de guardar el proveedor.
+    const fleteODescuentoCambio =
+      modal === "editar" &&
+      (String(form.flete ? 1 : 0) !== String(selected?.flete ? 1 : 0) ||
+        String(form.descuento ?? "") !== String(selected?.descuento ?? ""));
+
+    if (modal === "crear") {
+      onAdd(payload);
+    } else {
+      await onEdit({ ...selected, ...payload });
+      if (fleteODescuentoCambio) {
+        recalcularArticulosDelProveedor(form.provnombre);
+      }
+    }
     onCloseModal();
   };
   const handleEliminar = () => {
@@ -859,6 +903,27 @@ export default function Proveedores({
                 borderTop: "1px solid #1e3a5f",
               }}
             >
+              {modal === "editar" && (
+                <button
+                  type="button"
+                  onClick={() => recalcularArticulosDelProveedor(form.provnombre)}
+                  disabled={recalculando}
+                  title="Recalcula costosi/costosicf/costocicf de todos los artículos de este proveedor con el flete/descuento actuales"
+                  style={{
+                    background: "transparent",
+                    border: "1px solid #1e3a5f",
+                    color: recalculando ? "#475569" : "#94a3b8",
+                    borderRadius: 10,
+                    padding: "0.6rem 1.2rem",
+                    fontSize: "0.875rem",
+                    cursor: recalculando ? "default" : "pointer",
+                    fontWeight: 500,
+                    marginRight: "auto",
+                  }}
+                >
+                  {recalculando ? "Recalculando…" : "🔄 Recalcular precios"}
+                </button>
+              )}
               <button
                 onClick={onCloseModal}
                 style={{
