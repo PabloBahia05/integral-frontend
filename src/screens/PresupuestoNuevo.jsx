@@ -2567,6 +2567,7 @@ export default function PresupuestoNuevo({
       grupoDe,
       ordenGrupos,
       lineaPorGrupo,
+      confirmado,
       mostrarCosto,
       incluirPrecio,
       incluirSubtotalItem,
