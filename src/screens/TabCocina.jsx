@@ -939,13 +939,19 @@ export default function TabCocina({
                         // fila.cantidad (columna "Cant." — unidades iguales
                         // en este renglón) para que el badge muestre el
                         // total real a comprar/cortar, no solo el de una
-                        // unidad. El precio ($) sigue siendo por unidad
-                        // (precioUn × area) porque el subtotal de la fila ya
-                        // se multiplica por fila.cantidad más abajo — acá
-                        // solo se corrige la CANTIDAD mostrada, no el $.
+                        // unidad.
                         const cantidadFila = parseFloat(fila.cantidad) || 1;
                         const cantAccTotal = area * cantidadFila;
-                        const total = precioUn * area;
+                        // El $ mostrado junto al badge tiene que reflejar el
+                        // MISMO total que "cant" (cantAccTotal), no solo el
+                        // costo de una unidad — si no, "cant: 6 · +$X" se ve
+                        // como si $X fueran 6 juegos cuando en realidad eran
+                        // el costo de 2 (1 sola unidad). Este total es solo
+                        // informativo para este badge: el precio por unidad
+                        // real (usado en Línea 1/Subtotal) sigue viviendo en
+                        // recalcFila (useCocinaPlacard.js) sin cambios, y no
+                        // se toca acá.
+                        const total = precioUn * cantAccTotal;
                         return (
                           <div
                             key={nombre}
