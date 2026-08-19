@@ -30,6 +30,12 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
     colocacion: 0,
     material: "",
     materialPrecio: 0,
+    materialBlanco: "",
+    materialBlancoPrecio: 0,
+    lateralDer: "COLOR",
+    lateralIzq: "COLOR",
+    base: "COLOR",
+    techo: "COLOR",
     corredera: "",
     correderaPrecio: 0,
     correderaCantidad: 1,
@@ -50,7 +56,6 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
   const [colocacionBD, setColocacionBD] = useState(null);
   const [margenBD, setMargenBD] = useState(null);
   const [insumosMuebles, setInsumosMuebles] = useState([]);
-  const [herrajes, setHerrajes] = useState([]);
   const [cargandoInsumos, setCargandoInsumos] = useState(false);
 
   // Próximo número — se carga al montar y muestra el siguiente disponible
@@ -265,6 +270,12 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
       COLOCACION: Number(form.colocacion),
       MATERIAL: form.material || null,
       MATERIAL_PRECIO: Number(form.materialPrecio) || 0,
+      MATERIAL_BLANCO: form.materialBlanco || null,
+      MATERIAL_BLANCO_PRECIO: Number(form.materialBlancoPrecio) || 0,
+      LATERAL_DER: form.lateralDer,
+      LATERAL_IZQ: form.lateralIzq,
+      BASE: form.base,
+      TECHO: form.techo,
       CORREDERA: form.corredera || null,
       CORREDERA_PRECIO: Number(form.correderaPrecio) || 0,
       CORREDERA_CANTIDAD: Number(form.correderaCantidad) || 1,
@@ -376,6 +387,8 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
       <div class="info-row"><span class="info-label">Cantidad</span><span class="info-value">${form.cantidad} unidad(es)</span></div>
       <div class="info-row"><span class="info-label">Medidas generales</span><span class="info-value">${form.ancho} × ${form.alto} × ${form.profundo} cm</span></div>
       ${form.material ? `<div class="info-row"><span class="info-label">Material</span><span class="info-value">${form.material}</span></div>` : ""}
+      ${form.materialBlanco ? `<div class="info-row"><span class="info-label">Material blanco</span><span class="info-value">${form.materialBlanco}</span></div>` : ""}
+      <div class="info-row"><span class="info-label">Color por lado</span><span class="info-value">Der: ${form.lateralDer} · Izq: ${form.lateralIzq} · Base: ${form.base} · Techo: ${form.techo}</span></div>
       ${form.corredera ? `<div class="info-row"><span class="info-label">Correderas</span><span class="info-value">${form.corredera} × ${form.correderaCantidad} u.</span></div>` : ""}
     </div>
     <div class="info-box">
@@ -734,6 +747,123 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
                     ))}
                   </select>
                 )}
+              </div>
+
+              {/* Material blanco (alternativo, para los lados que se
+                  elijan como "BLANCO" en vez de "COLOR") */}
+              <div className="field">
+                <span className="label-text">
+                  🤍 MATERIAL BLANCO
+                  {form.materialBlanco && (
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        fontSize: "10px",
+                        color: "#2d7fc1",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {formatPeso(form.materialBlancoPrecio)}
+                    </span>
+                  )}
+                </span>
+                {cargandoInsumos ? (
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "#4a8ab5",
+                      fontStyle: "italic",
+                      padding: "10px 0",
+                    }}
+                  >
+                    ⏳ Cargando...
+                  </div>
+                ) : (
+                  <select
+                    className="input"
+                    style={{ cursor: "pointer" }}
+                    value={form.materialBlanco}
+                    onChange={(e) => {
+                      const sel = insumosMuebles.find(
+                        (p) => p.articulo === e.target.value,
+                      );
+                      setForm((prev) => ({
+                        ...prev,
+                        materialBlanco: e.target.value,
+                        materialBlancoPrecio: sel
+                          ? parseFloat(sel.precio) || 0
+                          : 0,
+                      }));
+                    }}
+                  >
+                    <option value="">— Sin material blanco —</option>
+                    {insumosMuebles.map((p, i) => (
+                      <option key={p.id ?? p.codart ?? i} value={p.articulo}>
+                        {p.codart ? `[${p.codart}] ` : ""}
+                        {p.articulo}
+                        {p.precio != null
+                          ? ` — $${parseFloat(p.precio).toLocaleString("es-AR")}`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Color por lado (4 casillas: lateral derecho, lateral
+                  izquierdo, base, techo). "COLOR" es una referencia
+                  dinámica al MATERIAL elegido arriba, no una copia fija —
+                  por eso cambiar el material de arriba actualiza
+                  automáticamente los lados que sigan en "COLOR", sin
+                  necesidad de resetearlos a mano. */}
+              <div className="field">
+                <span className="label-text">🎨 COLOR POR LADO</span>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    marginTop: 6,
+                  }}
+                >
+                  {[
+                    { label: "LATERAL DERECHO", key: "lateralDer" },
+                    { label: "LATERAL IZQUIERDO", key: "lateralIzq" },
+                    { label: "BASE", key: "base" },
+                    { label: "TECHO", key: "techo" },
+                  ].map(({ label, key }) => (
+                    <div
+                      key={key}
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          color: "#6a8aa0",
+                          width: 140,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {label}
+                      </span>
+                      <select
+                        className="input"
+                        style={{ cursor: "pointer", flex: 1 }}
+                        value={form[key]}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            [key]: e.target.value,
+                          }))
+                        }
+                      >
+                        <option value="COLOR">COLOR</option>
+                        <option value="BLANCO">BLANCO</option>
+                        <option value="SIN">SIN</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Correderas */}
