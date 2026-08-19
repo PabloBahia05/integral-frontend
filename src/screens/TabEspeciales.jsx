@@ -668,7 +668,14 @@ export default function TabEspeciales({
         modoSelector={true}
         onArmar={(modelo) => {
           setVanitoryModelo(modelo);
-          setVanitoryVista("presupuesto");
+          // TiposVanitory manda modelo=null solo desde la tarjeta "Armar"
+          // (modelo personalizado, sin artículo de catálogo asociado) —
+          // ver TiposVanitory.jsx, onClick={() => onArmar?.(null)} en esa
+          // tarjeta. Con modelo real (A/B/C/D, etc.) va a PresupuestoVanitory
+          // (formulario con fórmulas asociadas al artículo); con modelo=null
+          // va a ArmarVanitory, la pantalla dedicada a armar uno a medida
+          // (cajones/puertas custom, sin depender de un codart de catálogo).
+          setVanitoryVista(modelo == null ? "armar" : "presupuesto");
         }}
         onPrueba={() => setVanitoryVista("breakdown")}
         onVolver={() => {
