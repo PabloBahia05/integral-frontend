@@ -56,6 +56,7 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
   const [colocacionBD, setColocacionBD] = useState(null);
   const [margenBD, setMargenBD] = useState(null);
   const [insumosMuebles, setInsumosMuebles] = useState([]);
+  const [herrajes, setHerrajes] = useState([]);
   const [cargandoInsumos, setCargandoInsumos] = useState(false);
 
   // Próximo número — se carga al montar y muestra el siguiente disponible
