@@ -900,7 +900,26 @@ export default function PlacardSection({
                                 const precioUn = parseFloat(art?.precio) || 0;
                                 const areaItem = resolverAreaItem(fila);
                                 const area = parseFloat(areaItem) || 1;
-                                const total = precioUn * area;
+                                // Cantidad total de juegos/bisagras a
+                                // mostrar: "área" del artículo es cuántos
+                                // corresponden a UNA unidad de este ítem, así
+                                // que hay que multiplicarla por
+                                // fila.cantidad (columna "Cant.") para que el
+                                // badge muestre el total real a
+                                // comprar/cortar, no solo el de una unidad.
+                                // El $ mostrado tiene que reflejar el MISMO
+                                // total (cantAccTotal), no solo el costo de
+                                // una unidad — si no, "cant: N · +$X" se ve
+                                // como si $X fueran N juegos cuando en
+                                // realidad era el costo de 1 unidad. El
+                                // precio por unidad real (usado en la
+                                // columna de precio de línea / subtotal)
+                                // sigue viviendo en recalcFila
+                                // (useCocinaPlacard.js) sin cambios.
+                                const cantidadFila =
+                                  parseFloat(fila.cantidad) || 1;
+                                const cantAccTotal = area * cantidadFila;
+                                const total = precioUn * cantAccTotal;
                                 return (
                                   <div
                                     key={nombre}
@@ -910,7 +929,8 @@ export default function PlacardSection({
                                       marginTop: 2,
                                     }}
                                   >
-                                    🔧 {nombre} — cant: {areaItem ?? "-"} · +
+                                    🔧 {nombre} — cant:{" "}
+                                    {areaItem != null ? cantAccTotal : "-"} · +
                                     {total.toLocaleString("es-AR", {
                                       style: "currency",
                                       currency: "ARS",
