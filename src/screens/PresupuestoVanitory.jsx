@@ -580,12 +580,13 @@ export default function PresupuestoVanitory({
     });
 
     Promise.all([
-      // Material: tabla articulos filtrada por AREA='MELAMINA' — mismo
-      // criterio que ArmarVanitory.jsx (antes acá era /productos/placas-vanitory,
-      // que filtraba por LIKE %PLACA%, un criterio distinto).
-      authFetch(
-        `${API}/productos?area=${encodeURIComponent("MELAMINA")}&limit=500`,
-      )
+      // Material: /productos/melaminas ya filtra WHERE UPPER(TRIM(area)) =
+      // 'MELAMINA' — mismo endpoint que usan ListaPresupuestos.jsx y
+      // Produccion.jsx. El genérico /productos?area= NO sirve para esto:
+      // hace parseInt(area) en el backend, pensado para los valores
+      // numéricos de area (2, 3, 4...) del sistema de accesorios de
+      // Cocina/Placard, no para strings como "MELAMINA".
+      authFetch(`${API}/productos/melaminas`)
         .then((r) => r.json())
         .then((data) => (Array.isArray(data) ? data : []).map(normalizar))
         .catch(() => []),

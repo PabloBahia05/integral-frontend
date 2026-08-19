@@ -122,9 +122,21 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
       // criterio que PresupuestoVanitory.jsx (antes cada uno filtraba
       // distinto: acá por rubro/familia INSUMOS, allá por LIKE %PLACA% en
       // /productos/placas-vanitory).
-      authFetch(`${API}/productos?area=${encodeURIComponent("MELAMINA")}&limit=500`)
+      // Material: /productos/melaminas ya filtra WHERE UPPER(TRIM(area)) =
+      // 'MELAMINA' — mismo endpoint que usan ListaPresupuestos.jsx y
+      // Produccion.jsx para el desplegable de color. El genérico
+      // /productos?area= NO sirve para esto: su filtro de area hace
+      // parseInt(area), pensado para los valores numéricos de area
+      // (2, 3, 4...) que usa el sistema de accesorios de Cocina/Placard,
+      // no para strings como "MELAMINA".
+      authFetch(`${API}/productos/melaminas`)
         .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : []))
+        .then((d) =>
+          (Array.isArray(d) ? d : []).map((p) => ({
+            ...p,
+            codart: p.codartint,
+          })),
+        )
         .catch(() => []),
       authFetch(
         `${API}/productos?familia=${encodeURIComponent("HERRAJES")}&limit=500`,
