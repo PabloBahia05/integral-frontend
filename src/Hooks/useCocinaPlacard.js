@@ -561,12 +561,16 @@ export default function useCocinaPlacard({
 
   // Atajo para el caso más común: togglear el accesorio de un ítem YA
   // guardado en cocinaItems/placardItems por índice (fila de vista).
+  // Recalcula el precio en el mismo toque (vía recalcFila) — ya no depende
+  // de un paso de confirmación separado, así que un click afuera del
+  // popover (que solo cierra el menú, sin llamar a onConfirm) no puede
+  // dejar el accesorio tildado sin sumar al precio.
   const toggleAccesorioItem = (tipo, familia, idx, nombreAccesorio) => {
     const actualizar = (prev) => ({
       ...prev,
       [familia]: (prev[familia] ?? []).map((f, i) =>
         i === idx
-          ? { ...f, accesorios: toggleAccesorioEnArray(f.accesorios, nombreAccesorio) }
+          ? recalcFila({ ...f, accesorios: toggleAccesorioEnArray(f.accesorios, nombreAccesorio) })
           : f,
       ),
     });
