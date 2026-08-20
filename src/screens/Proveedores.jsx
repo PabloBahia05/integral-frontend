@@ -126,13 +126,14 @@ const FIELDS = [
   { label: "Perc. IIBB (%)", name: "pers_IIBB", placeholder: "0.00" },
 ];
 
-async function uploadImagenProveedor(file) {
+async function uploadImagenProveedor(file, token) {
   const formData = new FormData();
   formData.append("imagen", file);
   const res = await fetch(
     "https://integral-backend-production.up.railway.app/api/upload-imagen-proveedor",
     {
       method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       body: formData,
     },
   );
@@ -144,6 +145,7 @@ export default function Proveedores({
   proveedores = [],
   selected,
   modal,
+  token,
   onAdd,
   onEdit,
   onDelete,
@@ -158,15 +160,20 @@ export default function Proveedores({
   const [rubroEsNuevo, setRubroEsNuevo] = useState(false);
   const [nuevoRubro, setNuevoRubro] = useState("");
   const [recalculando, setRecalculando] = useState(false);
+  const [recalculandoTodos, setRecalculandoTodos] = useState(false);
+  const [progresoRecalculo, setProgresoRecalculo] = useState(null);
 
   const API = "https://integral-backend-production.up.railway.app";
 
   useEffect(() => {
-    fetch(`${API}/proveedores/rubros`)
+    if (!token) return;
+    fetch(`${API}/proveedores/rubros`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
       .then((r) => r.json())
       .then((data) => setRubros(Array.isArray(data) ? data : []))
       .catch(() => {});
-  }, []);
+  }, [token]);
 
   const abrirCrear = () => {
     setForm(EMPTY);
@@ -203,17 +210,28 @@ export default function Proveedores({
   // el backend solo aplica flete/descuento del proveedor cuando el artículo
   // en sí se guarda — si acá cambiás flete o descuento, los artículos ya
   // cargados quedan con los costos viejos hasta que se re-guardan.
+  // Llama al endpoint para un único proveedor. No maneja loading ni alerts:
+  // eso queda a cargo de quien la invoque (recalcularUnProveedor o
+  // recalcularTodosLosProveedores), para poder reusarla en ambos casos.
+  const recalcularPorProveedorRaw = async (provnombre) => {
+    const r = await fetch(`${API}/articulos/recalcular-por-proveedor`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ proveedor: provnombre }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data?.error || "Error al recalcular");
+    return data;
+  };
+
   const recalcularArticulosDelProveedor = async (provnombre) => {
     if (!provnombre) return;
     setRecalculando(true);
     try {
-      const r = await fetch(`${API}/articulos/recalcular-por-proveedor`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proveedor: provnombre }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data?.error || "Error al recalcular");
+      const data = await recalcularPorProveedorRaw(provnombre);
       alert(
         `Precios recalculados: ${data.actualizados} de ${data.total} artículos` +
           (data.sinValorlista
@@ -225,6 +243,43 @@ export default function Proveedores({
     } finally {
       setRecalculando(false);
     }
+  };
+
+  // Recorre TODOS los proveedores y recalcula sus artículos uno por uno
+  // (el backend solo expone el endpoint por-proveedor). Secuencial, no en
+  // paralelo, para no saturar el backend ni perder el orden de los logs.
+  const recalcularTodosLosProveedores = async () => {
+    if (!proveedores.length) return;
+    const ok = window.confirm(
+      `Esto va a recalcular los precios de los artículos de los ${proveedores.length} proveedores. Puede tardar. ¿Continuar?`,
+    );
+    if (!ok) return;
+
+    setRecalculandoTodos(true);
+    let totalActualizados = 0;
+    let totalArticulos = 0;
+    const errores = [];
+
+    for (const prov of proveedores) {
+      if (!prov.provnombre) continue;
+      setProgresoRecalculo(prov.provnombre);
+      try {
+        const data = await recalcularPorProveedorRaw(prov.provnombre);
+        totalActualizados += data.actualizados || 0;
+        totalArticulos += data.total || 0;
+      } catch (e) {
+        errores.push(`${prov.provnombre}: ${e.message}`);
+      }
+    }
+
+    setProgresoRecalculo(null);
+    setRecalculandoTodos(false);
+    alert(
+      `Recálculo finalizado.\nArtículos actualizados: ${totalActualizados} de ${totalArticulos}.` +
+        (errores.length
+          ? `\n\nHubo errores en ${errores.length} proveedor(es):\n${errores.join("\n")}`
+          : ""),
+    );
   };
 
   const handleGuardar = async () => {
@@ -316,6 +371,26 @@ export default function Proveedores({
         >
           {filtrados.length} proveedor{filtrados.length !== 1 ? "es" : ""}
         </div>
+        <button
+          onClick={recalcularTodosLosProveedores}
+          disabled={recalculandoTodos}
+          title="Recalcula los precios de los artículos de todos los proveedores, uno por uno"
+          style={{
+            background: "transparent",
+            border: "1px solid #1e3a5f",
+            color: recalculandoTodos ? "#475569" : "#94a3b8",
+            borderRadius: 10,
+            padding: "0.6rem 1.1rem",
+            fontSize: "0.875rem",
+            fontWeight: 500,
+            cursor: recalculandoTodos ? "default" : "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {recalculandoTodos
+            ? `Recalculando… ${progresoRecalculo ?? ""}`
+            : "🔄 Recalcular todos"}
+        </button>
         <button
           onClick={abrirCrear}
           style={{

@@ -651,6 +651,7 @@ export default function VerTablas({
           proveedores={proveedores ?? []}
           selected={selectedProveedor}
           modal={modal}
+          token={token}
           {...localCRUD(proveedoresCRUD ?? {})}
           onSelect={(row) => proveedoresCRUD?.onSelect?.(row)}
         />
