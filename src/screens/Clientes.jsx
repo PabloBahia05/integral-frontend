@@ -64,7 +64,7 @@ const FIELDS_RIGHT = [
   { field: "profesional", label: "Profesional",      placeholder: "Ej: Comerciante" },
 ];
 
-export default function Clientes({ clientes, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal, abrirFicha, onFichaAbierta, busquedaInicial, authFetch }) {
+export default function Clientes({ clientes, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal, abrirFicha, onFichaAbierta, busquedaInicial, authFetch, onAbrirPresupuesto }) {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
   const [search, setSearch] = useState(busquedaInicial || "");
@@ -268,13 +268,18 @@ export default function Clientes({ clientes, onSave, onDelete, selected, onSelec
               Este cliente todavía no tiene presupuestos cargados.
             </p>
           ) : (
-            <DataTable
-              columns={COLS_HISTORIAL_CLIENTE}
-              rows={presupuestosCliente}
-              selectedId={null}
-              onSelect={null}
-              storageKey="clientes-historial-presupuestos"
-            />
+            <>
+              <DataTable
+                columns={COLS_HISTORIAL_CLIENTE}
+                rows={presupuestosCliente}
+                selectedId={null}
+                onSelect={(row) => onAbrirPresupuesto?.(row)}
+                storageKey="clientes-historial-presupuestos"
+              />
+              <p style={{ fontSize: 11, color: "#8aabb8", marginTop: 8 }}>
+                Tocá un presupuesto de la lista para abrirlo en el editor.
+              </p>
+            </>
           )}
           <div className="form-actions" style={{ marginTop: "16px" }}>
             <button className="btn-cancel" onClick={() => setModalPresupuestos(false)}>
