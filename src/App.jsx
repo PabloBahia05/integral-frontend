@@ -483,6 +483,18 @@ function App() {
     fetchClientes,
     "Cliente",
   );
+
+  // Navega a la pantalla Clientes con un cliente puntual ya seleccionado
+  // (usado desde PresupuestoNuevo → ClienteSection, botón "Ver ficha").
+  const irACliente = (codclienteBuscado) => {
+    const encontrado = codclienteBuscado
+      ? clientes.find(
+          (c) => String(c.codcliente) === String(codclienteBuscado),
+        )
+      : null;
+    setSelectedCliente(encontrado ?? null);
+    setScreen("clientes");
+  };
   const colocacionesCRUD = makeCRUD(
     "colocacion",
     colocaciones,
@@ -968,6 +980,7 @@ function App() {
                 tiposDespensero={tiposDespensero}
                 tiposDespenseroRUD={tiposDespenseroRUD}
                 token={token}
+                onIrACliente={irACliente}
               />
             )}
             {screen === "lista-presupuestos-2" && (
