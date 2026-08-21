@@ -54,7 +54,9 @@ export default function ClienteSection({
         <button
           type="button"
           className="pn-tool-btn"
-          onClick={() => onIrACliente?.(codcliente)}
+          onClick={() =>
+            onIrACliente?.(codcliente, cliente, telefono1 || telefono2 || wapp)
+          }
           disabled={!codcliente}
           title={
             codcliente

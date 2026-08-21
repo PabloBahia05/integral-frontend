@@ -50,10 +50,10 @@ const FIELDS_RIGHT = [
   { field: "profesional", label: "Profesional",      placeholder: "Ej: Comerciante" },
 ];
 
-export default function Clientes({ clientes, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal, abrirFicha, onFichaAbierta }) {
+export default function Clientes({ clientes, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal, abrirFicha, onFichaAbierta, busquedaInicial }) {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(busquedaInicial || "");
 
   // Mapea una fila de la tabla al shape del form del modal. Se usa tanto
   // desde "Editar" (botón manual) como desde la apertura automática al
@@ -101,7 +101,10 @@ export default function Clientes({ clientes, onSave, onDelete, selected, onSelec
       (c.localidad           ?? "").toLowerCase().includes(q) ||
       (c["domicilio fiscal"] ?? "").toLowerCase().includes(q) ||
       String(c.cuit       ?? "").includes(q) ||
-      String(c.codcliente ?? "").includes(q)
+      String(c.codcliente ?? "").includes(q) ||
+      String(c.telefono1  ?? "").includes(q) ||
+      String(c.telefono2  ?? "").includes(q) ||
+      String(c.wapp       ?? "").includes(q)
     );
   });
 
