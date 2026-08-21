@@ -37,6 +37,32 @@ export default function ClienteSection({
   LOCALIDADES,
   authFetch,
 }) {
+  // Solo dígitos, para comparar teléfonos sin importar guiones/espacios.
+  const soloDigitos = (v) => String(v ?? "").replace(/\D/g, "");
+
+  // Aplica los datos de un cliente ya existente (de BD) a todo el bloque.
+  // Se usa tanto al elegir una sugerencia (nombre o teléfono) como al
+  // detectar un match exacto de teléfono mientras se tipea — en ambos
+  // casos deja el cliente vinculado (codcliente seteado), así nunca
+  // termina cargándose como cliente nuevo por accidente.
+  const aplicarCliente = (c) => {
+    const nombre = c.nombre ?? c.NOMBRE ?? "";
+    const tel1 = c.telefono1 ?? c.TELEFONO1 ?? "";
+    const tel2 = c.telefono2 ?? c.TELEFONO2 ?? "";
+    const wp = c.wapp ?? c.WAPP ?? "";
+    setCliente(nombre);
+    setCodcliente(c.codcliente ?? c.CODCLIENTE ?? null);
+    setTelefono1(tel1);
+    setTelefono2(tel2);
+    setWapp(wp);
+    setDomicilio(c.domrem ?? c.DOMREM ?? "");
+    setDomicilioFiscal(
+      c.domiciliofiscal ?? c["domicilio fiscal"] ?? c.DOMICILIO_FISCAL ?? "",
+    );
+    setTelefonoSearch(tel1 || tel2 || wp);
+    setClienteAutoResuelto("existente");
+  };
+
   return (
     <>
       {/* Cliente + Teléfono */}
@@ -138,20 +164,7 @@ export default function ClienteSection({
                   <div
                     key={i}
                     onMouseDown={() => {
-                      setCliente(nombre);
-                      setCodcliente(c.codcliente ?? c.CODCLIENTE ?? null);
-                      setTelefono1(tel1);
-                      setTelefono2(tel2);
-                      setWapp(wp);
-                      setDomicilio(c.domrem ?? c.DOMREM ?? "");
-                      setDomicilioFiscal(
-                        c.domiciliofiscal ??
-                          c["domicilio fiscal"] ??
-                          c.DOMICILIO_FISCAL ??
-                          "",
-                      );
-                      setTelefonoSearch(tel1 || tel2 || wp);
-                      setClienteAutoResuelto("existente");
+                      aplicarCliente(c);
                       setClientesSugeridos([]);
                     }}
                     style={{
@@ -213,9 +226,31 @@ export default function ClienteSection({
                     `${API}/clientes/buscar-telefono?q=${encodeURIComponent(val)}`,
                   )
                     .then((r) => r.json())
-                    .then((data) =>
-                      setTelefonosSugeridos(Array.isArray(data) ? data : []),
-                    )
+                    .then((data) => {
+                      const lista = Array.isArray(data) ? data : [];
+                      // Si el número tipeado coincide EXACTO (comparando
+                      // solo dígitos) con el teléfono de un cliente
+                      // existente, lo cargamos directo — así no queda la
+                      // posibilidad de guardar como "cliente nuevo" un
+                      // teléfono que ya está en la base.
+                      const digitos = soloDigitos(val);
+                      const exacto =
+                        digitos.length > 0
+                          ? lista.find((c) =>
+                              [
+                                c.telefono1 ?? c.TELEFONO1,
+                                c.telefono2 ?? c.TELEFONO2,
+                                c.wapp ?? c.WAPP,
+                              ].some((t) => t && soloDigitos(t) === digitos),
+                            )
+                          : null;
+                      if (exacto) {
+                        aplicarCliente(exacto);
+                        setTelefonosSugeridos([]);
+                      } else {
+                        setTelefonosSugeridos(lista);
+                      }
+                    })
                     .catch(() => {});
                 }, 250);
               } else {
@@ -253,20 +288,7 @@ export default function ClienteSection({
                   <div
                     key={i}
                     onMouseDown={() => {
-                      setCliente(nombre);
-                      setCodcliente(c.codcliente ?? c.CODCLIENTE ?? null);
-                      setTelefono1(tel1);
-                      setTelefono2(tel2);
-                      setWapp(wp);
-                      setDomicilio(c.domrem ?? c.DOMREM ?? "");
-                      setDomicilioFiscal(
-                        c.domiciliofiscal ??
-                          c["domicilio fiscal"] ??
-                          c.DOMICILIO_FISCAL ??
-                          "",
-                      );
-                      setTelefonoSearch(tel1 || tel2 || wp);
-                      setClienteAutoResuelto("existente");
+                      aplicarCliente(c);
                       setTelefonosSugeridos([]);
                     }}
                     style={{
