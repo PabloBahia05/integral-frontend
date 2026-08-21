@@ -485,14 +485,22 @@ function App() {
   );
 
   // Navega a la pantalla Clientes con un cliente puntual ya seleccionado
-  // (usado desde PresupuestoNuevo → ClienteSection, botón "Ver ficha").
+  // y abre directo su ficha (usado desde PresupuestoNuevo → ClienteSection,
+  // botón "👤 Ficha"). El backend a veces devuelve columnas en mayúsculas
+  // (CODCLIENTE) según la consulta — por eso se contemplan ambas.
+  const [abrirFichaCliente, setAbrirFichaCliente] = useState(false);
   const irACliente = (codclienteBuscado) => {
-    const encontrado = codclienteBuscado
+    const buscado =
+      codclienteBuscado !== null && codclienteBuscado !== undefined
+        ? String(codclienteBuscado)
+        : null;
+    const encontrado = buscado
       ? clientes.find(
-          (c) => String(c.codcliente) === String(codclienteBuscado),
+          (c) => String(c.codcliente ?? c.CODCLIENTE ?? "") === buscado,
         )
       : null;
     setSelectedCliente(encontrado ?? null);
+    setAbrirFichaCliente(!!encontrado);
     setScreen("clientes");
   };
   const colocacionesCRUD = makeCRUD(
@@ -930,6 +938,8 @@ function App() {
                 selected={sel}
                 modal={modal}
                 {...crud}
+                abrirFicha={abrirFichaCliente}
+                onFichaAbierta={() => setAbrirFichaCliente(false)}
               />
             )}
             {screen === "productos" && (
