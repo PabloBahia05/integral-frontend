@@ -6,6 +6,20 @@ import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
 import FormField from "../Component/FormField";
+import { API, COLS_ENCABEZADO } from "./presupuestosShared";
+
+// Columnas del historial de presupuestos de un cliente puntual (botón
+// "📋 Presupuestos" acá abajo): mismo render/estilo que la lista general
+// de presupuestos (COLS_ENCABEZADO, de presupuestosShared.jsx), pero
+// mostrando solo número/revisión/estado/fecha — sin cliente/teléfono/línea,
+// que acá ya sabemos cuáles son.
+const COLS_HISTORIAL_CLIENTE = COLS_ENCABEZADO.filter((c) =>
+  ["numeropres", "revision", "confirmado", "actualizado_en"].includes(c.key),
+);
+
+// Solo dígitos, para comparar teléfonos sin importar guiones/espacios
+// (mismo criterio que ClienteSection.jsx).
+const soloDigitos = (v) => String(v ?? "").replace(/\D/g, "");
 
 const COLUMNS = [
   { key: "id",               label: "ID" },
@@ -50,10 +64,47 @@ const FIELDS_RIGHT = [
   { field: "profesional", label: "Profesional",      placeholder: "Ej: Comerciante" },
 ];
 
-export default function Clientes({ clientes, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal, abrirFicha, onFichaAbierta, busquedaInicial }) {
+export default function Clientes({ clientes, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal, abrirFicha, onFichaAbierta, busquedaInicial, authFetch }) {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
   const [search, setSearch] = useState(busquedaInicial || "");
+
+  // Historial de presupuestos del cliente seleccionado (botón "📋
+  // Presupuestos"). Se pide bajo demanda, no en cada selección de fila.
+  const [modalPresupuestos, setModalPresupuestos] = useState(false);
+  const [presupuestosCliente, setPresupuestosCliente] = useState([]);
+  const [loadingPresupuestos, setLoadingPresupuestos] = useState(false);
+
+  // `/presupuesto-info/lista-presupuestos` no tiene filtro por cliente, así
+  // que se trae todo y se filtra acá por nombre exacto o por coincidencia
+  // de teléfono (mismo criterio tolerante que la carga de cliente en
+  // ClienteSection.jsx) — evita depender de que codcliente haya quedado
+  // bien vinculado en cada presupuesto viejo.
+  const abrirPresupuestosCliente = () => {
+    if (!selected) return;
+    setModalPresupuestos(true);
+    setLoadingPresupuestos(true);
+    authFetch(`${API}/presupuesto-info/lista-presupuestos`)
+      .then((r) => r.json())
+      .then((data) => {
+        const lista = Array.isArray(data) ? data : [];
+        const nombreCliente = (selected.nombre ?? "").trim().toLowerCase();
+        const telsCliente = [selected.telefono1, selected.telefono2, selected.wapp]
+          .map(soloDigitos)
+          .filter(Boolean);
+        const propios = lista.filter((p) => {
+          const nombreP = (p.nombre ?? "").trim().toLowerCase();
+          if (nombreCliente && nombreP === nombreCliente) return true;
+          const telsP = [p.telefono1, p.telefono2].map(soloDigitos).filter(Boolean);
+          return telsP.some((t) => telsCliente.includes(t));
+        });
+        setPresupuestosCliente(
+          propios.map((p) => ({ ...p, id: `${p.numeropres}-${p.revision}` })),
+        );
+      })
+      .catch(console.error)
+      .finally(() => setLoadingPresupuestos(false));
+  };
 
   // Mapea una fila de la tabla al shape del form del modal. Se usa tanto
   // desde "Editar" (botón manual) como desde la apertura automática al
@@ -144,14 +195,40 @@ export default function Clientes({ clientes, onSave, onDelete, selected, onSelec
         { label: "Resultados filtro", value: filtered.length },
       ]} />
 
-      <ActionBar
-        selected={selected}
-        onNew={openNew}
-        onEdit={openEdit}
-        onDelete={() => selected && onOpenModal("eliminar")}
-        search={search}
-        onSearch={setSearch}
-      />
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <ActionBar
+          selected={selected}
+          onNew={openNew}
+          onEdit={openEdit}
+          onDelete={() => selected && onOpenModal("eliminar")}
+          search={search}
+          onSearch={setSearch}
+        />
+        <button
+          type="button"
+          disabled={!selected}
+          onClick={abrirPresupuestosCliente}
+          title={
+            selected
+              ? "Ver historial de presupuestos de este cliente"
+              : "Elegí un cliente primero"
+          }
+          style={{
+            padding: "8px 14px",
+            background: selected ? "#0a3a5c" : "#c8dae8",
+            color: selected ? "#fff" : "#99aabb",
+            border: "none",
+            borderRadius: 3,
+            fontFamily: "'Space Mono',monospace",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: selected ? "pointer" : "default",
+            whiteSpace: "nowrap",
+          }}
+        >
+          📋 Presupuestos
+        </button>
+      </div>
 
       <DataTable columns={COLUMNS} rows={filtered} selectedId={selected?.id} onSelect={onSelect} />
 
@@ -171,6 +248,36 @@ export default function Clientes({ clientes, onSave, onDelete, selected, onSelec
 
       {modal === "eliminar" && (
         <ConfirmDelete item={selected} onConfirm={onDelete} onClose={onCloseModal} />
+      )}
+
+      {modalPresupuestos && selected && (
+        <Modal
+          title={`Presupuestos — ${selected.nombre ?? "sin nombre"}`}
+          onClose={() => setModalPresupuestos(false)}
+        >
+          {loadingPresupuestos ? (
+            <p style={{ textAlign: "center", padding: "24px", color: "#4a8ab5" }}>
+              ⏳ Cargando...
+            </p>
+          ) : presupuestosCliente.length === 0 ? (
+            <p style={{ textAlign: "center", padding: "24px", color: "#8aabb8" }}>
+              Este cliente todavía no tiene presupuestos cargados.
+            </p>
+          ) : (
+            <DataTable
+              columns={COLS_HISTORIAL_CLIENTE}
+              rows={presupuestosCliente}
+              selectedId={null}
+              onSelect={null}
+              storageKey="clientes-historial-presupuestos"
+            />
+          )}
+          <div className="form-actions" style={{ marginTop: "16px" }}>
+            <button className="btn-cancel" onClick={() => setModalPresupuestos(false)}>
+              Cerrar
+            </button>
+          </div>
+        </Modal>
       )}
     </>
   );
