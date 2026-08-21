@@ -19,6 +19,7 @@ import Observaciones from "./Observaciones";
 import EncabezadoSection from "./EncabezadoSection";
 import useCocinaPlacard from "../Hooks/useCocinaPlacard";
 import { generarPresupuestoPDF } from "./pdfPresupuesto";
+import { generarConfirmadoPDF } from "./pdfConfirmado";
 import { TEXTO_SENA_DEFAULT, useTextoSena } from "./textoSenaStore";
 
 const WALLPANEL_IMG =
@@ -2548,9 +2549,11 @@ export default function PresupuestoNuevo({
     setIncluirDescripcion(querDescripcion);
 
     // El armado del HTML/CSS y la generación + descarga del PDF viven en
-    // pdfPresupuesto.js (separado de este archivo para no mezclar la lógica
-    // de UI con la de armado del documento).
-    generarPresupuestoPDF({
+    // pdfPresupuesto.js / pdfConfirmado.js (separados de este archivo para
+    // no mezclar la lógica de UI con la de armado del documento, y entre sí
+    // para no mezclar el caso "etapa de presupuesto" con el de "obra
+    // confirmada" — ver pdfMotorComun.js para lo que comparten los dos).
+    const datosComunesPDF = {
       querDescripcion,
       fecha,
       numeroPres,
@@ -2567,8 +2570,6 @@ export default function PresupuestoNuevo({
       presupuestoItems,
       grupoDe,
       ordenGrupos,
-      lineaPorGrupo,
-      confirmado,
       mostrarCosto,
       incluirPrecio,
       incluirSubtotalItem,
@@ -2580,7 +2581,13 @@ export default function PresupuestoNuevo({
       imagenesFinal,
       setGenerandoPDF,
       authFetch,
-    });
+    };
+
+    if (confirmado) {
+      generarConfirmadoPDF({ ...datosComunesPDF, lineaPorGrupo });
+    } else {
+      generarPresupuestoPDF(datosComunesPDF);
+    }
   };
 
   return (
