@@ -486,21 +486,51 @@ function App() {
 
   // Navega a la pantalla Clientes con un cliente puntual ya seleccionado
   // y abre directo su ficha (usado desde PresupuestoNuevo → ClienteSection,
-  // botón "👤 Ficha"). El backend a veces devuelve columnas en mayúsculas
-  // (CODCLIENTE) según la consulta — por eso se contemplan ambas.
+  // botón "👤 Ficha"). Se manda codcliente + nombre + teléfono juntos, y se
+  // prueban en ese orden: el backend a veces devuelve columnas en
+  // mayúsculas (CODCLIENTE) según la consulta, así que si el match por
+  // código falla se cae a nombre, y si tampoco hay nombre (o no matchea) se
+  // cae a teléfono — entre los tres, casi siempre hay uno que pega. El
+  // nombre (o teléfono si no hay nombre) queda precargado en el buscador de
+  // Clientes, para que se vea filtrado aunque no haya match exacto.
+  const soloDigitos = (v) => String(v ?? "").replace(/\D/g, "");
   const [abrirFichaCliente, setAbrirFichaCliente] = useState(false);
-  const irACliente = (codclienteBuscado) => {
+  const [filtroClienteInicial, setFiltroClienteInicial] = useState("");
+  const irACliente = (codclienteBuscado, nombreBuscado, telefonoBuscado) => {
     const buscado =
       codclienteBuscado !== null && codclienteBuscado !== undefined
         ? String(codclienteBuscado)
         : null;
-    const encontrado = buscado
+    let encontrado = buscado
       ? clientes.find(
           (c) => String(c.codcliente ?? c.CODCLIENTE ?? "") === buscado,
         )
       : null;
+    if (!encontrado && nombreBuscado) {
+      const nombreNorm = nombreBuscado.trim().toLowerCase();
+      encontrado = clientes.find(
+        (c) =>
+          (c.nombre ?? c.NOMBRE ?? "").trim().toLowerCase() === nombreNorm,
+      );
+    }
+    if (!encontrado && telefonoBuscado) {
+      const telNorm = soloDigitos(telefonoBuscado);
+      if (telNorm) {
+        encontrado = clientes.find((c) => {
+          const candidatos = [
+            c.telefono1 ?? c.TELEFONO1,
+            c.telefono2 ?? c.TELEFONO2,
+            c.wapp ?? c.WAPP,
+          ];
+          return candidatos.some((v) => v && soloDigitos(v) === telNorm);
+        });
+      }
+    }
     setSelectedCliente(encontrado ?? null);
     setAbrirFichaCliente(!!encontrado);
+    setFiltroClienteInicial(
+      nombreBuscado || encontrado?.nombre || telefonoBuscado || "",
+    );
     setScreen("clientes");
   };
   const colocacionesCRUD = makeCRUD(
@@ -940,6 +970,7 @@ function App() {
                 {...crud}
                 abrirFicha={abrirFichaCliente}
                 onFichaAbierta={() => setAbrirFichaCliente(false)}
+                busquedaInicial={filtroClienteInicial}
               />
             )}
             {screen === "productos" && (
