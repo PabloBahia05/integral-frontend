@@ -972,6 +972,10 @@ function App() {
                 onFichaAbierta={() => setAbrirFichaCliente(false)}
                 busquedaInicial={filtroClienteInicial}
                 authFetch={authFetch}
+                onAbrirPresupuesto={(row) => {
+                  setPresupuestoAbierto(row);
+                  setScreen("presupuesto-nuevo");
+                }}
               />
             )}
             {screen === "productos" && (
