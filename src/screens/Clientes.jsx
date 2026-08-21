@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DataTable from "../Component/DataTable";
 import Modal from "../Component/Modal";
 import ActionBar from "../Component/ActionBar";
@@ -50,10 +50,47 @@ const FIELDS_RIGHT = [
   { field: "profesional", label: "Profesional",      placeholder: "Ej: Comerciante" },
 ];
 
-export default function Clientes({ clientes, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal }) {
+export default function Clientes({ clientes, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal, abrirFicha, onFichaAbierta }) {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+
+  // Mapea una fila de la tabla al shape del form del modal. Se usa tanto
+  // desde "Editar" (botón manual) como desde la apertura automática al
+  // llegar acá con un cliente puntual ya resuelto (ver botón "👤 Ficha"
+  // en ClienteSection.jsx, dentro de un presupuesto).
+  const datosParaForm = (row) => ({
+    codcliente:         row.codcliente          ?? "",
+    nombre:             row.nombre              ?? "",
+    nombre1:            row.nombre1             ?? "",
+    nombre2:            row.nombre2             ?? "",
+    "domicilio fiscal": row["domicilio fiscal"] ?? "",
+    codloc:             row.codloc              ?? "",
+    telefono1:          row.telefono1           ?? "",
+    telefono2:          row.telefono2           ?? "",
+    wapp:               row.wapp                ?? "",
+    domrem:             row.domrem              ?? "",
+    ubicacion:          row.ubicacion           ?? "",
+    cuit:               row.cuit                ?? "",
+    dni:                row.dni                 ?? "",
+    tipofact:           row.tipofact            ?? "",
+    profesional:        row.profesional         ?? "",
+    localidad:          row.localidad           ?? "",
+    codpostal:          row.codpostal           ?? "",
+  });
+
+  // Al llegar desde "👤 Ficha" (PresupuestoNuevo → ClienteSection) con un
+  // cliente ya seleccionado, abrimos directo el modal de edición en vez de
+  // dejar la fila solo resaltada en la tabla.
+  useEffect(() => {
+    if (abrirFicha && selected) {
+      setForm(datosParaForm(selected));
+      setError("");
+      onOpenModal("editar");
+      onFichaAbierta?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = clientes.filter((c) => {
     const q = search.toLowerCase();
@@ -72,25 +109,7 @@ export default function Clientes({ clientes, onSave, onDelete, selected, onSelec
 
   const openEdit = () => {
     if (!selected) return;
-    setForm({
-      codcliente:         selected.codcliente          ?? "",
-      nombre:             selected.nombre              ?? "",
-      nombre1:            selected.nombre1             ?? "",
-      nombre2:            selected.nombre2             ?? "",
-      "domicilio fiscal": selected["domicilio fiscal"] ?? "",
-      codloc:             selected.codloc              ?? "",
-      telefono1:          selected.telefono1           ?? "",
-      telefono2:          selected.telefono2           ?? "",
-      wapp:               selected.wapp                ?? "",
-      domrem:             selected.domrem              ?? "",
-      ubicacion:          selected.ubicacion           ?? "",
-      cuit:               selected.cuit                ?? "",
-      dni:                selected.dni                 ?? "",
-      tipofact:           selected.tipofact            ?? "",
-      profesional:        selected.profesional         ?? "",
-      localidad:          selected.localidad           ?? "",
-      codpostal:          selected.codpostal           ?? "",
-    });
+    setForm(datosParaForm(selected));
     setError("");
     onOpenModal("editar");
   };
