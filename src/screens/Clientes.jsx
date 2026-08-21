@@ -174,10 +174,14 @@ export default function Clientes({ clientes, onSave, onDelete, selected, onSelec
       ...form,
       codcliente: form.codcliente ? parseInt(form.codcliente)  : null,
       codloc:     form.codloc     ? parseInt(form.codloc)      : null,
-      telefono1:  form.telefono1  ? parseFloat(form.telefono1) : null,
-      telefono2:  form.telefono2  ? parseFloat(form.telefono2) : null,
-      wapp:       form.wapp       ? parseFloat(form.wapp)      : null,
-      cuit:       form.cuit       ? parseFloat(form.cuit)      : null,
+      // Teléfonos y CUIT NO se parsean como número: llevan guiones y ceros
+      // a la izquierda (ej: "0291-4551234", "20-12345678-9") que
+      // parseFloat cortaba/perdía silenciosamente — se guardaba un valor
+      // distinto al tipeado sin ningún error visible.
+      telefono1:  form.telefono1  ? form.telefono1.trim()      : null,
+      telefono2:  form.telefono2  ? form.telefono2.trim()      : null,
+      wapp:       form.wapp       ? form.wapp.trim()           : null,
+      cuit:       form.cuit       ? form.cuit.trim()           : null,
       dni:        form.dni        ? parseFloat(form.dni)       : null,
       codpostal:  form.codpostal  ? parseInt(form.codpostal)   : null,
     };
