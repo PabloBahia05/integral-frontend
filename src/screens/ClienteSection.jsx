@@ -8,7 +8,9 @@ const API = "https://integral-backend-production.up.railway.app";
 export default function ClienteSection({
   cliente,
   setCliente,
+  codcliente,
   setCodcliente,
+  onIrACliente,
   clienteAutoResuelto,
   setClienteAutoResuelto,
   clientesSugeridos,
@@ -45,6 +47,30 @@ export default function ClienteSection({
         <span className="pn-field-label" style={{ paddingTop: 7 }}>
           Cliente:
         </span>
+
+        {/* Acceso rápido a la ficha del cliente en Clientes — para
+            completar o buscar datos como domicilio, CUIT, etc. Solo
+            disponible una vez que el cliente quedó vinculado (codcliente). */}
+        <button
+          type="button"
+          className="pn-tool-btn"
+          onClick={() => onIrACliente?.(codcliente)}
+          disabled={!codcliente}
+          title={
+            codcliente
+              ? "Ver / completar ficha del cliente"
+              : "Elegí un cliente existente para poder abrir su ficha"
+          }
+          style={{
+            fontSize: 12,
+            padding: "6px 10px",
+            marginTop: 1,
+            opacity: codcliente ? 1 : 0.5,
+            cursor: codcliente ? "pointer" : "not-allowed",
+          }}
+        >
+          👤 Ficha
+        </button>
 
         {/* Campo cliente — busca por nombre en BD, o ingresa nuevo */}
         <div

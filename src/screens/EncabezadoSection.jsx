@@ -14,7 +14,9 @@ export default function EncabezadoSection({
   // Cliente (se reenvían a ClienteSection)
   cliente,
   setCliente,
+  codcliente,
   setCodcliente,
+  onIrACliente,
   clienteAutoResuelto,
   setClienteAutoResuelto,
   clientesSugeridos,
@@ -101,7 +103,9 @@ export default function EncabezadoSection({
       <ClienteSection
         cliente={cliente}
         setCliente={setCliente}
+        codcliente={codcliente}
         setCodcliente={setCodcliente}
+        onIrACliente={onIrACliente}
         clienteAutoResuelto={clienteAutoResuelto}
         setClienteAutoResuelto={setClienteAutoResuelto}
         clientesSugeridos={clientesSugeridos}

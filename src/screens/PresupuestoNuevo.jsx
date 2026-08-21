@@ -570,6 +570,7 @@ export default function PresupuestoNuevo({
   tiposDespensero = [],
   tiposDespenseroRUD = {},
   token,
+  onIrACliente,
 }) {
   const listaPendienteRef = useRef(null);
 
@@ -3799,7 +3800,9 @@ export default function PresupuestoNuevo({
                 formatFechaLarga={formatFechaLarga}
                 cliente={cliente}
                 setCliente={setCliente}
+                codcliente={codcliente}
                 setCodcliente={setCodcliente}
+                onIrACliente={onIrACliente}
                 clienteAutoResuelto={clienteAutoResuelto}
                 setClienteAutoResuelto={setClienteAutoResuelto}
                 clientesSugeridos={clientesSugeridos}
