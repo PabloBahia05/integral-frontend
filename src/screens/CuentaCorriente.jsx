@@ -9,21 +9,29 @@ const API = "https://integral-backend-production.up.railway.app";
 
 // Mismo criterio de columnas/estilo que el resto de la app (ver
 // Clientes.jsx / presupuestosShared.jsx).
+//
+// OJO con la firma de `render`: DataTable llama `col.render(row[col.key], row)`
+// — primer parámetro es el VALOR de la celda, segundo la fila completa.
 const COLUMNS_CLIENTES = [
   { key: "codcliente", label: "Cód." },
   { key: "nombre", label: "Cliente" },
   { key: "telefono1", label: "Teléfono" },
+  { key: "numeropres", label: "Presupuesto", render: (value, row) => (value != null ? `Nº${value} rev.${row.revision}` : "—") },
+  { key: "lineas", label: "Líneas elegidas", render: (value) => fmtLineasElegidas(value) },
+  { key: "monto_obra", label: "Monto total", render: (value) => fmtMoneda(value) },
+  { key: "color", label: "Color", render: (value) => value ?? "—" },
+  { key: "anticipo", label: "Anticipo", render: (value) => fmtMoneda(value) },
   {
     key: "saldo",
     label: "Saldo",
-    render: (row) => (
+    render: (value) => (
       <span
         style={{
           fontWeight: 700,
-          color: row.saldo > 0 ? "#c0392b" : row.saldo < 0 ? "#1a7a3a" : "#8aabb8",
+          color: value > 0 ? "#c0392b" : value < 0 ? "#1a7a3a" : "#8aabb8",
         }}
       >
-        {fmtMoneda(row.saldo)}
+        {fmtMoneda(value)}
       </span>
     ),
   },
@@ -53,6 +61,26 @@ function fmtFecha(v) {
   if (!v) return "";
   const d = new Date(v);
   return isNaN(d.getTime()) ? String(v) : d.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// linea_por_grupo llega como JSON { grupo: idx } (idx 0=línea1, 1=línea2,
+// 2=línea3). Se muestra como lista de números de línea (idx+1) únicos y
+// ordenados, ej. "8" o "21, 22". Sin datos (obra que nunca eligió línea por
+// grupo, sigue en línea1 por defecto) muestra "—", igual criterio que la
+// pantalla "Obras Confirmadas".
+function fmtLineasElegidas(raw) {
+  if (!raw) return "—";
+  let obj;
+  try {
+    obj = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return "—";
+  }
+  if (!obj || typeof obj !== "object") return "—";
+  const valores = Object.values(obj);
+  if (!valores.length) return "—";
+  const distintos = [...new Set(valores.map((v) => Number(v) + 1))].sort((a, b) => a - b);
+  return distintos.join(", ");
 }
 
 export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack }) {
@@ -123,6 +151,12 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
       nombre: r.nombre,
       telefono1: r.telefono1,
       saldo: Number(r.saldo),
+      numeropres: r.numeropres ?? null,
+      revision: r.revision ?? null,
+      monto_obra: r.monto_obra != null ? Number(r.monto_obra) : null,
+      lineas: r.linea_por_grupo ?? null,
+      color: r.color ?? null,
+      anticipo: r.anticipo != null ? Number(r.anticipo) : 0,
     }));
 
   const filtradas = filas.filter((c) => {
@@ -219,20 +253,20 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
   };
 
   const COLUMNS_MOVIMIENTOS = [
-    { key: "creado_en", label: "Fecha", render: (row) => fmtFecha(row.creado_en) },
-    { key: "tipo", label: "Tipo", render: (row) => TIPO_LABEL[row.tipo] ?? row.tipo },
-    { key: "concepto", label: "Concepto", render: (row) => row.concepto ?? "—" },
+    { key: "creado_en", label: "Fecha", render: (value) => fmtFecha(value) },
+    { key: "tipo", label: "Tipo", render: (value) => TIPO_LABEL[value] ?? value },
+    { key: "concepto", label: "Concepto", render: (value) => value ?? "—" },
     {
       key: "monto",
       label: "Monto",
-      render: (row) => (
-        <span style={{ fontWeight: 700, color: row.monto >= 0 ? "#c0392b" : "#1a7a3a" }}>
-          {row.monto >= 0 ? "+" : ""}
-          {fmtMoneda(row.monto)}
+      render: (value) => (
+        <span style={{ fontWeight: 700, color: value >= 0 ? "#c0392b" : "#1a7a3a" }}>
+          {value >= 0 ? "+" : ""}
+          {fmtMoneda(value)}
         </span>
       ),
     },
-    { key: "saldo_acumulado", label: "Saldo", render: (row) => fmtMoneda(row.saldo_acumulado) },
+    { key: "saldo_acumulado", label: "Saldo", render: (value) => fmtMoneda(value) },
   ];
 
   return (
