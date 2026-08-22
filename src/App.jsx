@@ -91,10 +91,10 @@ const buttons = [
   },
   {
     id: 12,
-    label: "MUEBLE ESPECIAL",
-    icon: "🪚",
+    label: "CUENTA CORRIENTE",
+    icon: "💰",
     color: "#e67e22",
-    screen: "mueble-especial",
+    screen: "cuenta-corriente",
   },
   {
     id: 13,
