@@ -50,7 +50,7 @@ const SCREENS = {
   usuarios: { label: "USUARIOS", icon: "👤" },
   "actualizar-precios": { label: "ACTUALIZAR PRECIOS", icon: "💲" },
   "vehiculos-mantenimiento": { label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚" },
-  "cuenta-corriente": { label: "CUENTA CORRIENTE", icon: "💰" },
+  "cuenta-corriente": { label: "CLIENTES ACTIVOS", icon: "💰" },
 };
 
 const buttons = [
@@ -91,7 +91,7 @@ const buttons = [
   },
   {
     id: 12,
-    label: "CUENTA CORRIENTE",
+    label: "CLIENTES ACTIVOS",
     icon: "💰",
     color: "#e67e22",
     screen: "cuenta-corriente",
@@ -1160,7 +1160,7 @@ function App() {
               />
             )}
 
-            {/* ── Cuenta Corriente ── */}
+            {/* ── Clientes Activos (ex Cuenta Corriente) ── */}
             {screen === "cuenta-corriente" && (
               <CuentaCorriente
                 clientes={clientes}
@@ -1275,7 +1275,7 @@ function App() {
       <div className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <h3>Menú</h3>
         {puedo("clientes", "ver") && <p onClick={() => { setScreen("clientes"); setSidebarOpen(false); }}>👥 Clientes</p>}
-        {puedo("cuenta-corriente", "ver") && <p onClick={() => { setScreen("cuenta-corriente"); setSidebarOpen(false); }}>💰 Cuenta Corriente</p>}
+        {puedo("cuenta-corriente", "ver") && <p onClick={() => { setScreen("cuenta-corriente"); setSidebarOpen(false); }}>💰 Clientes Activos</p>}
         {puedo("presupuesto-mamparas", "ver") && <p onClick={() => { setScreen("presupuestos-tabla"); setSidebarOpen(false); }}>📋 Presupuestos Mamparas</p>}
         {puedo("productos", "ver") && <p onClick={() => { setScreen("productos"); setSidebarOpen(false); }}>🛒 Productos</p>}
         {puedo("lista-margenes", "ver") && <p onClick={() => { setScreen("lista-margenes"); fetchListas(); setSidebarOpen(false); }}>📊 Lista de Márgenes</p>}
