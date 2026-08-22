@@ -2578,6 +2578,7 @@ export default function PresupuestoNuevo({
       incluirTextoColoc,
       incluirTextoSena,
       textoSena,
+      melaminas: melaminasDB,
       imagenesFinal,
       setGenerandoPDF,
       authFetch,

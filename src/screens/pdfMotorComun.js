@@ -56,6 +56,61 @@ export const filaFotosHTML = (fila) => {
 export const formatPeso = (v) =>
   "$" + Number(v || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 });
 
+// Franja de color por grupo (nombre de melamina, ej. "Blanco Nube") ────────
+//
+// /productos/melaminas (articulos_controller.js) solo trae
+// codartint/articulo/precio — no hay ningún color real (hex/rgb) cargado en
+// la base. Así que el color de la franja es GENERADO a partir del nombre de
+// la melamina (hash determinístico → mismo color siempre para el mismo
+// nombre, en cualquier PDF). Si en algún momento se agrega una columna de
+// color real a `articulos`, reemplazar colorParaMelamina por esa columna.
+const hashString = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0; // fuerza 32-bit
+  }
+  return Math.abs(hash);
+};
+
+// Pastel (saturación/luminosidad fijas) para que el texto en negro encima
+// siempre se lea bien, sea cual sea el hue que le toque al nombre.
+export const colorParaMelamina = (nombreMelamina) => {
+  const hue = hashString(nombreMelamina) % 360;
+  return `hsl(${hue}, 55%, 82%)`;
+};
+
+// { [codartint]: nombreArticulo }, a partir del mismo catálogo que ya carga
+// PresupuestoNuevo.jsx en melaminasDB (GET /productos/melaminas) — no se
+// vuelve a fetchear acá, se recibe como parámetro.
+export const mapaMelaminas = (melaminas) => {
+  const mapa = {};
+  (melaminas || []).forEach((m) => {
+    if (m.codartint != null) mapa[m.codartint] = m.articulo;
+  });
+  return mapa;
+};
+
+// Color de un grupo: toma el color del primer ítem del grupo que tenga uno
+// cargado (item.color = codartint de melamina, elegido en la columna Color
+// de TablaArticulos). Si ningún ítem del grupo tiene color asignado,
+// devuelve null (no se muestra franja para ese grupo).
+export const colorGrupo = (items, mapaMelaminasPorCodigo) => {
+  const item = items.find((it) => it.color != null && it.color !== "");
+  if (!item) return null;
+  const nombre = mapaMelaminasPorCodigo[item.color];
+  if (!nombre) return null;
+  return { nombre, css: colorParaMelamina(nombre) };
+};
+
+// Franja de color + nombre de la melamina, para pegar al lado del título de
+// un grupo en el PDF. Devuelve "" si el grupo no tiene color (colorGrupo
+// devolvió null) — no se agrega franja vacía.
+export const franjaColorHTML = (infoColor) =>
+  infoColor
+    ? `<span class="franja-color" style="background:${infoColor.css};">${infoColor.nombre}</span>`
+    : "";
+
 // Foto de la mampara: no se persiste en el ítem del presupuesto, así que se
 // busca en vivo en la tabla `articulos` (mismo endpoint que usa
 // PresupuestoMamparas.jsx para el panel de foto) justo antes de armar el
@@ -160,7 +215,9 @@ body { font-family: 'Space Mono', 'Courier New', monospace; background: #fff; co
 .fila-fotos { display: flex; gap: 10px; align-items: flex-start; }
 .foto-individual { min-width: 0; }
 .foto-individual img { display: block; }
-.sec-title { font-style: italic; font-weight: 700; text-transform: uppercase; font-size: 12px; margin-bottom: 3px; }
+.sec-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 3px; }
+.sec-title { font-style: italic; font-weight: 700; text-transform: uppercase; font-size: 12px; }
+.franja-color { font-style: normal; font-weight: 700; text-transform: none; font-size: 10px; padding: 2px 9px; border-radius: 3px; border: 1px solid #111; white-space: nowrap; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
 thead th { text-align: left; font-weight: 700; border-bottom: 1px solid #111; padding: 1px 8px 3px 0; }
 thead th.cant, td.cant { width: 44px; }

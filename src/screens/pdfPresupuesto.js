@@ -18,6 +18,9 @@ import {
   calcularNro,
   calcularNombreArchivo,
   ordenarSecciones,
+  mapaMelaminas,
+  colorGrupo,
+  franjaColorHTML,
   descargarPDF,
 } from "./pdfMotorComun.js";
 
@@ -40,6 +43,9 @@ import {
 //  - mostrarCosto, incluirPrecio, incluirTotal, agregarIVA, incluirTextoColoc: flags de armado
 //  - incluirTextoSena: bool, si se agrega el recuadro de seña/condiciones (fondo amarillo)
 //  - textoSena: texto libre de ese recuadro, editable desde el Encabezado
+//  - melaminas: catálogo de melaminas (misma forma que melaminasDB en
+//    PresupuestoNuevo.jsx: [{codartint, articulo, precio}]), para mostrar la
+//    franja de color por grupo. Opcional: sin catálogo, no se muestra franja.
 //  - imagenesFinal: fotos y PDFs adjuntos
 //  - setGenerandoPDF: setter de estado para mostrar "Generando..." en el botón
 export async function generarPresupuestoPDF({
@@ -66,6 +72,7 @@ export async function generarPresupuestoPDF({
   incluirTextoColoc,
   incluirTextoSena,
   textoSena,
+  melaminas,
   imagenesFinal,
   setGenerandoPDF,
   authFetch,
@@ -74,6 +81,8 @@ export async function generarPresupuestoPDF({
     presupuestoItems,
     authFetch,
   );
+
+  const mapaMelaminasPorCodigo = mapaMelaminas(melaminas);
 
   const fechaFmt = formatearFecha(fecha);
   const nro = calcularNro({ numeroPres, numero });
@@ -95,6 +104,7 @@ export async function generarPresupuestoPDF({
     .map((sec) => {
       const items = presupuestoItems.filter((p) => grupoDe(p) === sec);
       const subtotalSec = items.reduce((s, it) => s + (it.subtotal || 0), 0);
+      const infoColorSec = colorGrupo(items, mapaMelaminasPorCodigo);
 
       // Placard tiene su propia línea de precios fija en la BD (línea 15,
       // ver LINEA_FIJA_PLACARD en useCocinaPlacard.js), independiente de
@@ -219,7 +229,10 @@ export async function generarPresupuestoPDF({
 
       return `
     <div class="tabla-block">
-      <div class="sec-title">${sec}:</div>
+      <div class="sec-title-row">
+        <div class="sec-title">${sec}:</div>
+        ${franjaColorHTML(infoColorSec)}
+      </div>
       <table>
         <thead>
           <tr>
