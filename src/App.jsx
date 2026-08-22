@@ -20,6 +20,7 @@ import HistorialFacturas from "./screens/HistorialFacturas";
 import AfipIVA from "./screens/AfipIVA";
 import ActualizarPreciosExcel from "./screens/ActualizarPreciosExcel";
 import VehiculosMantenimiento from "./screens/VehiculosMantenimiento";
+import CuentaCorriente from "./screens/CuentaCorriente";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState } from "react";
@@ -49,6 +50,7 @@ const SCREENS = {
   usuarios: { label: "USUARIOS", icon: "👤" },
   "actualizar-precios": { label: "ACTUALIZAR PRECIOS", icon: "💲" },
   "vehiculos-mantenimiento": { label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚" },
+  "cuenta-corriente": { label: "CUENTA CORRIENTE", icon: "💰" },
 };
 
 const buttons = [
@@ -1158,6 +1160,19 @@ function App() {
               />
             )}
 
+            {/* ── Cuenta Corriente ── */}
+            {screen === "cuenta-corriente" && (
+              <CuentaCorriente
+                clientes={clientes}
+                authFetch={authFetch}
+                onAbrirPresupuesto={(row) => {
+                  setPresupuestoAbierto(row);
+                  setScreen("presupuesto-nuevo");
+                }}
+                onBack={() => setScreen(null)}
+              />
+            )}
+
             {/* ── Facturas ── */}
             {screen === "facturas" && <Facturas proveedores={proveedores} token={token} />}
 
@@ -1260,6 +1275,7 @@ function App() {
       <div className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <h3>Menú</h3>
         {puedo("clientes", "ver") && <p onClick={() => { setScreen("clientes"); setSidebarOpen(false); }}>👥 Clientes</p>}
+        {puedo("cuenta-corriente", "ver") && <p onClick={() => { setScreen("cuenta-corriente"); setSidebarOpen(false); }}>💰 Cuenta Corriente</p>}
         {puedo("presupuesto-mamparas", "ver") && <p onClick={() => { setScreen("presupuestos-tabla"); setSidebarOpen(false); }}>📋 Presupuestos Mamparas</p>}
         {puedo("productos", "ver") && <p onClick={() => { setScreen("productos"); setSidebarOpen(false); }}>🛒 Productos</p>}
         {puedo("lista-margenes", "ver") && <p onClick={() => { setScreen("lista-margenes"); fetchListas(); setSidebarOpen(false); }}>📊 Lista de Márgenes</p>}
