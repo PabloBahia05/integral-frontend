@@ -71,6 +71,33 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
 
+  // ── TEMPORAL: backfill de obras confirmadas antes de que existiera este
+  // módulo. Borrar este bloque + el botón + el endpoint /admin/backfill-cuenta-corriente
+  // una vez confirmado que las obras viejas ya quedaron cargadas. ──────────
+  const [backfillCorriendo, setBackfillCorriendo] = useState(false);
+  const [backfillResultado, setBackfillResultado] = useState(null);
+
+  const correrBackfill = async () => {
+    if (!window.confirm("Esto va a recorrer TODAS las obras confirmadas y generar/actualizar su movimiento en Cuenta Corriente. ¿Continuar?")) {
+      return;
+    }
+    setBackfillCorriendo(true);
+    setBackfillResultado(null);
+    try {
+      const res = await authFetch(`${API}/admin/backfill-cuenta-corriente`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Error desconocido");
+      setBackfillResultado(data);
+      fetchResumen();
+    } catch (err) {
+      console.error("Error corriendo backfill:", err);
+      setBackfillResultado({ error: err.message });
+    } finally {
+      setBackfillCorriendo(false);
+    }
+  };
+  // ── FIN bloque temporal ──────────────────────────────────────────────────
+
   const fetchResumen = () => {
     setLoadingResumen(true);
     authFetch(`${API}/cuenta-corriente/resumen`)
@@ -219,7 +246,7 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
         ]}
       />
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <input
           className="pn-field-input"
           value={search}
@@ -227,7 +254,55 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
           placeholder="🔎 Buscar cliente..."
           style={{ flex: 1, maxWidth: 320 }}
         />
+        {/* TEMPORAL — quitar junto con el bloque de estado/función de arriba
+            y el endpoint /admin/backfill-cuenta-corriente cuando ya no haga falta. */}
+        <button
+          type="button"
+          className="btn-cancel"
+          onClick={correrBackfill}
+          disabled={backfillCorriendo}
+          style={{ padding: "8px 14px" }}
+        >
+          {backfillCorriendo ? "⏳ Corriendo..." : "🔄 Backfill obras confirmadas"}
+        </button>
       </div>
+
+      {backfillResultado && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: 12,
+            borderRadius: 8,
+            background: backfillResultado.error ? "#fdecea" : "#eaf7ee",
+            color: backfillResultado.error ? "#c0392b" : "#1a7a3a",
+            fontSize: 13,
+          }}
+        >
+          {backfillResultado.error ? (
+            <p style={{ margin: 0 }}>❌ Error: {backfillResultado.error}</p>
+          ) : (
+            <>
+              <p style={{ margin: 0, fontWeight: 700 }}>
+                ✅ Procesadas: {backfillResultado.totalProcesadas} — Insertados/actualizados: {backfillResultado.insertados} — Saltados: {backfillResultado.saltados} — Errores: {backfillResultado.errores}
+              </p>
+              {Array.isArray(backfillResultado.detalle) && backfillResultado.detalle.length > 0 && (
+                <details style={{ marginTop: 6 }}>
+                  <summary style={{ cursor: "pointer" }}>Ver detalle</summary>
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    {backfillResultado.detalle.map((d, i) => (
+                      <li key={i}>
+                        {d.numeropres} rev.{d.revision} — {d.resultado}
+                        {d.monto != null ? ` — $${d.monto}` : ""}
+                        {d.motivo ? ` (${d.motivo})` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {loadingResumen ? (
         <p style={{ textAlign: "center", padding: 24, color: "#4a8ab5" }}>⏳ Cargando...</p>
