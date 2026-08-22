@@ -1108,6 +1108,8 @@ export default function PresupuestoNuevo({
   const [guiasDB, setGuiasDB] = useState([]);
   // Melaminas (columna Color de TablaArticulos)
   const [melaminasDB, setMelaminasDB] = useState([]);
+  // Manijas (columna Manija de TablaArticulos)
+  const [manijasDB, setManijasDB] = useState([]);
 
   // Cargar materiales/guias desde BD al montar
   useEffect(() => {
@@ -1127,6 +1129,12 @@ export default function PresupuestoNuevo({
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setMelaminasDB(data);
+      })
+      .catch(() => {});
+    authFetch(`${API}/productos/manijas`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setManijasDB(data);
       })
       .catch(() => {});
   }, []);
@@ -1911,6 +1919,7 @@ export default function PresupuestoNuevo({
             .filter(Boolean),
           grupo: it.grupo ?? it.GRUPO ?? "",
           color: it.color ?? it.COLOR ?? null,
+          manija: it.manija ?? it.MANIJA ?? null,
         };
         if (tipo.includes("cocina") && tipo.includes("bajomesada"))
           nuevaCocina.bajomesadas.push(fila);
@@ -2000,6 +2009,7 @@ export default function PresupuestoNuevo({
             alto: it.alto ?? it.ALTO ?? null,
             grupo: it.grupo ?? it.GRUPO ?? null,
             color: it.color ?? it.COLOR ?? null,
+            manija: it.manija ?? it.MANIJA ?? null,
           });
         }
       });
@@ -2425,6 +2435,9 @@ export default function PresupuestoNuevo({
           // Color (melamina) elegido para el ítem en la columna Color de
           // TablaArticulos — guarda el codartint de articulos.
           color: it.color ?? null,
+          // Manija elegida para el ítem en la columna Manija de
+          // TablaArticulos — mismo criterio que color, guarda el codartint.
+          manija: it.manija ?? null,
         };
       }),
     };
@@ -2579,6 +2592,7 @@ export default function PresupuestoNuevo({
       incluirTextoSena,
       textoSena,
       melaminas: melaminasDB,
+      manijas: manijasDB,
       imagenesFinal,
       setGenerandoPDF,
       authFetch,
@@ -4023,6 +4037,7 @@ export default function PresupuestoNuevo({
               lineaPorGrupo={lineaPorGrupo}
               setLineaPorGrupo={setLineaPorGrupo}
               melaminas={melaminasDB}
+              manijas={manijasDB}
               setPresupuestoItems={setPresupuestoItems}
             />
           )}

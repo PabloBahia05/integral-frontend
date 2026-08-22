@@ -84,6 +84,8 @@ export default function TablaArticulos({
   // Color (melamina): lista de opciones + setter para actualizar el ítem
   // local en presupuestoItems cuando se elige un color en la grilla.
   melaminas,
+  // Manija: lista de opciones (mismo shape que melaminas), mismo mecanismo.
+  manijas,
   setPresupuestoItems,
 }) {
   // Grupo efectivo de un ítem: el personalizado si el usuario le asignó uno,
@@ -144,6 +146,21 @@ export default function TablaArticulos({
     setPresupuestoItems((prev) =>
       prev.map((p) =>
         grupoDe(p) === grupoColorSel ? { ...p, color: valor } : p,
+      ),
+    );
+  };
+
+  // ── Manija por grupo: mismo mecanismo que Color por grupo. ──────────────
+  const [grupoManijaSel, setGrupoManijaSel] = useState("");
+  const SIN_MANIJA = "__SIN_MANIJA__";
+  const [manijaGrupoValor, setManijaGrupoValor] = useState("");
+
+  const aplicarManijaAGrupo = () => {
+    if (!grupoManijaSel || !manijaGrupoValor) return;
+    const valor = manijaGrupoValor === SIN_MANIJA ? "" : manijaGrupoValor;
+    setPresupuestoItems((prev) =>
+      prev.map((p) =>
+        grupoDe(p) === grupoManijaSel ? { ...p, manija: valor } : p,
       ),
     );
   };
@@ -479,6 +496,100 @@ export default function TablaArticulos({
             >
               Aplicar
             </button>
+
+            {/* Separador */}
+            <span
+              style={{
+                width: 1,
+                alignSelf: "stretch",
+                background: "#c8dae8",
+                margin: "0 2px",
+              }}
+            />
+
+            {/* Etiqueta manija por grupo */}
+            <span
+              style={{
+                fontWeight: 700,
+                color: "#0a3a5c",
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              🔧 Manija por grupo
+            </span>
+
+            {/* Selector de grupo */}
+            <select
+              value={grupoManijaSel}
+              onChange={(e) => setGrupoManijaSel(e.target.value)}
+              style={{
+                padding: "5px 8px",
+                border: "1px solid #b8cfe0",
+                borderRadius: 2,
+                fontFamily: "'Space Mono',monospace",
+                fontSize: 11,
+                color: "#0a3a5c",
+                background: "#fff",
+                maxWidth: 180,
+              }}
+            >
+              <option value="">Grupo...</option>
+              {secciones.map((sec) => (
+                <option key={sec} value={sec}>
+                  {sec}
+                </option>
+              ))}
+            </select>
+
+            {/* Selector de manija */}
+            <select
+              value={manijaGrupoValor}
+              onChange={(e) => setManijaGrupoValor(e.target.value)}
+              style={{
+                padding: "5px 8px",
+                border: "1px solid #b8cfe0",
+                borderRadius: 2,
+                fontFamily: "'Space Mono',monospace",
+                fontSize: 11,
+                color: "#0a3a5c",
+                background: "#fff",
+                maxWidth: 180,
+              }}
+            >
+              <option value="">Manija...</option>
+              <option value={SIN_MANIJA}>— Sin manija —</option>
+              {(manijas ?? []).map((m) => (
+                <option key={m.codartint} value={m.codartint}>
+                  {m.articulo}
+                </option>
+              ))}
+            </select>
+
+            {/* Botón aplicar manija a grupo */}
+            <button
+              onClick={aplicarManijaAGrupo}
+              disabled={!grupoManijaSel || !manijaGrupoValor}
+              title="Aplica esta manija a todos los ítems del grupo elegido"
+              style={{
+                padding: "5px 14px",
+                background:
+                  grupoManijaSel && manijaGrupoValor ? "#0a3a5c" : "#c8dae8",
+                color: grupoManijaSel && manijaGrupoValor ? "#fff" : "#99aabb",
+                border: "none",
+                borderRadius: 2,
+                fontFamily: "'Space Mono',monospace",
+                fontSize: 11,
+                cursor:
+                  grupoManijaSel && manijaGrupoValor ? "pointer" : "default",
+                fontWeight: 700,
+                transition: "all 0.12s",
+              }}
+            >
+              Aplicar
+            </button>
           </div>
         </div>
       )}
@@ -571,6 +682,16 @@ export default function TablaArticulos({
               >
                 Color
               </th>
+              <th
+                style={{
+                  padding: "9px 10px",
+                  textAlign: "center",
+                  fontWeight: 700,
+                  width: 110,
+                }}
+              >
+                Manija
+              </th>
               {lineasActivas.length > 0 ? (
                 lineasActivas.map((l, li) => (
                   <th
@@ -642,13 +763,13 @@ export default function TablaArticulos({
                   0,
                 );
                 const totalCols =
-                  7 + (lineasActivas.length > 0 ? lineasActivas.length : 1); // sección+prod+desc+cant+ancho+alto+color + líneas
+                  8 + (lineasActivas.length > 0 ? lineasActivas.length : 1); // sección+prod+desc+cant+ancho+alto+color+manija + líneas
 
                 return [
                   // Fila de sección
                   <tr key={`sec-${sec}`} style={{ background: "#ddeefa" }}>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       style={{
                         padding: "6px 14px",
                         fontWeight: 700,
@@ -1010,6 +1131,42 @@ export default function TablaArticulos({
                             ))}
                           </select>
                         </td>
+                        <td
+                          style={{
+                            padding: "4px 6px",
+                            border: "1px solid #e8f0f7",
+                            textAlign: "center",
+                          }}
+                        >
+                          <select
+                            value={item.manija ?? ""}
+                            onChange={(e) => {
+                              const valor = e.target.value || null;
+                              setPresupuestoItems((prev) =>
+                                prev.map((p) =>
+                                  p.id === item.id ? { ...p, manija: valor } : p,
+                                ),
+                              );
+                            }}
+                            style={{
+                              width: "100%",
+                              fontSize: 11,
+                              fontFamily: "'Space Mono',monospace",
+                              border: "1px solid #c8dae8",
+                              borderRadius: 2,
+                              padding: "3px 2px",
+                              background: "#fff",
+                              color: "#0a3a5c",
+                            }}
+                          >
+                            <option value="">—</option>
+                            {(manijas ?? []).map((m) => (
+                              <option key={m.codartint} value={m.codartint}>
+                                {m.articulo}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
                         {lineasActivas.length > 0 ? (
                           usarColMerged ? (
                             (() => {
@@ -1335,7 +1492,7 @@ export default function TablaArticulos({
                   // Subtotal de sección
                   <tr key={`sub-${sec}`} style={{ background: "#e8f4ee" }}>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       style={{
                         padding: "6px 14px",
                         textAlign: "right",
