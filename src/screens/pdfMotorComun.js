@@ -111,6 +111,47 @@ export const franjaColorHTML = (infoColor) =>
     ? `<span class="franja-color" style="background:${infoColor.css};">${infoColor.nombre}</span>`
     : "";
 
+// Franja de manija por grupo (nombre de manija, ej. "Recta Aluminio 128mm") ─
+//
+// A diferencia del color, la manija no necesita un color generado (no
+// representa un color real ni uno inventado por hash) — es un badge neutro,
+// mismo tamaño/tipografía que franja-color pero con fondo gris fijo, para
+// que se distinga a simple vista de la franja de color cuando ambas
+// aparecen juntas en el título del grupo.
+
+// { [codartint]: nombreArticulo }, a partir del mismo catálogo que carga
+// ObrasConfirmadas.jsx/PresupuestoNuevo.jsx en manijasDB (GET
+// /productos/manijas) — no se vuelve a fetchear acá, se recibe como
+// parámetro. Mirror exacto de mapaMelaminas.
+export const mapaManijas = (manijas) => {
+  const mapa = {};
+  (manijas || []).forEach((m) => {
+    if (m.codartint != null) mapa[m.codartint] = m.articulo;
+  });
+  return mapa;
+};
+
+// Manija de un grupo: toma la manija del primer ítem del grupo que tenga una
+// cargada (item.manija = codartint de manija, elegido en la columna Manija
+// de TablaArticulos). Si ningún ítem del grupo tiene manija asignada,
+// devuelve null (no se muestra franja para ese grupo). Mirror de colorGrupo,
+// sin el campo css (el badge de manija usa un color fijo, no generado).
+export const manijaGrupo = (items, mapaManijasPorCodigo) => {
+  const item = items.find((it) => it.manija != null && it.manija !== "");
+  if (!item) return null;
+  const nombre = mapaManijasPorCodigo[item.manija];
+  if (!nombre) return null;
+  return { nombre };
+};
+
+// Franja de manija, para pegar al lado del título de un grupo en el PDF,
+// junto a la franja de color si también hay. Devuelve "" si el grupo no
+// tiene manija (manijaGrupo devolvió null) — no se agrega franja vacía.
+export const franjaManijaHTML = (infoManija) =>
+  infoManija
+    ? `<span class="franja-manija">Manija: ${infoManija.nombre}</span>`
+    : "";
+
 // Foto de la mampara: no se persiste en el ítem del presupuesto, así que se
 // busca en vivo en la tabla `articulos` (mismo endpoint que usa
 // PresupuestoMamparas.jsx para el panel de foto) justo antes de armar el
@@ -217,7 +258,9 @@ body { font-family: 'Space Mono', 'Courier New', monospace; background: #fff; co
 .foto-individual img { display: block; }
 .sec-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 3px; }
 .sec-title { font-style: italic; font-weight: 700; text-transform: uppercase; font-size: 12px; }
+.franjas-row { display: flex; align-items: center; gap: 6px; }
 .franja-color { font-style: normal; font-weight: 700; text-transform: none; font-size: 10px; padding: 2px 9px; border-radius: 3px; border: 1px solid #111; white-space: nowrap; }
+.franja-manija { font-style: normal; font-weight: 700; text-transform: none; font-size: 10px; padding: 2px 9px; border-radius: 3px; border: 1px solid #111; white-space: nowrap; background: #eee; color: #333; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
 thead th { text-align: left; font-weight: 700; border-bottom: 1px solid #111; padding: 1px 8px 3px 0; }
 thead th.cant, td.cant { width: 44px; }

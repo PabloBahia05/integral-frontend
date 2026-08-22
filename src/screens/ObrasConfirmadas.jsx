@@ -39,6 +39,10 @@ export default function ObrasConfirmadas({
   const [guardandoColorId, setGuardandoColorId] = useState(null);
   const [errorColorId, setErrorColorId] = useState(null);
 
+  const [manijas, setManijas] = useState([]);
+  const [guardandoManijaId, setGuardandoManijaId] = useState(null);
+  const [errorManijaId, setErrorManijaId] = useState(null);
+
   // Línea de precio confirmada por grupo (numeropres/revision seleccionado).
   // Formato { "ALACENAS": 0, "BAJO MESADA": 1 } — 0/1/2 → valor1/valor2/valor3.
   const [lineaPorGrupo, setLineaPorGrupo] = useState({});
@@ -81,6 +85,10 @@ export default function ObrasConfirmadas({
     authFetch(`${API}/productos/melaminas`)
       .then((r) => r.json())
       .then((data) => setMelaminas(Array.isArray(data) ? data : []))
+      .catch(console.error);
+    authFetch(`${API}/productos/manijas`)
+      .then((r) => r.json())
+      .then((data) => setManijas(Array.isArray(data) ? data : []))
       .catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -204,6 +212,27 @@ export default function ObrasConfirmadas({
       setErrorColorId(produccionId);
     } finally {
       setGuardandoColorId(null);
+    }
+  };
+
+  const handleManijaChange = async (produccionId, valor) => {
+    setProduccionSeleccionada((prev) =>
+      prev.map((p) => (p.id === produccionId ? { ...p, manija: valor } : p)),
+    );
+    setGuardandoManijaId(produccionId);
+    setErrorManijaId(null);
+    try {
+      const res = await authFetch(`${API}/produccion/${produccionId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manija: valor || null }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      console.error("Error guardando manija:", e);
+      setErrorManijaId(produccionId);
+    } finally {
+      setGuardandoManijaId(null);
     }
   };
 
@@ -348,6 +377,10 @@ export default function ObrasConfirmadas({
         guardandoColorId={guardandoColorId}
         errorColorId={errorColorId}
         onChangeColor={handleColorChange}
+        manijas={manijas}
+        guardandoManijaId={guardandoManijaId}
+        errorManijaId={errorManijaId}
+        onChangeManija={handleManijaChange}
         lineaPorGrupo={lineaPorGrupo}
         onChangeLineaGrupo={handleLineaGrupoChange}
       />

@@ -21,6 +21,9 @@ import {
   mapaMelaminas,
   colorGrupo,
   franjaColorHTML,
+  mapaManijas,
+  manijaGrupo,
+  franjaManijaHTML,
   descargarPDF,
 } from "./pdfMotorComun.js";
 
@@ -46,6 +49,9 @@ import {
 //  - melaminas: catálogo de melaminas (misma forma que melaminasDB en
 //    PresupuestoNuevo.jsx: [{codartint, articulo, precio}]), para mostrar la
 //    franja de color por grupo. Opcional: sin catálogo, no se muestra franja.
+//  - manijas: catálogo de manijas (misma forma que manijasDB en
+//    PresupuestoNuevo.jsx: [{codartint, articulo, precio}]), para mostrar la
+//    franja de manija por grupo. Opcional: sin catálogo, no se muestra franja.
 //  - imagenesFinal: fotos y PDFs adjuntos
 //  - setGenerandoPDF: setter de estado para mostrar "Generando..." en el botón
 export async function generarPresupuestoPDF({
@@ -73,6 +79,7 @@ export async function generarPresupuestoPDF({
   incluirTextoSena,
   textoSena,
   melaminas,
+  manijas,
   imagenesFinal,
   setGenerandoPDF,
   authFetch,
@@ -83,6 +90,7 @@ export async function generarPresupuestoPDF({
   );
 
   const mapaMelaminasPorCodigo = mapaMelaminas(melaminas);
+  const mapaManijasPorCodigo = mapaManijas(manijas);
 
   const fechaFmt = formatearFecha(fecha);
   const nro = calcularNro({ numeroPres, numero });
@@ -105,6 +113,7 @@ export async function generarPresupuestoPDF({
       const items = presupuestoItems.filter((p) => grupoDe(p) === sec);
       const subtotalSec = items.reduce((s, it) => s + (it.subtotal || 0), 0);
       const infoColorSec = colorGrupo(items, mapaMelaminasPorCodigo);
+      const infoManijaSec = manijaGrupo(items, mapaManijasPorCodigo);
 
       // Placard tiene su propia línea de precios fija en la BD (línea 15,
       // ver LINEA_FIJA_PLACARD en useCocinaPlacard.js), independiente de
@@ -231,7 +240,7 @@ export async function generarPresupuestoPDF({
     <div class="tabla-block">
       <div class="sec-title-row">
         <div class="sec-title">${sec}:</div>
-        ${franjaColorHTML(infoColorSec)}
+        <div class="franjas-row">${franjaColorHTML(infoColorSec)}${franjaManijaHTML(infoManijaSec)}</div>
       </div>
       <table>
         <thead>
