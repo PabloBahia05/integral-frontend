@@ -55,7 +55,7 @@ function fmtFecha(v) {
   return isNaN(d.getTime()) ? String(v) : d.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function CuentaCorriente({ clientes, authFetch, onAbrirPresupuesto, onBack }) {
+export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack }) {
   const [resumen, setResumen] = useState([]);
   const [loadingResumen, setLoadingResumen] = useState(true);
   const [search, setSearch] = useState("");
@@ -82,19 +82,21 @@ export default function CuentaCorriente({ clientes, authFetch, onAbrirPresupuest
 
   useEffect(fetchResumen, []);
 
-  // Lista completa de clientes, con saldo 0 para los que todavía no
-  // tienen ningún movimiento — así siempre se puede entrar a cualquier
-  // cliente y darle de alta el primer pago/ajuste.
-  const filas = (clientes ?? []).map((c) => {
-    const r = resumen.find((x) => x.codcliente === c.codcliente);
-    return {
-      id: c.id,
-      codcliente: c.codcliente,
-      nombre: c.nombre,
-      telefono1: c.telefono1,
-      saldo: r ? Number(r.saldo) : 0,
-    };
-  });
+  // Antes se mergeaba contra TODOS los clientes (mostrando saldo 0 de
+  // relleno para los que nunca tuvieron movimiento). Ahora solo se listan
+  // los que ya tienen algún movimiento en cuenta corriente (típicamente
+  // generado al confirmar una obra) Y cuyo saldo no dio exactamente 0 —
+  // un cliente que pagó justo lo que debía no tiene sentido que siga
+  // apareciendo en esta pantalla.
+  const filas = resumen
+    .filter((r) => Number(r.saldo) !== 0)
+    .map((r) => ({
+      id: r.codcliente,
+      codcliente: r.codcliente,
+      nombre: r.nombre,
+      telefono1: r.telefono1,
+      saldo: Number(r.saldo),
+    }));
 
   const filtradas = filas.filter((c) => {
     const q = search.toLowerCase();
@@ -212,7 +214,7 @@ export default function CuentaCorriente({ clientes, authFetch, onAbrirPresupuest
 
       <StatCards
         stats={[
-          { label: "Clientes con saldo", value: filas.filter((c) => c.saldo !== 0).length },
+          { label: "Clientes con saldo", value: filas.length },
           { label: "Deuda total", value: fmtMoneda(deudaTotal) },
         ]}
       />
