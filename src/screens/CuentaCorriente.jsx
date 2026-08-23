@@ -4,7 +4,7 @@ import Modal from "../Component/Modal";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
-import { generarPdfRecibo } from "../pdfRecibo";
+import { generarPdfRecibo } from "../pdf/pdfRecibo";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -17,9 +17,22 @@ const COLUMNS_CLIENTES = [
   { key: "codcliente", label: "Cód." },
   { key: "nombre", label: "Cliente" },
   { key: "telefono1", label: "Teléfono" },
-  { key: "numeropres", label: "Presupuesto", render: (value, row) => (value != null ? `Nº${value} rev.${row.revision}` : "—") },
-  { key: "lineas", label: "Líneas elegidas", render: (value) => fmtLineasElegidas(value) },
-  { key: "monto_obra", label: "Monto total", render: (value) => fmtMoneda(value) },
+  {
+    key: "numeropres",
+    label: "Presupuesto",
+    render: (value, row) =>
+      value != null ? `Nº${value} rev.${row.revision}` : "—",
+  },
+  {
+    key: "lineas",
+    label: "Líneas elegidas",
+    render: (value) => fmtLineasElegidas(value),
+  },
+  {
+    key: "monto_obra",
+    label: "Monto total",
+    render: (value) => fmtMoneda(value),
+  },
   { key: "color", label: "Color", render: (value) => value ?? "—" },
   { key: "anticipo", label: "Anticipo", render: (value) => fmtMoneda(value) },
   {
@@ -55,13 +68,25 @@ const TIPOS_MANUALES = [
 
 function fmtMoneda(v) {
   const n = Number(v ?? 0);
-  return n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 2 });
+  return n.toLocaleString("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 2,
+  });
 }
 
 function fmtFecha(v) {
   if (!v) return "";
   const d = new Date(v);
-  return isNaN(d.getTime()) ? String(v) : d.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return isNaN(d.getTime())
+    ? String(v)
+    : d.toLocaleString("es-AR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 }
 
 // linea_por_grupo llega como JSON { grupo: idx } (idx 0=línea1, 1=línea2,
@@ -80,11 +105,17 @@ function fmtLineasElegidas(raw) {
   if (!obj || typeof obj !== "object") return "—";
   const valores = Object.values(obj);
   if (!valores.length) return "—";
-  const distintos = [...new Set(valores.map((v) => Number(v) + 1))].sort((a, b) => a - b);
+  const distintos = [...new Set(valores.map((v) => Number(v) + 1))].sort(
+    (a, b) => a - b,
+  );
   return distintos.join(", ");
 }
 
-export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack }) {
+export default function CuentaCorriente({
+  authFetch,
+  onAbrirPresupuesto,
+  onBack,
+}) {
   const [resumen, setResumen] = useState([]);
   const [loadingResumen, setLoadingResumen] = useState(true);
   const [search, setSearch] = useState("");
@@ -96,7 +127,12 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
 
   const [modalNuevo, setModalNuevo] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
-  const [form, setForm] = useState({ tipo: "pago", monto: "", concepto: "", signoAjuste: "-" });
+  const [form, setForm] = useState({
+    tipo: "pago",
+    monto: "",
+    concepto: "",
+    signoAjuste: "-",
+  });
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
 
@@ -104,7 +140,11 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
   const [modalRecibo, setModalRecibo] = useState(false);
   const [obrasCliente, setObrasCliente] = useState([]);
   const [loadingObrasCliente, setLoadingObrasCliente] = useState(false);
-  const [formRecibo, setFormRecibo] = useState({ numeropres: "", monto: "", concepto: "Anticipo" });
+  const [formRecibo, setFormRecibo] = useState({
+    numeropres: "",
+    monto: "",
+    concepto: "Anticipo",
+  });
   const [errorRecibo, setErrorRecibo] = useState("");
   const [guardandoRecibo, setGuardandoRecibo] = useState(false);
 
@@ -133,7 +173,9 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
     }
 
     const obraElegida = formRecibo.numeropres
-      ? obrasCliente.find((o) => String(o.numeropres) === String(formRecibo.numeropres))
+      ? obrasCliente.find(
+          (o) => String(o.numeropres) === String(formRecibo.numeropres),
+        )
       : null;
 
     setGuardandoRecibo(true);
@@ -149,7 +191,8 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
         }),
       });
       const recibo = await res.json();
-      if (!res.ok) throw new Error(recibo?.error || "No se pudo guardar el recibo.");
+      if (!res.ok)
+        throw new Error(recibo?.error || "No se pudo guardar el recibo.");
 
       setModalRecibo(false);
       fetchResumen();
@@ -175,13 +218,19 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
   const [backfillResultado, setBackfillResultado] = useState(null);
 
   const correrBackfill = async () => {
-    if (!window.confirm("Esto va a recorrer TODAS las obras confirmadas y generar/actualizar su movimiento en Cuenta Corriente. ¿Continuar?")) {
+    if (
+      !window.confirm(
+        "Esto va a recorrer TODAS las obras confirmadas y generar/actualizar su movimiento en Cuenta Corriente. ¿Continuar?",
+      )
+    ) {
       return;
     }
     setBackfillCorriendo(true);
     setBackfillResultado(null);
     try {
-      const res = await authFetch(`${API}/admin/backfill-cuenta-corriente`, { method: "POST" });
+      const res = await authFetch(`${API}/admin/backfill-cuenta-corriente`, {
+        method: "POST",
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Error desconocido");
       setBackfillResultado(data);
@@ -237,7 +286,10 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
     );
   });
 
-  const deudaTotal = filas.reduce((acc, c) => acc + (c.saldo > 0 ? c.saldo : 0), 0);
+  const deudaTotal = filas.reduce(
+    (acc, c) => acc + (c.saldo > 0 ? c.saldo : 0),
+    0,
+  );
 
   const fetchMovimientos = (codcliente) => {
     setLoadingMovimientos(true);
@@ -261,7 +313,10 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
 
   const abrirMovimiento = (row) => {
     if (row.tipo === "presupuesto" && row.numeropres != null) {
-      onAbrirPresupuesto?.({ numeropres: row.numeropres, revision: row.revision });
+      onAbrirPresupuesto?.({
+        numeropres: row.numeropres,
+        revision: row.revision,
+      });
       return;
     }
     setSelectedMovimiento(row?.id === selectedMovimiento?.id ? null : row);
@@ -280,9 +335,12 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
       return;
     }
     let montoFinal = montoNum;
-    if (form.tipo === "pago" || form.tipo === "nota_credito") montoFinal = -Math.abs(montoNum);
+    if (form.tipo === "pago" || form.tipo === "nota_credito")
+      montoFinal = -Math.abs(montoNum);
     if (form.tipo === "nota_debito") montoFinal = Math.abs(montoNum);
-    if (form.tipo === "ajuste") montoFinal = form.signoAjuste === "-" ? -Math.abs(montoNum) : Math.abs(montoNum);
+    if (form.tipo === "ajuste")
+      montoFinal =
+        form.signoAjuste === "-" ? -Math.abs(montoNum) : Math.abs(montoNum);
 
     setGuardando(true);
     try {
@@ -309,7 +367,10 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
 
   const handleEliminarMovimiento = async () => {
     try {
-      const res = await authFetch(`${API}/cuenta-corriente/${selectedMovimiento.id}`, { method: "DELETE" });
+      const res = await authFetch(
+        `${API}/cuenta-corriente/${selectedMovimiento.id}`,
+        { method: "DELETE" },
+      );
       if (!res.ok) throw new Error(await res.text());
       setModalEliminar(false);
       setSelectedMovimiento(null);
@@ -323,24 +384,38 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
 
   const COLUMNS_MOVIMIENTOS = [
     { key: "creado_en", label: "Fecha", render: (value) => fmtFecha(value) },
-    { key: "tipo", label: "Tipo", render: (value) => TIPO_LABEL[value] ?? value },
+    {
+      key: "tipo",
+      label: "Tipo",
+      render: (value) => TIPO_LABEL[value] ?? value,
+    },
     { key: "concepto", label: "Concepto", render: (value) => value ?? "—" },
     {
       key: "monto",
       label: "Monto",
       render: (value) => (
-        <span style={{ fontWeight: 700, color: value >= 0 ? "#c0392b" : "#1a7a3a" }}>
+        <span
+          style={{ fontWeight: 700, color: value >= 0 ? "#c0392b" : "#1a7a3a" }}
+        >
           {value >= 0 ? "+" : ""}
           {fmtMoneda(value)}
         </span>
       ),
     },
-    { key: "saldo_acumulado", label: "Saldo", render: (value) => fmtMoneda(value) },
+    {
+      key: "saldo_acumulado",
+      label: "Saldo",
+      render: (value) => fmtMoneda(value),
+    },
   ];
 
   return (
     <>
-      <ScreenHeader icon="💰" title="Cuenta Corriente" subtitle="Saldo y movimientos por cliente" />
+      <ScreenHeader
+        icon="💰"
+        title="Cuenta Corriente"
+        subtitle="Saldo y movimientos por cliente"
+      />
 
       <StatCards
         stats={[
@@ -349,7 +424,15 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
         ]}
       />
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 12,
+          flexWrap: "wrap",
+        }}
+      >
         <input
           className="pn-field-input"
           value={search}
@@ -366,7 +449,9 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
           disabled={backfillCorriendo}
           style={{ padding: "8px 14px" }}
         >
-          {backfillCorriendo ? "⏳ Corriendo..." : "🔄 Backfill obras confirmadas"}
+          {backfillCorriendo
+            ? "⏳ Corriendo..."
+            : "🔄 Backfill obras confirmadas"}
         </button>
       </div>
 
@@ -386,29 +471,35 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
           ) : (
             <>
               <p style={{ margin: 0, fontWeight: 700 }}>
-                ✅ Procesadas: {backfillResultado.totalProcesadas} — Insertados/actualizados: {backfillResultado.insertados} — Saltados: {backfillResultado.saltados} — Errores: {backfillResultado.errores}
+                ✅ Procesadas: {backfillResultado.totalProcesadas} —
+                Insertados/actualizados: {backfillResultado.insertados} —
+                Saltados: {backfillResultado.saltados} — Errores:{" "}
+                {backfillResultado.errores}
               </p>
-              {Array.isArray(backfillResultado.detalle) && backfillResultado.detalle.length > 0 && (
-                <details style={{ marginTop: 6 }}>
-                  <summary style={{ cursor: "pointer" }}>Ver detalle</summary>
-                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-                    {backfillResultado.detalle.map((d, i) => (
-                      <li key={i}>
-                        {d.numeropres} rev.{d.revision} — {d.resultado}
-                        {d.monto != null ? ` — $${d.monto}` : ""}
-                        {d.motivo ? ` (${d.motivo})` : ""}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
+              {Array.isArray(backfillResultado.detalle) &&
+                backfillResultado.detalle.length > 0 && (
+                  <details style={{ marginTop: 6 }}>
+                    <summary style={{ cursor: "pointer" }}>Ver detalle</summary>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                      {backfillResultado.detalle.map((d, i) => (
+                        <li key={i}>
+                          {d.numeropres} rev.{d.revision} — {d.resultado}
+                          {d.monto != null ? ` — $${d.monto}` : ""}
+                          {d.motivo ? ` (${d.motivo})` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
             </>
           )}
         </div>
       )}
 
       {loadingResumen ? (
-        <p style={{ textAlign: "center", padding: 24, color: "#4a8ab5" }}>⏳ Cargando...</p>
+        <p style={{ textAlign: "center", padding: 24, color: "#4a8ab5" }}>
+          ⏳ Cargando...
+        </p>
       ) : (
         <DataTable
           columns={COLUMNS_CLIENTES}
@@ -433,9 +524,15 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
           >
             <h3 style={{ margin: 0, color: "#0a3a5c" }}>
               📋 {selectedCliente.nombre} — Saldo:{" "}
-              <span style={{ color: selectedCliente.saldo > 0 ? "#c0392b" : "#1a7a3a" }}>
+              <span
+                style={{
+                  color: selectedCliente.saldo > 0 ? "#c0392b" : "#1a7a3a",
+                }}
+              >
                 {fmtMoneda(
-                  movimientos.length ? movimientos[movimientos.length - 1].saldo_acumulado : selectedCliente.saldo,
+                  movimientos.length
+                    ? movimientos[movimientos.length - 1].saldo_acumulado
+                    : selectedCliente.saldo,
                 )}
               </span>
             </h3>
@@ -470,7 +567,9 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
           </div>
 
           {loadingMovimientos ? (
-            <p style={{ textAlign: "center", padding: 24, color: "#4a8ab5" }}>⏳ Cargando...</p>
+            <p style={{ textAlign: "center", padding: 24, color: "#4a8ab5" }}>
+              ⏳ Cargando...
+            </p>
           ) : movimientos.length === 0 ? (
             <p style={{ textAlign: "center", padding: 24, color: "#8aabb8" }}>
               Este cliente todavía no tiene movimientos.
@@ -485,8 +584,8 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
                 storageKey="cuenta-corriente-movimientos"
               />
               <p style={{ fontSize: 11, color: "#8aabb8", marginTop: 8 }}>
-                Tocá un movimiento de presupuesto para abrirlo en el editor. Los movimientos manuales se pueden
-                seleccionar para eliminarlos.
+                Tocá un movimiento de presupuesto para abrirlo en el editor. Los
+                movimientos manuales se pueden seleccionar para eliminarlos.
               </p>
             </>
           )}
@@ -494,17 +593,25 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
       )}
 
       {modalNuevo && selectedCliente && (
-        <Modal title={`Nuevo movimiento — ${selectedCliente.nombre}`} onClose={() => setModalNuevo(false)}>
+        <Modal
+          title={`Nuevo movimiento — ${selectedCliente.nombre}`}
+          onClose={() => setModalNuevo(false)}
+        >
           {error && <p className="form-error">{error}</p>}
           <div className="form-grid" style={{ gridTemplateColumns: "1fr" }}>
             <div>
-              <label className="pn-field-label" style={{ display: "block", marginBottom: 4 }}>
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
                 Tipo
               </label>
               <select
                 className="pn-field-select"
                 value={form.tipo}
-                onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, tipo: e.target.value }))
+                }
                 style={{ width: "100%", marginBottom: 12 }}
               >
                 {TIPOS_MANUALES.map((t) => (
@@ -519,7 +626,9 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
                   <button
                     type="button"
                     onClick={() => setForm((f) => ({ ...f, signoAjuste: "-" }))}
-                    className={form.signoAjuste === "-" ? "btn-save" : "btn-cancel"}
+                    className={
+                      form.signoAjuste === "-" ? "btn-save" : "btn-cancel"
+                    }
                     style={{ flex: 1, padding: "8px 10px" }}
                   >
                     − Resta deuda (a favor del cliente)
@@ -527,7 +636,9 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
                   <button
                     type="button"
                     onClick={() => setForm((f) => ({ ...f, signoAjuste: "+" }))}
-                    className={form.signoAjuste === "+" ? "btn-save" : "btn-cancel"}
+                    className={
+                      form.signoAjuste === "+" ? "btn-save" : "btn-cancel"
+                    }
                     style={{ flex: 1, padding: "8px 10px" }}
                   >
                     + Suma deuda
@@ -535,7 +646,10 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
                 </div>
               )}
 
-              <label className="pn-field-label" style={{ display: "block", marginBottom: 4 }}>
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
                 Monto
               </label>
               <input
@@ -543,18 +657,25 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
                 type="text"
                 inputMode="decimal"
                 value={form.monto}
-                onChange={(e) => setForm((f) => ({ ...f, monto: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, monto: e.target.value }))
+                }
                 placeholder="Ej: 15000"
                 style={{ width: "100%", marginBottom: 12 }}
               />
 
-              <label className="pn-field-label" style={{ display: "block", marginBottom: 4 }}>
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
                 Concepto
               </label>
               <input
                 className="pn-field-input"
                 value={form.concepto}
-                onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, concepto: e.target.value }))
+                }
                 placeholder="Ej: Seña, transferencia, corrección..."
                 style={{ width: "100%" }}
               />
@@ -564,7 +685,11 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
             <button className="btn-cancel" onClick={() => setModalNuevo(false)}>
               Cancelar
             </button>
-            <button className="btn-save" onClick={handleGuardarMovimiento} disabled={guardando}>
+            <button
+              className="btn-save"
+              onClick={handleGuardarMovimiento}
+              disabled={guardando}
+            >
               {guardando ? "Guardando..." : "Guardar"}
             </button>
           </div>
@@ -572,29 +697,43 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
       )}
 
       {modalRecibo && selectedCliente && (
-        <Modal title={`Nuevo recibo — ${selectedCliente.nombre}`} onClose={() => setModalRecibo(false)}>
+        <Modal
+          title={`Nuevo recibo — ${selectedCliente.nombre}`}
+          onClose={() => setModalRecibo(false)}
+        >
           {errorRecibo && <p className="form-error">{errorRecibo}</p>}
           <div className="form-grid" style={{ gridTemplateColumns: "1fr" }}>
             <div>
-              <label className="pn-field-label" style={{ display: "block", marginBottom: 4 }}>
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
                 Obra vinculada (opcional)
               </label>
               <select
                 className="pn-field-select"
                 value={formRecibo.numeropres}
-                onChange={(e) => setFormRecibo((f) => ({ ...f, numeropres: e.target.value }))}
+                onChange={(e) =>
+                  setFormRecibo((f) => ({ ...f, numeropres: e.target.value }))
+                }
                 style={{ width: "100%", marginBottom: 12 }}
                 disabled={loadingObrasCliente}
               >
                 <option value="">— Sin vincular a una obra puntual —</option>
                 {obrasCliente.map((o) => (
-                  <option key={`${o.numeropres}-${o.revision}`} value={o.numeropres}>
+                  <option
+                    key={`${o.numeropres}-${o.revision}`}
+                    value={o.numeropres}
+                  >
                     Presupuesto Nº{o.numeropres} rev.{o.revision}
                   </option>
                 ))}
               </select>
 
-              <label className="pn-field-label" style={{ display: "block", marginBottom: 4 }}>
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
                 Monto
               </label>
               <input
@@ -602,28 +741,42 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
                 type="text"
                 inputMode="decimal"
                 value={formRecibo.monto}
-                onChange={(e) => setFormRecibo((f) => ({ ...f, monto: e.target.value }))}
+                onChange={(e) =>
+                  setFormRecibo((f) => ({ ...f, monto: e.target.value }))
+                }
                 placeholder="Ej: 50000"
                 style={{ width: "100%", marginBottom: 12 }}
               />
 
-              <label className="pn-field-label" style={{ display: "block", marginBottom: 4 }}>
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
                 Concepto
               </label>
               <input
                 className="pn-field-input"
                 value={formRecibo.concepto}
-                onChange={(e) => setFormRecibo((f) => ({ ...f, concepto: e.target.value }))}
+                onChange={(e) =>
+                  setFormRecibo((f) => ({ ...f, concepto: e.target.value }))
+                }
                 placeholder="Ej: Anticipo, seña..."
                 style={{ width: "100%" }}
               />
             </div>
           </div>
           <div className="form-actions">
-            <button className="btn-cancel" onClick={() => setModalRecibo(false)}>
+            <button
+              className="btn-cancel"
+              onClick={() => setModalRecibo(false)}
+            >
               Cancelar
             </button>
-            <button className="btn-save" onClick={handleGuardarRecibo} disabled={guardandoRecibo}>
+            <button
+              className="btn-save"
+              onClick={handleGuardarRecibo}
+              disabled={guardandoRecibo}
+            >
               {guardandoRecibo ? "Guardando..." : "Guardar y descargar PDF"}
             </button>
           </div>
@@ -632,7 +785,9 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
 
       {modalEliminar && selectedMovimiento && (
         <ConfirmDelete
-          item={{ nombre: `${TIPO_LABEL[selectedMovimiento.tipo] ?? selectedMovimiento.tipo} — ${fmtMoneda(selectedMovimiento.monto)}` }}
+          item={{
+            nombre: `${TIPO_LABEL[selectedMovimiento.tipo] ?? selectedMovimiento.tipo} — ${fmtMoneda(selectedMovimiento.monto)}`,
+          }}
           onConfirm={handleEliminarMovimiento}
           onClose={() => setModalEliminar(false)}
         />
