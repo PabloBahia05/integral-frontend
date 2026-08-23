@@ -309,10 +309,28 @@ export function descargarPDF({ pageHTML, nombreArchivo, imagenesFinal, setGenera
   };
 
   const paginaEl = contenedor.querySelector(".page");
-  const esperarFuentes =
-    document.fonts && document.fonts.ready
-      ? document.fonts.ready
-      : Promise.resolve();
+  // Espera explícita de "Space Mono" (regular y bold), no solo
+  // document.fonts.ready: ese promise puede resolverse ANTES de que el
+  // navegador llegue a pedir la fuente del @import recién insertado en el
+  // <style> de arriba, porque el @import se dispara async al parsear la
+  // hoja de estilos. Si html2pdf mide alturas (para decidir dónde cortar
+  // página, incluido el "avoid" de .texto-sena) con la fuente todavía sin
+  // cargar, el reflow posterior (cuando la fuente sí carga) puede desfasar
+  // ese cálculo y cortar un bloque que debía empujarse entero a la
+  // siguiente hoja. document.fonts.load fuerza la carga y espera a que
+  // esté lista de verdad antes de seguir.
+  const esperarFuentes = (
+    document.fonts
+      ? Promise.all([
+          document.fonts.load('400 12px "Space Mono"'),
+          document.fonts.load('700 12px "Space Mono"'),
+          document.fonts.ready,
+        ])
+      : Promise.resolve()
+  ).catch(() => {
+    // Si algo falla cargando la fuente (ej. sin internet), seguimos igual
+    // con la fuente de respaldo (Courier New) antes que trabar el PDF.
+  });
 
   const pdfsAdjuntos = imagenesFinal.filter((im) => im.tipo === "pdf");
   const necesitaFusionPDF = pdfsAdjuntos.length > 0;
