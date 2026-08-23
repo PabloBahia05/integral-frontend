@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Totales from "./Totales";
 
 // Secciones cuyos ítems llevan medidas de ancho/alto.
@@ -87,6 +87,9 @@ export default function TablaArticulos({
   // Manija: lista de opciones (mismo shape que melaminas), mismo mecanismo.
   manijas,
   setPresupuestoItems,
+  // Confirmado: si la revisión actual ya fue confirmada (ver PresupuestoNuevo.jsx).
+  // Determina el valor predeterminado de mostrarColor/mostrarManija.
+  confirmado,
 }) {
   // Grupo efectivo de un ítem: el personalizado si el usuario le asignó uno,
   // si no la sección automática de siempre.
@@ -164,6 +167,25 @@ export default function TablaArticulos({
       ),
     );
   };
+
+  // ── Visibilidad de las columnas Color / Manija: ocultas por defecto,
+  // salvo que el presupuesto ya esté confirmado (ahí arrancan visibles).
+  // En ambos casos el usuario puede activarlas/desactivarlas a mano con los
+  // botones de abajo. El default se vuelve a calcular cuando cambia el
+  // presupuesto/revisión cargado o su estado de confirmación, sin pisar un
+  // toggle manual hecho mientras se sigue trabajando sobre el mismo.
+  const [mostrarColor, setMostrarColor] = useState(!!confirmado);
+  const [mostrarManija, setMostrarManija] = useState(!!confirmado);
+  useEffect(() => {
+    setMostrarColor(!!confirmado);
+    setMostrarManija(!!confirmado);
+  }, [numero, revision, confirmado]);
+
+  // Cantidad de columnas fijas antes de las columnas de línea de precio:
+  // Grupo, Producto, Descripción, Cant., Ancho, Alto (+ Color / Manija si
+  // están activadas). Se usa para los colSpan de las filas de sección y
+  // subtotal.
+  const colSpanBase = 6 + (mostrarColor ? 1 : 0) + (mostrarManija ? 1 : 0);
 
   return (
     <div>
@@ -413,89 +435,119 @@ export default function TablaArticulos({
               }}
             />
 
-            {/* Etiqueta color por grupo */}
-            <span
-              style={{
-                fontWeight: 700,
-                color: "#0a3a5c",
-                fontSize: 11,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                whiteSpace: "nowrap",
-              }}
-            >
-              🎨 Color por grupo
-            </span>
-
-            {/* Selector de grupo */}
-            <select
-              value={grupoColorSel}
-              onChange={(e) => setGrupoColorSel(e.target.value)}
-              style={{
-                padding: "5px 8px",
-                border: "1px solid #b8cfe0",
-                borderRadius: 2,
-                fontFamily: "'Space Mono',monospace",
-                fontSize: 11,
-                color: "#0a3a5c",
-                background: "#fff",
-                maxWidth: 180,
-              }}
-            >
-              <option value="">Grupo...</option>
-              {secciones.map((sec) => (
-                <option key={sec} value={sec}>
-                  {sec}
-                </option>
-              ))}
-            </select>
-
-            {/* Selector de color (melamina) */}
-            <select
-              value={colorGrupoValor}
-              onChange={(e) => setColorGrupoValor(e.target.value)}
-              style={{
-                padding: "5px 8px",
-                border: "1px solid #b8cfe0",
-                borderRadius: 2,
-                fontFamily: "'Space Mono',monospace",
-                fontSize: 11,
-                color: "#0a3a5c",
-                background: "#fff",
-                maxWidth: 180,
-              }}
-            >
-              <option value="">Color...</option>
-              <option value={SIN_COLOR}>— Sin color —</option>
-              {(melaminas ?? []).map((m) => (
-                <option key={m.codartint} value={m.codartint}>
-                  {m.articulo}
-                </option>
-              ))}
-            </select>
-
-            {/* Botón aplicar color a grupo */}
+            {/* Botón mostrar/ocultar columna Color */}
             <button
-              onClick={aplicarColorAGrupo}
-              disabled={!grupoColorSel || !colorGrupoValor}
-              title="Aplica este color a todos los ítems del grupo elegido"
+              onClick={() => setMostrarColor((v) => !v)}
+              title={
+                mostrarColor
+                  ? "Ocultar columna Color"
+                  : "Mostrar columna Color"
+              }
               style={{
                 padding: "5px 14px",
-                background:
-                  grupoColorSel && colorGrupoValor ? "#0a3a5c" : "#c8dae8",
-                color: grupoColorSel && colorGrupoValor ? "#fff" : "#99aabb",
-                border: "none",
+                background: mostrarColor ? "#0a3a5c" : "#fff",
+                color: mostrarColor ? "#fff" : "#0a3a5c",
+                border: "1px solid #b8cfe0",
                 borderRadius: 2,
                 fontFamily: "'Space Mono',monospace",
                 fontSize: 11,
-                cursor:
-                  grupoColorSel && colorGrupoValor ? "pointer" : "default",
+                cursor: "pointer",
                 fontWeight: 700,
+                whiteSpace: "nowrap",
                 transition: "all 0.12s",
               }}
             >
-              Aplicar
+              🎨 Color {mostrarColor ? "ON" : "OFF"}
             </button>
+
+            {mostrarColor && (
+              <>
+                {/* Etiqueta color por grupo */}
+                <span
+                  style={{
+                    fontWeight: 700,
+                    color: "#0a3a5c",
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Color por grupo
+                </span>
+
+                {/* Selector de grupo */}
+                <select
+                  value={grupoColorSel}
+                  onChange={(e) => setGrupoColorSel(e.target.value)}
+                  style={{
+                    padding: "5px 8px",
+                    border: "1px solid #b8cfe0",
+                    borderRadius: 2,
+                    fontFamily: "'Space Mono',monospace",
+                    fontSize: 11,
+                    color: "#0a3a5c",
+                    background: "#fff",
+                    maxWidth: 180,
+                  }}
+                >
+                  <option value="">Grupo...</option>
+                  {secciones.map((sec) => (
+                    <option key={sec} value={sec}>
+                      {sec}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Selector de color (melamina) */}
+                <select
+                  value={colorGrupoValor}
+                  onChange={(e) => setColorGrupoValor(e.target.value)}
+                  style={{
+                    padding: "5px 8px",
+                    border: "1px solid #b8cfe0",
+                    borderRadius: 2,
+                    fontFamily: "'Space Mono',monospace",
+                    fontSize: 11,
+                    color: "#0a3a5c",
+                    background: "#fff",
+                    maxWidth: 180,
+                  }}
+                >
+                  <option value="">Color...</option>
+                  <option value={SIN_COLOR}>— Sin color —</option>
+                  {(melaminas ?? []).map((m) => (
+                    <option key={m.codartint} value={m.codartint}>
+                      {m.articulo}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Botón aplicar color a grupo */}
+                <button
+                  onClick={aplicarColorAGrupo}
+                  disabled={!grupoColorSel || !colorGrupoValor}
+                  title="Aplica este color a todos los ítems del grupo elegido"
+                  style={{
+                    padding: "5px 14px",
+                    background:
+                      grupoColorSel && colorGrupoValor ? "#0a3a5c" : "#c8dae8",
+                    color:
+                      grupoColorSel && colorGrupoValor ? "#fff" : "#99aabb",
+                    border: "none",
+                    borderRadius: 2,
+                    fontFamily: "'Space Mono',monospace",
+                    fontSize: 11,
+                    cursor:
+                      grupoColorSel && colorGrupoValor ? "pointer" : "default",
+                    fontWeight: 700,
+                    transition: "all 0.12s",
+                  }}
+                >
+                  Aplicar
+                </button>
+              </>
+            )}
 
             {/* Separador */}
             <span
@@ -507,89 +559,125 @@ export default function TablaArticulos({
               }}
             />
 
-            {/* Etiqueta manija por grupo */}
-            <span
-              style={{
-                fontWeight: 700,
-                color: "#0a3a5c",
-                fontSize: 11,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                whiteSpace: "nowrap",
-              }}
-            >
-              🔧 Manija por grupo
-            </span>
-
-            {/* Selector de grupo */}
-            <select
-              value={grupoManijaSel}
-              onChange={(e) => setGrupoManijaSel(e.target.value)}
-              style={{
-                padding: "5px 8px",
-                border: "1px solid #b8cfe0",
-                borderRadius: 2,
-                fontFamily: "'Space Mono',monospace",
-                fontSize: 11,
-                color: "#0a3a5c",
-                background: "#fff",
-                maxWidth: 180,
-              }}
-            >
-              <option value="">Grupo...</option>
-              {secciones.map((sec) => (
-                <option key={sec} value={sec}>
-                  {sec}
-                </option>
-              ))}
-            </select>
-
-            {/* Selector de manija */}
-            <select
-              value={manijaGrupoValor}
-              onChange={(e) => setManijaGrupoValor(e.target.value)}
-              style={{
-                padding: "5px 8px",
-                border: "1px solid #b8cfe0",
-                borderRadius: 2,
-                fontFamily: "'Space Mono',monospace",
-                fontSize: 11,
-                color: "#0a3a5c",
-                background: "#fff",
-                maxWidth: 180,
-              }}
-            >
-              <option value="">Manija...</option>
-              <option value={SIN_MANIJA}>— Sin manija —</option>
-              {(manijas ?? []).map((m) => (
-                <option key={m.codartint} value={m.codartint}>
-                  {m.articulo}
-                </option>
-              ))}
-            </select>
-
-            {/* Botón aplicar manija a grupo */}
+            {/* Botón mostrar/ocultar columna Manija */}
             <button
-              onClick={aplicarManijaAGrupo}
-              disabled={!grupoManijaSel || !manijaGrupoValor}
-              title="Aplica esta manija a todos los ítems del grupo elegido"
+              onClick={() => setMostrarManija((v) => !v)}
+              title={
+                mostrarManija
+                  ? "Ocultar columna Manija"
+                  : "Mostrar columna Manija"
+              }
               style={{
                 padding: "5px 14px",
-                background:
-                  grupoManijaSel && manijaGrupoValor ? "#0a3a5c" : "#c8dae8",
-                color: grupoManijaSel && manijaGrupoValor ? "#fff" : "#99aabb",
-                border: "none",
+                background: mostrarManija ? "#0a3a5c" : "#fff",
+                color: mostrarManija ? "#fff" : "#0a3a5c",
+                border: "1px solid #b8cfe0",
                 borderRadius: 2,
                 fontFamily: "'Space Mono',monospace",
                 fontSize: 11,
-                cursor:
-                  grupoManijaSel && manijaGrupoValor ? "pointer" : "default",
+                cursor: "pointer",
                 fontWeight: 700,
+                whiteSpace: "nowrap",
                 transition: "all 0.12s",
               }}
             >
-              Aplicar
+              🔧 Manija {mostrarManija ? "ON" : "OFF"}
             </button>
+
+            {mostrarManija && (
+              <>
+                {/* Etiqueta manija por grupo */}
+                <span
+                  style={{
+                    fontWeight: 700,
+                    color: "#0a3a5c",
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Manija por grupo
+                </span>
+
+                {/* Selector de grupo */}
+                <select
+                  value={grupoManijaSel}
+                  onChange={(e) => setGrupoManijaSel(e.target.value)}
+                  style={{
+                    padding: "5px 8px",
+                    border: "1px solid #b8cfe0",
+                    borderRadius: 2,
+                    fontFamily: "'Space Mono',monospace",
+                    fontSize: 11,
+                    color: "#0a3a5c",
+                    background: "#fff",
+                    maxWidth: 180,
+                  }}
+                >
+                  <option value="">Grupo...</option>
+                  {secciones.map((sec) => (
+                    <option key={sec} value={sec}>
+                      {sec}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Selector de manija */}
+                <select
+                  value={manijaGrupoValor}
+                  onChange={(e) => setManijaGrupoValor(e.target.value)}
+                  style={{
+                    padding: "5px 8px",
+                    border: "1px solid #b8cfe0",
+                    borderRadius: 2,
+                    fontFamily: "'Space Mono',monospace",
+                    fontSize: 11,
+                    color: "#0a3a5c",
+                    background: "#fff",
+                    maxWidth: 180,
+                  }}
+                >
+                  <option value="">Manija...</option>
+                  <option value={SIN_MANIJA}>— Sin manija —</option>
+                  {(manijas ?? []).map((m) => (
+                    <option key={m.codartint} value={m.codartint}>
+                      {m.articulo}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Botón aplicar manija a grupo */}
+                <button
+                  onClick={aplicarManijaAGrupo}
+                  disabled={!grupoManijaSel || !manijaGrupoValor}
+                  title="Aplica esta manija a todos los ítems del grupo elegido"
+                  style={{
+                    padding: "5px 14px",
+                    background:
+                      grupoManijaSel && manijaGrupoValor
+                        ? "#0a3a5c"
+                        : "#c8dae8",
+                    color:
+                      grupoManijaSel && manijaGrupoValor
+                        ? "#fff"
+                        : "#99aabb",
+                    border: "none",
+                    borderRadius: 2,
+                    fontFamily: "'Space Mono',monospace",
+                    fontSize: 11,
+                    cursor:
+                      grupoManijaSel && manijaGrupoValor
+                        ? "pointer"
+                        : "default",
+                    fontWeight: 700,
+                    transition: "all 0.12s",
+                  }}
+                >
+                  Aplicar
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -672,26 +760,30 @@ export default function TablaArticulos({
               >
                 Alto
               </th>
-              <th
-                style={{
-                  padding: "9px 10px",
-                  textAlign: "center",
-                  fontWeight: 700,
-                  width: 110,
-                }}
-              >
-                Color
-              </th>
-              <th
-                style={{
-                  padding: "9px 10px",
-                  textAlign: "center",
-                  fontWeight: 700,
-                  width: 110,
-                }}
-              >
-                Manija
-              </th>
+              {mostrarColor && (
+                <th
+                  style={{
+                    padding: "9px 10px",
+                    textAlign: "center",
+                    fontWeight: 700,
+                    width: 110,
+                  }}
+                >
+                  Color
+                </th>
+              )}
+              {mostrarManija && (
+                <th
+                  style={{
+                    padding: "9px 10px",
+                    textAlign: "center",
+                    fontWeight: 700,
+                    width: 110,
+                  }}
+                >
+                  Manija
+                </th>
+              )}
               {lineasActivas.length > 0 ? (
                 lineasActivas.map((l, li) => (
                   <th
@@ -763,13 +855,14 @@ export default function TablaArticulos({
                   0,
                 );
                 const totalCols =
-                  8 + (lineasActivas.length > 0 ? lineasActivas.length : 1); // sección+prod+desc+cant+ancho+alto+color+manija + líneas
+                  colSpanBase +
+                  (lineasActivas.length > 0 ? lineasActivas.length : 1); // sección+prod+desc+cant+ancho+alto(+color)(+manija) + líneas
 
                 return [
                   // Fila de sección
                   <tr key={`sec-${sec}`} style={{ background: "#ddeefa" }}>
                     <td
-                      colSpan={8}
+                      colSpan={colSpanBase}
                       style={{
                         padding: "6px 14px",
                         fontWeight: 700,
@@ -1095,78 +1188,86 @@ export default function TablaArticulos({
                             ? (item.alto ?? "—")
                             : "—"}
                         </td>
-                        <td
-                          style={{
-                            padding: "4px 6px",
-                            border: "1px solid #e8f0f7",
-                            textAlign: "center",
-                          }}
-                        >
-                          <select
-                            value={item.color ?? ""}
-                            onChange={(e) => {
-                              const valor = e.target.value || null;
-                              setPresupuestoItems((prev) =>
-                                prev.map((p) =>
-                                  p.id === item.id ? { ...p, color: valor } : p,
-                                ),
-                              );
-                            }}
+                        {mostrarColor && (
+                          <td
                             style={{
-                              width: "100%",
-                              fontSize: 11,
-                              fontFamily: "'Space Mono',monospace",
-                              border: "1px solid #c8dae8",
-                              borderRadius: 2,
-                              padding: "3px 2px",
-                              background: "#fff",
-                              color: "#0a3a5c",
+                              padding: "4px 6px",
+                              border: "1px solid #e8f0f7",
+                              textAlign: "center",
                             }}
                           >
-                            <option value="">—</option>
-                            {(melaminas ?? []).map((m) => (
-                              <option key={m.codartint} value={m.codartint}>
-                                {m.articulo}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td
-                          style={{
-                            padding: "4px 6px",
-                            border: "1px solid #e8f0f7",
-                            textAlign: "center",
-                          }}
-                        >
-                          <select
-                            value={item.manija ?? ""}
-                            onChange={(e) => {
-                              const valor = e.target.value || null;
-                              setPresupuestoItems((prev) =>
-                                prev.map((p) =>
-                                  p.id === item.id ? { ...p, manija: valor } : p,
-                                ),
-                              );
-                            }}
+                            <select
+                              value={item.color ?? ""}
+                              onChange={(e) => {
+                                const valor = e.target.value || null;
+                                setPresupuestoItems((prev) =>
+                                  prev.map((p) =>
+                                    p.id === item.id
+                                      ? { ...p, color: valor }
+                                      : p,
+                                  ),
+                                );
+                              }}
+                              style={{
+                                width: "100%",
+                                fontSize: 11,
+                                fontFamily: "'Space Mono',monospace",
+                                border: "1px solid #c8dae8",
+                                borderRadius: 2,
+                                padding: "3px 2px",
+                                background: "#fff",
+                                color: "#0a3a5c",
+                              }}
+                            >
+                              <option value="">—</option>
+                              {(melaminas ?? []).map((m) => (
+                                <option key={m.codartint} value={m.codartint}>
+                                  {m.articulo}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        )}
+                        {mostrarManija && (
+                          <td
                             style={{
-                              width: "100%",
-                              fontSize: 11,
-                              fontFamily: "'Space Mono',monospace",
-                              border: "1px solid #c8dae8",
-                              borderRadius: 2,
-                              padding: "3px 2px",
-                              background: "#fff",
-                              color: "#0a3a5c",
+                              padding: "4px 6px",
+                              border: "1px solid #e8f0f7",
+                              textAlign: "center",
                             }}
                           >
-                            <option value="">—</option>
-                            {(manijas ?? []).map((m) => (
-                              <option key={m.codartint} value={m.codartint}>
-                                {m.articulo}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
+                            <select
+                              value={item.manija ?? ""}
+                              onChange={(e) => {
+                                const valor = e.target.value || null;
+                                setPresupuestoItems((prev) =>
+                                  prev.map((p) =>
+                                    p.id === item.id
+                                      ? { ...p, manija: valor }
+                                      : p,
+                                  ),
+                                );
+                              }}
+                              style={{
+                                width: "100%",
+                                fontSize: 11,
+                                fontFamily: "'Space Mono',monospace",
+                                border: "1px solid #c8dae8",
+                                borderRadius: 2,
+                                padding: "3px 2px",
+                                background: "#fff",
+                                color: "#0a3a5c",
+                              }}
+                            >
+                              <option value="">—</option>
+                              {(manijas ?? []).map((m) => (
+                                <option key={m.codartint} value={m.codartint}>
+                                  {m.articulo}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        )}
                         {lineasActivas.length > 0 ? (
                           usarColMerged ? (
                             (() => {
@@ -1492,7 +1593,7 @@ export default function TablaArticulos({
                   // Subtotal de sección
                   <tr key={`sub-${sec}`} style={{ background: "#e8f4ee" }}>
                     <td
-                      colSpan={8}
+                      colSpan={colSpanBase}
                       style={{
                         padding: "6px 14px",
                         textAlign: "right",

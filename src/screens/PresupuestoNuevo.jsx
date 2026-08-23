@@ -4039,6 +4039,7 @@ export default function PresupuestoNuevo({
               melaminas={melaminasDB}
               manijas={manijasDB}
               setPresupuestoItems={setPresupuestoItems}
+              confirmado={confirmado}
             />
           )}
         </div>
