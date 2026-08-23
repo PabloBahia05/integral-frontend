@@ -120,7 +120,6 @@ const S = {
     fontSize: 13,
     fontWeight: active ? 600 : 400,
     color: active ? "#5b8fff" : "#6b7a99",
-    borderBottom: `2px solid ${active ? "#5b8fff" : "transparent"}`,
     cursor: "pointer",
     background: "none",
     border: "none",
