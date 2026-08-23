@@ -4,6 +4,7 @@ import Modal from "../Component/Modal";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
+import { generarPdfRecibo } from "../pdfRecibo";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -98,6 +99,74 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
   const [form, setForm] = useState({ tipo: "pago", monto: "", concepto: "", signoAjuste: "-" });
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
+
+  // ── Recibos ───────────────────────────────────────────────────────────
+  const [modalRecibo, setModalRecibo] = useState(false);
+  const [obrasCliente, setObrasCliente] = useState([]);
+  const [loadingObrasCliente, setLoadingObrasCliente] = useState(false);
+  const [formRecibo, setFormRecibo] = useState({ numeropres: "", monto: "", concepto: "Anticipo" });
+  const [errorRecibo, setErrorRecibo] = useState("");
+  const [guardandoRecibo, setGuardandoRecibo] = useState(false);
+
+  const openRecibo = () => {
+    setFormRecibo({ numeropres: "", monto: "", concepto: "Anticipo" });
+    setErrorRecibo("");
+    setModalRecibo(true);
+    setLoadingObrasCliente(true);
+    authFetch(`${API}/tabla-presupuestos/revisiones-confirmadas`)
+      .then((r) => r.json())
+      .then((data) => {
+        const propias = (Array.isArray(data) ? data : []).filter(
+          (o) => o.codcliente === selectedCliente.codcliente,
+        );
+        setObrasCliente(propias);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingObrasCliente(false));
+  };
+
+  const handleGuardarRecibo = async () => {
+    const montoNum = parseFloat(String(formRecibo.monto).replace(",", "."));
+    if (!montoNum || montoNum <= 0) {
+      setErrorRecibo("Ingresá un monto mayor a cero.");
+      return;
+    }
+
+    const obraElegida = formRecibo.numeropres
+      ? obrasCliente.find((o) => String(o.numeropres) === String(formRecibo.numeropres))
+      : null;
+
+    setGuardandoRecibo(true);
+    try {
+      const res = await authFetch(`${API}/recibos`, {
+        method: "POST",
+        body: JSON.stringify({
+          codcliente: selectedCliente.codcliente,
+          numeropres: obraElegida?.numeropres ?? null,
+          revision: obraElegida?.revision ?? null,
+          monto: montoNum,
+          concepto: formRecibo.concepto || "Anticipo",
+        }),
+      });
+      const recibo = await res.json();
+      if (!res.ok) throw new Error(recibo?.error || "No se pudo guardar el recibo.");
+
+      setModalRecibo(false);
+      fetchResumen();
+      fetchMovimientos(selectedCliente.codcliente);
+
+      // generarPdfRecibo no devuelve promesa (descargarPDF corre su propia
+      // cadena async y ya maneja sus errores con alert() adentro) — se
+      // dispara y no se espera, el modal ya se cerró arriba.
+      generarPdfRecibo(recibo, selectedCliente, obraElegida);
+    } catch (err) {
+      console.error("Error guardando recibo:", err);
+      setErrorRecibo(err.message || "No se pudo guardar el recibo.");
+    } finally {
+      setGuardandoRecibo(false);
+    }
+  };
+  // ── FIN Recibos ───────────────────────────────────────────────────────
 
   // ── TEMPORAL: backfill de obras confirmadas antes de que existiera este
   // módulo. Borrar este bloque + el botón + el endpoint /admin/backfill-cuenta-corriente
@@ -384,6 +453,14 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
               <button
                 type="button"
                 className="btn-save"
+                onClick={openRecibo}
+                style={{ padding: "8px 14px" }}
+              >
+                🧾 + Recibo
+              </button>
+              <button
+                type="button"
+                className="btn-save"
                 onClick={openNuevo}
                 style={{ padding: "8px 14px" }}
               >
@@ -489,6 +566,65 @@ export default function CuentaCorriente({ authFetch, onAbrirPresupuesto, onBack 
             </button>
             <button className="btn-save" onClick={handleGuardarMovimiento} disabled={guardando}>
               {guardando ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {modalRecibo && selectedCliente && (
+        <Modal title={`Nuevo recibo — ${selectedCliente.nombre}`} onClose={() => setModalRecibo(false)}>
+          {errorRecibo && <p className="form-error">{errorRecibo}</p>}
+          <div className="form-grid" style={{ gridTemplateColumns: "1fr" }}>
+            <div>
+              <label className="pn-field-label" style={{ display: "block", marginBottom: 4 }}>
+                Obra vinculada (opcional)
+              </label>
+              <select
+                className="pn-field-select"
+                value={formRecibo.numeropres}
+                onChange={(e) => setFormRecibo((f) => ({ ...f, numeropres: e.target.value }))}
+                style={{ width: "100%", marginBottom: 12 }}
+                disabled={loadingObrasCliente}
+              >
+                <option value="">— Sin vincular a una obra puntual —</option>
+                {obrasCliente.map((o) => (
+                  <option key={`${o.numeropres}-${o.revision}`} value={o.numeropres}>
+                    Presupuesto Nº{o.numeropres} rev.{o.revision}
+                  </option>
+                ))}
+              </select>
+
+              <label className="pn-field-label" style={{ display: "block", marginBottom: 4 }}>
+                Monto
+              </label>
+              <input
+                className="pn-field-input"
+                type="text"
+                inputMode="decimal"
+                value={formRecibo.monto}
+                onChange={(e) => setFormRecibo((f) => ({ ...f, monto: e.target.value }))}
+                placeholder="Ej: 50000"
+                style={{ width: "100%", marginBottom: 12 }}
+              />
+
+              <label className="pn-field-label" style={{ display: "block", marginBottom: 4 }}>
+                Concepto
+              </label>
+              <input
+                className="pn-field-input"
+                value={formRecibo.concepto}
+                onChange={(e) => setFormRecibo((f) => ({ ...f, concepto: e.target.value }))}
+                placeholder="Ej: Anticipo, seña..."
+                style={{ width: "100%" }}
+              />
+            </div>
+          </div>
+          <div className="form-actions">
+            <button className="btn-cancel" onClick={() => setModalRecibo(false)}>
+              Cancelar
+            </button>
+            <button className="btn-save" onClick={handleGuardarRecibo} disabled={guardandoRecibo}>
+              {guardandoRecibo ? "Guardando..." : "Guardar y descargar PDF"}
             </button>
           </div>
         </Modal>
