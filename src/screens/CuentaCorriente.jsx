@@ -66,6 +66,14 @@ const TIPOS_MANUALES = [
   { value: "nota_debito", label: "Nota de débito" },
 ];
 
+const FORMAS_FACTURACION = [
+  "Factura A",
+  "Factura B",
+  "Factura C",
+  "Ticket",
+  "Otro",
+];
+
 function fmtMoneda(v) {
   const n = Number(v ?? 0);
   return n.toLocaleString("es-AR", {
@@ -210,6 +218,67 @@ export default function CuentaCorriente({
     }
   };
   // ── FIN Recibos ───────────────────────────────────────────────────────
+
+  // ── Facturado ─────────────────────────────────────────────────────────
+  const [modalFacturado, setModalFacturado] = useState(false);
+  const [movFacturando, setMovFacturando] = useState(null);
+  const [formFacturado, setFormFacturado] = useState({
+    facturado: "",
+    forma: FORMAS_FACTURACION[0],
+  });
+  const [errorFacturado, setErrorFacturado] = useState("");
+  const [guardandoFacturado, setGuardandoFacturado] = useState(false);
+
+  const abrirFacturado = (row) => {
+    setMovFacturando(row);
+    setFormFacturado({
+      facturado: row.facturado ?? "",
+      forma: row.forma || FORMAS_FACTURACION[0],
+    });
+    setErrorFacturado("");
+    setModalFacturado(true);
+  };
+
+  const handleGuardarFacturado = async () => {
+    if (!formFacturado.facturado.trim()) {
+      setErrorFacturado("Ingresá un número/dato de facturación.");
+      return;
+    }
+    setGuardandoFacturado(true);
+    try {
+      const res = await authFetch(
+        `${API}/cuenta-corriente/${movFacturando.id}/facturado`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            facturado: formFacturado.facturado.trim(),
+            forma: formFacturado.forma,
+          }),
+        },
+      );
+      if (!res.ok) throw new Error(await res.text());
+
+      // Actualiza en memoria sin tener que refetchear toda la lista.
+      setMovimientos((prev) =>
+        prev.map((m) =>
+          m.id === movFacturando.id
+            ? {
+                ...m,
+                facturado: formFacturado.facturado.trim(),
+                forma: formFacturado.forma,
+              }
+            : m,
+        ),
+      );
+      setModalFacturado(false);
+    } catch (err) {
+      console.error("Error guardando facturado:", err);
+      setErrorFacturado("No se pudo guardar. Probá de nuevo.");
+    } finally {
+      setGuardandoFacturado(false);
+    }
+  };
+  // ── FIN Facturado ─────────────────────────────────────────────────────
 
   // ── TEMPORAL: backfill de obras confirmadas antes de que existiera este
   // módulo. Borrar este bloque + el botón + el endpoint /admin/backfill-cuenta-corriente
@@ -406,6 +475,46 @@ export default function CuentaCorriente({
       key: "saldo_acumulado",
       label: "Saldo",
       render: (value) => fmtMoneda(value),
+    },
+    {
+      key: "facturado",
+      label: "Facturado",
+      render: (value, row) =>
+        value ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              abrirFacturado(row);
+            }}
+            title="Tocá para editar"
+            style={{
+              padding: "4px 10px",
+              borderRadius: 6,
+              border: "1px solid #1a7a3a",
+              background: "#eaf7ee",
+              color: "#1a7a3a",
+              fontWeight: 700,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            ✅ {value}
+            {row.forma ? ` · ${row.forma}` : ""}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              abrirFacturado(row);
+            }}
+            className="btn-cancel"
+            style={{ padding: "4px 10px", fontSize: 12 }}
+          >
+            🧾 Facturado
+          </button>
+        ),
     },
   ];
 
@@ -778,6 +887,73 @@ export default function CuentaCorriente({
               disabled={guardandoRecibo}
             >
               {guardandoRecibo ? "Guardando..." : "Guardar y descargar PDF"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {modalFacturado && movFacturando && (
+        <Modal
+          title="Marcar facturado"
+          onClose={() => setModalFacturado(false)}
+        >
+          {errorFacturado && <p className="form-error">{errorFacturado}</p>}
+          <div className="form-grid" style={{ gridTemplateColumns: "1fr" }}>
+            <div>
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
+                Facturado (Nº de factura / referencia)
+              </label>
+              <input
+                className="pn-field-input"
+                value={formFacturado.facturado}
+                onChange={(e) =>
+                  setFormFacturado((f) => ({
+                    ...f,
+                    facturado: e.target.value,
+                  }))
+                }
+                placeholder="Ej: 0001-00001234"
+                style={{ width: "100%", marginBottom: 12 }}
+              />
+
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
+                Forma
+              </label>
+              <select
+                className="pn-field-select"
+                value={formFacturado.forma}
+                onChange={(e) =>
+                  setFormFacturado((f) => ({ ...f, forma: e.target.value }))
+                }
+                style={{ width: "100%" }}
+              >
+                {FORMAS_FACTURACION.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="form-actions">
+            <button
+              className="btn-cancel"
+              onClick={() => setModalFacturado(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              className="btn-save"
+              onClick={handleGuardarFacturado}
+              disabled={guardandoFacturado}
+            >
+              {guardandoFacturado ? "Guardando..." : "Guardar"}
             </button>
           </div>
         </Modal>
