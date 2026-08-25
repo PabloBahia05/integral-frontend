@@ -4,8 +4,8 @@ const API = "https://integral-backend-production.up.railway.app";
 const HISTORIAL_URL = `${API}/vehiculos`;
 const FLOTA_URL = `${API}/flota`;
 
-const vacioHistorial = { vehiculo: '', chofer: '', fecha: '', taller: '', costo: '' };
-const vacioFlota = { patente: '', marca: '', modelo: '', anio: '' };
+const vacioHistorial = { vehiculo: '', chofer: '', fecha: '', taller: '', costo: '', foto: '' };
+const vacioFlota = { patente: '', marca: '', modelo: '', anio: '', foto: '' };
 
 export default function VehiculosMantenimiento({ token, onBack }) {
   const [vista, setVista] = useState('historial'); // 'historial' | 'vehiculos'
@@ -15,6 +15,20 @@ export default function VehiculosMantenimiento({ token, onBack }) {
     ...extra,
   });
 
+  // Sube un archivo de imagen al endpoint indicado y devuelve la URL (o null si falla)
+  const subirFoto = async (endpointBase, archivo) => {
+    const data = new FormData();
+    data.append('foto', archivo);
+    const res = await fetch(`${endpointBase}/foto`, {
+      method: 'POST',
+      headers: authHeaders(), // sin Content-Type: el browser arma el multipart solo
+      body: data,
+    });
+    if (!res.ok) throw new Error('Error al subir la foto');
+    const json = await res.json();
+    return json.url;
+  };
+
   // ---------------- FLOTA (Vehículos) ----------------
   const [flota, setFlota] = useState([]);
   const [cargandoFlota, setCargandoFlota] = useState(true);
@@ -23,6 +37,7 @@ export default function VehiculosMantenimiento({ token, onBack }) {
   const [editandoFlotaId, setEditandoFlotaId] = useState(null);
   const [formFlota, setFormFlota] = useState(vacioFlota);
   const [guardandoFlota, setGuardandoFlota] = useState(false);
+  const [subiendoFotoFlota, setSubiendoFotoFlota] = useState(false);
 
   const cargarFlota = async () => {
     setCargandoFlota(true);
@@ -53,6 +68,7 @@ export default function VehiculosMantenimiento({ token, onBack }) {
       marca: registro.marca,
       modelo: registro.modelo,
       anio: registro.anio,
+      foto: registro.foto || '',
     });
     setModalFlotaAbierto(true);
   };
@@ -65,6 +81,22 @@ export default function VehiculosMantenimiento({ token, onBack }) {
 
   const handleChangeFlota = (campo) => (e) => {
     setFormFlota((prev) => ({ ...prev, [campo]: e.target.value }));
+  };
+
+  const handleFotoFlota = async (e) => {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    setSubiendoFotoFlota(true);
+    try {
+      const url = await subirFoto(FLOTA_URL, archivo);
+      setFormFlota((prev) => ({ ...prev, foto: url }));
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo subir la foto');
+    } finally {
+      setSubiendoFotoFlota(false);
+      e.target.value = '';
+    }
   };
 
   const handleGuardarFlota = async () => {
@@ -115,6 +147,7 @@ export default function VehiculosMantenimiento({ token, onBack }) {
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(vacioHistorial);
   const [guardando, setGuardando] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
 
   const cargarRegistros = async () => {
     setCargando(true);
@@ -152,6 +185,7 @@ export default function VehiculosMantenimiento({ token, onBack }) {
       fecha: registro.fecha?.slice(0, 10) || '',
       taller: registro.taller,
       costo: registro.costo,
+      foto: registro.foto || '',
     });
     setModalAbierto(true);
   };
@@ -164,6 +198,22 @@ export default function VehiculosMantenimiento({ token, onBack }) {
 
   const handleChange = (campo) => (e) => {
     setForm((prev) => ({ ...prev, [campo]: e.target.value }));
+  };
+
+  const handleFoto = async (e) => {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    setSubiendoFoto(true);
+    try {
+      const url = await subirFoto(HISTORIAL_URL, archivo);
+      setForm((prev) => ({ ...prev, foto: url }));
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo subir la foto');
+    } finally {
+      setSubiendoFoto(false);
+      e.target.value = '';
+    }
   };
 
   const handleGuardar = async () => {
@@ -275,6 +325,7 @@ export default function VehiculosMantenimiento({ token, onBack }) {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
+                    <th style={th}>Foto</th>
                     <th style={th}>Patente</th>
                     <th style={th}>Marca</th>
                     <th style={th}>Modelo</th>
@@ -285,13 +336,20 @@ export default function VehiculosMantenimiento({ token, onBack }) {
                 <tbody>
                   {flota.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ ...td, textAlign: 'center', color: '#6b7280' }}>
+                      <td colSpan={6} style={{ ...td, textAlign: 'center', color: '#6b7280' }}>
                         No hay vehículos cargados todavía.
                       </td>
                     </tr>
                   ) : (
                     flota.map((v) => (
                       <tr key={v.id} style={{ borderTop: '1px solid #e5e7eb' }}>
+                        <td style={td}>
+                          {v.foto ? (
+                            <img src={v.foto} alt={v.patente} style={miniatura} />
+                          ) : (
+                            <span style={{ color: '#9ca3af', fontSize: '12px' }}>—</span>
+                          )}
+                        </td>
                         <td style={td}>{v.patente}</td>
                         <td style={td}>{v.marca}</td>
                         <td style={td}>{v.modelo}</td>
@@ -332,6 +390,7 @@ export default function VehiculosMantenimiento({ token, onBack }) {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
+                    <th style={th}>Foto</th>
                     <th style={th}>Vehículo</th>
                     <th style={th}>Chofer</th>
                     <th style={th}>Fecha</th>
@@ -343,13 +402,20 @@ export default function VehiculosMantenimiento({ token, onBack }) {
                 <tbody>
                   {registros.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ ...td, textAlign: 'center', color: '#6b7280' }}>
+                      <td colSpan={7} style={{ ...td, textAlign: 'center', color: '#6b7280' }}>
                         No hay registros cargados todavía.
                       </td>
                     </tr>
                   ) : (
                     registros.map((r) => (
                       <tr key={r.id} style={{ borderTop: '1px solid #e5e7eb' }}>
+                        <td style={td}>
+                          {r.foto ? (
+                            <img src={r.foto} alt="foto registro" style={miniatura} />
+                          ) : (
+                            <span style={{ color: '#9ca3af', fontSize: '12px' }}>—</span>
+                          )}
+                        </td>
                         <td style={td}>{r.vehiculo}</td>
                         <td style={td}>{r.chofer}</td>
                         <td style={td}>{formatearFecha(r.fecha)}</td>
@@ -417,11 +483,18 @@ export default function VehiculosMantenimiento({ token, onBack }) {
               placeholder="Ej: 2020"
             />
 
+            <label style={label}>Foto</label>
+            {formFlota.foto && (
+              <img src={formFlota.foto} alt="preview" style={previewFoto} />
+            )}
+            <input type="file" accept="image/*" onChange={handleFotoFlota} disabled={subiendoFotoFlota} />
+            {subiendoFotoFlota && <p style={{ fontSize: '12px', color: '#6b7280' }}>Subiendo foto...</p>}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
               <button onClick={cerrarModalFlota} style={btnSecundario} disabled={guardandoFlota}>
                 Cancelar
               </button>
-              <button onClick={handleGuardarFlota} style={btnPrimario} disabled={guardandoFlota}>
+              <button onClick={handleGuardarFlota} style={btnPrimario} disabled={guardandoFlota || subiendoFotoFlota}>
                 {guardandoFlota ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
@@ -480,11 +553,18 @@ export default function VehiculosMantenimiento({ token, onBack }) {
               placeholder="0.00"
             />
 
+            <label style={label}>Foto</label>
+            {form.foto && (
+              <img src={form.foto} alt="preview" style={previewFoto} />
+            )}
+            <input type="file" accept="image/*" onChange={handleFoto} disabled={subiendoFoto} />
+            {subiendoFoto && <p style={{ fontSize: '12px', color: '#6b7280' }}>Subiendo foto...</p>}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
               <button onClick={cerrarModal} style={btnSecundario} disabled={guardando}>
                 Cancelar
               </button>
-              <button onClick={handleGuardar} style={btnPrimario} disabled={guardando}>
+              <button onClick={handleGuardar} style={btnPrimario} disabled={guardando || subiendoFoto}>
                 {guardando ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
@@ -561,4 +641,19 @@ const btnSecundario = {
   border: 'none',
   borderRadius: '6px',
   cursor: 'pointer',
+};
+const miniatura = {
+  width: '44px',
+  height: '44px',
+  objectFit: 'cover',
+  borderRadius: '6px',
+  border: '1px solid #e5e7eb',
+};
+const previewFoto = {
+  width: '100%',
+  maxHeight: '160px',
+  objectFit: 'cover',
+  borderRadius: '6px',
+  border: '1px solid #e5e7eb',
+  marginBottom: '8px',
 };
