@@ -21,6 +21,7 @@ import AfipIVA from "./screens/AfipIVA";
 import ActualizarPreciosExcel from "./screens/ActualizarPreciosExcel";
 import VehiculosMantenimiento from "./screens/VehiculosMantenimiento";
 import CuentaCorriente from "./screens/CuentaCorriente";
+import TestFacturacionAFIP from "./screens/TestFacturacionAFIP"; // TEMPORAL: pantalla de prueba AFIP, borrar cuando ya no haga falta
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState } from "react";
@@ -51,6 +52,7 @@ const SCREENS = {
   "actualizar-precios": { label: "ACTUALIZAR PRECIOS", icon: "💲" },
   "vehiculos-mantenimiento": { label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚" },
   "cuenta-corriente": { label: "CLIENTES ACTIVOS", icon: "💰" },
+  "test-afip-facturar": { label: "TEST AFIP FACTURAR", icon: "🧪" }, // TEMPORAL
 };
 
 const buttons = [
@@ -102,6 +104,15 @@ const buttons = [
     icon: "✅",
     color: "#00b4d8",
     screen: "obras-confirmadas",
+  },
+  {
+    // TEMPORAL: pantalla de prueba del circuito React -> Node -> Python -> AFIP.
+    // Borrar este bloque (y el import de arriba) cuando ya no haga falta.
+    id: 16,
+    label: "TEST AFIP",
+    icon: "🧪",
+    color: "#9b59b6",
+    screen: "test-afip-facturar",
   },
   {
     id: 15,
@@ -1171,6 +1182,11 @@ function App() {
                 }}
                 onBack={() => setScreen(null)}
               />
+            )}
+
+            {/* ── Test Facturación AFIP (TEMPORAL, borrar cuando ya no haga falta) ── */}
+            {screen === "test-afip-facturar" && (
+              <TestFacturacionAFIP authFetch={authFetch} />
             )}
 
             {/* ── Facturas ── */}
