@@ -225,6 +225,7 @@ export default function CuentaCorriente({
   const [formFacturado, setFormFacturado] = useState({
     facturado: "",
     forma: FORMAS_FACTURACION[0],
+    descripcion: "",
   });
   const [errorFacturado, setErrorFacturado] = useState("");
   const [guardandoFacturado, setGuardandoFacturado] = useState(false);
@@ -234,6 +235,7 @@ export default function CuentaCorriente({
     setFormFacturado({
       facturado: row.facturado ?? "",
       forma: row.forma || FORMAS_FACTURACION[0],
+      descripcion: row.descripcion ?? "",
     });
     setErrorFacturado("");
     setModalFacturado(true);
@@ -253,6 +255,7 @@ export default function CuentaCorriente({
           body: JSON.stringify({
             facturado: formFacturado.facturado.trim(),
             forma: formFacturado.forma,
+            descripcion: formFacturado.descripcion.trim() || null,
           }),
         },
       );
@@ -266,6 +269,7 @@ export default function CuentaCorriente({
                 ...m,
                 facturado: formFacturado.facturado.trim(),
                 forma: formFacturado.forma,
+                descripcion: formFacturado.descripcion.trim() || null,
               }
             : m,
         ),
@@ -931,7 +935,7 @@ export default function CuentaCorriente({
                 onChange={(e) =>
                   setFormFacturado((f) => ({ ...f, forma: e.target.value }))
                 }
-                style={{ width: "100%" }}
+                style={{ width: "100%", marginBottom: 12 }}
               >
                 {FORMAS_FACTURACION.map((f) => (
                   <option key={f} value={f}>
@@ -939,6 +943,26 @@ export default function CuentaCorriente({
                   </option>
                 ))}
               </select>
+
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
+                Descripción (opcional)
+              </label>
+              <textarea
+                className="pn-field-input"
+                value={formFacturado.descripcion}
+                onChange={(e) =>
+                  setFormFacturado((f) => ({
+                    ...f,
+                    descripcion: e.target.value,
+                  }))
+                }
+                placeholder="Notas adicionales sobre esta factura..."
+                rows={3}
+                style={{ width: "100%", resize: "vertical" }}
+              />
             </div>
           </div>
           <div className="form-actions">
