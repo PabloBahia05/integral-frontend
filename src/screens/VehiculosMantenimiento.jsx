@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import jsPDF from 'jspdf';
 
 const API = "https://integral-backend-production.up.railway.app";
 const HISTORIAL_URL = `${API}/vehiculos`;
@@ -6,6 +7,34 @@ const FLOTA_URL = `${API}/flota`;
 
 const vacioHistorial = { vehiculo: '', chofer: '', fecha: '', taller: '', costo: '', foto: '' };
 const vacioFlota = { patente: '', marca: '', modelo: '', anio: '', foto: '' };
+
+// Convierte la foto (URL de Cloudinary) en un PDF de una página y lo descarga.
+// Abrir ese PDF en el navegador y usar Ctrl+P también sirve para imprimir.
+const descargarFotoComoPDF = async (url, nombreArchivo) => {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+    const orientacion = img.width >= img.height ? 'landscape' : 'portrait';
+    const pdf = new jsPDF({ orientation: orientacion, unit: 'px', format: [img.width, img.height] });
+    pdf.addImage(dataUrl, 'JPEG', 0, 0, img.width, img.height);
+    pdf.save(nombreArchivo);
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo generar el PDF de la foto');
+  }
+};
 
 export default function VehiculosMantenimiento({ token, onBack }) {
   const [vista, setVista] = useState('historial'); // 'historial' | 'vehiculos'
@@ -358,6 +387,14 @@ export default function VehiculosMantenimiento({ token, onBack }) {
                           <button onClick={() => abrirEdicionFlota(v)} style={btnAccion}>
                             Editar
                           </button>
+                          {v.foto && (
+                            <button
+                              onClick={() => descargarFotoComoPDF(v.foto, `vehiculo-${v.patente}.pdf`)}
+                              style={btnAccion}
+                            >
+                              PDF
+                            </button>
+                          )}
                           <button
                             onClick={() => handleEliminarFlota(v.id)}
                             style={{ ...btnAccion, color: '#b91c1c' }}
@@ -425,6 +462,14 @@ export default function VehiculosMantenimiento({ token, onBack }) {
                           <button onClick={() => abrirEdicion(r)} style={btnAccion}>
                             Editar
                           </button>
+                          {r.foto && (
+                            <button
+                              onClick={() => descargarFotoComoPDF(r.foto, `historial-${r.vehiculo}-${r.fecha?.slice(0, 10)}.pdf`)}
+                              style={btnAccion}
+                            >
+                              PDF
+                            </button>
+                          )}
                           <button
                             onClick={() => handleEliminar(r.id)}
                             style={{ ...btnAccion, color: '#b91c1c' }}
@@ -485,7 +530,16 @@ export default function VehiculosMantenimiento({ token, onBack }) {
 
             <label style={label}>Foto</label>
             {formFlota.foto && (
-              <img src={formFlota.foto} alt="preview" style={previewFoto} />
+              <>
+                <img src={formFlota.foto} alt="preview" style={previewFoto} />
+                <button
+                  type="button"
+                  onClick={() => descargarFotoComoPDF(formFlota.foto, `vehiculo-${formFlota.patente || 'foto'}.pdf`)}
+                  style={{ ...btnSecundario, marginBottom: '8px' }}
+                >
+                  Abrir como PDF
+                </button>
+              </>
             )}
             <input type="file" accept="image/*" onChange={handleFotoFlota} disabled={subiendoFotoFlota} />
             {subiendoFotoFlota && <p style={{ fontSize: '12px', color: '#6b7280' }}>Subiendo foto...</p>}
@@ -555,7 +609,16 @@ export default function VehiculosMantenimiento({ token, onBack }) {
 
             <label style={label}>Foto</label>
             {form.foto && (
-              <img src={form.foto} alt="preview" style={previewFoto} />
+              <>
+                <img src={form.foto} alt="preview" style={previewFoto} />
+                <button
+                  type="button"
+                  onClick={() => descargarFotoComoPDF(form.foto, `historial-${form.vehiculo || 'foto'}.pdf`)}
+                  style={{ ...btnSecundario, marginBottom: '8px' }}
+                >
+                  Abrir como PDF
+                </button>
+              </>
             )}
             <input type="file" accept="image/*" onChange={handleFoto} disabled={subiendoFoto} />
             {subiendoFoto && <p style={{ fontSize: '12px', color: '#6b7280' }}>Subiendo foto...</p>}
