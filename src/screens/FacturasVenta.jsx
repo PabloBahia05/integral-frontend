@@ -129,24 +129,24 @@ export default function FacturasVenta({ authFetch }) {
   );
 
   const COLUMNS = [
-    { key: "nro_comprobante", label: "N° Comprobante", render: (f) => `${String(f.pto_vta).padStart(4, "0")}-${String(f.nro_comprobante).padStart(8, "0")}` },
-    { key: "tipo_cbte",       label: "Tipo",           render: (f) => `Factura ${TIPO_CBTE_LABEL[f.tipo_cbte] ?? f.tipo_cbte}` },
+    { key: "nro_comprobante", label: "N° Comprobante", render: (_v, row) => `${String(row.pto_vta).padStart(4, "0")}-${String(row.nro_comprobante).padStart(8, "0")}` },
+    { key: "tipo_cbte",       label: "Tipo",           render: (_v, row) => `Factura ${TIPO_CBTE_LABEL[row.tipo_cbte] ?? row.tipo_cbte}` },
     { key: "cliente_nombre",  label: "Cliente" },
-    { key: "cliente_cuit",    label: "CUIT/DNI",       render: (f) => f.cliente_cuit ?? f.cliente_dni ?? "—" },
+    { key: "cliente_cuit",    label: "CUIT/DNI",       render: (_v, row) => row.cliente_cuit ?? row.cliente_dni ?? "—" },
     { key: "numeropres",      label: "N° Presupuesto" },
-    { key: "importe_total",   label: "Total",          render: (f) => formatPeso(f.importe_total) },
-    { key: "creado_en",       label: "Emitida",        render: (f) => formatearFechaHora(f.creado_en) },
+    { key: "importe_total",   label: "Total",          render: (_v, row) => formatPeso(row.importe_total) },
+    { key: "creado_en",       label: "Emitida",        render: (_v, row) => formatearFechaHora(row.creado_en) },
     { key: "ambiente",        label: "Ambiente" },
     {
       key: "pdf",
       label: "",
-      render: (f) => (
+      render: (_v, row) => (
         <button
           type="button"
-          disabled={!emisor || generandoPDFId === f.id}
+          disabled={!emisor || generandoPDFId === row.id}
           onClick={(e) => {
             e.stopPropagation();
-            generarPDF(f);
+            generarPDF(row);
           }}
           style={{
             padding: "4px 10px",
@@ -158,7 +158,7 @@ export default function FacturasVenta({ authFetch }) {
             cursor: emisor ? "pointer" : "not-allowed",
           }}
         >
-          {generandoPDFId === f.id ? "Generando..." : "📄 PDF"}
+          {generandoPDFId === row.id ? "Generando..." : "📄 PDF"}
         </button>
       ),
     },
@@ -243,7 +243,13 @@ export default function FacturasVenta({ authFetch }) {
           ⏳ Cargando facturas...
         </p>
       ) : (
-        <DataTable columns={COLUMNS} rows={filtered} storageKey="facturas-venta-listado" />
+        <DataTable
+          columns={COLUMNS}
+          rows={filtered}
+          selectedId={null}
+          onSelect={() => {}}
+          storageKey="facturas-venta-listado"
+        />
       )}
 
       {!emisor && (
