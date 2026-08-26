@@ -364,6 +364,13 @@ export default function ObrasConfirmadas({
             📝 Abrir
           </button>
         )}
+        {selected && (
+          <BotonFacturar
+            numeropres={selected.numeropres}
+            authFetch={authFetch}
+            onFacturaGenerada={fetchEncabezados}
+          />
+        )}
       </div>
 
       {loadingEnc ? (
