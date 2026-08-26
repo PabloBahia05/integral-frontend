@@ -4,6 +4,8 @@ import jsPDF from 'jspdf';
 const API = "https://integral-backend-production.up.railway.app";
 const HISTORIAL_URL = `${API}/vehiculos`;
 const FLOTA_URL = `${API}/flota`;
+const PROVEEDORES_URL = `${API}/proveedores`;
+const RUBRO_TALLER = 'MANTENIMIENTO';
 
 const vacioHistorial = { vehiculo: '', chofer: '', fecha: '', taller: '', costo: '', foto: '' };
 const vacioFlota = { patente: '', marca: '', modelo: '', anio: '', foto: '' };
@@ -168,6 +170,23 @@ export default function VehiculosMantenimiento({ token, onBack }) {
     }
   };
 
+  // ---------------- TALLERES (proveedores con rubro = MANTENIMIENTO) ----------------
+  const [talleres, setTalleres] = useState([]);
+
+  const cargarTalleres = async () => {
+    try {
+      const res = await fetch(PROVEEDORES_URL, { headers: authHeaders() });
+      if (!res.ok) throw new Error('No se pudieron cargar los proveedores');
+      const data = await res.json();
+      const filtrados = (Array.isArray(data) ? data : []).filter(
+        (p) => (p.rubro || '').toUpperCase() === RUBRO_TALLER
+      );
+      setTalleres(filtrados);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // ---------------- HISTORIAL (mantenimiento) ----------------
   const [registros, setRegistros] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -198,6 +217,7 @@ export default function VehiculosMantenimiento({ token, onBack }) {
     if (!token) return;
     cargarFlota();
     cargarRegistros();
+    cargarTalleres();
   }, [token]);
 
   const abrirNuevo = () => {
@@ -591,12 +611,17 @@ export default function VehiculosMantenimiento({ token, onBack }) {
             />
 
             <label style={label}>Taller</label>
-            <input
-              style={input}
-              value={form.taller}
-              onChange={handleChange('taller')}
-              placeholder="Nombre del taller"
-            />
+            <select style={input} value={form.taller} onChange={handleChange('taller')}>
+              <option value="">Seleccioná un taller</option>
+              {form.taller && !talleres.some((t) => t.provnombre === form.taller) && (
+                <option value={form.taller}>{form.taller} (no está en Proveedores)</option>
+              )}
+              {talleres.map((t) => (
+                <option key={t.id} value={t.provnombre}>
+                  {t.provnombre}
+                </option>
+              ))}
+            </select>
 
             <label style={label}>Costo</label>
             <input
