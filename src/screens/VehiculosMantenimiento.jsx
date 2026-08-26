@@ -650,9 +650,11 @@ const miniatura = {
   border: '1px solid #e5e7eb',
 };
 const previewFoto = {
+  display: 'block',
   width: '100%',
-  maxHeight: '160px',
-  objectFit: 'cover',
+  maxHeight: '320px',
+  objectFit: 'contain',
+  background: '#f9fafb',
   borderRadius: '6px',
   border: '1px solid #e5e7eb',
   marginBottom: '8px',
