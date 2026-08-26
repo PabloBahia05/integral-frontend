@@ -678,6 +678,8 @@ const modal = {
   padding: '24px',
   width: '380px',
   maxWidth: '90vw',
+  maxHeight: '90vh',
+  overflowY: 'auto',
 };
 const label = { display: 'block', fontSize: '13px', color: '#374151', marginTop: '10px', marginBottom: '4px' };
 const input = {
@@ -715,7 +717,7 @@ const miniatura = {
 const previewFoto = {
   display: 'block',
   width: '100%',
-  maxHeight: '320px',
+  maxHeight: '220px',
   objectFit: 'contain',
   background: '#f9fafb',
   borderRadius: '6px',
