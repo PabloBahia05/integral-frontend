@@ -8,7 +8,7 @@ import {
   formatPeso,
   styleCSS,
   descargarPDF,
-} from "./pdfMotorComun";
+} from "../pdf/pdfMotorComun";
 
 const API = "https://integral-backend-production.up.railway.app";
 
