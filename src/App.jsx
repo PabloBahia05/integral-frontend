@@ -16,6 +16,7 @@ import ObrasConfirmadas from "./screens/ObrasConfirmadas";
 import Produccion from "./screens/Produccion";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
+import FacturasVenta from "./screens/FacturasVenta";
 import HistorialFacturas from "./screens/HistorialFacturas";
 import AfipIVA from "./screens/AfipIVA";
 import ActualizarPreciosExcel from "./screens/ActualizarPreciosExcel";
@@ -45,6 +46,7 @@ const SCREENS = {
   "obras-confirmadas": { label: "OBRAS CONFIRMADAS", icon: "✅" },
   produccion: { label: "PRODUCCIÓN", icon: "🏭" },
   facturas: { label: "FACTURAS", icon: "🧾" },
+  "facturas-venta": { label: "FACTURAS EMITIDAS", icon: "🧮" },
   "historial-facturas": { label: "HISTORIAL FACTURAS", icon: "📋" },
   anviz: { label: "ASISTENCIA", icon: "🕐" },
   "afip-iva": { label: "AFIP IVA", icon: "🏦" },
@@ -509,7 +511,12 @@ function App() {
   const soloDigitos = (v) => String(v ?? "").replace(/\D/g, "");
   const [abrirFichaCliente, setAbrirFichaCliente] = useState(false);
   const [filtroClienteInicial, setFiltroClienteInicial] = useState("");
-  const irACliente = (codclienteBuscado, nombreBuscado, telefonoBuscado) => {
+  // Campos que le faltan al cliente para poder facturarle (CUIT/DNI según
+  // tipofact) — llega desde BotonFacturar cuando el backend devuelve 400
+  // con `faltantes`, vía onFaltanDatosCliente → irACliente(..., faltantes).
+  // Se muestra como banner en Clientes.jsx dentro del modal de edición.
+  const [camposFaltantesCliente, setCamposFaltantesCliente] = useState([]);
+  const irACliente = (codclienteBuscado, nombreBuscado, telefonoBuscado, camposFaltantes) => {
     const buscado =
       codclienteBuscado !== null && codclienteBuscado !== undefined
         ? String(codclienteBuscado)
@@ -544,6 +551,7 @@ function App() {
     setFiltroClienteInicial(
       nombreBuscado || encontrado?.nombre || telefonoBuscado || "",
     );
+    setCamposFaltantesCliente(camposFaltantes ?? []);
     setScreen("clientes");
   };
   const colocacionesCRUD = makeCRUD(
@@ -985,6 +993,7 @@ function App() {
                 onFichaAbierta={() => setAbrirFichaCliente(false)}
                 busquedaInicial={filtroClienteInicial}
                 authFetch={authFetch}
+                camposFaltantes={camposFaltantesCliente}
                 onAbrirPresupuesto={(row) => {
                   setPresupuestoAbierto(row);
                   setScreen("presupuesto-nuevo");
@@ -1066,7 +1075,18 @@ function App() {
                   setScreen("presupuesto-nuevo");
                 }}
                 authFetch={authFetch}
+                onFaltanDatosCliente={(info) =>
+                  irACliente(
+                    info.codcliente,
+                    info.nombreCliente,
+                    null,
+                    info.faltantes?.map((f) => f.field),
+                  )
+                }
               />
+            )}
+            {screen === "facturas-venta" && (
+              <FacturasVenta authFetch={authFetch} />
             )}
             {screen === "produccion" && (
               <Produccion authFetch={authFetch} />
@@ -1296,6 +1316,7 @@ function App() {
         {puedo("productos", "ver") && <p onClick={() => { setScreen("productos"); setSidebarOpen(false); }}>🛒 Productos</p>}
         {puedo("lista-margenes", "ver") && <p onClick={() => { setScreen("lista-margenes"); fetchListas(); setSidebarOpen(false); }}>📊 Lista de Márgenes</p>}
         {puedo("facturas", "ver") && <p onClick={() => { setScreen("facturas"); setSidebarOpen(false); }}>🧾 Facturas</p>}
+        {puedo("facturas-venta", "ver") && <p onClick={() => { setScreen("facturas-venta"); setSidebarOpen(false); }}>🧮 Facturas Emitidas</p>}
         {puedo("anviz", "ver") && <p onClick={() => { setScreen("anviz"); setSidebarOpen(false); }}>🕐 Asistencia</p>}
         {puedo("usuarios", "ver") && <p onClick={() => { setScreen("usuarios"); setSidebarOpen(false); }}>👤 Usuarios</p>}
         {puedo("actualizar-precios", "ver") && <p onClick={() => { setScreen("actualizar-precios"); setSidebarOpen(false); }}>💲 Actualizar Precios</p>}
@@ -1402,6 +1423,20 @@ function App() {
                 <span className="sub-card-icon">🧾</span>
                 <span className="sub-card-label">FACTURAS</span>
                 <span className="sub-card-desc">Gestión de comprobantes</span>
+              </div>
+              )}
+              {puedo("facturas-venta", "ver") && (
+              <div
+                className="sub-card"
+                style={{ "--sc-color": "#16a085" }}
+                onClick={() => {
+                  setScreen("facturas-venta");
+                  setHomeSection(HOME_SECTIONS.main);
+                }}
+              >
+                <span className="sub-card-icon">🧮</span>
+                <span className="sub-card-label">FACTURAS EMITIDAS</span>
+                <span className="sub-card-desc">CAE, QR AFIP y PDF de ventas</span>
               </div>
               )}
               {puedo("afip-iva", "ver") && (
