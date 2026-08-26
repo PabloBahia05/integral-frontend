@@ -12,6 +12,7 @@ import {
   ItemsPanel,
   HistorialModal,
 } from "./presupuestosShared";
+import BotonFacturar from "../Component/BotonFacturar";
 
 // Presupuestos confirmados. Antes vivía junto con "Lista Presupuestos" en
 // ListaPresupuestos2.jsx (con un prop soloConfirmadas); se separaron en dos
@@ -187,7 +188,10 @@ export default function ObrasConfirmadas({
       .values(),
   );
 
-  const itemsConColor = cruzarConProduccion(itemsDetalle, produccionSeleccionada);
+  const itemsConColor = cruzarConProduccion(
+    itemsDetalle,
+    produccionSeleccionada,
+  );
 
   const totalSeleccionado = itemsDetalle.reduce(
     (s, it) => s + Number(it.valor1 ?? 0) * (Number(it.cantidad) || 1),
@@ -257,7 +261,9 @@ export default function ObrasConfirmadas({
       console.error("Error guardando línea por grupo:", e);
       // Revertir en caso de error, para no dejar la UI mintiendo sobre lo guardado.
       setLineaPorGrupo(lineaPorGrupo);
-      alert("No se pudo guardar la línea confirmada para ese grupo. Probá de nuevo.");
+      alert(
+        "No se pudo guardar la línea confirmada para ese grupo. Probá de nuevo.",
+      );
     }
   };
 
@@ -272,7 +278,9 @@ export default function ObrasConfirmadas({
         { method: "DELETE" },
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setRevisiones((prev) => prev.filter((r) => r.id !== revisionAEliminar.id));
+      setRevisiones((prev) =>
+        prev.filter((r) => r.id !== revisionAEliminar.id),
+      );
       fetchEncabezados();
       setRevisionAEliminar(null);
     } catch (e) {
@@ -289,14 +297,18 @@ export default function ObrasConfirmadas({
     if (!presupuestoAEliminar) return;
     setEliminandoPresupuesto(true);
     try {
-      const res = await authFetch(`${API}/tabla-indice/${presupuestoAEliminar.numeropres}`, {
-        method: "DELETE",
-      });
+      const res = await authFetch(
+        `${API}/tabla-indice/${presupuestoAEliminar.numeropres}`,
+        {
+          method: "DELETE",
+        },
+      );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setEncabezados((prev) =>
         prev.filter((e) => e.numeropres !== presupuestoAEliminar.numeropres),
       );
-      if (selected?.numeropres === presupuestoAEliminar.numeropres) setSelected(null);
+      if (selected?.numeropres === presupuestoAEliminar.numeropres)
+        setSelected(null);
       setPresupuestoAEliminar(null);
     } catch (e) {
       console.error("Error borrando presupuesto:", e);
@@ -355,7 +367,13 @@ export default function ObrasConfirmadas({
       </div>
 
       {loadingEnc ? (
-        <p style={{ padding: "24px", color: "#4a8ab5", fontFamily: "'Space Mono',monospace" }}>
+        <p
+          style={{
+            padding: "24px",
+            color: "#4a8ab5",
+            fontFamily: "'Space Mono',monospace",
+          }}
+        >
           ⏳ Cargando presupuestos...
         </p>
       ) : (
@@ -411,13 +429,18 @@ export default function ObrasConfirmadas({
           message={
             <>
               Vas a eliminar el presupuesto{" "}
-              <strong>N° {String(presupuestoAEliminar.numeropres).padStart(4, "0")}</strong>{" "}
+              <strong>
+                N° {String(presupuestoAEliminar.numeropres).padStart(4, "0")}
+              </strong>{" "}
               ({presupuestoAEliminar.nombre ?? "sin cliente"}) y{" "}
-              <strong>TODAS sus revisiones</strong>. Esta acción no se puede deshacer.
+              <strong>TODAS sus revisiones</strong>. Esta acción no se puede
+              deshacer.
             </>
           }
           onConfirm={handleDeletePresupuesto}
-          onClose={() => !eliminandoPresupuesto && setPresupuestoAEliminar(null)}
+          onClose={() =>
+            !eliminandoPresupuesto && setPresupuestoAEliminar(null)
+          }
         />
       )}
     </>
