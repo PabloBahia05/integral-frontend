@@ -9,12 +9,23 @@ const API = "https://integral-backend-production.up.railway.app";
 // PresupuestoNuevo.jsx, etc.) y el `numeropres` del presupuesto.
 //
 // Uso:
-//   <BotonFacturar numeropres={row.numeropres} authFetch={authFetch} />
+//   <BotonFacturar
+//     numeropres={row.numeropres}
+//     authFetch={authFetch}
+//     onFacturaGenerada={fetchEncabezados}
+//     onFaltanDatosCliente={(info) => irACliente(info.codcliente, info.nombreCliente, null, info.faltantes.map(f => f.field))}
+//   />
 //
 // No pide revisión ni tipo de comprobante — el backend
 // (facturas.routes.js) los resuelve solo a partir de presupuesto_info
 // (última revisión) y clientes.tipofact (Factura A/B/C).
-export default function BotonFacturar({ numeropres, authFetch, onFacturaGenerada }) {
+//
+// `onFaltanDatosCliente` es opcional: si el backend devuelve 400 con
+// `faltantes` (cliente sin CUIT/DNI según su tipofact) y este callback está
+// presente, se dispara con { codcliente, nombreCliente, tipofact, faltantes }
+// para que el padre navegue a la ficha del cliente y la abra ya. Si no se
+// pasa, el 400 se muestra solo como texto (comportamiento anterior).
+export default function BotonFacturar({ numeropres, authFetch, onFacturaGenerada, onFaltanDatosCliente }) {
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState(null);
@@ -37,7 +48,17 @@ export default function BotonFacturar({ numeropres, authFetch, onFacturaGenerada
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || JSON.stringify(data));
+        // 400 con `faltantes` = cliente sin CUIT/DNI según su tipofact. Si
+        // el padre nos dio el callback, abrimos la ficha del cliente en vez
+        // de dejar solo el texto de error.
+        if (res.status === 400 && data.faltantes && onFaltanDatosCliente) {
+          setError(
+            `${data.error} Abriendo la ficha de ${data.nombreCliente ?? "cliente"} para completarlo...`,
+          );
+          onFaltanDatosCliente(data);
+        } else {
+          setError(data.error || JSON.stringify(data));
+        }
       } else {
         setResultado(data);
         onFacturaGenerada?.(data);

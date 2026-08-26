@@ -64,7 +64,7 @@ const FIELDS_RIGHT = [
   { field: "profesional", label: "Profesional",      placeholder: "Ej: Comerciante" },
 ];
 
-export default function Clientes({ clientes, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal, abrirFicha, onFichaAbierta, busquedaInicial, authFetch, onAbrirPresupuesto }) {
+export default function Clientes({ clientes, onSave, onDelete, selected, onSelect, modal, onOpenModal, onCloseModal, abrirFicha, onFichaAbierta, busquedaInicial, authFetch, onAbrirPresupuesto, camposFaltantes }) {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
   const [search, setSearch] = useState(busquedaInicial || "");
@@ -239,9 +239,31 @@ export default function Clientes({ clientes, onSave, onDelete, selected, onSelec
       {(modal === "nuevo" || modal === "editar") && (
         <Modal title={modal === "nuevo" ? "Nuevo cliente" : "Editar cliente"} onClose={onCloseModal}>
           {error && <p className="form-error">{error}</p>}
+
+          {camposFaltantes?.length > 0 && (
+            <div
+              style={{
+                background: "#fff3cd",
+                border: "1px solid #d4a017",
+                borderRadius: 4,
+                padding: "8px 12px",
+                marginBottom: 12,
+                fontSize: 12,
+                color: "#5c4400",
+              }}
+            >
+              ⚠️ Para facturar a este cliente falta completar:{" "}
+              <strong>
+                {camposFaltantes
+                  .map((f) => FIELDS_RIGHT.find((fr) => fr.field === f)?.label ?? f)
+                  .join(", ")}
+              </strong>
+            </div>
+          )}
+
           <div className="form-grid">
             <div>{FIELDS_LEFT.map(f  => <FormField key={f.field} {...f} form={form} setForm={setForm} />)}</div>
-            <div>{FIELDS_RIGHT.map(f => <FormField key={f.field} {...f} form={form} setForm={setForm} />)}</div>
+            <div>{FIELDS_RIGHT.map(f => <FormField key={f.field} {...f} form={form} setForm={setForm} highlight={camposFaltantes?.includes(f.field)} />)}</div>
           </div>
           <div className="form-actions">
             <button className="btn-cancel" onClick={onCloseModal}>Cancelar</button>

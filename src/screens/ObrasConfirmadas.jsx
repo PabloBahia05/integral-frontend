@@ -24,6 +24,7 @@ export default function ObrasConfirmadas({
   onAbrirPresupuesto,
   onNuevoPresupuesto,
   authFetch,
+  onFaltanDatosCliente,
 }) {
   // "Obras Confirmadas" necesita 1 fila POR REVISIÓN confirmada (una obra
   // puede tener varias revisiones ya cerradas), así que usa un endpoint
@@ -369,6 +370,7 @@ export default function ObrasConfirmadas({
             numeropres={selected.numeropres}
             authFetch={authFetch}
             onFacturaGenerada={fetchEncabezados}
+            onFaltanDatosCliente={onFaltanDatosCliente}
           />
         )}
       </div>
