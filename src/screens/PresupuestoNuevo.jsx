@@ -2589,9 +2589,34 @@ export default function PresupuestoNuevo({
         // había commiteado. Esperando acá, cuando el botón se vuelve a
         // habilitar la leyenda/observaciones/texto de seña ya están
         // guardados de verdad.
+        // ── Persistir línea confirmada por grupo (y recalcular monto en
+        // cuenta corriente) ──
+        // El POST de más arriba ya guarda lineaPorGrupo dentro de
+        // presupuesto_meta como parte del payload general, pero eso NO
+        // dispara el recálculo del movimiento en cuenta_corriente_movimientos
+        // — eso solo lo hace este PUT (ver upsertMovimientoPresupuesto en
+        // cuentacorriente_routes.js). Antes nada llamaba a este endpoint
+        // desde el guardado normal, así que el monto mostrado en Cuenta
+        // Corriente quedaba congelado en el valor del "confirmar" original
+        // sin importar qué línea se eligiera por grupo después.
+        const guardarLineaGrupo = authFetch(
+          `${API}/tabla-presupuestos/linea-grupo/${numAsignado}/${Number(revAsignada)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lineaPorGrupo }),
+          },
+        ).catch((e) => {
+          console.error(
+            "[handleGuardar] no se pudo actualizar línea por grupo / cuenta corriente:",
+            e,
+          );
+        });
+
         await Promise.all([
           guardarImagenesPresupuesto(numAsignado, Number(revAsignada)),
           guardarInfoPresupuesto(numAsignado),
+          guardarLineaGrupo,
         ]);
 
         // ── Refrescar quién/cuándo guardó, para mostrar en pantalla ──
