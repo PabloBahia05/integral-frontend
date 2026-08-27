@@ -360,11 +360,22 @@ export default function TablaArticulos({
               }}
             >
               <option value="todos">Todos los ítems</option>
-              {presupuestoItems.map((it) => (
-                <option key={it.id} value={it.id}>
-                  {it.descripcion || it.nombreart || it.id}
-                </option>
-              ))}
+              {(nombresGruposUsados ?? []).length > 0 && (
+                <optgroup label="Por grupo">
+                  {nombresGruposUsados.map((g) => (
+                    <option key={`grupo:${g}`} value={`grupo:${g}`}>
+                      {g}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Por artículo">
+                {presupuestoItems.map((it) => (
+                  <option key={it.id} value={it.id}>
+                    {it.descripcion || it.nombreart || it.id}
+                  </option>
+                ))}
+              </optgroup>
             </select>
 
             {/* Botón aplicar */}
@@ -422,6 +433,16 @@ export default function TablaArticulos({
               >
                 AJUSTE ACTIVO: {ajusteValor}
                 {ajusteModo === "porcentaje" ? "%" : "$"}
+                {ajusteScope !== "todos" && (
+                  <>
+                    {" "}
+                    (
+                    {ajusteScope.startsWith("grupo:")
+                      ? `grupo: ${ajusteScope.slice(6)}`
+                      : "1 ítem"}
+                    )
+                  </>
+                )}
               </span>
             )}
 
