@@ -11,9 +11,20 @@ const API = "https://integral-backend-production.up.railway.app";
 //
 // Lista los ítems que caen en `produccion` al confirmar un presupuesto
 // (ver PUT /tabla-presupuestos/confirmar/:numeropres/:revision en
-// tabla-presupuestos_routes.js). El único campo pensado para editarse acá
-// es `modulo` — queda vacío al confirmar y se completa a mano, ítem por
-// ítem, en esta pantalla.
+// tabla-presupuestos_routes.js). Los campos pensados para editarse acá son
+// `modulo` y las columnas de seguimiento de proceso (DOMUS/OP/PERFORADO/
+// USPER/ARMADO/USARM/DESPACHO/USDES) — quedan vacíos al confirmar y se
+// completan a mano, ítem por ítem, en esta pantalla.
+
+// Campos SI-NO de seguimiento de proceso y el campo de usuario asociado a
+// cada uno (queda vacío si el proceso todavía no se marcó). Se define acá
+// para no repetir la lista en columnas + handlers.
+const ETAPAS = [
+  { campo: "DOMUS", label: "Domus", usuario: null },
+  { campo: "PERFORADO", label: "Perforado", usuario: "USPER" },
+  { campo: "ARMADO", label: "Armado", usuario: "USARM" },
+  { campo: "DESPACHO", label: "Despacho", usuario: "USDES" },
+];
 
 export default function Produccion({ authFetch }) {
   const [rows, setRows] = useState([]);
@@ -42,6 +53,13 @@ export default function Produccion({ authFetch }) {
   // Guardado de `color` por fila: mismo patrón de feedback que `modulo`.
   const [guardandoColorId, setGuardandoColorId] = useState(null);
   const [errorColorId, setErrorColorId] = useState(null);
+
+  // Guardado de las columnas de seguimiento de proceso (DOMUS/OP/PERFORADO/
+  // USPER/ARMADO/USARM/DESPACHO/USDES). Mismo patrón de feedback que
+  // `modulo`/`color`, pero indexado por "id-campo" porque hay varias
+  // columnas editables de este tipo en la misma fila.
+  const [guardandoCampo, setGuardandoCampo] = useState(null); // `${id}-${campo}`
+  const [errorCampo, setErrorCampo] = useState(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────
 
@@ -109,6 +127,59 @@ export default function Produccion({ authFetch }) {
     }
   };
 
+  // ── Edición de las columnas de seguimiento de proceso ───────────────────
+
+  // Select SI/NO (DOMUS, PERFORADO, ARMADO, DESPACHO): se guarda al cambiar,
+  // igual que `color`.
+  const handleEtapaChange = async (row, campo, valor) => {
+    setRows((prev) =>
+      prev.map((r) => (r.id === row.id ? { ...r, [campo]: valor } : r)),
+    );
+    const key = `${row.id}-${campo}`;
+    setGuardandoCampo(key);
+    setErrorCampo(null);
+    try {
+      const res = await authFetch(`${API}/produccion/${row.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [campo]: valor }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      console.error(`Error guardando ${campo}:`, e);
+      setErrorCampo(key);
+    } finally {
+      setGuardandoCampo(null);
+    }
+  };
+
+  // Input de texto (OP, USPER, USARM, USDES): se guarda al salir del campo,
+  // igual que `modulo`.
+  const handleTextoCampoChange = (id, campo, valor) => {
+    setRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, [campo]: valor } : r)),
+    );
+  };
+
+  const handleTextoCampoBlur = async (row, campo) => {
+    const key = `${row.id}-${campo}`;
+    setGuardandoCampo(key);
+    setErrorCampo(null);
+    try {
+      const res = await authFetch(`${API}/produccion/${row.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [campo]: row[campo] || null }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      console.error(`Error guardando ${campo}:`, e);
+      setErrorCampo(key);
+    } finally {
+      setGuardandoCampo(null);
+    }
+  };
+
   // ── Filtro ────────────────────────────────────────────────────────────
 
   const q = search.toLowerCase();
@@ -120,7 +191,11 @@ export default function Produccion({ authFetch }) {
       (r.grupo ?? "").toLowerCase().includes(q) ||
       (r.producto ?? "").toLowerCase().includes(q) ||
       (r.modulo ?? "").toLowerCase().includes(q) ||
-      nombreMelamina(r.color).toLowerCase().includes(q),
+      nombreMelamina(r.color).toLowerCase().includes(q) ||
+      (r.OP ?? "").toLowerCase().includes(q) ||
+      (r.USPER ?? "").toLowerCase().includes(q) ||
+      (r.USARM ?? "").toLowerCase().includes(q) ||
+      (r.USDES ?? "").toLowerCase().includes(q),
   );
 
   const pendientes = rows.filter((r) => !r.modulo || !r.modulo.trim()).length;
@@ -151,6 +226,20 @@ export default function Produccion({ authFetch }) {
       setEliminando(false);
     }
   };
+
+  // ── Estilos compartidos por los campos editables de la tabla ───────────
+
+  const estiloInput = (row, campo, guardandoId, errorId) => ({
+    width: "100%",
+    maxWidth: "140px",
+    padding: "4px 8px",
+    fontSize: "12px",
+    fontFamily: "'Space Mono',monospace",
+    border: `1.5px solid ${errorId === (campo ? `${row.id}-${campo}` : row.id) ? "#e57373" : "#b8d6ef"}`,
+    borderRadius: "4px",
+    background: guardandoId === (campo ? `${row.id}-${campo}` : row.id) ? "#fffbe6" : "#fff",
+    color: "#0a3a5c",
+  });
 
   // ── Columnas ──────────────────────────────────────────────────────────
 
@@ -268,6 +357,65 @@ export default function Produccion({ authFetch }) {
         </select>
       ),
     },
+    {
+      key: "OP",
+      label: "OP",
+      render: (v, row) => (
+        <input
+          type="text"
+          value={row.OP ?? ""}
+          placeholder="—"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => handleTextoCampoChange(row.id, "OP", e.target.value)}
+          onBlur={() => handleTextoCampoBlur(row, "OP")}
+          maxLength={10}
+          style={estiloInput(row, "OP", guardandoCampo, errorCampo)}
+        />
+      ),
+    },
+    // Las 4 etapas (Domus/Perforado/Armado/Despacho) siguen todas el mismo
+    // patrón: select SI/NO que guarda al cambiar, y si tienen usuario
+    // asociado, un input de texto al lado que guarda al salir del campo.
+    ...ETAPAS.flatMap(({ campo, label, usuario }) => {
+      const cols = [
+        {
+          key: campo,
+          label,
+          render: (v, row) => (
+            <select
+              value={row[campo] ?? "NO"}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => handleEtapaChange(row, campo, e.target.value)}
+              style={estiloInput(row, campo, guardandoCampo, errorCampo)}
+            >
+              <option value="NO">NO</option>
+              <option value="SI">SI</option>
+            </select>
+          ),
+        },
+      ];
+      if (usuario) {
+        cols.push({
+          key: usuario,
+          label: `Usuario (${label})`,
+          render: (v, row) => (
+            <input
+              type="text"
+              value={row[usuario] ?? ""}
+              placeholder="—"
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) =>
+                handleTextoCampoChange(row.id, usuario, e.target.value)
+              }
+              onBlur={() => handleTextoCampoBlur(row, usuario)}
+              maxLength={50}
+              style={estiloInput(row, usuario, guardandoCampo, errorCampo)}
+            />
+          ),
+        });
+      }
+      return cols;
+    }),
   ];
 
   // ── Render ────────────────────────────────────────────────────────────
