@@ -153,15 +153,11 @@ export default function PresupuestoPuertas({
           familia:
             a.familia && a.familia.trim() ? a.familia.trim() : (a.rubro ?? ""),
         }));
-        // Solo artículos de área PUERTA y proveedor DANIEL ROQUE
-        const filtrados = normalized.filter(
-          (a) =>
-            (a.area ?? "").trim().toUpperCase() === "PUERTA" &&
-            (a.proveedor ?? "").trim().toUpperCase().includes("DANIEL ROQUE"),
-        );
-        setArticulos(filtrados);
+        // El backend (/productos/puertas) ya filtra por rubro=PUERTA y
+        // proveedor=DANIEL ROQUE SRL, no hace falta filtrar de nuevo acá.
+        setArticulos(normalized);
         const fams = [
-          ...new Set(filtrados.map((a) => a.familia).filter(Boolean)),
+          ...new Set(normalized.map((a) => a.familia).filter(Boolean)),
         ].sort();
         setFamilias(fams);
       })
