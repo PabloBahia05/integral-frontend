@@ -5,6 +5,7 @@ import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
 import { generarPdfRecibo } from "../pdf/pdfRecibo";
+import { generarPdfResumenCuenta } from "../pdf/pdfResumenCuenta";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -97,6 +98,13 @@ function fmtFecha(v) {
       });
 }
 
+// Fecha de hoy en formato YYYY-MM-DD, la que espera un <input type="date">.
+function hoyISO() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 // linea_por_grupo llega como JSON { grupo: idx } (idx 0=línea1, 1=línea2,
 // 2=línea3). Se muestra como lista de números de línea (idx+1) únicos y
 // ordenados, ej. "8" o "21, 22". Sin datos (obra que nunca eligió línea por
@@ -152,12 +160,18 @@ export default function CuentaCorriente({
     numeropres: "",
     monto: "",
     concepto: "Anticipo",
+    fecha: hoyISO(),
   });
   const [errorRecibo, setErrorRecibo] = useState("");
   const [guardandoRecibo, setGuardandoRecibo] = useState(false);
 
   const openRecibo = () => {
-    setFormRecibo({ numeropres: "", monto: "", concepto: "Anticipo" });
+    setFormRecibo({
+      numeropres: "",
+      monto: "",
+      concepto: "Anticipo",
+      fecha: hoyISO(),
+    });
     setErrorRecibo("");
     setModalRecibo(true);
     setLoadingObrasCliente(true);
@@ -186,6 +200,11 @@ export default function CuentaCorriente({
         )
       : null;
 
+    if (!formRecibo.fecha) {
+      setErrorRecibo("Elegí una fecha para el recibo.");
+      return;
+    }
+
     setGuardandoRecibo(true);
     try {
       const res = await authFetch(`${API}/recibos`, {
@@ -196,6 +215,7 @@ export default function CuentaCorriente({
           revision: obraElegida?.revision ?? null,
           monto: montoNum,
           concepto: formRecibo.concepto || "Anticipo",
+          fecha: formRecibo.fecha,
         }),
       });
       const recibo = await res.json();
@@ -209,7 +229,15 @@ export default function CuentaCorriente({
       // generarPdfRecibo no devuelve promesa (descargarPDF corre su propia
       // cadena async y ya maneja sus errores con alert() adentro) — se
       // dispara y no se espera, el modal ya se cerró arriba.
-      generarPdfRecibo(recibo, selectedCliente, obraElegida);
+      // Se fuerza `fecha` con la elegida en el form: si el backend todavía
+      // no persiste/devuelve ese campo, el PDF igual sale con la fecha
+      // correcta (ver nota en /recibos routes — confirmar que la columna
+      // "fecha" exista y se guarde).
+      generarPdfRecibo(
+        { ...recibo, fecha: formRecibo.fecha },
+        selectedCliente,
+        obraElegida,
+      );
     } catch (err) {
       console.error("Error guardando recibo:", err);
       setErrorRecibo(err.message || "No se pudo guardar el recibo.");
@@ -382,6 +410,24 @@ export default function CuentaCorriente({
     }
     setSelectedCliente(row);
     fetchMovimientos(row.codcliente);
+  };
+
+  const handleGenerarResumenPdf = () => {
+    if (!selectedCliente) return;
+    const saldoFinal = movimientos.length
+      ? movimientos[movimientos.length - 1].saldo_acumulado
+      : selectedCliente.saldo;
+    generarPdfResumenCuenta({
+      cliente: selectedCliente,
+      saldoFinal: Number(saldoFinal ?? 0),
+      movimientos: movimientos.map((m) => ({
+        fecha: fmtFecha(m.creado_en),
+        tipo: TIPO_LABEL[m.tipo] ?? m.tipo,
+        concepto: m.concepto ?? "—",
+        monto: Number(m.monto ?? 0),
+        saldo: Number(m.saldo_acumulado ?? 0),
+      })),
+    });
   };
 
   const abrirMovimiento = (row) => {
@@ -663,6 +709,15 @@ export default function CuentaCorriente({
               <button
                 type="button"
                 className="btn-save"
+                onClick={handleGenerarResumenPdf}
+                disabled={movimientos.length === 0}
+                style={{ padding: "8px 14px" }}
+              >
+                📄 Resumen PDF
+              </button>
+              <button
+                type="button"
+                className="btn-save"
                 onClick={openRecibo}
                 style={{ padding: "8px 14px" }}
               >
@@ -817,6 +872,22 @@ export default function CuentaCorriente({
           {errorRecibo && <p className="form-error">{errorRecibo}</p>}
           <div className="form-grid" style={{ gridTemplateColumns: "1fr" }}>
             <div>
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
+                Fecha
+              </label>
+              <input
+                className="pn-field-input"
+                type="date"
+                value={formRecibo.fecha}
+                onChange={(e) =>
+                  setFormRecibo((f) => ({ ...f, fecha: e.target.value }))
+                }
+                style={{ width: "100%", marginBottom: 12 }}
+              />
+
               <label
                 className="pn-field-label"
                 style={{ display: "block", marginBottom: 4 }}
