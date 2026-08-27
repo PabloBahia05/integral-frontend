@@ -1,10 +1,13 @@
+// pdfResumenCuenta.js
 // Genera el PDF de "Resumen de cuenta" de un cliente en Cuenta Corriente.
 //
-// Mismo motor que el resto de los PDF de la app (html2pdf.js: arma un HTML
-// off-screen y lo rasteriza). Si en el proyecto el import real de la
-// librería es distinto al de abajo (ver pdfPresupuesto.js), ajustar esa
-//   línea nomás — el resto del archivo no depende de eso.
-import html2pdf from "html2pdf.js";
+// Usa el mismo motor compartido que pdfPresupuesto.js / pdfConfirmado.js
+// (pdfMotorComun.js: descargarPDF + styleCSS), en vez de importar
+// html2pdf.js directamente — así no depende de una librería npm aparte y
+// queda con el mismo look monospace tipo factura que el resto de los PDF
+// de la app.
+
+import { descargarPDF, styleCSS } from "./pdfMotorComun.js";
 
 function fmtMoneda(v) {
   const n = Number(v ?? 0);
@@ -23,13 +26,26 @@ function fmtHoy() {
   });
 }
 
+function calcularNombreArchivo(cliente) {
+  const base = (cliente?.nombre || "cliente")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
+  return `resumen-cuenta-${base}.pdf`;
+}
+
 /**
  * @param {Object} params
  * @param {Object} params.cliente - { nombre, codcliente, telefono1 }
  * @param {number} params.saldoFinal
  * @param {Array<{fecha:string, tipo:string, concepto:string, monto:number, saldo:number}>} params.movimientos
+ * @param {(v: boolean) => void} params.setGenerandoPDF - setter de estado para mostrar loading mientras se genera
  */
-export function generarPdfResumenCuenta({ cliente, saldoFinal, movimientos }) {
+export function generarPdfResumenCuenta({
+  cliente,
+  saldoFinal,
+  movimientos,
+  setGenerandoPDF,
+}) {
   const filas = (movimientos ?? [])
     .map(
       (m) => `
@@ -45,83 +61,64 @@ export function generarPdfResumenCuenta({ cliente, saldoFinal, movimientos }) {
     )
     .join("");
 
-  const html = `
-    <div id="resumen-cuenta-pdf" style="
-      font-family:'Space Mono',monospace;
-      color:#0a3a5c;
-      width:750px;
-      padding:24px;
-      box-sizing:border-box;
-    ">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0a3a5c;padding-bottom:10px;margin-bottom:16px;">
-        <div>
-          <h2 style="margin:0;font-size:18px;">Resumen de cuenta corriente</h2>
-          <p style="margin:4px 0 0;font-size:12px;color:#4a8ab5;">Generado el ${fmtHoy()}</p>
+  const pageHTML = `
+    <div class="page">
+      <div class="doc-nro-corner">Generado el ${fmtHoy()}</div>
+      <div class="doc-title">Resumen de cuenta corriente</div>
+
+      <div class="info-line">
+        <span><strong>${cliente?.nombre ?? ""}</strong></span>
+        <span>Cód. cliente: ${cliente?.codcliente ?? ""}</span>
+      </div>
+      ${
+        cliente?.telefono1
+          ? `<div class="info-line right-only"><span>Tel: ${cliente.telefono1}</span></div>`
+          : ""
+      }
+
+      <div class="body">
+        <div class="tabla-block">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Concepto</th>
+                <th class="right">Monto</th>
+                <th class="right">Saldo</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filas || `<tr><td colspan="5" style="text-align:center;color:#888;">Sin movimientos</td></tr>`}
+            </tbody>
+          </table>
         </div>
-        <div style="text-align:right;font-size:12px;">
-          <div><strong>${cliente?.nombre ?? ""}</strong></div>
-          <div>Cód. cliente: ${cliente?.codcliente ?? ""}</div>
-          ${cliente?.telefono1 ? `<div>Tel: ${cliente.telefono1}</div>` : ""}
+
+        <div class="totals-final">
+          <div class="t-row">
+            Saldo final:
+            <span style="color:${saldoFinal > 0 ? "#c0392b" : "#1a7a3a"};margin-left:6px;">
+              ${fmtMoneda(saldoFinal)}
+            </span>
+          </div>
         </div>
       </div>
 
-      <table style="width:100%;border-collapse:collapse;font-size:11px;">
-        <thead>
-          <tr style="background:#0a3a5c;color:#fff;">
-            <th style="padding:6px 8px;text-align:left;">Fecha</th>
-            <th style="padding:6px 8px;text-align:left;">Tipo</th>
-            <th style="padding:6px 8px;text-align:left;">Concepto</th>
-            <th style="padding:6px 8px;text-align:right;">Monto</th>
-            <th style="padding:6px 8px;text-align:right;">Saldo</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${filas || `<tr><td colspan="5" style="padding:10px;text-align:center;color:#8aabb8;">Sin movimientos</td></tr>`}
-        </tbody>
-      </table>
-
-      <div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:10px;border-top:1px solid #b8cfe0;">
-        <div style="font-size:13px;font-weight:700;">
-          Saldo final:
-          <span style="color:${saldoFinal > 0 ? "#c0392b" : "#1a7a3a"};margin-left:6px;">
-            ${fmtMoneda(saldoFinal)}
-          </span>
-        </div>
+      <div class="footer">
+        <span>Daniel Roque S.R.L.</span>
+        <span>${fmtHoy()}</span>
       </div>
     </div>
-
-    <style>
-      #resumen-cuenta-pdf table td, #resumen-cuenta-pdf table th { border-bottom: 1px solid #e0e8ee; }
-      #resumen-cuenta-pdf table td.right, #resumen-cuenta-pdf table th.right { text-align: right; }
-    </style>
   `;
 
-  const contenedor = document.createElement("div");
-  contenedor.style.position = "fixed";
-  contenedor.style.left = "-9999px";
-  contenedor.style.top = "0";
-  contenedor.innerHTML = html;
-  document.body.appendChild(contenedor);
-
-  const nombreArchivo = `resumen-cuenta-${(cliente?.nombre || "cliente")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")}.pdf`;
-
-  html2pdf()
-    .from(contenedor.querySelector("#resumen-cuenta-pdf"))
-    .set({
-      margin: 10,
-      filename: nombreArchivo,
-      image: { type: "jpeg", quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    })
-    .save()
-    .catch((err) => {
-      console.error("Error generando PDF de resumen de cuenta:", err);
-      alert("No se pudo generar el PDF del resumen de cuenta.");
-    })
-    .finally(() => {
-      document.body.removeChild(contenedor);
-    });
+  descargarPDF({
+    pageHTML,
+    nombreArchivo: calcularNombreArchivo(cliente),
+    imagenesFinal: [],
+    setGenerandoPDF: setGenerandoPDF ?? (() => {}),
+  });
 }
+
+// Exportado por si algún caller quiere reusar el CSS compartido sin pasar
+// por descargarPDF (por ejemplo, para previsualizar en pantalla).
+export { styleCSS };
