@@ -153,9 +153,15 @@ export default function PresupuestoPuertas({
           familia:
             a.familia && a.familia.trim() ? a.familia.trim() : (a.rubro ?? ""),
         }));
-        setArticulos(normalized);
+        // Solo artículos de área PUERTA y proveedor DANIEL ROQUE
+        const filtrados = normalized.filter(
+          (a) =>
+            (a.area ?? "").trim().toUpperCase() === "PUERTA" &&
+            (a.proveedor ?? "").trim().toUpperCase() === "DANIEL ROQUE",
+        );
+        setArticulos(filtrados);
         const fams = [
-          ...new Set(normalized.map((a) => a.familia).filter(Boolean)),
+          ...new Set(filtrados.map((a) => a.familia).filter(Boolean)),
         ].sort();
         setFamilias(fams);
       })
