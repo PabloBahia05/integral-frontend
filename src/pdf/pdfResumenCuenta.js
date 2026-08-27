@@ -3,7 +3,7 @@
 // Mismo motor que el resto de los PDF de la app (html2pdf.js: arma un HTML
 // off-screen y lo rasteriza). Si en el proyecto el import real de la
 // librería es distinto al de abajo (ver pdfPresupuesto.js), ajustar esa
-// línea nomás — el resto del archivo no depende de eso.
+//   línea nomás — el resto del archivo no depende de eso.
 import html2pdf from "html2pdf.js";
 
 function fmtMoneda(v) {
