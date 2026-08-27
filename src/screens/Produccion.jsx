@@ -169,32 +169,58 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
           ETAPAS DE PROCESO
         </p>
 
-        {ETAPAS.map(({ campo, label, usuario }) => (
-          <div
-            key={campo}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "12px",
-              padding: "8px 0",
-              borderBottom: "1px solid #eaf3fb",
-              fontSize: "13px",
-            }}
-          >
-            <span style={{ color: "#4a8ab5", fontFamily: "'Space Mono', monospace" }}>
-              {label}
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              {usuario && row[usuario] ? (
-                <span style={{ color: "#0a3a5c", fontSize: "12px" }}>
-                  {row[usuario]}
-                </span>
-              ) : null}
-              {badgeEtapa(row[campo] ?? "NO")}
+        {(() => {
+          // Solo se listan las etapas que ya tienen algún dato cargado (SI
+          // marcado, o un usuario asociado) — si una etapa sigue en NO y sin
+          // usuario, no se muestra fila para no ensuciar el detalle con
+          // "NO" en todo lo que todavía no se hizo.
+          const completadas = ETAPAS.filter(
+            ({ campo, usuario }) =>
+              row[campo] === "SI" || (usuario && row[usuario]),
+          );
+
+          if (completadas.length === 0) {
+            return (
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#8aabb8",
+                  fontFamily: "'Space Mono', monospace",
+                  padding: "8px 0",
+                }}
+              >
+                Sin etapas completadas todavía.
+              </p>
+            );
+          }
+
+          return completadas.map(({ campo, label, usuario }) => (
+            <div
+              key={campo}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "12px",
+                padding: "8px 0",
+                borderBottom: "1px solid #eaf3fb",
+                fontSize: "13px",
+              }}
+            >
+              <span style={{ color: "#4a8ab5", fontFamily: "'Space Mono', monospace" }}>
+                {label}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {usuario && row[usuario] ? (
+                  <span style={{ color: "#0a3a5c", fontSize: "12px" }}>
+                    {row[usuario]}
+                  </span>
+                ) : null}
+                {badgeEtapa(row[campo] ?? "NO")}
+              </div>
             </div>
-          </div>
-        ))}
+          ));
+        })()}
       </div>
     </div>
   );
