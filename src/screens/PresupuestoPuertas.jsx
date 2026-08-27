@@ -157,7 +157,7 @@ export default function PresupuestoPuertas({
         const filtrados = normalized.filter(
           (a) =>
             (a.area ?? "").trim().toUpperCase() === "PUERTA" &&
-            (a.proveedor ?? "").trim().toUpperCase() === "DANIEL ROQUE",
+            (a.proveedor ?? "").trim().toUpperCase().includes("DANIEL ROQUE"),
         );
         setArticulos(filtrados);
         const fams = [
