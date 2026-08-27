@@ -1367,7 +1367,8 @@ export default function PresupuestoNuevo({
   // ── Ajuste de precios ────────────────────────────────────
   const [ajusteModo, setAjusteModo] = useState("porcentaje"); // "porcentaje" | "monto"
   const [ajusteValor, setAjusteValor] = useState("");
-  const [ajusteScope, setAjusteScope] = useState("todos"); // "todos" | id de item
+  // "todos" | "grupo:<nombre>" (mismo nombre que devuelve grupoDe/nombresGruposUsados) | id de item
+  const [ajusteScope, setAjusteScope] = useState("todos");
   const [preciosOriginales, setPreciosOriginales] = useState({}); // { [id]: { precio, precios } }
   const [ajusteAplicado, setAjusteAplicado] = useState(false);
 
@@ -1467,6 +1468,24 @@ export default function PresupuestoNuevo({
     setPresupuestoItems,
   });
 
+  // Resuelve si el ítem (id + fila) cae dentro del scope elegido para el
+  // ajuste. Para ids "cocina-"/"placard-" la fila interna (cocinaItems/
+  // placardItems) no trae grupo/seccion propios, así que para el modo
+  // "grupo:" resolvemos el grupo real vía presupuestoItems (que sí está
+  // sincronizado con grupoDe/gruposCustom) en vez de la fila cruda.
+  const perteneceAScope = (id, fila) => {
+    if (ajusteScope === "todos") return true;
+    if (ajusteScope.startsWith("grupo:")) {
+      const grupoBuscado = ajusteScope.slice("grupo:".length);
+      const item =
+        id.startsWith("cocina-") || id.startsWith("placard-")
+          ? presupuestoItems.find((x) => x.id === id)
+          : fila;
+      return item ? grupoDe(item) === grupoBuscado : false;
+    }
+    return id === ajusteScope;
+  };
+
   const aplicarAjuste = () => {
     const val = parseFloat(ajusteValor);
     if (!val || isNaN(val)) return;
@@ -1484,7 +1503,7 @@ export default function PresupuestoNuevo({
     }
 
     const ajustarFila = (id, f, origenPreciosOriginales) => {
-      if (ajusteScope !== "todos" && id !== ajusteScope) return f;
+      if (!perteneceAScope(id, f)) return f;
       const origItem = ajusteAplicado
         ? origenPreciosOriginales[id]
         : { precio: f.precio, precios: f.precios };
