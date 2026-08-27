@@ -4,7 +4,6 @@ import ActionBar from "../Component/ActionBar";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import {
-  MEMBRETE_DANIEL_ROQUE_B64,
   formatPeso,
   styleCSS,
   descargarPDF,
@@ -23,6 +22,118 @@ const API = "https://integral-backend-production.up.railway.app";
 // con el botón 🧾 Facturar (BotonFacturar.jsx).
 
 const TIPO_CBTE_LABEL = { 1: "A", 6: "B", 11: "C" };
+// Código de comprobante AFIP de 2 dígitos que va bajo la letra en el
+// recuadro (Cód.01 = Factura A, Cód.06 = Factura B, Cód.11 = Factura C).
+const CODIGO_CBTE = { 1: "01", 6: "06", 11: "11" };
+
+// ── Importe en letras ("Pesos Argentinos ... con ... centavos") ──────────
+const UNIDADES = ["", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
+const ESPECIALES_10_19 = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISEIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE"];
+const DECENAS = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
+const CENTENAS = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
+
+function convertirGrupo(n) {
+  // n: 0..999
+  if (n === 0) return "";
+  if (n === 100) return "CIEN";
+  let out = "";
+  const c = Math.floor(n / 100);
+  const resto = n % 100;
+  if (c > 0) out += CENTENAS[c] + " ";
+  if (resto >= 10 && resto < 20) {
+    out += ESPECIALES_10_19[resto - 10];
+  } else if (resto >= 20) {
+    const d = Math.floor(resto / 10);
+    const u = resto % 10;
+    if (resto >= 21 && resto <= 29) {
+      out += "VEINTI" + UNIDADES[u].toLowerCase();
+      out = out.toUpperCase();
+    } else {
+      out += DECENAS[d] + (u > 0 ? " Y " + UNIDADES[u] : "");
+    }
+  } else if (resto > 0) {
+    out += UNIDADES[resto];
+  }
+  return out.trim();
+}
+
+// Convierte un número entero (parte entera de los pesos) a letras. Cubre
+// hasta 999.999.999 — más que suficiente para una factura de muebles a
+// medida. No es exhaustivo en todos los casos límite del idioma (ej. "UN"
+// vs "UNO" delante de sustantivo), pero cubre bien los montos típicos de
+// esta facturación.
+function enteroALetras(n) {
+  if (n === 0) return "CERO";
+  const millones = Math.floor(n / 1000000);
+  const miles = Math.floor((n % 1000000) / 1000);
+  const resto = n % 1000;
+
+  let partes = [];
+  if (millones > 0) {
+    partes.push(
+      millones === 1 ? "UN MILLON" : convertirGrupo(millones) + " MILLONES",
+    );
+  }
+  if (miles > 0) {
+    partes.push(miles === 1 ? "MIL" : convertirGrupo(miles) + " MIL");
+  }
+  if (resto > 0) {
+    partes.push(convertirGrupo(resto));
+  }
+  return partes.join(" ").trim();
+}
+
+// "Pesos Argentinos <entero en letras> con <centavos> centavos.-" — mismo
+// formato que usa el comprobante real de AFIP.
+function importeEnLetras(monto) {
+  const num = Number(monto) || 0;
+  const entero = Math.floor(num);
+  const centavos = Math.round((num - entero) * 100);
+  return `Pesos Argentinos ${enteroALetras(entero)} con ${centavos} centavos.-`;
+}
+
+// CSS específico del layout de factura (recuadro ORIGINAL, grillas con
+// bordes, etc.) — separado de styleCSS (que es el de los presupuestos) para
+// no pisar sus clases; se inyectan los dos juntos en el <style> del PDF.
+const FACTURA_CSS = `
+.f-page { width: 780px; margin: 0 auto; padding: 16px 20px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; border: 1.5px solid #111; }
+.f-original { text-align: center; font-weight: 700; font-size: 13px; letter-spacing: 0.1em; border-bottom: 1.5px solid #111; padding-bottom: 6px; margin-bottom: 8px; }
+.f-header { display: flex; border-bottom: 1.5px solid #111; padding-bottom: 8px; margin-bottom: 8px; }
+.f-emisor { flex: 1.3; padding-right: 10px; border-right: 1.5px solid #111; }
+.f-emisor .f-razon { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.f-emisor .f-linea { font-size: 10px; margin-bottom: 2px; line-height: 1.35; }
+.f-tipo-box { width: 64px; flex-shrink: 0; border-right: 1.5px solid #111; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.f-tipo-box .f-letra { font-size: 30px; font-weight: 700; border: 1.5px solid #111; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+.f-tipo-box .f-cod { font-size: 9px; margin-top: 2px; }
+.f-meta { flex: 1.3; padding-left: 10px; }
+.f-meta .f-factura-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.f-meta .f-linea { font-size: 10.5px; margin-bottom: 3px; display: flex; justify-content: space-between; }
+.f-vto-pago { text-align: right; font-size: 10.5px; border-bottom: 1.5px solid #111; padding-bottom: 6px; margin-bottom: 8px; }
+.f-cliente { border-bottom: 1.5px solid #111; padding-bottom: 8px; margin-bottom: 0; font-size: 10.5px; display: flex; }
+.f-cliente .f-cliente-izq { flex: 2; line-height: 1.6; }
+.f-cliente .f-cliente-der { flex: 1; line-height: 1.6; text-align: left; }
+.f-items { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+.f-items thead th { text-align: left; font-weight: 700; border-bottom: 1.5px solid #111; padding: 5px 6px; background: #f2f2f2; }
+.f-items thead th.f-right { text-align: right; }
+.f-items thead th.f-center { text-align: center; }
+.f-items tbody td { padding: 5px 6px; vertical-align: top; }
+.f-items tbody td.f-right { text-align: right; }
+.f-items tbody td.f-center { text-align: center; }
+.f-items-body { min-height: 340px; border-bottom: 1.5px solid #111; }
+.f-footer-row { display: flex; border-bottom: 1.5px solid #111; }
+.f-observaciones { flex: 1; padding: 8px; font-size: 10px; border-right: 1.5px solid #111; }
+.f-totales { width: 210px; flex-shrink: 0; padding: 8px; font-size: 11px; }
+.f-totales .f-t-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.f-totales .f-t-total { border-top: 1.5px solid #111; padding-top: 4px; font-weight: 700; }
+.f-monto-letras { padding: 6px 8px; font-size: 10px; border-bottom: 1.5px solid #111; display: flex; justify-content: space-between; align-items: center; }
+.f-cae-footer { display: flex; align-items: flex-start; padding-top: 8px; justify-content: space-between; }
+.f-arca { display: flex; align-items: center; gap: 8px; }
+.f-arca .f-arca-nombre { font-weight: 700; font-size: 14px; }
+.f-arca .f-arca-desc { font-size: 8px; line-height: 1.3; }
+.f-arca .f-arca-autorizado { font-size: 9px; font-weight: 700; margin-top: 2px; }
+.f-cae-datos { text-align: right; font-size: 10px; }
+.f-pagina { text-align: center; font-size: 9px; color: #555; margin-top: 6px; }
+`;
 
 // Mismo criterio que resolverTipoFactura() en facturasventa.routers.js,
 // pero reducido a lo que hace falta para el QR (tipo/número de documento
@@ -58,6 +169,47 @@ const formatearFechaHora = (iso) =>
         minute: "2-digit",
       })
     : "";
+
+// DD/MM/AAAA — para "Fecha de Emisión" y "Fecha de Vto. para el pago" en
+// el comprobante (sin hora, como en el modelo real).
+const formatearFechaCorta = (iso) =>
+  iso
+    ? new Date(iso).toLocaleDateString("es-AR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : "";
+
+// cae_vencimiento viene de AFIP como string "YYYYMMDD" (así lo define la
+// tabla facturas_venta: VARCHAR(8) — ver CREATE TABLE en
+// facturasventa.routers.js). Lo convertimos a DD/MM/AAAA para mostrarlo.
+const formatearFechaCae = (yyyymmdd) => {
+  const s = String(yyyymmdd ?? "");
+  if (s.length !== 8) return s;
+  return `${s.slice(6, 8)}/${s.slice(4, 6)}/${s.slice(0, 4)}`;
+};
+
+// Inserta los guiones del CUIT/CUIL (XX-XXXXXXXX-X) a partir de un valor
+// que puede venir con o sin formato. Si no tiene 11 dígitos (dato viejo,
+// incompleto, o Ingresos Brutos con otra longitud), lo devuelve tal cual
+// vino en vez de forzar un formato que no corresponde.
+const formatearCuit = (v) => {
+  const digitos = String(v ?? "").replace(/\D/g, "");
+  if (digitos.length !== 11) return v ?? "";
+  return `${digitos.slice(0, 2)}-${digitos.slice(2, 10)}-${digitos.slice(10)}`;
+};
+
+// Etiqueta larga de la condición frente al IVA del cliente, para el bloque
+// "Condición frente al IVA:" del comprobante (clientes.tipofact es el
+// código corto: RI/MT/EX/CF).
+const condicionIvaLabel = (tipofact) => {
+  const t = (tipofact || "").trim().toUpperCase();
+  if (t === "RI") return "IVA Responsable Inscripto";
+  if (t === "MT") return "Responsable Monotributo";
+  if (t === "EX") return "IVA Sujeto Exento";
+  return "Consumidor Final";
+};
 
 // AFIP exige la fecha del comprobante en formato YYYYMMDD dentro del QR.
 const fechaAfipQR = (iso) => {
@@ -171,49 +323,123 @@ export default function FacturasVenta({ authFetch }) {
     const qrSrc = armarQrUrl(f, emisor);
     const nroCompleto = `${String(f.pto_vta).padStart(4, "0")}-${String(f.nro_comprobante).padStart(8, "0")}`;
     const letra = TIPO_CBTE_LABEL[f.tipo_cbte] ?? "";
+    const codigoCbte = CODIGO_CBTE[f.tipo_cbte] ?? "";
+    const fechaEmision = formatearFechaCorta(f.creado_en);
+    const fechaVtoCae = formatearFechaCae(f.cae_vencimiento);
+    const documentoCliente = f.cliente_cuit
+      ? formatearCuit(f.cliente_cuit)
+      : f.cliente_dni ?? "—";
+
+    // La tabla de ítems muestra UNA línea que resume el presupuesto — la
+    // factura solo tiene neto/IVA/total agregados (no ítems individuales
+    // guardados), así que se factura como concepto único. Si más adelante
+    // guardás el detalle real del presupuesto en facturas_venta, este
+    // bloque se puede reemplazar por un .map() de ítems.
+    const detalleItem = `Presupuesto N° ${f.numeropres} — Muebles a medida`;
 
     const pageHTML = `
-      <style>${styleCSS}</style>
-      <div class="page">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
-          <img src="${MEMBRETE_DANIEL_ROQUE_B64}" style="height:70px;" />
-          <div style="border:2px solid #111; text-align:center; padding:6px 14px;">
-            <div style="font-size:22px; font-weight:700;">${letra}</div>
-            <div style="font-size:10px;">COD. ${f.tipo_cbte}</div>
+      <style>${styleCSS}${FACTURA_CSS}</style>
+      <div class="f-page">
+        <div class="f-original">ORIGINAL</div>
+
+        <div class="f-header">
+          <div class="f-emisor">
+            <div class="f-razon">${emisor.razonSocial?.toUpperCase() ?? ""}</div>
+            <div class="f-linea">Razón Social: ${emisor.razonSocial ?? ""}</div>
+            <div class="f-linea">Domicilio Comercial: ${emisor.domicilio ?? ""}</div>
+            ${emisor.telefono || emisor.web ? `<div class="f-linea">${emisor.web ? `http: ${emisor.web}` : ""}${emisor.web && emisor.telefono ? " - " : ""}${emisor.telefono ? `Tel./Fax ${emisor.telefono}` : ""}</div>` : ""}
+            <div class="f-linea">Responsabilidad frente al IVA: ${(emisor.condicionIva ?? "").toUpperCase()}</div>
           </div>
-          <div style="text-align:right; font-size:11px;">
-            <div><strong>${emisor.razonSocial}</strong></div>
-            <div>CUIT: ${emisor.cuit}</div>
-            <div>${emisor.condicionIva}</div>
-            <div>${emisor.domicilio}</div>
+          <div class="f-tipo-box">
+            <div class="f-letra">${letra}</div>
+            <div class="f-cod">Cód.${codigoCbte}</div>
+          </div>
+          <div class="f-meta">
+            <div class="f-factura-title">FACTURA</div>
+            <div class="f-linea"><span>Punto de Venta: ${String(f.pto_vta).padStart(4, "0")}</span><span>Comp. Nro: ${String(f.nro_comprobante).padStart(8, "0")}</span></div>
+            <div class="f-linea"><span>Fecha de Emisión: ${fechaEmision}</span><span></span></div>
+            <div class="f-linea"><span>CUIT: ${formatearCuit(emisor.cuit)}</span><span></span></div>
+            <div class="f-linea"><span>Ingresos Brutos: ${formatearCuit(emisor.ingresosBrutos)}</span><span></span></div>
+            ${emisor.inicioActividades ? `<div class="f-linea"><span>Inicio de Actividades: ${emisor.inicioActividades}</span><span></span></div>` : ""}
           </div>
         </div>
 
-        <div class="doc-title">Factura ${letra} — N° ${nroCompleto}</div>
+        <div class="f-vto-pago">Fecha de Vto.para el pago: ${fechaEmision}</div>
 
-        <div class="info-line"><span>Fecha: ${formatearFechaHora(f.creado_en)}</span><span>Presupuesto N° ${f.numeropres}</span></div>
-        <div class="info-line"><span>Cliente: ${f.cliente_nombre}</span><span>CUIT/DNI: ${f.cliente_cuit ?? f.cliente_dni ?? "—"}</span></div>
+        <div class="f-cliente">
+          <div class="f-cliente-izq">
+            <div><strong>Sr(es):</strong> ${(f.cliente_nombre ?? "").toUpperCase()}</div>
+            <div><strong>Domicilio Comercial:</strong> ${[f.cliente_domicilio, f.cliente_localidad].filter(Boolean).join(", ")}</div>
+            <div><strong>CUIT:</strong> ${documentoCliente}</div>
+            <div><strong>Condición frente al IVA:</strong> ${condicionIvaLabel(f.cliente_tipofact)}</div>
+          </div>
+          <div class="f-cliente-der">
+            <div><strong>Cliente N°</strong> ${String(f.codcliente).padStart(5, "0")}</div>
+            <div><strong>Condición de Venta:</strong> Contado</div>
+          </div>
+        </div>
 
-        <div class="body">
-          <table>
-            <thead><tr><th>Concepto</th><th class="right">Importe</th></tr></thead>
+        <div class="f-items-body">
+          <table class="f-items">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th class="f-center">Cantidad</th>
+                <th class="f-center">Un.</th>
+                <th>D e t a l l e</th>
+                <th class="f-right">Ancho</th>
+                <th class="f-right">Alto</th>
+                <th class="f-right">P.Unit.</th>
+                <th class="f-right">% Bon.</th>
+                <th class="f-right">Importe</th>
+              </tr>
+            </thead>
             <tbody>
-              <tr><td>Neto gravado</td><td class="right">${formatPeso(f.importe_neto)}</td></tr>
-              <tr><td>IVA 21%</td><td class="right">${formatPeso(f.importe_iva)}</td></tr>
+              <tr>
+                <td>${String(f.numeropres).padStart(5, "0")}</td>
+                <td class="f-center">1.00</td>
+                <td class="f-center">Un.</td>
+                <td>${detalleItem}</td>
+                <td class="f-right"></td>
+                <td class="f-right"></td>
+                <td class="f-right">${formatPeso(f.importe_neto)}</td>
+                <td class="f-right">0.00</td>
+                <td class="f-right">${formatPeso(f.importe_neto)}</td>
+              </tr>
             </tbody>
           </table>
-          <div class="totals-final">
-            <div class="t-row">TOTAL: ${formatPeso(f.importe_total)}</div>
+        </div>
+
+        <div class="f-footer-row">
+          <div class="f-observaciones">
+            <strong>Observaciones:</strong><br />
+          </div>
+          <div class="f-totales">
+            <div class="f-t-row"><span>Importe Neto</span><span>${formatPeso(f.importe_neto)}</span></div>
+            <div class="f-t-row"><span>IVA 21%</span><span>${formatPeso(f.importe_iva)}</span></div>
+            <div class="f-t-row f-t-total"><span>Total Comprobante</span><span>${formatPeso(f.importe_total)}</span></div>
           </div>
         </div>
 
-        <div class="footer" style="align-items:center;">
-          <div>
-            <div>CAE: ${f.cae}</div>
-            <div>Vto. CAE: ${f.cae_vencimiento}</div>
-          </div>
-          <img src="${qrSrc}" style="width:110px; height:110px;" />
+        <div class="f-monto-letras">
+          <span>${importeEnLetras(f.importe_total)}</span>
         </div>
+
+        <div class="f-cae-footer">
+          <div class="f-arca">
+            <img src="${qrSrc}" style="width:78px; height:78px;" />
+            <div>
+              <div class="f-arca-nombre">ARCA</div>
+              <div class="f-arca-desc">AGENCIA DE RECAUDACION<br />Y CONTROL ADUANERO</div>
+              <div class="f-arca-autorizado">Comprobante Autorizado</div>
+            </div>
+          </div>
+          <div class="f-cae-datos">
+            <div><strong>CAE N°:</strong> ${f.cae}</div>
+            <div><strong>Fecha de Vto. de CAE:</strong> ${fechaVtoCae}</div>
+          </div>
+        </div>
+        <div class="f-pagina">Página 1 de 1</div>
       </div>
     `;
 
