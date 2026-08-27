@@ -26,6 +26,180 @@ const ETAPAS = [
   { campo: "DESPACHO", label: "Despacho", usuario: "USDES" },
 ];
 
+// ── Modal de detalle (se abre al clickear el código) ───────────────────────
+//
+// Solo muestra datos que ya vienen en la fila de `produccion` (no pega a
+// ningún endpoint nuevo): cliente, grupo, producto, módulo, color resuelto,
+// y el estado de las 4 etapas con su usuario y OP.
+function DetalleProduccion({ row, nombreMelamina, onClose }) {
+  if (!row) return null;
+
+  const badgeEtapa = (valor) => (
+    <span
+      style={{
+        display: "inline-block",
+        background: valor === "SI" ? "#eaf7ea" : "#f3f3f3",
+        color: valor === "SI" ? "#2e7d32" : "#888",
+        border: `1px solid ${valor === "SI" ? "#a5d6a7" : "#ddd"}`,
+        borderRadius: "4px",
+        padding: "2px 10px",
+        fontSize: "12px",
+        fontWeight: 700,
+        fontFamily: "'Space Mono', monospace",
+      }}
+    >
+      {valor === "SI" ? "✓ SI" : "NO"}
+    </span>
+  );
+
+  const fila = (label, valor) => (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        gap: "16px",
+        padding: "8px 0",
+        borderBottom: "1px solid #eaf3fb",
+        fontSize: "13px",
+      }}
+    >
+      <span style={{ color: "#4a8ab5", fontFamily: "'Space Mono', monospace" }}>
+        {label}
+      </span>
+      <span style={{ color: "#0a3a5c", fontWeight: 600, textAlign: "right" }}>
+        {valor}
+      </span>
+    </div>
+  );
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,58,92,0.35)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff",
+          borderRadius: "8px",
+          padding: "24px",
+          width: "90%",
+          maxWidth: "420px",
+          maxHeight: "85vh",
+          overflowY: "auto",
+          boxShadow: "0 8px 30px rgba(10,58,92,0.25)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "12px",
+          }}
+        >
+          <span
+            style={{
+              display: "inline-block",
+              background: "#0a3a5c",
+              color: "#fff",
+              borderRadius: "4px",
+              padding: "2px 10px",
+              fontSize: "13px",
+              fontWeight: 700,
+              letterSpacing: "0.5px",
+              fontFamily: "'Space Mono', monospace",
+            }}
+          >
+            {row.codpro ?? "—"}
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: "20px",
+              lineHeight: 1,
+              cursor: "pointer",
+              color: "#8aabb8",
+            }}
+            aria-label="Cerrar"
+          >
+            ×
+          </button>
+        </div>
+
+        <p
+          style={{
+            fontSize: "11px",
+            color: "#8aabb8",
+            fontFamily: "'Space Mono', monospace",
+            marginTop: 0,
+            marginBottom: "16px",
+          }}
+        >
+          Presupuesto N° {row.numeropres ? String(row.numeropres).padStart(4, "0") : "—"}
+          {" · "}Rev. {row.revision ?? 0}
+        </p>
+
+        {fila("Cliente", row.cliente_nombre ?? "(sin cliente)")}
+        {fila("Grupo", row.grupo ?? "—")}
+        {fila("Producto", row.producto ?? "—")}
+        {fila("Módulo", row.modulo ?? "Sin cargar")}
+        {fila("Color", row.color ? nombreMelamina(row.color) : "Sin color")}
+        {fila("OP", row.OP ?? "—")}
+
+        <p
+          style={{
+            fontSize: "11px",
+            color: "#8aabb8",
+            fontFamily: "'Space Mono', monospace",
+            marginTop: "16px",
+            marginBottom: "8px",
+          }}
+        >
+          ETAPAS DE PROCESO
+        </p>
+
+        {ETAPAS.map(({ campo, label, usuario }) => (
+          <div
+            key={campo}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "12px",
+              padding: "8px 0",
+              borderBottom: "1px solid #eaf3fb",
+              fontSize: "13px",
+            }}
+          >
+            <span style={{ color: "#4a8ab5", fontFamily: "'Space Mono', monospace" }}>
+              {label}
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {usuario && row[usuario] ? (
+                <span style={{ color: "#0a3a5c", fontSize: "12px" }}>
+                  {row[usuario]}
+                </span>
+              ) : null}
+              {badgeEtapa(row[campo] ?? "NO")}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Produccion({ authFetch }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +214,10 @@ export default function Produccion({ authFetch }) {
 
   const [aEliminar, setAEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
+
+  // Fila que se está mostrando en el modal de detalle (se abre al
+  // clickear el código de producción, ver columna `codpro` más abajo).
+  const [detalle, setDetalle] = useState(null);
 
   // Melaminas disponibles para el desplegable de `color` (ver
   // GET /productos/melaminas en articulos_controller.js — filtra
@@ -247,8 +425,13 @@ export default function Produccion({ authFetch }) {
     {
       key: "codpro",
       label: "Cód.",
-      render: (v) => (
+      render: (v, row) => (
         <span
+          onClick={(e) => {
+            e.stopPropagation();
+            setDetalle(row);
+          }}
+          title="Ver detalle"
           style={{
             display: "inline-block",
             background: "#0a3a5c",
@@ -259,6 +442,7 @@ export default function Produccion({ authFetch }) {
             fontWeight: 700,
             letterSpacing: "0.5px",
             fontFamily: "'Space Mono', monospace",
+            cursor: "pointer",
           }}
         >
           {v ?? "—"}
@@ -495,6 +679,14 @@ export default function Produccion({ authFetch }) {
           }
           onConfirm={handleDelete}
           onClose={() => !eliminando && setAEliminar(null)}
+        />
+      )}
+
+      {detalle && (
+        <DetalleProduccion
+          row={detalle}
+          nombreMelamina={nombreMelamina}
+          onClose={() => setDetalle(null)}
         />
       )}
     </>
