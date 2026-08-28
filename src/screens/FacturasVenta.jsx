@@ -272,8 +272,20 @@ function cargarHtml2pdf() {
 function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
   setGenerandoPDF(true);
   const contenedor = document.createElement("div");
+  // OJO: a diferencia de descargarPDF() (pdfMotorComun.js), que posiciona
+  // su contenedor bien lejos con `left:-9999px`, acá lo dejamos en
+  // coordenadas normales (0,0) y lo ocultamos con opacity — porque
+  // html2canvas clona la página adentro de un iframe del ancho de la
+  // ventana REAL del navegador (por default document.clientWidth) salvo
+  // que se le pase `windowWidth` explícito. En una ventana angosta (ej.
+  // el emulador de celular de DevTools, ~470px) un contenedor a
+  // left:-9999px queda fuera del área que ese iframe alcanza a cubrir, y
+  // el borde derecho del comprobante se recorta — que es exactamente lo
+  // que pasó en la prueba. Con position:fixed en (0,0) + windowWidth
+  // forzado más abajo, la captura no depende del ancho real de la
+  // ventana de quien esté mirando.
   contenedor.style.cssText =
-    "position:fixed; left:-9999px; top:0; width:794px; background:#fff; z-index:-1;";
+    "position:fixed; left:0; top:0; width:794px; background:#fff; opacity:0; pointer-events:none; z-index:-1;";
   contenedor.innerHTML = pageHTML;
   document.body.appendChild(contenedor);
 
@@ -295,7 +307,16 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
     margin: [10, 0, 10, 0],
     filename: nombreArchivo,
     image: { type: "jpeg", quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      // Fuerza el "ancho de ventana" que usa html2canvas para su clon
+      // interno, sin importar el ancho real de la ventana del navegador
+      // (ver comentario arriba). Un poco más que 794 para no dejar el
+      // borde derecho pegado al límite.
+      windowWidth: 850,
+    },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
   };
 
