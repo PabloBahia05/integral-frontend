@@ -294,13 +294,11 @@ export default function PresupuestoPuertas({
             JSON.stringify(codartLower),
             "len:", codartLower.length,
           );
-          console.warn(
-            "[DEBUG asociaciones] disponibles:",
-            dataAsoc.map((a) => {
-              const c = (a.codartint ?? a.codart ?? "").toLowerCase().trim();
-              return { raw: JSON.stringify(a.codart ?? a.codartint ?? ""), normalizado: JSON.stringify(c), len: c.length, coincideExacto: c === codartLower };
-            }),
-          );
+          const debugList = dataAsoc.map((a) => {
+            const c = (a.codartint ?? a.codart ?? "").toLowerCase().trim();
+            return { id: a.id, raw: a.codart ?? a.codartint ?? "", normalizado: c, len: c.length, coincideExacto: c === codartLower };
+          });
+          console.warn("[DEBUG asociaciones] disponibles (texto plano):\n" + JSON.stringify(debugList, null, 2));
           setCargandoAsociados(false);
           setAsociados([]);
           setErrorCalc(
