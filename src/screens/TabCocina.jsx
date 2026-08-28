@@ -932,7 +932,13 @@ export default function TabCocina({
                         );
                         const precioUn = parseFloat(art?.precio) || 0;
                         const areaItem = resolverAreaItem(fila);
-                        const area = parseFloat(areaItem) || 1;
+                        // Si el accesorio tiene linea=1 en SQL, se aplica
+                        // una sola vez por unidad del ítem (área fija en 1),
+                        // sin importar el área del producto — mismo criterio
+                        // que totalAccesorios en useCocinaPlacard.js.
+                        const lineaAcc = Number(art?.linea ?? art?.LINEA ?? 0);
+                        const area =
+                          lineaAcc === 1 ? 1 : parseFloat(areaItem) || 1;
                         // Cantidad total de juegos/bisagras a mostrar: el
                         // "área" del artículo es cuántos corresponden a UNA
                         // unidad de este ítem (ej: cajonera de 2 caj. ->
@@ -962,7 +968,7 @@ export default function TabCocina({
                               marginTop: 2,
                             }}
                           >
-                            🔧 {nombre} — cant: {areaItem != null ? cantAccTotal : "-"} · +
+                            🔧 {nombre} — cant: {lineaAcc === 1 || areaItem != null ? cantAccTotal : "-"} · +
                             {total.toLocaleString("es-AR", {
                               style: "currency",
                               currency: "ARS",
@@ -992,24 +998,14 @@ export default function TabCocina({
                       onClick={(e) =>
                         abrirAccesorioMenu?.(
                           fila.accesorios ?? [],
-                          (nombre) => {
-                            // TEMP DEBUG — sacar cuando se confirme el fix
-                            console.log("[toggleAccesorio][cocina]", {
-                              nombre,
-                              "fila.articulo": fila.articulo,
-                              "fila.nombreart": fila.nombreart,
-                              "fila.area": fila.area,
-                              "fila.cantidad": fila.cantidad,
-                              areaResuelta: resolverAreaItem(fila),
-                            });
+                          (nombre) =>
                             toggleAccesorioItem?.(
                               "cocina",
                               cocinaFamilia,
                               idx,
                               nombre,
                               resolverAreaItem(fila),
-                            );
-                          },
+                            ),
                           () =>
                             confirmarAccesoriosItem?.(
                               "cocina",
