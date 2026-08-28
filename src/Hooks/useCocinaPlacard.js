@@ -575,14 +575,23 @@ export default function useCocinaPlacard({
   // de un paso de confirmación separado, así que un click afuera del
   // popover (que solo cierra el menú, sin llamar a onConfirm) no puede
   // dejar el accesorio tildado sin sumar al precio.
-  const toggleAccesorioItem = (tipo, familia, idx, nombreAccesorio) => {
+  const toggleAccesorioItem = (tipo, familia, idx, nombreAccesorio, areaResuelta) => {
     const actualizar = (prev) => ({
       ...prev,
-      [familia]: (prev[familia] ?? []).map((f, i) =>
-        i === idx
-          ? recalcFila({ ...f, accesorios: toggleAccesorioEnArray(f.accesorios, nombreAccesorio) })
-          : f,
-      ),
+      [familia]: (prev[familia] ?? []).map((f, i) => {
+        if (i !== idx) return f;
+        // Mismo fallback que confirmarAccesoriosItem: si f.area viene null
+        // (ítem cargado/agregado antes de persistir esa columna), usamos
+        // areaResuelta que debe mandar el llamador (TabCocina/PlacardSection,
+        // con resolverAreaItem). Sin esto, recalcFila caía en su default
+        // "area || 1" y sumaba el precio de un solo accesorio en vez de la
+        // cantidad real (ej. 2 bisagras en una puerta simple).
+        const fila = f.area != null ? f : { ...f, area: areaResuelta ?? f.area };
+        return recalcFila({
+          ...fila,
+          accesorios: toggleAccesorioEnArray(fila.accesorios, nombreAccesorio),
+        });
+      }),
     });
     if (tipo === "cocina") setCocinaItems(actualizar);
     else setPlacardItems(actualizar);
