@@ -353,6 +353,17 @@ export default function useCocinaPlacard({
       const cantidad = parseFloat(fila.cantidad) || 1;
       return acc + p * area * cantidad;
     }, 0);
+    // TEMP DEBUG — sacar cuando se confirme el fix
+    if ((fila.accesorios ?? []).length > 0) {
+      console.log("[recalcFila][totalAccesorios]", {
+        articulo: fila.articulo,
+        accesorios: fila.accesorios,
+        "fila.area": fila.area,
+        "fila.cantidad": fila.cantidad,
+        accesoriosDisponibles_len: accesoriosDisponibles.length,
+        totalAccesorios,
+      });
+    }
     const conAccesorios = (precio) => {
       if (!totalAccesorios) return precio;
       const p = parseFloat(precio) || 0;
