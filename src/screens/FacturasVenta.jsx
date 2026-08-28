@@ -92,6 +92,7 @@ function importeEnLetras(monto) {
 // bordes, etc.) — separado de styleCSS (que es el de los presupuestos) para
 // no pisar sus clases; se inyectan los dos juntos en el <style> del PDF.
 const FACTURA_CSS = `
+.f-page, .f-page * { box-sizing: border-box; }
 .f-page { width: 780px; margin: 0 auto; padding: 16px 20px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; border: 1.5px solid #111; }
 .f-original { text-align: center; font-weight: 700; font-size: 13px; letter-spacing: 0.1em; border-bottom: 1.5px solid #111; padding-bottom: 6px; margin-bottom: 8px; }
 .f-header { display: flex; border-bottom: 1.5px solid #111; padding-bottom: 8px; margin-bottom: 8px; }
@@ -284,7 +285,14 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
   const elFactura = contenedor.querySelector(".f-page");
 
   const opciones = {
-    margin: [8, 8, 8, 8],
+    // Margen horizontal en 0 a propósito: esta versión de html2pdf.js
+    // recorta el contenido en vez de escalarlo cuando el margen
+    // izquierdo/derecho es distinto de cero (así se vio en el primer PDF
+    // de prueba — el texto se cortaba siempre en la misma columna). El
+    // motor de presupuestos (pdfMotorComun.js) usa el mismo patrón
+    // [arriba, 0, abajo, 0] por esta razón. El "aire" de los costados acá
+    // lo da el padding de .f-page, no el margen de jsPDF.
+    margin: [10, 0, 10, 0],
     filename: nombreArchivo,
     image: { type: "jpeg", quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
