@@ -378,6 +378,14 @@ export default function useCocinaPlacard({
         precio: conAccesorios(conAjusteGeneral(conExtra(conLista, fila.porcentaje1))),
       };
     }
+    // Fallback: fila sin preciosBase ni precioBase (ítems que llegan solo con
+    // `precio` ya resuelto, ej. cargados desde un presupuesto guardado antes
+    // de que existiera el campo base). Sin esta rama, conAccesorios nunca se
+    // llamaba acá y el freno/accesorios quedaba calculado en memoria
+    // (totalAccesorios) pero nunca sumado al precio real de la línea.
+    if (totalAccesorios) {
+      return { ...fila, precio: conAccesorios(fila.precio) };
+    }
     return fila;
   };
 
