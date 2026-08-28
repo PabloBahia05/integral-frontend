@@ -345,25 +345,27 @@ export default function useCocinaPlacard({
     // igual para todas las líneas. Se recalcula siempre desde cero (no es
     // acumulativo) así que confirmar el popover de accesorios varias veces
     // no duplica el cargo.
+    // Accesorios: suma el precio de cada artículo "extra" tildado para
+    // este ítem (fila.accesorios, nombres de artículos con area =
+    // 'accesorio'), multiplicado por la cantidad del ítem y por:
+    //  - el área del ítem (fila.area), si el accesorio tiene linea=0 en SQL
+    //    (comportamiento de siempre: la cantidad de accesorio escala con
+    //    el área del producto, ej. bisagras por puerta)
+    //  - 1 (fijo), si el accesorio tiene linea=1 en SQL (el accesorio se
+    //    aplica una sola vez por unidad del ítem, sin importar el área)
+    // Se suma después de %lista, %item y ajuste general, igual para todas
+    // las líneas. Se recalcula siempre desde cero (no es acumulativo) así
+    // que confirmar el popover de accesorios varias veces no duplica el
+    // cargo.
     const totalAccesorios = (fila.accesorios ?? []).reduce((acc, nombre) => {
       const art = accesoriosDisponibles.find((a) => a.articulo === nombre);
       const p = parseFloat(art?.precio);
       if (isNaN(p)) return acc;
-      const area = parseFloat(fila.area) || 1;
+      const lineaAcc = Number(art?.linea ?? art?.LINEA ?? 0);
+      const area = lineaAcc === 1 ? 1 : parseFloat(fila.area) || 1;
       const cantidad = parseFloat(fila.cantidad) || 1;
       return acc + p * area * cantidad;
     }, 0);
-    // TEMP DEBUG — sacar cuando se confirme el fix
-    if ((fila.accesorios ?? []).length > 0) {
-      console.log("[recalcFila][totalAccesorios]", {
-        articulo: fila.articulo,
-        accesorios: fila.accesorios,
-        "fila.area": fila.area,
-        "fila.cantidad": fila.cantidad,
-        accesoriosDisponibles_len: accesoriosDisponibles.length,
-        totalAccesorios,
-      });
-    }
     const conAccesorios = (precio) => {
       if (!totalAccesorios) return precio;
       const p = parseFloat(precio) || 0;
