@@ -702,6 +702,7 @@ export default function TabCocina({
                               cocinaFamilia,
                               idx,
                               nombre,
+                              resolverAreaItem(fila),
                             );
                             setCocinaFila((f) => ({
                               ...f,
@@ -997,6 +998,7 @@ export default function TabCocina({
                               cocinaFamilia,
                               idx,
                               nombre,
+                              resolverAreaItem(fila),
                             ),
                           () =>
                             confirmarAccesoriosItem?.(
