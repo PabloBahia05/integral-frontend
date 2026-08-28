@@ -359,8 +359,6 @@ export default function useCocinaPlacard({
     // cargo.
     const totalAccesorios = (fila.accesorios ?? []).reduce((acc, nombre) => {
       const art = accesoriosDisponibles.find((a) => a.articulo === nombre);
-      // TEMP DEBUG — sacar cuando se resuelva
-      console.log("[totalAccesorios] art completo:", art);
       const p = parseFloat(art?.precio);
       if (isNaN(p)) return acc;
       const lineaAcc = Number(art?.linea ?? art?.LINEA ?? 0);
@@ -518,21 +516,9 @@ export default function useCocinaPlacard({
   const [accesoriosDisponibles, setAccesoriosDisponibles] = useState([]);
   useEffect(() => {
     authFetch(`${API}/articulos/accesorios`)
-      .then((r) => {
-        // TEMP DEBUG — sacar cuando se resuelva
-        if (!r.ok) console.error("[accesoriosDisponibles] HTTP", r.status);
-        return r.json();
-      })
-      .then((data) => {
-        const lista = Array.isArray(data) ? data : [];
-        // TEMP DEBUG — sacar cuando se resuelva
-        console.log("[accesoriosDisponibles] cargados:", lista.length, "primero:", lista[0]);
-        setAccesoriosDisponibles(lista);
-      })
-      .catch((e) => {
-        // TEMP DEBUG — sacar cuando se resuelva
-        console.error("[accesoriosDisponibles] fetch FALLÓ:", e);
-      });
+      .then((r) => r.json())
+      .then((data) => setAccesoriosDisponibles(Array.isArray(data) ? data : []))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
