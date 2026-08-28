@@ -92,8 +92,9 @@ function importeEnLetras(monto) {
 // bordes, etc.) — separado de styleCSS (que es el de los presupuestos) para
 // no pisar sus clases; se inyectan los dos juntos en el <style> del PDF.
 const FACTURA_CSS = `
-.f-page, .f-page * { box-sizing: border-box; }
-.f-page { width: 780px; margin: 0 auto; padding: 16px 20px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; border: 1.5px solid #111; }
+.f-page-outer, .f-page-outer * { box-sizing: border-box; }
+.f-page-outer { width: 800px; margin: 0 auto; padding: 10px; }
+.f-page { width: 100%; padding: 16px 20px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; border: 1.5px solid #111; }
 .f-original { text-align: center; font-weight: 700; font-size: 13px; letter-spacing: 0.1em; border-bottom: 1.5px solid #111; padding-bottom: 6px; margin-bottom: 8px; }
 .f-header { display: flex; border-bottom: 1.5px solid #111; padding-bottom: 8px; margin-bottom: 8px; }
 .f-emisor { flex: 1.3; padding-right: 10px; border-right: 1.5px solid #111; }
@@ -285,7 +286,7 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
   // forzado más abajo, la captura no depende del ancho real de la
   // ventana de quien esté mirando.
   contenedor.style.cssText =
-    "position:fixed; left:0; top:0; width:794px; background:#fff; opacity:0; pointer-events:none; z-index:-1;";
+    "position:fixed; left:0; top:0; width:820px; background:#fff; opacity:0; pointer-events:none; z-index:-1;";
   contenedor.innerHTML = pageHTML;
   document.body.appendChild(contenedor);
 
@@ -294,7 +295,11 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
     setGenerandoPDF(false);
   };
 
-  const elFactura = contenedor.querySelector(".f-page");
+  // Se captura el wrapper ancho (.f-page-outer), no el div con el borde
+  // (.f-page) directamente — así el borde queda con margen de sobra
+  // respecto al límite que recorta html2canvas, en vez de pegado al
+  // borde exacto del área capturada (ahí es donde se estaba cortando).
+  const elFactura = contenedor.querySelector(".f-page-outer");
 
   const opciones = {
     // Margen horizontal en 0 a propósito: esta versión de html2pdf.js
@@ -315,7 +320,7 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
       // interno, sin importar el ancho real de la ventana del navegador
       // (ver comentario arriba). Un poco más que 794 para no dejar el
       // borde derecho pegado al límite.
-      windowWidth: 850,
+      windowWidth: 880,
     },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
   };
@@ -425,6 +430,7 @@ export default function FacturasVenta({ authFetch }) {
 
     const pageHTML = `
       <style>${FACTURA_CSS}</style>
+      <div class="f-page-outer">
       <div class="f-page">
         <div class="f-original">ORIGINAL</div>
 
@@ -526,6 +532,7 @@ export default function FacturasVenta({ authFetch }) {
           </div>
         </div>
         <div class="f-pagina">Página 1 de 1</div>
+      </div>
       </div>
     `;
 
