@@ -3,11 +3,7 @@ import DataTable from "../Component/DataTable";
 import ActionBar from "../Component/ActionBar";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
-import {
-  formatPeso,
-  styleCSS,
-  descargarPDF,
-} from "../pdf/pdfMotorComun";
+import { formatPeso } from "../pdf/pdfMotorComun";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -247,6 +243,67 @@ function armarQrUrl(row, emisor) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(afipUrl)}`;
 }
 
+// Carga html2pdf.js del CDN (mismo que usa pdfMotorComun.js) si todavía no
+// está en la página — reusar la instancia global evita bajarlo dos veces
+// si el usuario ya generó un PDF de presupuesto en esta sesión.
+function cargarHtml2pdf() {
+  if (window.html2pdf) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src =
+      "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+    script.onload = resolve;
+    script.onerror = () =>
+      reject(new Error("No se pudo cargar el generador de PDF."));
+    document.head.appendChild(script);
+  });
+}
+
+// Exportador PROPIO para la factura, separado a propósito de
+// descargarPDF() (pdfMotorComun.js): ese motor está armado específicamente
+// para los presupuestos — busca `.page` (acá la clase es `.f-page`) y
+// SIEMPRE reserva 38mm arriba para estampar el logo de Daniel Roque en
+// cada hoja (estamparMembreteEnTodasLasPaginas), lo que pisaría el
+// encabezado propio que ya arma la factura (razón social, CUIT, etc. en
+// texto). Reusarlo tal cual rompía con "Unknown source type" (le llegaba
+// `null` por el mismatch de clase) y, aunque se corrigiera eso, iba a
+// duplicar la marca de la empresa arriba de todo.
+function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
+  setGenerandoPDF(true);
+  const contenedor = document.createElement("div");
+  contenedor.style.cssText =
+    "position:fixed; left:-9999px; top:0; width:794px; background:#fff; z-index:-1;";
+  contenedor.innerHTML = pageHTML;
+  document.body.appendChild(contenedor);
+
+  const limpiar = () => {
+    if (contenedor.parentNode) contenedor.parentNode.removeChild(contenedor);
+    setGenerandoPDF(false);
+  };
+
+  const elFactura = contenedor.querySelector(".f-page");
+
+  const opciones = {
+    margin: [8, 8, 8, 8],
+    filename: nombreArchivo,
+    image: { type: "jpeg", quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+  };
+
+  cargarHtml2pdf()
+    // Pequeña espera para que el <img> del QR (servicio externo) termine
+    // de cargar antes de que html2canvas tome la captura — si no, algunas
+    // veces la imagen todavía no resolvió y sale en blanco.
+    .then(() => new Promise((resolve) => setTimeout(resolve, 400)))
+    .then(() => window.html2pdf().set(opciones).from(elFactura).save())
+    .catch((err) => {
+      console.error("Error generando PDF de factura:", err);
+      alert("Ocurrió un error generando el PDF. Probá de nuevo.");
+    })
+    .finally(limpiar);
+}
+
 export default function FacturasVenta({ authFetch }) {
   const [facturas, setFacturas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -338,7 +395,7 @@ export default function FacturasVenta({ authFetch }) {
     const detalleItem = `Presupuesto N° ${f.numeropres} — Muebles a medida`;
 
     const pageHTML = `
-      <style>${styleCSS}${FACTURA_CSS}</style>
+      <style>${FACTURA_CSS}</style>
       <div class="f-page">
         <div class="f-original">ORIGINAL</div>
 
@@ -427,7 +484,7 @@ export default function FacturasVenta({ authFetch }) {
 
         <div class="f-cae-footer">
           <div class="f-arca">
-            <img src="${qrSrc}" style="width:78px; height:78px;" />
+            <img src="${qrSrc}" crossorigin="anonymous" style="width:78px; height:78px;" />
             <div>
               <div class="f-arca-nombre">ARCA</div>
               <div class="f-arca-desc">AGENCIA DE RECAUDACION<br />Y CONTROL ADUANERO</div>
@@ -443,10 +500,9 @@ export default function FacturasVenta({ authFetch }) {
       </div>
     `;
 
-    descargarPDF({
+    descargarFacturaPDF({
       pageHTML,
       nombreArchivo: `FACTURA_${letra}_${nroCompleto}.pdf`,
-      imagenesFinal: [],
       setGenerandoPDF: (v) => setGenerandoPDFId(v ? f.id : null),
     });
   };
