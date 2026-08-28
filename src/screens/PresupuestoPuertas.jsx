@@ -287,6 +287,20 @@ export default function PresupuestoPuertas({
         );
 
         if (!fila) {
+          // DEBUG TEMPORAL: para detectar espacios/caracteres ocultos en el
+          // codart. Revisar la consola del navegador y comparar longitudes.
+          console.warn(
+            "[DEBUG asociaciones] buscado:",
+            JSON.stringify(codartLower),
+            "len:", codartLower.length,
+          );
+          console.warn(
+            "[DEBUG asociaciones] disponibles:",
+            dataAsoc.map((a) => {
+              const c = (a.codartint ?? a.codart ?? "").toLowerCase().trim();
+              return { raw: JSON.stringify(a.codart ?? a.codartint ?? ""), normalizado: JSON.stringify(c), len: c.length, coincideExacto: c === codartLower };
+            }),
+          );
           setCargandoAsociados(false);
           setAsociados([]);
           setErrorCalc(
