@@ -992,14 +992,24 @@ export default function TabCocina({
                       onClick={(e) =>
                         abrirAccesorioMenu?.(
                           fila.accesorios ?? [],
-                          (nombre) =>
+                          (nombre) => {
+                            // TEMP DEBUG — sacar cuando se confirme el fix
+                            console.log("[toggleAccesorio][cocina]", {
+                              nombre,
+                              "fila.articulo": fila.articulo,
+                              "fila.nombreart": fila.nombreart,
+                              "fila.area": fila.area,
+                              "fila.cantidad": fila.cantidad,
+                              areaResuelta: resolverAreaItem(fila),
+                            });
                             toggleAccesorioItem?.(
                               "cocina",
                               cocinaFamilia,
                               idx,
                               nombre,
                               resolverAreaItem(fila),
-                            ),
+                            );
+                          },
                           () =>
                             confirmarAccesoriosItem?.(
                               "cocina",
