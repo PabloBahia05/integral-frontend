@@ -12,6 +12,21 @@ const tieneFreno = (accesorios, accesoriosDisponibles) =>
     return art && CODARTINT_FRENO.includes(String(art.codartint));
   });
 
+// Determina si el ítem es un "cajón" o una "puerta" según su nombre, mismo
+// criterio que codartintFrenoParaItem en useCocinaPlacard.js (CAJ ->
+// cajonera/correderas, PTA -> puerta). Se usa para filtrar el popover de
+// accesorios por la columna `aplicacion` del artículo (ver
+// PresupuestoNuevo.jsx): una guía telescópica (aplicacion='CAJ') no debería
+// poder tildarse en un ítem que es una puerta, y viceversa con bisagras
+// (aplicacion='PTA'). null si el nombre no matchea ninguno de los dos (no
+// se filtra nada para ese ítem).
+const tipoAccesorioParaItem = (fila) => {
+  const nombre = `${fila?.nombreart ?? ""} ${fila?.articulo ?? ""}`.toUpperCase();
+  if (nombre.includes("CAJ")) return "CAJ";
+  if (nombre.includes("PTA")) return "PTA";
+  return null;
+};
+
 const FILA_VACIA = {
   articulo: "",
   nombreart: "",
@@ -724,6 +739,7 @@ export default function TabCocina({
                             );
                           },
                           e,
+                          tipoAccesorioParaItem(fila),
                         )
                       }
                       title="Agregar/quitar accesorios (autofreno, led, etc)"
@@ -1014,6 +1030,7 @@ export default function TabCocina({
                               resolverAreaItem(fila),
                             ),
                           e,
+                          tipoAccesorioParaItem(fila),
                         )
                       }
                       title="Agregar/quitar accesorios (autofreno, led, etc)"

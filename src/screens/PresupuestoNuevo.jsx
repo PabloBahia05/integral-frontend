@@ -3486,18 +3486,37 @@ export default function PresupuestoNuevo({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="pn-popover-title">Accesorios</div>
-                  {accesoriosDisponibles.length === 0 ? (
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#6699bb",
-                        padding: "6px 2px",
-                      }}
-                    >
-                      No hay artículos cargados con área "accesorio".
-                    </div>
-                  ) : (
-                    accesoriosDisponibles.map((a) => {
+                  {(() => {
+                    // Filtro CAJ/PTA: si el accesorio tiene `aplicacion`
+                    // cargada (CAJ o PTA), solo se ofrece en ítems del
+                    // mismo tipo (ej. una guía telescópica, aplicacion=
+                    // 'CAJ', no aparece para tildar en una puerta). Los
+                    // accesorios sin aplicacion (NULL) quedan disponibles
+                    // siempre, sin filtrar — mismo criterio con el que ya
+                    // se aplica el freno automático.
+                    const tipoItem = accesorioMenu.tipoItem;
+                    const disponiblesFiltrados = accesoriosDisponibles.filter(
+                      (a) =>
+                        !a.aplicacion ||
+                        !tipoItem ||
+                        String(a.aplicacion).toUpperCase() === tipoItem,
+                    );
+                    if (disponiblesFiltrados.length === 0) {
+                      return (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "#6699bb",
+                            padding: "6px 2px",
+                          }}
+                        >
+                          {accesoriosDisponibles.length === 0
+                            ? 'No hay artículos cargados con área "accesorio".'
+                            : "No hay accesorios disponibles para este tipo de ítem."}
+                        </div>
+                      );
+                    }
+                    return disponiblesFiltrados.map((a) => {
                       const marcado = accesorioMenu.actuales.includes(
                         a.articulo,
                       );
@@ -3533,8 +3552,8 @@ export default function PresupuestoNuevo({
                           </span>
                         </label>
                       );
-                    })
-                  )}
+                    });
+                  })()}
                   <button
                     type="button"
                     onClick={cerrarAccesorioMenu}
