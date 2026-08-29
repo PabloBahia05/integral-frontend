@@ -315,16 +315,26 @@ export default function PresupuestoPuertas({
           const codLower2 = (cod ?? "").toLowerCase().trim();
           const artLower2 = (art ?? "").toLowerCase().trim();
 
-          // Precio del artículo asociado desde el catálogo
-          const productoAsoc = articulos.find(
-            (p) =>
-              (p.codart ?? "").toLowerCase().trim() === codLower2 ||
-              (p.articulo ?? "").toLowerCase().trim() === artLower2,
-          );
+          // Precio del artículo asociado: primero en el catálogo de puertas
+          // (articulos), y si no está ahí (ej. herrajes, kits, vidrios que
+          // no son rubro PUERTA) caer a catalogoGeneral.
+          const productoAsoc =
+            articulos.find(
+              (p) =>
+                (p.codart ?? "").toLowerCase().trim() === codLower2 ||
+                (p.articulo ?? "").toLowerCase().trim() === artLower2,
+            ) ??
+            catalogoGeneral.find(
+              (p) =>
+                (p.codartint ?? p.codart ?? "").toLowerCase().trim() ===
+                  codLower2 ||
+                (p.articulo ?? "").toLowerCase().trim() === artLower2,
+            );
           const precioAsoc = productoAsoc?.precio
             ? parseFloat(productoAsoc.precio)
             : 0;
-          const codartAsoc = productoAsoc?.codart ?? cod ?? "";
+          const codartAsoc =
+            productoAsoc?.codart ?? productoAsoc?.codartint ?? cod ?? "";
 
           // Margen: primero buscar en tabla MARGEN por codart del artículo asociado,
           // si no está ahí usar el campo margenN de asociaciones como fallback.
@@ -362,6 +372,7 @@ export default function PresupuestoPuertas({
     articuloSeleccionado?.codartint,
     articuloSeleccionado?.codart,
     articulos,
+    catalogoGeneral,
   ]);
 
   // ── Calcular bases: llama al backend por cada artículo asociado ─────────────
