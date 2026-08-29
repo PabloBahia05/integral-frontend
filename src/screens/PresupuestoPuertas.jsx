@@ -502,7 +502,11 @@ export default function PresupuestoPuertas({
             colocacion: Number(form.colocacion),
             precio: asoc.precio,
             precio_material: materialSeleccionado
-              ? parseFloat(materialSeleccionado.precio ?? 0) || 0
+              ? parseFloat(
+                  materialSeleccionado.precio_un ??
+                    materialSeleccionado.precio ??
+                    0,
+                ) || 0
               : 0,
             ...(esFijoBatiente
               ? {
@@ -1209,6 +1213,121 @@ export default function PresupuestoPuertas({
                   </select>
                 </div>
 
+
+                {/* Material (aplica a toda la puerta) */}
+                <div className="field">
+                  <span className="label-text">MATERIAL</span>
+                  <select
+                    className="input"
+                    value={
+                      materialSeleccionado?.codartint ??
+                      materialSeleccionado?.codart ??
+                      ""
+                    }
+                    onChange={(e) => {
+                      const mat = materiales.find(
+                        (m) =>
+                          (m.codartint ?? m.codart ?? "") === e.target.value,
+                      );
+                      setMaterialSeleccionado(mat ?? null);
+                    }}
+                  >
+                    <option value="">— Sin material —</option>
+                    {materiales.map((m) => (
+                      <option
+                        key={m.codartint ?? m.codart}
+                        value={m.codartint ?? m.codart}
+                      >
+                        {m.articulo}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Cantidad */}
+                <div className="field">
+                  <span className="label-text">CANTIDAD</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    value={form.cantidad}
+                    onChange={(e) =>
+                      setForm({ ...form, cantidad: Number(e.target.value) })
+                    }
+                  />
+                </div>
+
+                {/* Ancho / Alto */}
+                {esFijoBatiente ? (
+                  <div className="row">
+                    <div className="field">
+                      <span className="label-text">ANCHO PAÑO FIJO (CM)</span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={form.ancho_fijo}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            ancho_fijo: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <span className="label-text">ANCHO BATIENTE (CM)</span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={form.ancho_bat}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            ancho_bat: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <span className="label-text">ALTO (CM)</span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={form.alto}
+                        onChange={(e) =>
+                          setForm({ ...form, alto: Number(e.target.value) })
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="row">
+                    <div className="field">
+                      <span className="label-text">ANCHO (CM)</span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={form.ancho}
+                        onChange={(e) =>
+                          setForm({ ...form, ancho: Number(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <span className="label-text">ALTO (CM)</span>
+                      <input
+                        className="input"
+                        type="number"
+                        value={form.alto}
+                        onChange={(e) =>
+                          setForm({ ...form, alto: Number(e.target.value) })
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Artículos asociados */}
                 {articuloSeleccionado && (
                   <div className="asociados-section">
@@ -1563,120 +1682,6 @@ export default function PresupuestoPuertas({
                         </div>
                       );
                     })}
-                  </div>
-                )}
-
-                {/* Material (aplica a toda la puerta) */}
-                <div className="field">
-                  <span className="label-text">MATERIAL</span>
-                  <select
-                    className="input"
-                    value={
-                      materialSeleccionado?.codartint ??
-                      materialSeleccionado?.codart ??
-                      ""
-                    }
-                    onChange={(e) => {
-                      const mat = materiales.find(
-                        (m) =>
-                          (m.codartint ?? m.codart ?? "") === e.target.value,
-                      );
-                      setMaterialSeleccionado(mat ?? null);
-                    }}
-                  >
-                    <option value="">— Sin material —</option>
-                    {materiales.map((m) => (
-                      <option
-                        key={m.codartint ?? m.codart}
-                        value={m.codartint ?? m.codart}
-                      >
-                        {m.articulo}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Cantidad */}
-                <div className="field">
-                  <span className="label-text">CANTIDAD</span>
-                  <input
-                    className="input"
-                    type="number"
-                    min="1"
-                    value={form.cantidad}
-                    onChange={(e) =>
-                      setForm({ ...form, cantidad: Number(e.target.value) })
-                    }
-                  />
-                </div>
-
-                {/* Ancho / Alto */}
-                {esFijoBatiente ? (
-                  <div className="row">
-                    <div className="field">
-                      <span className="label-text">ANCHO PAÑO FIJO (CM)</span>
-                      <input
-                        className="input"
-                        type="number"
-                        value={form.ancho_fijo}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            ancho_fijo: Number(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <span className="label-text">ANCHO BATIENTE (CM)</span>
-                      <input
-                        className="input"
-                        type="number"
-                        value={form.ancho_bat}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            ancho_bat: Number(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <span className="label-text">ALTO (CM)</span>
-                      <input
-                        className="input"
-                        type="number"
-                        value={form.alto}
-                        onChange={(e) =>
-                          setForm({ ...form, alto: Number(e.target.value) })
-                        }
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="row">
-                    <div className="field">
-                      <span className="label-text">ANCHO (CM)</span>
-                      <input
-                        className="input"
-                        type="number"
-                        value={form.ancho}
-                        onChange={(e) =>
-                          setForm({ ...form, ancho: Number(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <span className="label-text">ALTO (CM)</span>
-                      <input
-                        className="input"
-                        type="number"
-                        value={form.alto}
-                        onChange={(e) =>
-                          setForm({ ...form, alto: Number(e.target.value) })
-                        }
-                      />
-                    </div>
                   </div>
                 )}
 
