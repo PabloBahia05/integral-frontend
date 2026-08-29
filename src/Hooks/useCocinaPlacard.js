@@ -565,10 +565,16 @@ export default function useCocinaPlacard({
   // editar accesorios tanto desde la fila de vista como desde "editar".
   const [accesorioMenu, setAccesorioMenu] = useState(null);
 
-  const abrirAccesorioMenu = (actuales, onToggle, onConfirm, e) => {
+  const abrirAccesorioMenu = (actuales, onToggle, onConfirm, e, tipoItem) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    setAccesorioMenu({ actuales: actuales ?? [], onToggle, onConfirm, rect });
+    setAccesorioMenu({
+      actuales: actuales ?? [],
+      onToggle,
+      onConfirm,
+      rect,
+      tipoItem: tipoItem ?? null,
+    });
   };
 
   const cerrarAccesorioMenu = () => setAccesorioMenu(null);
