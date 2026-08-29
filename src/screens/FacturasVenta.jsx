@@ -295,11 +295,15 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
     setGenerandoPDF(false);
   };
 
-  // Se captura el wrapper ancho (.f-page-outer), no el div con el borde
-  // (.f-page) directamente — así el borde queda con margen de sobra
-  // respecto al límite que recorta html2canvas, en vez de pegado al
-  // borde exacto del área capturada (ahí es donde se estaba cortando).
   const elFactura = contenedor.querySelector(".f-page-outer");
+
+  // En vez de adivinar un windowWidth fijo (lo que causó el desplazamiento
+  // de la prueba anterior: 880 no coincidía con el ancho real del
+  // contenedor), se lee el tamaño REAL ya renderizado del elemento y se le
+  // pasa tal cual a html2canvas — así no hay forma de que quede
+  // desalineado con lo que realmente ocupa en el DOM.
+  const anchoReal = elFactura.scrollWidth;
+  const altoReal = elFactura.scrollHeight;
 
   const opciones = {
     // Margen horizontal en 0 a propósito: esta versión de html2pdf.js
@@ -316,11 +320,10 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",
-      // Fuerza el "ancho de ventana" que usa html2canvas para su clon
-      // interno, sin importar el ancho real de la ventana del navegador
-      // (ver comentario arriba). Un poco más que 794 para no dejar el
-      // borde derecho pegado al límite.
-      windowWidth: 880,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: anchoReal,
+      windowHeight: altoReal,
     },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
   };
