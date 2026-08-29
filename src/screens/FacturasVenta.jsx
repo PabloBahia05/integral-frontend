@@ -92,9 +92,8 @@ function importeEnLetras(monto) {
 // bordes, etc.) — separado de styleCSS (que es el de los presupuestos) para
 // no pisar sus clases; se inyectan los dos juntos en el <style> del PDF.
 const FACTURA_CSS = `
-.f-page-outer, .f-page-outer * { box-sizing: border-box; }
-.f-page-outer { width: 800px; margin: 0 auto; padding: 10px; }
-.f-page { width: 100%; padding: 16px 20px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; border: 1.5px solid #111; }
+.f-page, .f-page * { box-sizing: border-box; }
+.f-page { width: calc(100% - 20px); margin: 10px auto; padding: 16px 20px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; border: 1.5px solid #111; }
 .f-original { text-align: center; font-weight: 700; font-size: 13px; letter-spacing: 0.1em; border-bottom: 1.5px solid #111; padding-bottom: 6px; margin-bottom: 8px; }
 .f-header { display: flex; border-bottom: 1.5px solid #111; padding-bottom: 8px; margin-bottom: 8px; }
 .f-emisor { flex: 1.3; padding-right: 10px; border-right: 1.5px solid #111; }
@@ -286,7 +285,7 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
   // forzado más abajo, la captura no depende del ancho real de la
   // ventana de quien esté mirando.
   contenedor.style.cssText =
-    "position:fixed; left:0; top:0; width:820px; background:#fff; opacity:0; pointer-events:none; z-index:-1;";
+    "position:fixed; left:0; top:0; width:800px; background:#fff; opacity:0; pointer-events:none; z-index:-1;";
   contenedor.innerHTML = pageHTML;
   document.body.appendChild(contenedor);
 
@@ -295,14 +294,18 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
     setGenerandoPDF(false);
   };
 
-  const elFactura = contenedor.querySelector(".f-page-outer");
+  // Se captura el CONTENEDOR mismo, no un hijo con su propio ancho fijo
+  // aparte — así hay un solo lugar donde se define el ancho (el inline
+  // style de acá arriba), y windowWidth/anchoReal se leen de ESE mismo
+  // elemento. Las vueltas anteriores (un wrapper interno con su propio
+  // width en px, distinto del contenedor externo) generaban dos anchos
+  // que no coincidían entre sí, y eso es lo que desplazaba el contenido.
+  const elFactura = contenedor;
 
-  // En vez de adivinar un windowWidth fijo (lo que causó el desplazamiento
-  // de la prueba anterior: 880 no coincidía con el ancho real del
-  // contenedor), se lee el tamaño REAL ya renderizado del elemento y se le
-  // pasa tal cual a html2canvas — así no hay forma de que quede
-  // desalineado con lo que realmente ocupa en el DOM.
-  const anchoReal = elFactura.scrollWidth;
+  // Se lee el tamaño REAL ya renderizado del elemento que se va a
+  // capturar y se le pasa tal cual a html2canvas — nada de números
+  // inventados que puedan desalinearse de lo que hay en el DOM.
+  const anchoReal = elFactura.getBoundingClientRect().width;
   const altoReal = elFactura.scrollHeight;
 
   const opciones = {
@@ -312,7 +315,7 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
     // de prueba — el texto se cortaba siempre en la misma columna). El
     // motor de presupuestos (pdfMotorComun.js) usa el mismo patrón
     // [arriba, 0, abajo, 0] por esta razón. El "aire" de los costados acá
-    // lo da el padding de .f-page, no el margen de jsPDF.
+    // lo da el padding/margin de .f-page, no el margen de jsPDF.
     margin: [10, 0, 10, 0],
     filename: nombreArchivo,
     image: { type: "jpeg", quality: 0.98 },
@@ -433,7 +436,6 @@ export default function FacturasVenta({ authFetch }) {
 
     const pageHTML = `
       <style>${FACTURA_CSS}</style>
-      <div class="f-page-outer">
       <div class="f-page">
         <div class="f-original">ORIGINAL</div>
 
@@ -535,7 +537,6 @@ export default function FacturasVenta({ authFetch }) {
           </div>
         </div>
         <div class="f-pagina">Página 1 de 1</div>
-      </div>
       </div>
     `;
 
