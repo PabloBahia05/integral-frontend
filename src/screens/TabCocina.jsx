@@ -771,21 +771,33 @@ export default function TabCocina({
                           tipoAccesorioParaItem(fila, resolverProveedorItem(fila)),
                         )
                       }
-                      title="Agregar/quitar accesorios (autofreno, led, etc)"
+                      title={
+                        fila._accesoriosSinResolver
+                          ? "⚠️ Este ítem tiene un accesorio guardado en la base que no se pudo encontrar en el catálogo (código huérfano o catálogo sin cargar todavía). El precio y/o la lista mostrada pueden estar incompletos — revisar antes de confiar en este total."
+                          : "Agregar/quitar accesorios (autofreno, led, etc)"
+                      }
                       style={{
                         padding: "4px 8px",
-                        background: fila.accesorios?.length
-                          ? "#0a5c3a"
-                          : "#fff",
-                        color: fila.accesorios?.length ? "#fff" : "#0a3a5c",
-                        border: "1px solid #7aaac8",
+                        background: fila._accesoriosSinResolver
+                          ? "#b03a2e"
+                          : fila.accesorios?.length
+                            ? "#0a5c3a"
+                            : "#fff",
+                        color:
+                          fila._accesoriosSinResolver || fila.accesorios?.length
+                            ? "#fff"
+                            : "#0a3a5c",
+                        border: fila._accesoriosSinResolver
+                          ? "1px solid #7a2015"
+                          : "1px solid #7aaac8",
                         borderRadius: 2,
                         fontFamily: "'Space Mono',monospace",
                         fontSize: 11,
                         cursor: "pointer",
                       }}
                     >
-                      🔧 {fila.accesorios?.length ?? 0}
+                      {fila._accesoriosSinResolver ? "⚠️ " : "🔧 "}
+                      {fila.accesorios?.length ?? 0}
                     </button>
                   </td>
                   {lineasActivas.length > 0 ? (
@@ -1062,21 +1074,33 @@ export default function TabCocina({
                           tipoAccesorioParaItem(fila, resolverProveedorItem(fila)),
                         )
                       }
-                      title="Agregar/quitar accesorios (autofreno, led, etc)"
+                      title={
+                        fila._accesoriosSinResolver
+                          ? "⚠️ Este ítem tiene un accesorio guardado en la base que no se pudo encontrar en el catálogo (código huérfano o catálogo sin cargar todavía). El precio y/o la lista mostrada pueden estar incompletos — revisar antes de confiar en este total."
+                          : "Agregar/quitar accesorios (autofreno, led, etc)"
+                      }
                       style={{
                         padding: "4px 8px",
-                        background: fila.accesorios?.length
-                          ? "#0a5c3a"
-                          : "#fff",
-                        color: fila.accesorios?.length ? "#fff" : "#0a3a5c",
-                        border: "1px solid #c8dae8",
+                        background: fila._accesoriosSinResolver
+                          ? "#b03a2e"
+                          : fila.accesorios?.length
+                            ? "#0a5c3a"
+                            : "#fff",
+                        color:
+                          fila._accesoriosSinResolver || fila.accesorios?.length
+                            ? "#fff"
+                            : "#0a3a5c",
+                        border: fila._accesoriosSinResolver
+                          ? "1px solid #7a2015"
+                          : "1px solid #c8dae8",
                         borderRadius: 2,
                         fontFamily: "'Space Mono',monospace",
                         fontSize: 11,
                         cursor: "pointer",
                       }}
                     >
-                      🔧 {fila.accesorios?.length ?? 0}
+                      {fila._accesoriosSinResolver ? "⚠️ " : "🔧 "}
+                      {fila.accesorios?.length ?? 0}
                     </button>
                   </td>
                   {lineasActivas.length > 0 ? (

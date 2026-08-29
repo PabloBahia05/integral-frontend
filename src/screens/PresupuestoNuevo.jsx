@@ -1918,6 +1918,19 @@ export default function PresupuestoNuevo({
             ? [{ linea: l3, precioBase: String(b3 ?? v3), precio: String(v3) }]
             : []),
         ];
+        const codsAccesorioInicial = [
+          it.accesorio ?? it.ACCESORIO ?? null,
+          it.accesorio1 ?? it.ACCESORIO1 ?? null,
+          it.accesorio2 ?? it.ACCESORIO2 ?? null,
+        ].filter((cod) => cod != null && cod !== "");
+        const accesoriosResueltosInicial = codsAccesorioInicial
+          .map(
+            (cod) =>
+              accesoriosDisponibles.find(
+                (a) => String(a.codartint) === String(cod),
+              )?.articulo,
+          )
+          .filter(Boolean);
         const fila = {
           articulo,
           nombreart,
@@ -1951,19 +1964,16 @@ export default function PresupuestoNuevo({
             it.accesorio1 ?? it.ACCESORIO1 ?? null,
             it.accesorio2 ?? it.ACCESORIO2 ?? null,
           ].filter((cod) => cod != null && cod !== ""),
-          accesorios: [
-            it.accesorio ?? it.ACCESORIO ?? null,
-            it.accesorio1 ?? it.ACCESORIO1 ?? null,
-            it.accesorio2 ?? it.ACCESORIO2 ?? null,
-          ]
-            .filter((cod) => cod != null && cod !== "")
-            .map(
-              (cod) =>
-                accesoriosDisponibles.find(
-                  (a) => String(a.codartint) === String(cod),
-                )?.articulo,
-            )
-            .filter(Boolean),
+          accesorios: accesoriosResueltosInicial,
+          // Si vino algún codartint (_accesorioCods) pero no resolvió a un
+          // nombre acá, puede ser timing (accesoriosDisponibles todavía no
+          // cargó — el efecto de useCocinaPlacard.js lo va a reintentar
+          // solo) o un código realmente huérfano (se borró/cambió en el
+          // catálogo). Se marca igual acá para no depender de que ese
+          // efecto corra; si era timing, cuando resuelva bien la flag se
+          // limpia sola (ver resolverPendientes en useCocinaPlacard.js).
+          _accesoriosSinResolver:
+            codsAccesorioInicial.length > accesoriosResueltosInicial.length,
           grupo: it.grupo ?? it.GRUPO ?? "",
           color: it.color ?? it.COLOR ?? null,
           manija: it.manija ?? it.MANIJA ?? null,
