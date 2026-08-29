@@ -272,20 +272,14 @@ function cargarHtml2pdf() {
 function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
   setGenerandoPDF(true);
   const contenedor = document.createElement("div");
-  // OJO: a diferencia de descargarPDF() (pdfMotorComun.js), que posiciona
-  // su contenedor bien lejos con `left:-9999px`, acá lo dejamos en
-  // coordenadas normales (0,0) y lo ocultamos con opacity — porque
-  // html2canvas clona la página adentro de un iframe del ancho de la
-  // ventana REAL del navegador (por default document.clientWidth) salvo
-  // que se le pase `windowWidth` explícito. En una ventana angosta (ej.
-  // el emulador de celular de DevTools, ~470px) un contenedor a
-  // left:-9999px queda fuera del área que ese iframe alcanza a cubrir, y
-  // el borde derecho del comprobante se recorta — que es exactamente lo
-  // que pasó en la prueba. Con position:fixed en (0,0) + windowWidth
-  // forzado más abajo, la captura no depende del ancho real de la
-  // ventana de quien esté mirando.
+  // Posicionado bien lejos de la pantalla (mismo patrón que usa
+  // descargarPDF() en pdfMotorComun.js, probado en producción) — NO se
+  // usa opacity:0 para ocultarlo: html2canvas renderiza el CSS calculado
+  // tal cual, así que opacity:0 hace que el contenido capturado también
+  // salga con opacidad 0 (página en blanco) — ver historial de esta
+  // función si hace falta el porqué.
   contenedor.style.cssText =
-    "position:fixed; left:0; top:0; width:800px; background:#fff; opacity:0; pointer-events:none; z-index:-1;";
+    "position:fixed; left:-9999px; top:0; width:800px; background:#fff; z-index:-1;";
   contenedor.innerHTML = pageHTML;
   document.body.appendChild(contenedor);
 
@@ -294,19 +288,12 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
     setGenerandoPDF(false);
   };
 
-  // Se captura el CONTENEDOR mismo, no un hijo con su propio ancho fijo
-  // aparte — así hay un solo lugar donde se define el ancho (el inline
-  // style de acá arriba), y windowWidth/anchoReal se leen de ESE mismo
-  // elemento. Las vueltas anteriores (un wrapper interno con su propio
-  // width en px, distinto del contenedor externo) generaban dos anchos
-  // que no coincidían entre sí, y eso es lo que desplazaba el contenido.
+  // Se captura el contenedor mismo — un solo lugar donde se define el
+  // ancho (el inline style de arriba), nada de un hijo con su propio
+  // width por separado (eso fue lo que generaba un desplazamiento cuando
+  // se intentó forzar un windowWidth calculado a partir de un elemento
+  // distinto al que realmente se estaba posicionando).
   const elFactura = contenedor;
-
-  // Se lee el tamaño REAL ya renderizado del elemento que se va a
-  // capturar y se le pasa tal cual a html2canvas — nada de números
-  // inventados que puedan desalinearse de lo que hay en el DOM.
-  const anchoReal = elFactura.getBoundingClientRect().width;
-  const altoReal = elFactura.scrollHeight;
 
   const opciones = {
     // Margen horizontal en 0 a propósito: esta versión de html2pdf.js
@@ -319,15 +306,13 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
     margin: [10, 0, 10, 0],
     filename: nombreArchivo,
     image: { type: "jpeg", quality: 0.98 },
-    html2canvas: {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: anchoReal,
-      windowHeight: altoReal,
-    },
+    // Sin windowWidth/windowHeight forzado a propósito: el motor de
+    // presupuestos (probado en producción) tampoco lo usa con este mismo
+    // patrón de posicionamiento off-screen, y forzarlo a un valor
+    // calculado fue lo que terminó desplazando el contenido en la prueba
+    // anterior. Se deja que html2canvas use su comportamiento por
+    // default, igual que el motor que ya funciona.
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
   };
 
