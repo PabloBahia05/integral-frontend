@@ -272,37 +272,35 @@ export default function PresupuestoPuertas({
           });
         }
 
-        const codartLower = (
-          articuloSeleccionado.codartint ??
-          articuloSeleccionado.codart ??
-          ""
-        )
+        // La tabla "asociaciones" no guarda codartint/codart del artículo
+        // padre como columna real (ver comentario en Asociaciones.jsx) —
+        // solo guarda el nombre en `articulo`. Por eso acá hay que matchear
+        // por nombre, no por código.
+        const articuloLower = (articuloSeleccionado.articulo ?? "")
           .toLowerCase()
           .trim();
 
         const fila = dataAsoc.find(
-          (a) =>
-            (a.codartint ?? a.codart ?? "").toLowerCase().trim() ===
-            codartLower,
+          (a) => (a.articulo ?? "").toLowerCase().trim() === articuloLower,
         );
 
         if (!fila) {
           // DEBUG TEMPORAL: para detectar espacios/caracteres ocultos en el
-          // codart. Revisar la consola del navegador y comparar longitudes.
+          // nombre del artículo. Revisar la consola del navegador.
           console.warn(
             "[DEBUG asociaciones] buscado:",
-            JSON.stringify(codartLower),
-            "len:", codartLower.length,
+            JSON.stringify(articuloLower),
+            "len:", articuloLower.length,
           );
           const debugList = dataAsoc.map((a) => {
-            const c = (a.codartint ?? a.codart ?? "").toLowerCase().trim();
-            return { id: a.id, raw: a.codart ?? a.codartint ?? "", normalizado: c, len: c.length, coincideExacto: c === codartLower };
+            const c = (a.articulo ?? "").toLowerCase().trim();
+            return { id: a.id, raw: a.articulo ?? "", normalizado: c, len: c.length, coincideExacto: c === articuloLower };
           });
           console.warn("[DEBUG asociaciones] disponibles (texto plano):\n" + JSON.stringify(debugList, null, 2));
           setCargandoAsociados(false);
           setAsociados([]);
           setErrorCalc(
-            `No se encontraron artículos asociados para el código "${codartLower}" en la tabla de asociaciones.`,
+            `No se encontraron artículos asociados para "${articuloSeleccionado.articulo ?? ""}" en la tabla de asociaciones.`,
           );
           return;
         }
@@ -360,6 +358,7 @@ export default function PresupuestoPuertas({
     // Re-ejecutar cuando cambia el artículo o el catálogo
   }, [
     articuloSeleccionado?.id,
+    articuloSeleccionado?.articulo,
     articuloSeleccionado?.codartint,
     articuloSeleccionado?.codart,
     articulos,
