@@ -149,6 +149,7 @@ const EMPTY = {
   alto: "",
   prof: "",
   linea: "",
+  aplicacion: "",
   color: "",
   familia: "",
   rubro: "",
@@ -709,6 +710,7 @@ export default function Productos({
       alto: s(art.alto),
       prof: s(art.prof),
       linea: s(art.linea),
+      aplicacion: s(art.aplicacion),
       color: s(art.color),
       familia: s(art.familia),
       rubro: s(art.rubro),
@@ -764,6 +766,7 @@ export default function Productos({
       alto: toDecimal(form.alto),
       prof: toDecimal(form.prof),
       linea: form.linea || null,
+      aplicacion: form.aplicacion || null,
       color: form.color || null,
       familia: form.familia || null,
       rubro: form.rubro || null,
@@ -1429,6 +1432,45 @@ export default function Productos({
                   form={form}
                   setForm={setForm}
                 />
+              )}
+
+              {/* Aplicación: solo tiene sentido en accesorios (area=
+                  'accesorio', ej. bisagras/guías telescópicas). Determina
+                  en qué tipo de ítem puede tildarse el accesorio en el
+                  presupuesto — 'CAJ' para cajones/correderas, 'PTA' para
+                  puertas. Ver popover de accesorios en
+                  PresupuestoNuevo.jsx. */}
+              {String(form.area).trim().toLowerCase() === "accesorio" && (
+                <div className="form-field" style={{ marginBottom: 12 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontWeight: 600,
+                      marginBottom: 4,
+                      fontSize: 13,
+                    }}
+                  >
+                    Aplicación
+                  </label>
+                  <select
+                    value={form.aplicacion || ""}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, aplicacion: e.target.value }))
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: 6,
+                      border: "1px solid #ccc",
+                      fontSize: 14,
+                      background: "#fff",
+                    }}
+                  >
+                    <option value="">-- Sin restricción --</option>
+                    <option value="CAJ">CAJ — Cajones / correderas</option>
+                    <option value="PTA">PTA — Puertas / bisagras</option>
+                  </select>
+                </div>
               )}
 
               <FotoUpload
