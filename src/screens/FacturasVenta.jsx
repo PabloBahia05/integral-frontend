@@ -93,7 +93,7 @@ function importeEnLetras(monto) {
 // no pisar sus clases; se inyectan los dos juntos en el <style> del PDF.
 const FACTURA_CSS = `
 .f-page, .f-page * { box-sizing: border-box; }
-.f-page { width: calc(100% - 20px); margin: 10px auto; padding: 16px 20px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; border: 1.5px solid #111; }
+.f-page { width: 750px; margin: 10px 30px 10px 10px; padding: 16px 20px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; border: 1.5px solid #111; }
 .f-original { text-align: center; font-weight: 700; font-size: 13px; letter-spacing: 0.1em; border-bottom: 1.5px solid #111; padding-bottom: 6px; margin-bottom: 8px; }
 .f-header { display: flex; border-bottom: 1.5px solid #111; padding-bottom: 8px; margin-bottom: 8px; }
 .f-emisor { flex: 1.3; padding-right: 10px; border-right: 1.5px solid #111; }
@@ -272,6 +272,19 @@ function cargarHtml2pdf() {
 function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
   setGenerandoPDF(true);
 
+  // Se abre la pestaña ACÁ, de forma sincrónica, antes de cualquier
+  // `await`/promesa — si se abre después de un `.then()` o un setTimeout,
+  // la mayoría de los navegadores la bloquean como pop-up porque ya se
+  // perdió la asociación directa con el click del usuario. Se le carga la
+  // URL del PDF recién cuando está lista, más abajo (SIEMPRE esta misma
+  // pestaña — no se abre una segunda).
+  const ventana = window.open("", "_blank");
+  if (ventana) {
+    ventana.document.write(
+      "<p style='font-family:sans-serif;padding:24px;'>Generando el PDF...</p>",
+    );
+  }
+
   // El contenedor va en el flujo NORMAL del documento (position: static,
   // sin fixed ni offsets negativos) — el offset negativo enorme
   // (left:-9999px) que se probó antes es un patrón conocido por generar
@@ -286,7 +299,11 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
   wrapper.style.cssText = "height:0; overflow:hidden;";
 
   const contenedor = document.createElement("div");
-  contenedor.style.cssText = "width:800px; background:#fff;";
+  // Ancho reducido (antes 800px) — junto con el margen derecho de las
+  // opciones de abajo, angosta el comprobante y lo corre hacia la
+  // izquierda dentro de la hoja A4 (pedido: "correr unos milímetros a la
+  // izquierda y achicar el ancho").
+  contenedor.style.cssText = "width:770px; background:#fff;";
   contenedor.innerHTML = pageHTML;
 
   wrapper.appendChild(contenedor);
@@ -300,14 +317,15 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
   const elFactura = contenedor;
 
   const opciones = {
-    // Margen horizontal en 0 a propósito: esta versión de html2pdf.js
-    // recorta el contenido en vez de escalarlo cuando el margen
-    // izquierdo/derecho es distinto de cero (así se vio en el primer PDF
-    // de prueba — el texto se cortaba siempre en la misma columna). El
-    // motor de presupuestos (pdfMotorComun.js) usa el mismo patrón
-    // [arriba, 0, abajo, 0] por esta razón. El "aire" de los costados acá
-    // lo da el padding/margin de .f-page, no el margen de jsPDF.
-    margin: [10, 0, 10, 0],
+    // margin: [arriba, izquierda, abajo, derecha] en mm.
+    // Izquierda en 0 a propósito: esta versión de html2pdf.js recorta el
+    // contenido en vez de escalarlo cuando el margen izquierdo/derecho es
+    // distinto de cero en AMBOS lados a la vez (así se vio en el primer
+    // PDF de prueba). Se deja 0 a la izquierda y se agrega un margen
+    // chico a la derecha (4mm) — angosta el comprobante sin reintroducir
+    // ese bug, y el efecto visual es correrlo hacia la izquierda con un
+    // poco de aire a la derecha.
+    margin: [10, 0, 10, 4],
     filename: nombreArchivo,
     image: { type: "jpeg", quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
@@ -319,10 +337,31 @@ function descargarFacturaPDF({ pageHTML, nombreArchivo, setGenerandoPDF }) {
     // de cargar antes de que html2canvas tome la captura — si no, algunas
     // veces la imagen todavía no resolvió y sale en blanco.
     .then(() => new Promise((resolve) => setTimeout(resolve, 400)))
-    .then(() => window.html2pdf().set(opciones).from(elFactura).save())
+    // "bloburl" en vez de .save(): en vez de forzar la descarga, arma el
+    // PDF y lo carga en la pestaña que ya se abrió arriba, para que se
+    // pueda VER antes de decidir descargarlo — desde ahí el usuario tiene
+    // los botones nativos del visor del navegador para descargar o
+    // imprimir si quiere.
+    .then(() => window.html2pdf().set(opciones).from(elFactura).output("bloburl"))
+    .then((url) => {
+      if (ventana && !ventana.closed) {
+        ventana.location.href = url;
+      } else {
+        // Se bloqueó al abrirla en blanco al principio (o el usuario la
+        // cerró mientras se generaba el PDF) — se intenta una vez más acá;
+        // si el navegador la bloquea también, recién ahí se avisa.
+        const reintento = window.open(url, "_blank");
+        if (!reintento) {
+          alert(
+            "El navegador bloqueó la ventana del PDF. Habilitá los pop-ups para este sitio e intentá de nuevo.",
+          );
+        }
+      }
+    })
     .catch((err) => {
       console.error("Error generando PDF de factura:", err);
       alert("Ocurrió un error generando el PDF. Probá de nuevo.");
+      if (ventana && !ventana.closed) ventana.close();
     })
     .finally(limpiar);
 }
@@ -390,7 +429,7 @@ export default function FacturasVenta({ authFetch }) {
             cursor: emisor ? "pointer" : "not-allowed",
           }}
         >
-          {generandoPDFId === row.id ? "Generando..." : "📄 PDF"}
+          {generandoPDFId === row.id ? "Generando..." : "👁 Ver PDF"}
         </button>
       ),
     },
