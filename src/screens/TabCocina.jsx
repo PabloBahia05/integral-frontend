@@ -12,16 +12,29 @@ const tieneFreno = (accesorios, accesoriosDisponibles) =>
     return art && CODARTINT_FRENO.includes(String(art.codartint));
   });
 
-// Determina si el ítem es un "cajón" o una "puerta" según su nombre, mismo
-// criterio que codartintFrenoParaItem en useCocinaPlacard.js (CAJ ->
-// cajonera/correderas, PTA -> puerta). Se usa para filtrar el popover de
-// accesorios por la columna `aplicacion` del artículo (ver
-// PresupuestoNuevo.jsx): una guía telescópica (aplicacion='CAJ') no debería
-// poder tildarse en un ítem que es una puerta, y viceversa con bisagras
-// (aplicacion='PTA'). null si el nombre no matchea ninguno de los dos (no
-// se filtra nada para ese ítem).
-const tipoAccesorioParaItem = (fila) => {
-  const nombre = `${fila?.nombreart ?? ""} ${fila?.articulo ?? ""}`.toUpperCase();
+// Determina el "tipo" del ítem para filtrar el popover de accesorios por
+// la columna `aplicacion` del artículo (ver PresupuestoNuevo.jsx). Reglas,
+// en orden — la primera que matchea gana:
+//   - "ESQ": nombre empieza con "Esquinero Bajo" (prefijo, resto no
+//     importa) Y el artículo es de proveedor "DANIEL ROQUE SRL" (fabricado
+//     en casa, no comprado). El proveedor no viaja en `fila` — hay que
+//     resolverlo aparte contra el catálogo, ver resolverProveedorItem.
+//   - "CAJ" / "PTA": mismo criterio de siempre (cajonera/correderas vs.
+//     puerta), por substring en cualquier parte del nombre.
+//   - null: no matchea ninguno, no se filtra nada para ese ítem.
+const tipoAccesorioParaItem = (fila, proveedor) => {
+  const nombreart = String(fila?.nombreart ?? "").trim().toUpperCase();
+  const articulo = String(fila?.articulo ?? "").trim().toUpperCase();
+  const esEsquineroBajo =
+    nombreart.startsWith("ESQUINERO BAJO") ||
+    articulo.startsWith("ESQUINERO BAJO");
+  if (
+    esEsquineroBajo &&
+    String(proveedor ?? "").trim().toUpperCase() === "DANIEL ROQUE SRL"
+  ) {
+    return "ESQ";
+  }
+  const nombre = `${nombreart} ${articulo}`;
   if (nombre.includes("CAJ")) return "CAJ";
   if (nombre.includes("PTA")) return "PTA";
   return null;
@@ -131,6 +144,17 @@ export default function TabCocina({
       (a) => a.articulo === fila.articulo || a.nombreart === fila.nombreart,
     );
     return match ? (match.area ?? match.AREA ?? null) : null;
+  };
+
+  // Mismo patrón que resolverAreaItem, para saber el proveedor del artículo
+  // aunque `fila` no lo traiga (no viaja en el ítem del presupuesto, solo
+  // en el catálogo). Se usa para clasificar el ítem como "ESQ" en
+  // tipoAccesorioParaItem (ver arriba del archivo).
+  const resolverProveedorItem = (fila) => {
+    const match = articulosFamilia.find(
+      (a) => a.articulo === fila.articulo || a.nombreart === fila.nombreart,
+    );
+    return match ? (match.proveedor ?? match.PROVEEDOR ?? null) : null;
   };
 
   const resetFila = () => {
@@ -739,7 +763,7 @@ export default function TabCocina({
                             );
                           },
                           e,
-                          tipoAccesorioParaItem(fila),
+                          tipoAccesorioParaItem(fila, resolverProveedorItem(fila)),
                         )
                       }
                       title="Agregar/quitar accesorios (autofreno, led, etc)"
@@ -1030,7 +1054,7 @@ export default function TabCocina({
                               resolverAreaItem(fila),
                             ),
                           e,
-                          tipoAccesorioParaItem(fila),
+                          tipoAccesorioParaItem(fila, resolverProveedorItem(fila)),
                         )
                       }
                       title="Agregar/quitar accesorios (autofreno, led, etc)"
