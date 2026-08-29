@@ -140,8 +140,13 @@ export default function TabCocina({
   // guardado/recarga previo.
   const resolverAreaItem = (fila) => {
     if (fila.area != null) return fila.area;
+    // fila.nombreart es el nombre REAL del catálogo (columna "Articulo" en
+    // la tabla); fila.articulo es el nombre que quedó guardado como
+    // display y puede diferir (ej. otra medida del mismo modelo). Por eso
+    // se prioriza nombreart en el match — comparar solo por fila.articulo
+    // hacía fallar el matching en varios ítems ya guardados.
     const match = articulosFamilia.find(
-      (a) => a.articulo === fila.articulo || a.nombreart === fila.nombreart,
+      (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
     );
     return match ? (match.area ?? match.AREA ?? null) : null;
   };
@@ -152,7 +157,7 @@ export default function TabCocina({
   // tipoAccesorioParaItem (ver arriba del archivo).
   const resolverProveedorItem = (fila) => {
     const match = articulosFamilia.find(
-      (a) => a.articulo === fila.articulo || a.nombreart === fila.nombreart,
+      (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
     );
     return match ? (match.proveedor ?? match.PROVEEDOR ?? null) : null;
   };
