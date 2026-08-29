@@ -35,6 +35,14 @@ export default function PresupuestoPuertas({
   // ── Colocación ──────────────────────────────────────────────────────────────
   const [colocacionBD, setColocacionBD] = useState(null);
 
+  // ── Material (global para toda la puerta) ───────────────────────────────────
+  // Mismo patrón que la feature "Color" en Cocina/Placard: se elige acá una
+  // vez y su precio viaja como variable `precio_material` a TODAS las
+  // fórmulas de los artículos asociados que lo necesiten (ej. Alacena).
+  const [materiales, setMateriales] = useState([]);
+  const [materialSeleccionado, setMaterialSeleccionado] = useState(null); // objeto completo del catálogo
+
+
   // ── Guardado ────────────────────────────────────────────────────────────────
   const [guardando, setGuardando] = useState(false);
   const [guardadoOk, setGuardadoOk] = useState(false);
@@ -59,6 +67,18 @@ export default function PresupuestoPuertas({
   // Reconstituye todo el estado y pone modoEdicion = true.
   const cargadoRef = useRef(false);
   const modeloARestaurarRef = useRef(null);
+  const materialARestaurarRef = useRef(null);
+
+  // Cuando materiales carga y hay un material pendiente de restaurar, aplicarlo
+  useEffect(() => {
+    if (!materiales.length || !materialARestaurarRef.current) return;
+    const codGuardado = materialARestaurarRef.current;
+    const mat = materiales.find(
+      (m) => (m.codartint ?? m.codart ?? "") === codGuardado,
+    );
+    if (mat) setMaterialSeleccionado(mat);
+    materialARestaurarRef.current = null;
+  }, [materiales]);
 
   // Cuando articulos carga y hay un modelo pendiente de restaurar, buscar el tipo
   useEffect(() => {
@@ -112,6 +132,10 @@ export default function PresupuestoPuertas({
 
     // Guardar modelo en ref para re-aplicar cuando articulos cargue
     modeloARestaurarRef.current = p.MODELO ?? null;
+
+    // Material: se re-aplica cuando el catálogo de materiales cargue (ver
+    // efecto de abajo), porque acá solo tenemos el código guardado.
+    materialARestaurarRef.current = p.CODMATERIAL ?? null;
 
     // Reconstituir artículos asociados desde art1..art10 y valor1..valor10
     const slotsGuardados = [];
@@ -172,6 +196,19 @@ export default function PresupuestoPuertas({
       .then((data) => {
         if (!Array.isArray(data)) return;
         setCatalogoGeneral(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Cargar catálogo de materiales (melaminas) ────────────────────────────────
+  useEffect(() => {
+    authFetch(
+      "https://integral-backend-production.up.railway.app/productos/melaminas",
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data)) return;
+        setMateriales(data);
       })
       .catch(() => {});
   }, []);
@@ -453,6 +490,9 @@ export default function PresupuestoPuertas({
             cantidad: Number(form.cantidad),
             colocacion: Number(form.colocacion),
             precio: asoc.precio,
+            precio_material: materialSeleccionado
+              ? parseFloat(materialSeleccionado.precio ?? 0) || 0
+              : 0,
             ...(esFijoBatiente
               ? {
                   ancho_fijo: Number(form.ancho_fijo),
@@ -527,6 +567,8 @@ export default function PresupuestoPuertas({
     form.alto,
     form.cantidad,
     form.colocacion,
+    materialSeleccionado?.codartint,
+    materialSeleccionado?.codart,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     JSON.stringify(asociados.map((a) => a.codform)),
   ]);
@@ -720,6 +762,9 @@ export default function PresupuestoPuertas({
       CODPUERTA: codPuerta,
       CODHERRAJE: codHerraje,
       NOMBREHERRAJE: nombreHerraje,
+      CODMATERIAL:
+        materialSeleccionado?.codartint ?? materialSeleccionado?.codart ?? null,
+      MATERIAL: materialSeleccionado?.articulo ?? null,
       // Vinculación con el presupuesto principal de tabla_presupuestos
       NUMEROPRES: numeroPres ?? null,
       // Si es revisión, mandar PRESP para mantener el mismo número de puerta
@@ -799,6 +844,7 @@ export default function PresupuestoPuertas({
       colocacion: 0,
     });
     setColocacionBD(null);
+    setMaterialSeleccionado(null);
     setErrorCalc("");
     fetchProximoNumero(); // trae el próximo número actualizado desde la BD
   };
@@ -1508,6 +1554,36 @@ export default function PresupuestoPuertas({
                     })}
                   </div>
                 )}
+
+                {/* Material (aplica a toda la puerta) */}
+                <div className="field">
+                  <span className="label-text">MATERIAL</span>
+                  <select
+                    className="input"
+                    value={
+                      materialSeleccionado?.codartint ??
+                      materialSeleccionado?.codart ??
+                      ""
+                    }
+                    onChange={(e) => {
+                      const mat = materiales.find(
+                        (m) =>
+                          (m.codartint ?? m.codart ?? "") === e.target.value,
+                      );
+                      setMaterialSeleccionado(mat ?? null);
+                    }}
+                  >
+                    <option value="">— Sin material —</option>
+                    {materiales.map((m) => (
+                      <option
+                        key={m.codartint ?? m.codart}
+                        value={m.codartint ?? m.codart}
+                      >
+                        {m.articulo}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 {/* Cantidad */}
                 <div className="field">
