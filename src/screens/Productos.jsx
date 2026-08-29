@@ -495,6 +495,11 @@ export default function Productos({
     });
 
   const [form, setForm] = useState(EMPTY);
+  // Guarda el margen que había al entrar al campo, para poder revertir si
+  // el usuario confirma que NO quiso poner un margen > 100% (ver onBlur
+  // del input de margen más abajo — evita errores de tipeo tipo "400" en
+  // vez de "40").
+  const margenAlEnfocarRef = useRef(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState([]);
@@ -1347,6 +1352,9 @@ export default function Productos({
                         type="number"
                         placeholder="Ej: 40"
                         value={form.margen}
+                        onFocus={() => {
+                          margenAlEnfocarRef.current = form.margen;
+                        }}
                         onChange={(e) => {
                           const mg = e.target.value;
                           const dto =
@@ -1355,6 +1363,23 @@ export default function Productos({
                               : descuentoProv;
                           const calc = recalcular(form.valorlista, dto, mg);
                           setForm((p) => ({ ...p, margen: mg, ...calc }));
+                        }}
+                        onBlur={(e) => {
+                          const mg = parseFloat(e.target.value);
+                          if (!isNaN(mg) && mg > 100) {
+                            const confirmado = window.confirm(
+                              `Margen de ${mg}% — es un valor alto, ¿confirmás que no es un error de tipeo?`,
+                            );
+                            if (!confirmado) {
+                              const previo = margenAlEnfocarRef.current ?? "";
+                              const dto =
+                                form.descuento !== ""
+                                  ? form.descuento
+                                  : descuentoProv;
+                              const calc = recalcular(form.valorlista, dto, previo);
+                              setForm((p) => ({ ...p, margen: previo, ...calc }));
+                            }
+                          }
                         }}
                       />
                     </div>
