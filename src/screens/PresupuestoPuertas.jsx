@@ -383,16 +383,27 @@ export default function PresupuestoPuertas({
             null;
           const margen = margenTabla ?? margenAsoc ?? 1;
 
+          // Cantidad de este artículo asociado (cant1..cant10 de la tabla
+          // asociaciones). Solo aplica a slots "sin fórmula" (precio
+          // automático): esos no pasan por calcular(), así que su
+          // resultado hay que resolverlo acá mismo = precio × cantidad.
+          const cantAsoc = Number(fila[`cant${n}`] ?? 1) || 1;
+          const resultadoBaseInicial = codform ? 0 : precioAsoc * cantAsoc;
+          const resultadoInicial = codform
+            ? 0
+            : Math.round(resultadoBaseInicial * margen);
+
           slots.push({
             slot: n,
             art: art ?? codartAsoc,
             cod: codartAsoc,
             precio: precioAsoc,
+            cant: cantAsoc,
             codform: codform || null,
             margen: margen, // editable en el front
             margenBD: margen, // valor original de BD para restaurar
-            resultadoBase: 0, // resultado puro de la fórmula (sin margen)
-            resultado: 0, // resultado final = base * margen
+            resultadoBase: resultadoBaseInicial, // resultado puro (sin margen)
+            resultado: resultadoInicial, // resultado final = base * margen
             parciales: {},
             error: codform ? "" : "Sin fórmula",
           });
