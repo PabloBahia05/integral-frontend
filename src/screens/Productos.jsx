@@ -510,6 +510,9 @@ export default function Productos({
   const [detalleModal, setDetalleModal] = useState(null);
   const [familias, setFamilias] = useState([]);
   const [rubros, setRubros] = useState([]);
+  const [aplicaciones, setAplicaciones] = useState(["CAJ", "PTA"]);
+  const [aplicacionEsNueva, setAplicacionEsNueva] = useState(false);
+  const [nuevaAplicacion, setNuevaAplicacion] = useState("");
   const [filtroFamilia, setFiltroFamilia] = useState("");
   const [filtroRubro, setFiltroRubro] = useState("");
   const [filtroProveedor, setFiltroProveedor] = useState("");
@@ -562,6 +565,22 @@ export default function Productos({
   };
   useEffect(() => {
     cargarRubros();
+  }, []);
+
+  // Cargar aplicaciones únicas (CAJ/PTA + lo que se haya agregado con
+  // "+ Agregar" en otra sesión). Se mezclan con los defaults en vez de
+  // reemplazarlos, para que CAJ/PTA sigan estando aunque la base todavía
+  // no tenga ningún artículo con esos valores cargados.
+  useEffect(() => {
+    authFetch(`${API}/articulos/aplicaciones`)
+      .then((r) => r.json())
+      .then((data) => {
+        const desdeDb = Array.isArray(data) ? data : [];
+        setAplicaciones((prev) =>
+          Array.from(new Set([...prev, ...desdeDb])).sort(),
+        );
+      })
+      .catch(() => {});
   }, []);
 
   // Familias del filtro — se filtran por rubro si hay uno elegido
@@ -657,6 +676,8 @@ export default function Productos({
     setFamiliaEsNueva(false);
     setRubroEsNuevo(false);
     setNuevoRubro("");
+    setAplicacionEsNueva(false);
+    setNuevaAplicacion("");
     setProvSearch("");
     setProvFocus(false);
     onOpenModal("nuevo");
@@ -734,6 +755,8 @@ export default function Productos({
     setFamiliaEsNueva(false);
     setRubroEsNuevo(false);
     setNuevoRubro("");
+    setAplicacionEsNueva(false);
+    setNuevaAplicacion("");
     setProvSearch(s(art.proveedor));
     setProvFocus(false);
     onOpenModal("editar");
@@ -746,6 +769,16 @@ export default function Productos({
     setForm((f) => ({ ...f, rubro: r }));
     setNuevoRubro("");
     setRubroEsNuevo(false);
+  };
+
+  const handleAgregarAplicacion = () => {
+    const a = nuevaAplicacion.trim().toUpperCase();
+    if (!a) return;
+    if (!aplicaciones.includes(a))
+      setAplicaciones((prev) => [...prev, a].sort());
+    setForm((f) => ({ ...f, aplicacion: a }));
+    setNuevaAplicacion("");
+    setAplicacionEsNueva(false);
   };
 
   const handleSubmit = () => {
@@ -1452,24 +1485,74 @@ export default function Productos({
                   >
                     Aplicación
                   </label>
-                  <select
-                    value={form.aplicacion || ""}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, aplicacion: e.target.value }))
-                    }
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      borderRadius: 6,
-                      border: "1px solid #ccc",
-                      fontSize: 14,
-                      background: "#fff",
-                    }}
-                  >
-                    <option value="">-- Sin restricción --</option>
-                    <option value="CAJ">CAJ — Cajones / correderas</option>
-                    <option value="PTA">PTA — Puertas / bisagras</option>
-                  </select>
+                  {!aplicacionEsNueva ? (
+                    <select
+                      value={form.aplicacion || ""}
+                      onChange={(e) => {
+                        if (e.target.value === "__nuevo__") {
+                          setAplicacionEsNueva(true);
+                          setForm((f) => ({ ...f, aplicacion: "" }));
+                        } else {
+                          setForm((f) => ({
+                            ...f,
+                            aplicacion: e.target.value,
+                          }));
+                        }
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        borderRadius: 6,
+                        border: "1px solid #ccc",
+                        fontSize: 14,
+                        background: "#fff",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="">-- Sin restricción --</option>
+                      {aplicaciones.map((a) => (
+                        <option key={a} value={a}>
+                          {a}
+                        </option>
+                      ))}
+                      <option value="__nuevo__">
+                        ✏️ Escribir nueva aplicación...
+                      </option>
+                    </select>
+                  ) : (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        className="form-input"
+                        style={{ flex: 1, marginBottom: 0 }}
+                        placeholder="Ej: EST"
+                        value={nuevaAplicacion}
+                        onChange={(e) => setNuevaAplicacion(e.target.value)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && handleAgregarAplicacion()
+                        }
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        className="btn-save"
+                        style={{ padding: "8px 12px" }}
+                        onClick={handleAgregarAplicacion}
+                      >
+                        ✓
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-cancel"
+                        style={{ padding: "8px 12px" }}
+                        onClick={() => {
+                          setAplicacionEsNueva(false);
+                          setNuevaAplicacion("");
+                        }}
+                      >
+                        ← Volver
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
