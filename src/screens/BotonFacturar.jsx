@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { verFacturaPDF, imprimirFacturaPDF } from "../pdf/facturaPdf";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -25,10 +26,24 @@ const API = "https://integral-backend-production.up.railway.app";
 // presente, se dispara con { codcliente, nombreCliente, tipofact, faltantes }
 // para que el padre navegue a la ficha del cliente y la abra ya. Si no se
 // pasa, el 400 se muestra solo como texto (comportamiento anterior).
+//
+// Apenas se genera la factura con éxito, este componente pide de vuelta la
+// fila completa (con los datos del cliente ya unidos) y muestra "👁 Ver
+// PDF" / "🖨️ Imprimir" — la plantilla del comprobante vive en
+// src/pdf/facturaPdf.js, compartida con FacturasVenta.jsx, así que el PDF
+// sale igual se genere desde acá o desde el listado.
 export default function BotonFacturar({ numeropres, authFetch, onFacturaGenerada, onFaltanDatosCliente }) {
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState(null);
+
+  // Fila completa (con join a clientes) + config del emisor, para poder
+  // armar el PDF apenas se factura. Se piden aparte del resultado del
+  // POST porque ese endpoint solo devuelve lo que contesta el servicio de
+  // AFIP (cae, nro_comprobante, etc.) — no los datos del cliente.
+  const [filaFactura, setFilaFactura] = useState(null);
+  const [emisor, setEmisor] = useState(null);
+  const [cargandoPdf, setCargandoPdf] = useState(false);
 
   const facturar = async () => {
     if (cargando) return;
@@ -39,6 +54,8 @@ export default function BotonFacturar({ numeropres, authFetch, onFacturaGenerada
     setCargando(true);
     setResultado(null);
     setError(null);
+    setFilaFactura(null);
+    setEmisor(null);
 
     try {
       const res = await authFetch(`${API}/facturas/generar/${numeropres}`, {
@@ -62,6 +79,26 @@ export default function BotonFacturar({ numeropres, authFetch, onFacturaGenerada
       } else {
         setResultado(data);
         onFacturaGenerada?.(data);
+
+        // Se piden en paralelo la fila recién creada (con datos del
+        // cliente) y la config del emisor, para habilitar Ver PDF /
+        // Imprimir. Si cualquiera de las dos falla, los botones de PDF
+        // simplemente no aparecen — la factura ya se emitió igual, no hay
+        // que bloquear ni mostrar error por esto.
+        Promise.all([
+          authFetch(`${API}/facturas-venta/${numeropres}`).then((r) => r.json()),
+          authFetch(`${API}/facturas-venta/config-emisor`).then((r) => r.json()),
+        ])
+          .then(([filas, config]) => {
+            const filas_ordenadas = Array.isArray(filas) ? filas : [];
+            // La más reciente es la que se acaba de generar (el endpoint
+            // ya ordena por creado_en DESC).
+            setFilaFactura(filas_ordenadas[0] ?? null);
+            setEmisor(config);
+          })
+          .catch((e) =>
+            console.error("No se pudieron cargar los datos para el PDF:", e),
+          );
       }
     } catch (e) {
       setError(e.message);
@@ -69,6 +106,8 @@ export default function BotonFacturar({ numeropres, authFetch, onFacturaGenerada
       setCargando(false);
     }
   };
+
+  const puedeVerPdf = filaFactura && emisor;
 
   return (
     <div style={{ display: "inline-block" }}>
@@ -91,6 +130,52 @@ export default function BotonFacturar({ numeropres, authFetch, onFacturaGenerada
       {resultado && (
         <div style={{ marginTop: 8, fontSize: 12, color: "#1a5c1a" }}>
           ✅ CAE {resultado.cae} — Comprobante N° {resultado.nro_comprobante}
+        </div>
+      )}
+
+      {resultado && (
+        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            disabled={!puedeVerPdf || cargandoPdf}
+            onClick={() =>
+              verFacturaPDF(filaFactura, emisor, { setGenerando: setCargandoPdf })
+            }
+            style={{
+              padding: "5px 12px",
+              fontSize: 12,
+              background: puedeVerPdf ? "#0a3a5c" : "#c8dae8",
+              color: puedeVerPdf ? "#fff" : "#99aabb",
+              border: "none",
+              borderRadius: 4,
+              cursor: puedeVerPdf && !cargandoPdf ? "pointer" : "not-allowed",
+            }}
+          >
+            👁 Ver PDF
+          </button>
+          <button
+            type="button"
+            disabled={!puedeVerPdf || cargandoPdf}
+            onClick={() =>
+              imprimirFacturaPDF(filaFactura, emisor, { setGenerando: setCargandoPdf })
+            }
+            style={{
+              padding: "5px 12px",
+              fontSize: 12,
+              background: puedeVerPdf ? "#0a3a5c" : "#c8dae8",
+              color: puedeVerPdf ? "#fff" : "#99aabb",
+              border: "none",
+              borderRadius: 4,
+              cursor: puedeVerPdf && !cargandoPdf ? "pointer" : "not-allowed",
+            }}
+          >
+            🖨️ Imprimir
+          </button>
+          {!puedeVerPdf && (
+            <span style={{ fontSize: 11, color: "#8aabb8", alignSelf: "center" }}>
+              Cargando datos del PDF...
+            </span>
+          )}
         </div>
       )}
 
