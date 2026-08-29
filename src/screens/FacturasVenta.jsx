@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import DataTable from "../Component/DataTable";
-import ActionBar from "../Component/ActionBar";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import { formatPeso } from "../pdf/pdfMotorComun";
@@ -580,7 +579,23 @@ export default function FacturasVenta({ authFetch }) {
         ]}
       />
 
-      <ActionBar search={search} onSearch={setSearch} />
+      <div style={{ marginBottom: 12 }}>
+        <input
+          type="text"
+          placeholder="🔍 Buscar por cliente, CUIT, N° comprobante o presupuesto..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            width: "100%",
+            maxWidth: 420,
+            padding: "8px 12px",
+            border: "1px solid #c8dae8",
+            borderRadius: 4,
+            fontFamily: "'Space Mono',monospace",
+            fontSize: 12,
+          }}
+        />
+      </div>
 
       {loading ? (
         <p style={{ padding: "24px", color: "#4a8ab5", fontFamily: "'Space Mono',monospace" }}>
