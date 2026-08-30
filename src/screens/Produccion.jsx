@@ -486,7 +486,9 @@ export default function Produccion({ authFetch }) {
 
   // ── Columnas ──────────────────────────────────────────────────────────
 
-  const columns = [
+  // Columnas base: siempre se muestran (código, presupuesto, cliente,
+  // producto, módulo y color) sin importar qué botón de etapa esté activo.
+  const columnasBase = [
     {
       key: "codpro",
       label: "Cód.",
@@ -606,66 +608,93 @@ export default function Produccion({ authFetch }) {
         </select>
       ),
     },
-    {
-      key: "OP",
-      label: "OP",
-      render: (v, row) => (
-        <input
-          type="text"
-          value={row.OP ?? ""}
-          placeholder="—"
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handleTextoCampoChange(row.id, "OP", e.target.value)}
-          onBlur={() => handleTextoCampoBlur(row, "OP")}
-          maxLength={10}
-          style={estiloInput(row, "OP", guardandoCampo, errorCampo)}
-        />
-      ),
-    },
-    // Las 4 etapas (Domus/Perforado/Armado/Despacho) siguen todas el mismo
-    // patrón: select SI/NO que guarda al cambiar, y si tienen usuario
-    // asociado, un input de texto al lado que guarda al salir del campo.
-    ...ETAPAS.flatMap(({ campo, label, usuario }) => {
-      const cols = [
-        {
-          key: campo,
-          label,
-          render: (v, row) => (
-            <select
-              value={row[campo] ?? "NO"}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => handleEtapaChange(row, campo, e.target.value)}
-              style={estiloInput(row, campo, guardandoCampo, errorCampo)}
-            >
-              <option value="NO">NO</option>
-              <option value="SI">SI</option>
-            </select>
-          ),
-        },
-      ];
-      if (usuario) {
-        cols.push({
-          key: usuario,
-          label: `Usuario (${label})`,
-          render: (v, row) => (
-            <input
-              type="text"
-              value={row[usuario] ?? ""}
-              placeholder="—"
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) =>
-                handleTextoCampoChange(row.id, usuario, e.target.value)
-              }
-              onBlur={() => handleTextoCampoBlur(row, usuario)}
-              maxLength={50}
-              style={estiloInput(row, usuario, guardandoCampo, errorCampo)}
-            />
-          ),
-        });
-      }
-      return cols;
-    }),
   ];
+
+  const columnaOP = {
+    key: "OP",
+    label: "OP",
+    render: (v, row) => (
+      <input
+        type="text"
+        value={row.OP ?? ""}
+        placeholder="—"
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => handleTextoCampoChange(row.id, "OP", e.target.value)}
+        onBlur={() => handleTextoCampoBlur(row, "OP")}
+        maxLength={10}
+        style={estiloInput(row, "OP", guardandoCampo, errorCampo)}
+      />
+    ),
+  };
+
+  // Columnas de cada etapa (Domus/Perforado/Armado/Despacho), agrupadas por
+  // etapa para poder elegir cuáles mostrar según el filtro activo. Cada una
+  // sigue el mismo patrón: select SI/NO que guarda al cambiar, y si tiene
+  // usuario asociado, un input de texto al lado que guarda al salir del
+  // campo.
+  const columnasPorEtapa = {};
+  ETAPAS.forEach(({ campo, label, usuario }) => {
+    const cols = [
+      {
+        key: campo,
+        label,
+        render: (v, row) => (
+          <select
+            value={row[campo] ?? "NO"}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => handleEtapaChange(row, campo, e.target.value)}
+            style={estiloInput(row, campo, guardandoCampo, errorCampo)}
+          >
+            <option value="NO">NO</option>
+            <option value="SI">SI</option>
+          </select>
+        ),
+      },
+    ];
+    if (usuario) {
+      cols.push({
+        key: usuario,
+        label: `Usuario (${label})`,
+        render: (v, row) => (
+          <input
+            type="text"
+            value={row[usuario] ?? ""}
+            placeholder="—"
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) =>
+              handleTextoCampoChange(row.id, usuario, e.target.value)
+            }
+            onBlur={() => handleTextoCampoBlur(row, usuario)}
+            maxLength={50}
+            style={estiloInput(row, usuario, guardandoCampo, errorCampo)}
+          />
+        ),
+      });
+    }
+    columnasPorEtapa[campo] = cols;
+  });
+
+  // Qué columnas de etapa se agregan después de las base, según el botón
+  // activo. Sin filtro: todo (OP + las 4 etapas). Con un filtro activo, solo
+  // se muestran las etapas YA completadas (para confirmar que están en SI)
+  // — nunca la etapa que se está filtrando ni las siguientes, porque ahí
+  // todavía no hay nada cargado.
+  //   DOMUS      → solo columnas base (hasta Color)
+  //   PERFORADO  → base + Domus
+  //   ARMADO     → base + Domus + Perforado
+  const columnasEtapasSegunFiltro = {
+    DOMUS: [],
+    PERFORADO: [...columnasPorEtapa.DOMUS],
+    ARMADO: [...columnasPorEtapa.DOMUS, ...columnasPorEtapa.PERFORADO],
+  };
+
+  const columns = filtroEtapa
+    ? [...columnasBase, ...columnasEtapasSegunFiltro[filtroEtapa]]
+    : [
+        ...columnasBase,
+        columnaOP,
+        ...ETAPAS.flatMap(({ campo }) => columnasPorEtapa[campo]),
+      ];
 
   // ── Render ────────────────────────────────────────────────────────────
 
@@ -762,7 +791,7 @@ export default function Produccion({ authFetch }) {
           rows={filtered}
           selectedId={selected?.id}
           onSelect={handleSelect}
-          storageKey="produccion"
+          storageKey={`produccion-${filtroEtapa ?? "todos"}`}
         />
       )}
 
