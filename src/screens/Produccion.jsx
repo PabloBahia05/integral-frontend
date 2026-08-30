@@ -37,6 +37,7 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
 
   const badgeEtapa = (valor) => (
     <span
+      className="detalle-produccion-badge"
       style={{
         display: "inline-block",
         background: valor === "SI" ? "#eaf7ea" : "#f3f3f3",
@@ -114,6 +115,13 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
           }
           .detalle-produccion-cerrar {
             font-size: 30px !important;
+          }
+          .detalle-produccion-badge {
+            font-size: 15px !important;
+            padding: 4px 12px !important;
+          }
+          .detalle-produccion-usuario {
+            font-size: 15px !important;
           }
         }
       `}</style>
@@ -265,7 +273,10 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 {usuario && row[usuario] ? (
-                  <span style={{ color: "#0a3a5c", fontSize: "12px" }}>
+                  <span
+                    className="detalle-produccion-usuario"
+                    style={{ color: "#0a3a5c", fontSize: "12px" }}
+                  >
                     {row[usuario]}
                   </span>
                 ) : null}
@@ -788,9 +799,41 @@ export default function Produccion({ authFetch }) {
         ]}
       />
 
+      {/* Estilos que dependen del ancho de pantalla van en <style> porque
+          los inline styles no soportan media queries. En desktop el botón
+          queda como un cartel ancho con el texto en una sola línea; en
+          celular el texto bajaba de tamaño se desbordaba del botón (se
+          veía como una franja de color sin texto legible), así que en
+          mobile se achica la letra y se permite el salto de línea. */}
+      <style>{`
+        .produccion-btn-escanear-label {
+          font-size: 18px;
+          letter-spacing: 0.5px;
+          white-space: nowrap;
+        }
+        @media (max-width: 640px) {
+          .produccion-btn-escanear {
+            padding: 14px 12px !important;
+            min-height: 52px !important;
+          }
+          .produccion-btn-escanear-label {
+            font-size: 14px !important;
+            letter-spacing: 0.3px !important;
+            white-space: normal !important;
+            text-align: center;
+          }
+        }
+        @media (max-width: 380px) {
+          .produccion-btn-escanear-label {
+            font-size: 12px !important;
+          }
+        }
+      `}</style>
+
       <button
         type="button"
         onClick={() => setEscaneando(true)}
+        className="produccion-btn-escanear"
         style={{
           WebkitAppearance: "none",
           appearance: "none",
@@ -814,18 +857,16 @@ export default function Produccion({ authFetch }) {
         title="Escanear código de barras"
       >
         <span
+          className="produccion-btn-escanear-label"
           style={{
             display: "inline-block",
             color: "#ffffff",
-            fontSize: "18px",
             fontWeight: 700,
-            letterSpacing: "0.5px",
             lineHeight: "1.2",
             fontFamily: "'Space Mono', monospace",
-            whiteSpace: "nowrap",
           }}
         >
-          ESCANEAR CÓDIGO DE BARRAS
+          📷 ESCANEAR CÓDIGO DE BARRAS
         </span>
       </button>
 
