@@ -74,31 +74,47 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
   );
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(10,58,92,0.35)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-      }}
-    >
+    <>
+      {/* En pantallas angostas (celular) el modal pasa a ocupar toda la
+          pantalla en vez de quedar como cuadro chico centrado. Va en un
+          <style> porque los estilos inline no soportan media queries. */}
+      <style>{`
+        @media (max-width: 640px) {
+          .detalle-produccion-box {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 100% !important;
+            max-height: 100% !important;
+            border-radius: 0 !important;
+          }
+        }
+      `}</style>
       <div
-        onClick={(e) => e.stopPropagation()}
+        onClick={onClose}
         style={{
-          background: "#fff",
-          borderRadius: "8px",
-          padding: "24px",
-          width: "90%",
-          maxWidth: "420px",
-          maxHeight: "85vh",
-          overflowY: "auto",
-          boxShadow: "0 8px 30px rgba(10,58,92,0.25)",
+          position: "fixed",
+          inset: 0,
+          background: "rgba(10,58,92,0.35)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000,
         }}
       >
+        <div
+          className="detalle-produccion-box"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: "#fff",
+            borderRadius: "8px",
+            padding: "24px",
+            width: "90%",
+            maxWidth: "420px",
+            maxHeight: "85vh",
+            overflowY: "auto",
+            boxShadow: "0 8px 30px rgba(10,58,92,0.25)",
+          }}
+        >
         <div
           style={{
             display: "flex",
@@ -222,8 +238,9 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
             </div>
           ));
         })()}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
