@@ -755,6 +755,7 @@ export default function Produccion({ authFetch }) {
       <button
         onClick={() => setEscaneando(true)}
         style={{
+          boxSizing: "border-box",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -762,19 +763,26 @@ export default function Produccion({ authFetch }) {
           width: "100%",
           margin: "10px 0",
           padding: "16px 20px",
-          fontSize: "16px",
-          fontWeight: 700,
-          letterSpacing: "0.5px",
-          fontFamily: "'Space Mono', monospace",
           borderRadius: "6px",
           border: "1.5px solid #0a3a5c",
           background: "#0a3a5c",
-          color: "#fff",
           cursor: "pointer",
         }}
         title="Escanear código de barras"
       >
-        📷 Escanear código de barras
+        <span style={{ fontSize: "20px", lineHeight: 1 }}>📷</span>
+        <span
+          style={{
+            color: "#ffffff",
+            fontSize: "16px",
+            fontWeight: 700,
+            letterSpacing: "0.5px",
+            fontFamily: "'Space Mono', monospace",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Escanear código de barras
+        </span>
       </button>
 
       <div
