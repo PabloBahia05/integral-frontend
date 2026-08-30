@@ -5,22 +5,29 @@ import { verFacturaPDF, imprimirFacturaPDF } from "../pdf/facturaPdf";
 const API = "https://integral-backend-production.up.railway.app";
 
 const soloDigitos = (v) => String(v ?? "").replace(/\D/g, "");
+const fmt = (v) =>
+  Number(v || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+let nextItemId = 1;
 
 // FacturaManual.jsx — "Facturar" dentro de Facturas Emitidas: factura
 // libre, sin depender de un presupuesto/obra confirmada (para cargos
 // sueltos, adicionales, arreglos, etc.). Elegís un cliente ya cargado,
-// completás detalle + importe, y se emite igual que cualquier otra
-// factura (mismo resolverTipoFactura del backend, mismo CAE real de AFIP,
-// mismo PDF).
+// agregás renglones de artículos (traídos de la misma tabla que usa
+// Productos.jsx, vía prop `productos` — mismo criterio que `clientes`:
+// evitar pedir de nuevo algo que App.jsx ya carga), y se emite igual que
+// cualquier otra factura (mismo resolverTipoFactura del backend, mismo
+// CAE real de AFIP, mismo PDF).
 //
-// Recibe `clientes` como prop (el mismo array que ya carga App.jsx para
-// la pantalla Clientes) en vez de pedirlo de nuevo — evita inventar un
-// endpoint de búsqueda que quizás no existe tal cual.
-export default function FacturaManual({ clientes, authFetch, onVolver, onFaltanDatosCliente }) {
+// El importe total ya NO se tipea a mano: se calcula sumando los
+// renglones. El campo "Detalle" queda como texto libre opcional para
+// aclaraciones que no correspondan a un artículo puntual.
+export default function FacturaManual({ clientes, productos, authFetch, onVolver, onFaltanDatosCliente }) {
   const [busqueda, setBusqueda] = useState("");
   const [clienteSel, setClienteSel] = useState(null);
   const [detalle, setDetalle] = useState("");
-  const [importeTotal, setImporteTotal] = useState("");
+  const [items, setItems] = useState([]);
+  const [busquedaArt, setBusquedaArt] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(null);
   const [resultado, setResultado] = useState(null);
@@ -74,16 +81,61 @@ export default function FacturaManual({ clientes, authFetch, onVolver, onFaltanD
     setError(null);
   };
 
+  // Búsqueda de artículos por código interno o nombre, misma tabla que
+  // GET /productos (recibida como prop `productos`, sin pedirla de nuevo).
+  const qArt = busquedaArt.trim().toLowerCase();
+  const coincidenciasArt =
+    qArt.length < 2
+      ? []
+      : (productos ?? [])
+          .filter((p) => {
+            const nombreNorm = (p.articulo ?? "").toLowerCase();
+            const codigoNorm = String(p.codartint ?? "").toLowerCase();
+            return nombreNorm.includes(qArt) || codigoNorm.includes(qArt);
+          })
+          .slice(0, 8);
+
+  const agregarItem = (p) => {
+    setItems((prev) => [
+      ...prev,
+      {
+        id: nextItemId++,
+        codartint: p.codartint,
+        articulo: p.articulo,
+        unidad: p.unidad || "",
+        cantidad: 1,
+        // precio_un = precio de venta ya calculado (costo + margen); es lo
+        // que factura la empresa, no el costo interno (`precio`).
+        precioUnit: Number(p.precio_un) || 0,
+      },
+    ]);
+    setBusquedaArt("");
+  };
+
+  const actualizarItem = (id, campo, valor) => {
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, [campo]: valor } : it)),
+    );
+  };
+
+  const quitarItem = (id) => {
+    setItems((prev) => prev.filter((it) => it.id !== id));
+  };
+
+  const totalFactura = items.reduce(
+    (acc, it) => acc + Number(it.cantidad || 0) * Number(it.precioUnit || 0),
+    0,
+  );
+
   const facturar = async () => {
     if (!clienteSel) return;
-    const total = Number(importeTotal);
-    if (!total || total <= 0) {
-      setError("Cargá un importe mayor a cero.");
+    if (items.length === 0 || totalFactura <= 0) {
+      setError("Agregá al menos un artículo con cantidad y precio mayor a cero.");
       return;
     }
     if (
       !window.confirm(
-        `¿Emitir factura a ${clienteSel.nombre} por ${importeTotal}? Esto genera un CAE real.`,
+        `¿Emitir factura a ${clienteSel.nombre} por $${fmt(totalFactura)}? Esto genera un CAE real.`,
       )
     ) {
       return;
@@ -100,7 +152,19 @@ export default function FacturaManual({ clientes, authFetch, onVolver, onFaltanD
         body: JSON.stringify({
           codcliente: clienteSel.codcliente,
           detalle: detalle.trim() || null,
-          importe_total: total,
+          importe_total: totalFactura,
+          // NUEVO: detalle de renglones para que el backend lo persista en
+          // una tabla de ítems (ej. facturas_venta_items). El backend
+          // todavía tiene que actualizarse para aceptar y guardar esto —
+          // hoy solo usa importe_total.
+          items: items.map((it) => ({
+            codartint: it.codartint,
+            articulo: it.articulo,
+            unidad: it.unidad,
+            cantidad: Number(it.cantidad) || 0,
+            precio_unitario: Number(it.precioUnit) || 0,
+            subtotal: (Number(it.cantidad) || 0) * (Number(it.precioUnit) || 0),
+          })),
         }),
       });
       const data = await res.json();
@@ -127,7 +191,7 @@ export default function FacturaManual({ clientes, authFetch, onVolver, onFaltanD
   const nuevaFactura = () => {
     setClienteSel(null);
     setDetalle("");
-    setImporteTotal("");
+    setItems([]);
     setResultado(null);
     setError(null);
   };
@@ -192,7 +256,7 @@ export default function FacturaManual({ clientes, authFetch, onVolver, onFaltanD
           </button>
         </div>
       ) : (
-        <div style={{ maxWidth: 480, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 16 }}>
           {!clienteSel ? (
             <div>
               <label style={etiquetaEstilo}>Cliente</label>
@@ -272,26 +336,135 @@ export default function FacturaManual({ clientes, authFetch, onVolver, onFaltanD
           )}
 
           <div>
-            <label style={etiquetaEstilo}>Detalle (opcional)</label>
-            <textarea
-              rows={3}
-              placeholder="Ej: Arreglo de mueble, adicional de obra, etc."
-              value={detalle}
-              onChange={(e) => setDetalle(e.target.value)}
-              style={{ ...inputEstilo, resize: "vertical" }}
+            <label style={etiquetaEstilo}>Artículos</label>
+            <input
+              type="text"
+              placeholder="Buscar por código o nombre..."
+              value={busquedaArt}
+              onChange={(e) => setBusquedaArt(e.target.value)}
+              style={inputEstilo}
             />
+            {coincidenciasArt.length > 0 && (
+              <div
+                style={{
+                  marginTop: 4,
+                  border: "1px solid #c8dae8",
+                  borderRadius: 4,
+                  background: "#fff",
+                  maxHeight: 220,
+                  overflowY: "auto",
+                }}
+              >
+                {coincidenciasArt.map((p) => (
+                  <div
+                    key={p.codartint}
+                    onClick={() => agregarItem(p)}
+                    style={{
+                      padding: "8px 12px",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      borderBottom: "1px solid #eef4f9",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "#eef4f9")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <span style={{ fontFamily: "monospace", color: "#5580a0", marginRight: 8 }}>
+                      {p.codartint}
+                    </span>
+                    <strong>{p.articulo}</strong>
+                    {p.precio_un != null && (
+                      <span style={{ color: "#5580a0", marginLeft: 8 }}>
+                        ${fmt(p.precio_un)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {qArt.length >= 2 && coincidenciasArt.length === 0 && (
+              <p style={{ fontSize: 11, color: "#8aabb8", marginTop: 6 }}>
+                Sin resultados en la tabla de artículos.
+              </p>
+            )}
+
+            {items.length > 0 && (
+              <table style={{ width: "100%", marginTop: 10, borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "#0a3a5c", borderBottom: "1px solid #c8dae8" }}>
+                    <th style={{ padding: "6px 4px" }}>Código</th>
+                    <th style={{ padding: "6px 4px" }}>Artículo</th>
+                    <th style={{ padding: "6px 4px", width: 80 }}>Cant.</th>
+                    <th style={{ padding: "6px 4px", width: 110 }}>P. Unit.</th>
+                    <th style={{ padding: "6px 4px", width: 110, textAlign: "right" }}>Subtotal</th>
+                    <th style={{ width: 30 }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((it) => (
+                    <tr key={it.id} style={{ borderBottom: "1px solid #eef4f9" }}>
+                      <td style={{ padding: "6px 4px", fontFamily: "monospace", color: "#5580a0" }}>
+                        {it.codartint}
+                      </td>
+                      <td style={{ padding: "6px 4px" }}>{it.articulo}</td>
+                      <td style={{ padding: "6px 4px" }}>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={it.cantidad}
+                          onChange={(e) => actualizarItem(it.id, "cantidad", e.target.value)}
+                          style={inputCeldaEstilo}
+                        />
+                      </td>
+                      <td style={{ padding: "6px 4px" }}>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={it.precioUnit}
+                          onChange={(e) => actualizarItem(it.id, "precioUnit", e.target.value)}
+                          style={inputCeldaEstilo}
+                        />
+                      </td>
+                      <td style={{ padding: "6px 4px", textAlign: "right" }}>
+                        ${fmt(Number(it.cantidad || 0) * Number(it.precioUnit || 0))}
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <button
+                          type="button"
+                          onClick={() => quitarItem(it.id)}
+                          title="Quitar renglón"
+                          style={{ background: "none", border: "none", color: "#a72a2a", cursor: "pointer" }}
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={4} style={{ padding: "8px 4px", textAlign: "right", fontWeight: 700, color: "#0a3a5c" }}>
+                      Total (IVA incluido)
+                    </td>
+                    <td style={{ padding: "8px 4px", textAlign: "right", fontWeight: 700, color: "#0a3a5c" }}>
+                      ${fmt(totalFactura)}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
+            )}
           </div>
 
           <div>
-            <label style={etiquetaEstilo}>Importe total (con IVA incluido)</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Ej: 50000"
-              value={importeTotal}
-              onChange={(e) => setImporteTotal(e.target.value)}
-              style={inputEstilo}
+            <label style={etiquetaEstilo}>Detalle / aclaraciones (opcional)</label>
+            <textarea
+              rows={2}
+              placeholder="Ej: adicional de obra, arreglo puntual, etc."
+              value={detalle}
+              onChange={(e) => setDetalle(e.target.value)}
+              style={{ ...inputEstilo, resize: "vertical" }}
             />
           </div>
 
@@ -301,10 +474,10 @@ export default function FacturaManual({ clientes, authFetch, onVolver, onFaltanD
 
           <button
             type="button"
-            disabled={!clienteSel || cargando}
+            disabled={!clienteSel || items.length === 0 || cargando}
             onClick={facturar}
             style={{
-              ...botonEstilo(!!clienteSel && !cargando),
+              ...botonEstilo(!!clienteSel && items.length > 0 && !cargando),
               alignSelf: "flex-start",
               padding: "10px 20px",
             }}
@@ -333,6 +506,15 @@ const inputEstilo = {
   border: "1px solid #c8dae8",
   borderRadius: 4,
   fontSize: 13,
+  fontFamily: "inherit",
+};
+
+const inputCeldaEstilo = {
+  width: "100%",
+  padding: "4px 6px",
+  border: "1px solid #c8dae8",
+  borderRadius: 4,
+  fontSize: 12,
   fontFamily: "inherit",
 };
 
