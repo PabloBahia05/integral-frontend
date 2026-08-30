@@ -818,7 +818,7 @@ export default function Produccion({ authFetch }) {
             min-height: 52px !important;
             max-height: 52px !important;
             padding: 0 12px !important;
-            margin: 10px auto !important;
+            margin: 10px 0 !important;
           }
 
           .produccion-btn-escanear-label {
@@ -841,16 +841,15 @@ export default function Produccion({ authFetch }) {
           zIndex: 1,
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: "flex-start",
           gap: "10px",
 
           width: "100%",
-          maxWidth: "600px",
           height: "56px",
           minHeight: "56px",
           maxHeight: "56px",
 
-          margin: "10px auto",
+          margin: "10px 0",
           padding: "0 20px",
 
           borderRadius: "6px",
@@ -869,7 +868,7 @@ export default function Produccion({ authFetch }) {
             maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            textAlign: "center",
+            textAlign: "left",
             color: "#ffffff",
             fontWeight: 700,
             lineHeight: "1.2",
