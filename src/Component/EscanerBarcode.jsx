@@ -11,11 +11,8 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 // @media queries: cada estilo ya es el valor final para el dispositivo
 // actual. En celular la cámara ocupa toda la pantalla, con object-fit:
 // contain (nunca recorta) y pide un aspect ratio acorde a la pantalla
-// real para minimizar el letterbox. Además, en vez de dejar que el
-// navegador elija la lente trasera por `facingMode` (que en algunos
-// Android termina siendo la teleobjetivo, con zoom óptico de fábrica),
-// se enumeran las cámaras y se elige a mano la trasera que no sea
-// "tele". En desktop se mantiene como cuadro chico centrado.
+// real para minimizar el letterbox. En desktop se mantiene como cuadro
+// chico centrado.
 
 // Detecta celular vs escritorio por JavaScript (ancho real de pantalla),
 // en vez de depender de @media queries en CSS.
@@ -43,94 +40,50 @@ export default function EscanerBarcode({ onDetected, onClose }) {
     let detectado = false;
     let cancelado = false;
 
-    // En celulares con varias cámaras traseras (ancha, ultra-wide, tele),
-    // pedir solo `facingMode: 'environment'` a veces hace que el
-    // navegador elija la lente teleobjetivo (2x) en vez de la principal:
-    // el video llega "zoomeado" desde el propio sensor, antes de que
-    // cualquier CSS lo toque. Para evitar eso, primero se listan las
-    // cámaras disponibles y se elige a mano la trasera que NO tenga
-    // "tele"/"zoom" en el nombre (normalmente la principal/ancha).
-    const elegirCamaraTrasera = async () => {
-      try {
-        const dispositivos = await navigator.mediaDevices.enumerateDevices();
-        const camaras = dispositivos.filter((d) => d.kind === "videoinput");
-        const traseras = camaras.filter(
-          (d) => !/front|frontal|user/i.test(d.label),
-        );
-        const candidatas = traseras.length ? traseras : camaras;
-        const principal = candidatas.find(
-          (d) => !/tele|zoom/i.test(d.label),
-        );
-        return (principal || candidatas[0])?.deviceId || null;
-      } catch {
-        return null;
-      }
-    };
+    // Un solo pedido de cámara (facingMode: environment). Se probó antes
+    // pedir permiso, soltar el stream y volver a abrirlo eligiendo la
+    // lente a mano por deviceId (para evitar la teleobjetivo en celulares
+    // con varias cámaras traseras), pero soltar y reabrir la cámara tan
+    // rápido rompía la apertura en varios Android — el hardware no llega
+    // a liberarse a tiempo y el segundo pedido falla. Mejor un solo
+    // pedido, aunque en algún celular puntual pueda elegir una lente con
+    // algo de zoom de fábrica.
+    const aspectRatio =
+      typeof window !== "undefined" && window.innerHeight
+        ? { ideal: window.innerWidth / window.innerHeight }
+        : undefined;
 
-    const iniciar = async () => {
-      // Primero se pide cualquier cámara trasera solo para conseguir
-      // permiso: hasta que el usuario acepta, enumerateDevices() no
-      // devuelve las etiquetas (label) de cada cámara, y sin etiqueta no
-      // se puede saber cuál es la teleobjetivo.
-      let deviceId = null;
-      try {
-        const previo = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
-        });
-        previo.getTracks().forEach((t) => t.stop());
-        deviceId = await elegirCamaraTrasera();
-      } catch {
-        // Si esto falla, se sigue igual con facingMode como respaldo.
-      }
-
-      if (cancelado) return;
-
-      const aspectRatio =
-        typeof window !== "undefined" && window.innerHeight
-          ? { ideal: window.innerWidth / window.innerHeight }
-          : undefined;
-
-      reader
-        .decodeFromConstraints(
-          {
-            video: deviceId
-              ? {
-                  deviceId: { exact: deviceId },
-                  width: { ideal: 1280 },
-                  height: { ideal: 720 },
-                  aspectRatio,
-                }
-              : {
-                  facingMode: { ideal: "environment" },
-                  width: { ideal: 1280 },
-                  height: { ideal: 720 },
-                  aspectRatio,
-                },
+    reader
+      .decodeFromConstraints(
+        {
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            aspectRatio,
           },
-          videoRef.current,
-          (result) => {
-            if (detectado || !result) return;
-            detectado = true;
-            controlsRef.current?.stop();
-            onDetected(result.getText());
-          },
-        )
-        .then((controls) => {
-          if (cancelado) {
-            controls.stop();
-            return;
-          }
-          controlsRef.current = controls;
-        })
-        .catch((e) => {
-          console.error("Error abriendo la cámara:", e);
-          setError(
-            "No se pudo acceder a la cámara. Revisá los permisos del navegador para este sitio.",
-          );
-        });
-    };
-
-    iniciar();
+        },
+        videoRef.current,
+        (result) => {
+          if (detectado || !result) return;
+          detectado = true;
+          controlsRef.current?.stop();
+          onDetected(result.getText());
+        },
+      )
+      .then((controls) => {
+        if (cancelado) {
+          controls.stop();
+          return;
+        }
+        controlsRef.current = controls;
+      })
+      .catch((e) => {
+        console.error("Error abriendo la cámara:", e);
+        setError(
+          "No se pudo acceder a la cámara. Revisá los permisos del navegador para este sitio.",
+        );
+      });
 
     return () => {
       cancelado = true;
