@@ -8,9 +8,11 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 // se cierra solo (el padre es quien decide qué hacer con el código).
 //
 // En pantallas angostas (celular) la cámara ocupa toda la pantalla: el
-// <video> llena el viewport con object-fit:cover y el título/botón de
-// cerrar/texto de ayuda quedan flotando arriba y abajo, superpuestos.
-// En desktop se mantiene como cuadro chico centrado.
+// <video> se muestra con object-fit:contain (nunca recorta) y pide un
+// aspect ratio acorde a la pantalla real para minimizar el letterbox.
+// El título/botón de cerrar/texto de ayuda quedan flotando arriba y
+// abajo, superpuestos. En desktop se mantiene como cuadro chico
+// centrado.
 
 export default function EscanerBarcode({ onDetected, onClose }) {
   const videoRef = useRef(null);
@@ -59,6 +61,16 @@ export default function EscanerBarcode({ onDetected, onClose }) {
             advanced: [{ zoom: 1 }],
             width: { ideal: 1280 },
             height: { ideal: 720 },
+            // Pide una relación de aspecto parecida a la de la pantalla
+            // real del celular (alto/ancho, invertida porque el sensor
+            // entrega horizontal). Si no se pide esto, la cámara devuelve
+            // 16:9 y el CSS tiene que recortar mucho para llenar una
+            // pantalla de celular (que es bastante más alargada), y ese
+            // recorte se ve como si la imagen estuviera "zoomeada".
+            aspectRatio:
+              typeof window !== "undefined" && window.innerHeight
+                ? { ideal: window.innerWidth / window.innerHeight }
+                : undefined,
           },
         },
         videoRef.current,
@@ -132,7 +144,7 @@ export default function EscanerBarcode({ onDetected, onClose }) {
             width: 100%;
             height: 100%;
             border-radius: 0;
-            object-fit: cover;
+            object-fit: contain;
           }
           .escaner-header {
             position: absolute;
