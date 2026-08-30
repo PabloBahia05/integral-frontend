@@ -246,7 +246,14 @@ export function armarFacturaPageHTML(f, emisor) {
   // La tabla de ítems muestra UNA línea que resume el presupuesto — la
   // factura solo tiene neto/IVA/total agregados (no ítems individuales
   // guardados), así que se factura como concepto único.
-  const detalleItem = `Presupuesto N° ${f.numeropres} — Muebles a medida`;
+  // La tabla de ítems muestra UNA línea que resume la venta — la factura
+  // solo tiene neto/IVA/total agregados (no ítems individuales guardados).
+  // Si es una factura manual (sin presupuesto), usa el `detalle` cargado a
+  // mano; si viene de un presupuesto, arma la descripción con el número.
+  const detalleItem = f.numeropres
+    ? `Presupuesto N° ${f.numeropres} — Muebles a medida`
+    : f.detalle || "Venta de mercadería / servicio";
+  const codigoItem = f.numeropres ? String(f.numeropres).padStart(5, "0") : "S/N";
 
   return `
     <style>${FACTURA_CSS}</style>
@@ -307,7 +314,7 @@ export function armarFacturaPageHTML(f, emisor) {
           </thead>
           <tbody>
             <tr>
-              <td>${String(f.numeropres).padStart(5, "0")}</td>
+              <td>${codigoItem}</td>
               <td class="f-center">1.00</td>
               <td class="f-center">Un.</td>
               <td>${detalleItem}</td>
