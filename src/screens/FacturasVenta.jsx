@@ -32,7 +32,7 @@ const formatearFechaHora = (iso) =>
       })
     : "";
 
-export default function FacturasVenta({ authFetch }) {
+export default function FacturasVenta({ authFetch, onFacturar }) {
   const [facturas, setFacturas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -77,7 +77,7 @@ export default function FacturasVenta({ authFetch }) {
     { key: "tipo_cbte",       label: "Tipo",           render: (_v, row) => `Factura ${TIPO_CBTE_LABEL[row.tipo_cbte] ?? row.tipo_cbte}` },
     { key: "cliente_nombre",  label: "Cliente" },
     { key: "cliente_cuit",    label: "CUIT/DNI",       render: (_v, row) => row.cliente_cuit ?? row.cliente_dni ?? "—" },
-    { key: "numeropres",      label: "N° Presupuesto" },
+    { key: "numeropres",      label: "N° Presupuesto", render: (_v, row) => row.numeropres ?? "— (manual)" },
     { key: "importe_total",   label: "Total",          render: (_v, row) => formatPeso(row.importe_total) },
     { key: "creado_en",       label: "Emitida",        render: (_v, row) => formatearFechaHora(row.creado_en) },
     { key: "ambiente",        label: "Ambiente" },
@@ -119,7 +119,26 @@ export default function FacturasVenta({ authFetch }) {
         ]}
       />
 
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 12 }}>
+        {onFacturar && (
+          <button
+            type="button"
+            onClick={onFacturar}
+            style={{
+              padding: "8px 16px",
+              fontSize: 13,
+              fontWeight: 700,
+              background: "#0a3a5c",
+              color: "#fff",
+              border: "none",
+              borderRadius: 4,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            🧾 Facturar
+          </button>
+        )}
         <input
           type="text"
           placeholder="🔍 Buscar por cliente, CUIT, N° comprobante o presupuesto..."
