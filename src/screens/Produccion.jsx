@@ -825,7 +825,6 @@ export default function Produccion({ authFetch }) {
             font-size: clamp(10px, 3.6vw, 14px) !important;
             letter-spacing: 0.2px !important;
             white-space: nowrap !important;
-            text-align: center;
           }
         }
       `}</style>
@@ -866,9 +865,11 @@ export default function Produccion({ authFetch }) {
           className="produccion-btn-escanear-label"
           style={{
             display: "block",
+            width: "100%",
             maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",
+            textAlign: "center",
             color: "#ffffff",
             fontWeight: 700,
             lineHeight: "1.2",
