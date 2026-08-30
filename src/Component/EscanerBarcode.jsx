@@ -20,12 +20,15 @@ export default function EscanerBarcode({ onDetected, onClose }) {
   useEffect(() => {
     const reader = new BrowserMultiFormatReader();
     let detectado = false;
-    let timeoutZoom = null;
+    let intervaloZoom = null;
+    let intentosZoom = 0;
 
     // Baja el zoom de la cámara al mínimo disponible (idealmente 1x).
-    // Se llama más de una vez porque en algunos celulares el control de
-    // zoom no queda disponible hasta un instante después de iniciado el
-    // stream.
+    // En muchos celulares (sobre todo Android) las `capabilities` del
+    // track no están disponibles apenas arranca el stream, así que en
+    // vez de un único intento se reintenta cada 300ms durante ~3s hasta
+    // que el control de zoom aparece y se puede corregir. Devuelve true
+    // si ya se pudo aplicar, para poder cortar el reintento.
     const corregirZoom = () => {
       try {
         const stream = videoRef.current?.srcObject;
@@ -39,10 +42,12 @@ export default function EscanerBarcode({ onDetected, onClose }) {
           track
             .applyConstraints({ advanced: [{ zoom: objetivo }] })
             .catch(() => {});
+          return true;
         }
       } catch {
         // Si el navegador no soporta el control de zoom, seguimos igual.
       }
+      return false;
     };
 
     reader
@@ -51,6 +56,7 @@ export default function EscanerBarcode({ onDetected, onClose }) {
           video: {
             facingMode: { ideal: "environment" },
             zoom: { ideal: 1 },
+            advanced: [{ zoom: 1 }],
             width: { ideal: 1280 },
             height: { ideal: 720 },
           },
@@ -65,8 +71,15 @@ export default function EscanerBarcode({ onDetected, onClose }) {
       )
       .then((controls) => {
         controlsRef.current = controls;
-        corregirZoom();
-        timeoutZoom = setTimeout(corregirZoom, 400);
+        if (!corregirZoom()) {
+          intervaloZoom = setInterval(() => {
+            intentosZoom += 1;
+            if (corregirZoom() || intentosZoom >= 10) {
+              clearInterval(intervaloZoom);
+              intervaloZoom = null;
+            }
+          }, 300);
+        }
       })
       .catch((e) => {
         console.error("Error abriendo la cámara:", e);
@@ -76,7 +89,7 @@ export default function EscanerBarcode({ onDetected, onClose }) {
       });
 
     return () => {
-      if (timeoutZoom) clearTimeout(timeoutZoom);
+      if (intervaloZoom) clearInterval(intervaloZoom);
       controlsRef.current?.stop();
     };
   }, [onDetected]);
