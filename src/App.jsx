@@ -1096,6 +1096,7 @@ function App() {
             {screen === "factura-manual" && (
               <FacturaManual
                 clientes={clientes}
+                productos={productos}
                 authFetch={authFetch}
                 onVolver={() => setScreen("facturas-venta")}
                 onFaltanDatosCliente={(info) =>
