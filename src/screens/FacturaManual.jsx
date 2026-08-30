@@ -270,6 +270,29 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
             ✅ Factura emitida — CAE {resultado.cae} — Comprobante N°{" "}
             {String(resultado.pto_vta).padStart(4, "0")}-{String(resultado.nro_comprobante).padStart(8, "0")}
           </div>
+          {resultado.advertencia && (
+            <div
+              style={{
+                fontSize: 12,
+                color: "#7a4a00",
+                background: "#fff3d6",
+                border: "1px solid #e0b84a",
+                borderRadius: 4,
+                padding: "10px 12px",
+                marginBottom: 12,
+              }}
+            >
+              ⚠️ {resultado.advertencia}
+              {resultado.errorGuardado && (
+                <div style={{ marginTop: 4, fontFamily: "monospace", fontSize: 11 }}>
+                  {resultado.errorGuardado}
+                </div>
+              )}
+              <div style={{ marginTop: 6 }}>
+                Anotá el CAE de arriba a mano — la factura ya existe en AFIP aunque no quedó en la base.
+              </div>
+            </div>
+          )}
           <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
             <button
               type="button"
