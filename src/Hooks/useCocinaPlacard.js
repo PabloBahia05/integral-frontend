@@ -514,11 +514,25 @@ export default function useCocinaPlacard({
   // Se suman al precio del ítem (ver conAccesorios en recalcFila) y viajan
   // con el ítem hasta el backend.
   const [accesoriosDisponibles, setAccesoriosDisponibles] = useState([]);
+  // true SOLO si el fetch en sí falló (red caída, 500, etc.) — no si
+  // devolvió una lista vacía legítima. Es la única señal que dispara el
+  // aviso "sin resolver": un código que no matchea nada en un catálogo que
+  // SÍ cargó bien no es un error, es que ese artículo no tiene ese
+  // accesorio.
+  const [accesoriosFetchError, setAccesoriosFetchError] = useState(false);
   useEffect(() => {
     authFetch(`${API}/articulos/accesorios`)
-      .then((r) => r.json())
-      .then((data) => setAccesoriosDisponibles(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        setAccesoriosDisponibles(Array.isArray(data) ? data : []);
+        setAccesoriosFetchError(false);
+      })
+      .catch(() => {
+        setAccesoriosFetchError(true);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -527,8 +541,22 @@ export default function useCocinaPlacard({
   // sin resolver. En cuanto accesoriosDisponibles esté listo, se resuelven
   // acá y se recalcula el precio (recalcFila) para que el cargo del
   // accesorio quede sumado.
+  //
+  // Si un presupuesto se cargó ANTES de que terminara este fetch, las filas
+  // quedan con `_accesorioCods` (los codartint crudos) pero `accesorios: []`
+  // sin resolver. En cuanto el fetch de accesoriosDisponibles TERMINE (bien
+  // o mal), se reintenta acá y se recalcula el precio (recalcFila) para que
+  // el cargo del accesorio quede sumado.
+  //
+  // `_accesoriosSinResolver` se marca ÚNICA Y EXCLUSIVAMENTE si el fetch en
+  // sí falló (accesoriosFetchError) — no por cuántos códigos matchearon.
+  // Un código que no matchea nada en un catálogo que cargó bien no es un
+  // error: es que ese artículo no tiene ese accesorio. Si en cambio el
+  // fetch falló, no hay forma de saber si el código era válido o no, así
+  // que ahí sí se avisa: la pantalla podría estar mostrando menos
+  // accesorios de los que realmente tiene guardados.
   useEffect(() => {
-    if (accesoriosDisponibles.length === 0) return;
+    if (accesoriosDisponibles.length === 0 && !accesoriosFetchError) return;
     const resolverPendientes = (itemsObj) => {
       let cambio = false;
       const next = {};
@@ -543,9 +571,12 @@ export default function useCocinaPlacard({
                 )?.articulo,
             )
             .filter(Boolean);
-          if (!nombres.length) return f;
           cambio = true;
-          return recalcFila({ ...f, accesorios: nombres });
+          return recalcFila({
+            ...f,
+            accesorios: nombres,
+            _accesoriosSinResolver: accesoriosFetchError,
+          });
         });
       }
       return cambio ? next : itemsObj;
@@ -553,7 +584,7 @@ export default function useCocinaPlacard({
     setCocinaItems((prev) => resolverPendientes(prev));
     setPlacardItems((prev) => resolverPendientes(prev));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accesoriosDisponibles]);
+  }, [accesoriosDisponibles, accesoriosFetchError]);
 
   // Menú desplegable de accesorios: no sabe si el ítem está guardado o es
   // el draft de una fila en edición — solo necesita `actuales` (los
@@ -1182,6 +1213,7 @@ export default function useCocinaPlacard({
     setFrenoItemPlacard,
     // accesorios
     accesoriosDisponibles,
+    accesoriosFetchError,
     accesorioMenu,
     abrirAccesorioMenu,
     cerrarAccesorioMenu,
