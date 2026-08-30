@@ -265,6 +265,13 @@ export default function Produccion({ authFetch }) {
   const [guardandoCampo, setGuardandoCampo] = useState(null); // `${id}-${campo}`
   const [errorCampo, setErrorCampo] = useState(null);
 
+  // Filtro por etapa de proceso (los 3 botones DOMUS/PERFORADO/ARMADO arriba
+  // de la tabla). `null` = sin filtro (se ven todos los ítems). Cada botón
+  // muestra la "cola" de esa etapa: lo que ya pasó la etapa anterior (SI)
+  // pero todavía no pasó la propia (NO). DOMUS es la primera etapa, así que
+  // su cola es simplemente todo lo que sigue en NO.
+  const [filtroEtapa, setFiltroEtapa] = useState(null);
+
   // ── Fetch ──────────────────────────────────────────────────────────────
 
   const fetchProduccion = () => {
@@ -386,23 +393,55 @@ export default function Produccion({ authFetch }) {
 
   // ── Filtro ────────────────────────────────────────────────────────────
 
+  // Evalúa si una fila cae dentro de la "cola" de la etapa seleccionada.
+  // DOMUS: todo lo que sigue en NO (primera etapa, sin requisito previo).
+  // PERFORADO: DOMUS=SI y PERFORADO=NO (ya pasó Domus, falta perforar).
+  // ARMADO: DOMUS=SI, PERFORADO=SI y ARMADO=NO (ya pasó las dos anteriores,
+  // falta armar).
+  const cumpleEtapa = (r) => {
+    if (!filtroEtapa) return true;
+    if (filtroEtapa === "DOMUS") return (r.DOMUS ?? "NO") !== "SI";
+    if (filtroEtapa === "PERFORADO")
+      return r.DOMUS === "SI" && (r.PERFORADO ?? "NO") !== "SI";
+    if (filtroEtapa === "ARMADO")
+      return (
+        r.DOMUS === "SI" &&
+        r.PERFORADO === "SI" &&
+        (r.ARMADO ?? "NO") !== "SI"
+      );
+    return true;
+  };
+
   const q = search.toLowerCase();
   const filtered = rows.filter(
     (r) =>
-      (r.codpro ?? "").toLowerCase().includes(q) ||
-      (r.cliente_nombre ?? "").toLowerCase().includes(q) ||
-      String(r.numeropres ?? "").includes(q) ||
-      (r.grupo ?? "").toLowerCase().includes(q) ||
-      (r.producto ?? "").toLowerCase().includes(q) ||
-      (r.modulo ?? "").toLowerCase().includes(q) ||
-      nombreMelamina(r.color).toLowerCase().includes(q) ||
-      (r.OP ?? "").toLowerCase().includes(q) ||
-      (r.USPER ?? "").toLowerCase().includes(q) ||
-      (r.USARM ?? "").toLowerCase().includes(q) ||
-      (r.USDES ?? "").toLowerCase().includes(q),
+      cumpleEtapa(r) &&
+      ((r.codpro ?? "").toLowerCase().includes(q) ||
+        (r.cliente_nombre ?? "").toLowerCase().includes(q) ||
+        String(r.numeropres ?? "").includes(q) ||
+        (r.grupo ?? "").toLowerCase().includes(q) ||
+        (r.producto ?? "").toLowerCase().includes(q) ||
+        (r.modulo ?? "").toLowerCase().includes(q) ||
+        nombreMelamina(r.color).toLowerCase().includes(q) ||
+        (r.OP ?? "").toLowerCase().includes(q) ||
+        (r.USPER ?? "").toLowerCase().includes(q) ||
+        (r.USARM ?? "").toLowerCase().includes(q) ||
+        (r.USDES ?? "").toLowerCase().includes(q)),
   );
 
   const pendientes = rows.filter((r) => !r.modulo || !r.modulo.trim()).length;
+
+  // Cantidades para los badges de los 3 botones de etapa (siempre contadas
+  // sobre `rows` completo, no sobre `filtered`, para que el número no
+  // cambie según qué botón esté activo).
+  const countDomus = rows.filter((r) => (r.DOMUS ?? "NO") !== "SI").length;
+  const countPerforado = rows.filter(
+    (r) => r.DOMUS === "SI" && (r.PERFORADO ?? "NO") !== "SI",
+  ).length;
+  const countArmado = rows.filter(
+    (r) =>
+      r.DOMUS === "SI" && r.PERFORADO === "SI" && (r.ARMADO ?? "NO") !== "SI",
+  ).length;
 
   // ── Selección ─────────────────────────────────────────────────────────
 
@@ -645,6 +684,45 @@ export default function Produccion({ authFetch }) {
           { label: "Filtrados", value: filtered.length },
         ]}
       />
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          margin: "12px 0",
+          flexWrap: "wrap",
+        }}
+      >
+        {[
+          { etapa: "DOMUS", label: "Domus", count: countDomus },
+          { etapa: "PERFORADO", label: "Perforado", count: countPerforado },
+          { etapa: "ARMADO", label: "Armado", count: countArmado },
+        ].map(({ etapa, label, count }) => {
+          const activo = filtroEtapa === etapa;
+          return (
+            <button
+              key={etapa}
+              onClick={() => setFiltroEtapa(activo ? null : etapa)}
+              style={{
+                padding: "6px 14px",
+                fontSize: "12px",
+                fontWeight: 700,
+                letterSpacing: "0.5px",
+                fontFamily: "'Space Mono', monospace",
+                borderRadius: "4px",
+                border: `1.5px solid ${activo ? "#0a3a5c" : "#b8d6ef"}`,
+                background: activo ? "#0a3a5c" : "#fff",
+                color: activo ? "#fff" : "#0a3a5c",
+                cursor: "pointer",
+              }}
+              title={`Ver ítems pendientes de ${label}`}
+            >
+              {label} ({count})
+            </button>
+          );
+        })}
+      </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <ActionBar
