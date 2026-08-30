@@ -1446,6 +1446,7 @@ export default function PresupuestoNuevo({
     setFrenoItemCocina,
     setFrenoItemPlacard,
     accesoriosDisponibles,
+    accesoriosFetchError,
     accesorioMenu,
     abrirAccesorioMenu,
     cerrarAccesorioMenu,
@@ -1965,15 +1966,19 @@ export default function PresupuestoNuevo({
             it.accesorio2 ?? it.ACCESORIO2 ?? null,
           ].filter((cod) => cod != null && cod !== ""),
           accesorios: accesoriosResueltosInicial,
-          // Si vino algún codartint (_accesorioCods) pero no resolvió a un
-          // nombre acá, puede ser timing (accesoriosDisponibles todavía no
-          // cargó — el efecto de useCocinaPlacard.js lo va a reintentar
-          // solo) o un código realmente huérfano (se borró/cambió en el
-          // catálogo). Se marca igual acá para no depender de que ese
-          // efecto corra; si era timing, cuando resuelva bien la flag se
-          // limpia sola (ver resolverPendientes en useCocinaPlacard.js).
+          // _accesoriosSinResolver se marca SOLO si el fetch de
+          // accesoriosDisponibles falló de verdad (accesoriosFetchError) —
+          // no por cuántos códigos matchearon acá. Si el catálogo cargó
+          // bien y el código no matcheó nada, es que ese artículo no tiene
+          // ese accesorio, no un error. Si en este momento el catálogo
+          // simplemente todavía no terminó de cargar (ni error ni datos
+          // todavía), tampoco se avisa: el efecto de useCocinaPlacard.js
+          // va a reintentar apenas el fetch termine y recién ahí, si
+          // terminó en error, marca la advertencia.
           _accesoriosSinResolver:
-            codsAccesorioInicial.length > accesoriosResueltosInicial.length,
+            codsAccesorioInicial.length > 0 &&
+            accesoriosResueltosInicial.length === 0 &&
+            accesoriosFetchError,
           grupo: it.grupo ?? it.GRUPO ?? "",
           color: it.color ?? it.COLOR ?? null,
           manija: it.manija ?? it.MANIJA ?? null,
