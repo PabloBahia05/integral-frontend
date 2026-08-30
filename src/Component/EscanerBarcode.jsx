@@ -20,10 +20,41 @@ export default function EscanerBarcode({ onDetected, onClose }) {
   useEffect(() => {
     const reader = new BrowserMultiFormatReader();
     let detectado = false;
+    let timeoutZoom = null;
+
+    // Baja el zoom de la cámara al mínimo disponible (idealmente 1x).
+    // Se llama más de una vez porque en algunos celulares el control de
+    // zoom no queda disponible hasta un instante después de iniciado el
+    // stream.
+    const corregirZoom = () => {
+      try {
+        const stream = videoRef.current?.srcObject;
+        const track = stream?.getVideoTracks?.()[0];
+        const capacidades = track?.getCapabilities?.();
+        if (capacidades && "zoom" in capacidades) {
+          const objetivo = Math.min(
+            Math.max(1, capacidades.zoom.min ?? 1),
+            capacidades.zoom.max ?? 1,
+          );
+          track
+            .applyConstraints({ advanced: [{ zoom: objetivo }] })
+            .catch(() => {});
+        }
+      } catch {
+        // Si el navegador no soporta el control de zoom, seguimos igual.
+      }
+    };
 
     reader
       .decodeFromConstraints(
-        { video: { facingMode: "environment" } },
+        {
+          video: {
+            facingMode: { ideal: "environment" },
+            zoom: { ideal: 1 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        },
         videoRef.current,
         (result) => {
           if (detectado || !result) return;
@@ -34,23 +65,8 @@ export default function EscanerBarcode({ onDetected, onClose }) {
       )
       .then((controls) => {
         controlsRef.current = controls;
-        // Algunos celulares Android abren la cámara trasera con un lente
-        // en zoom por defecto (gran angular/teleobjetivo). Si el
-        // navegador expone el control de zoom, lo bajamos al mínimo.
-        try {
-          const stream = videoRef.current?.srcObject;
-          const track = stream?.getVideoTracks?.()[0];
-          const capacidades = track?.getCapabilities?.();
-          if (capacidades && "zoom" in capacidades) {
-            track
-              .applyConstraints({
-                advanced: [{ zoom: capacidades.zoom.min ?? 1 }],
-              })
-              .catch(() => {});
-          }
-        } catch {
-          // Si el navegador no soporta el control de zoom, seguimos igual.
-        }
+        corregirZoom();
+        timeoutZoom = setTimeout(corregirZoom, 400);
       })
       .catch((e) => {
         console.error("Error abriendo la cámara:", e);
@@ -60,6 +76,7 @@ export default function EscanerBarcode({ onDetected, onClose }) {
       });
 
     return () => {
+      if (timeoutZoom) clearTimeout(timeoutZoom);
       controlsRef.current?.stop();
     };
   }, [onDetected]);
