@@ -4,6 +4,7 @@ import ActionBar from "../Component/ActionBar";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
+import EscanerBarcode from "../Component/EscanerBarcode";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -245,6 +246,11 @@ export default function Produccion({ authFetch }) {
   // clickear el código de producción, ver columna `codpro` más abajo).
   const [detalle, setDetalle] = useState(null);
 
+  // Modal de escaneo de código de barras (ver EscanerBarcode.jsx). Al
+  // detectar un código busca la fila por `codpro` y abre el mismo modal
+  // de detalle que se abre al clickear la columna "Cód.".
+  const [escaneando, setEscaneando] = useState(false);
+
   // Melaminas disponibles para el desplegable de `color` (ver
   // GET /productos/melaminas en articulos_controller.js — filtra
   // articulos por rubro "melamina"/"MELAMINA"). Se guarda el `codartint`
@@ -388,6 +394,21 @@ export default function Produccion({ authFetch }) {
       setErrorCampo(key);
     } finally {
       setGuardandoCampo(null);
+    }
+  };
+
+  // ── Escaneo de código de barras ─────────────────────────────────────────
+
+  const handleCodigoDetectado = (codigo) => {
+    setEscaneando(false);
+    const limpio = codigo.trim();
+    const fila = rows.find(
+      (r) => (r.codpro ?? "").toLowerCase() === limpio.toLowerCase(),
+    );
+    if (fila) {
+      setDetalle(fila);
+    } else {
+      alert(`No se encontró ningún ítem con el código "${limpio}".`);
     }
   };
 
@@ -762,6 +783,25 @@ export default function Produccion({ authFetch }) {
           search={search}
           onSearch={setSearch}
         />
+        <button
+          onClick={() => setEscaneando(true)}
+          style={{
+            padding: "6px 14px",
+            fontSize: "12px",
+            fontWeight: 700,
+            letterSpacing: "0.5px",
+            fontFamily: "'Space Mono', monospace",
+            borderRadius: "4px",
+            border: "1.5px solid #0a3a5c",
+            background: "#0a3a5c",
+            color: "#fff",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+          title="Escanear código de barras"
+        >
+          📷 Escanear
+        </button>
       </div>
 
       {loading ? (
@@ -820,6 +860,13 @@ export default function Produccion({ authFetch }) {
           row={detalle}
           nombreMelamina={nombreMelamina}
           onClose={() => setDetalle(null)}
+        />
+      )}
+
+      {escaneando && (
+        <EscanerBarcode
+          onDetected={handleCodigoDetectado}
+          onClose={() => setEscaneando(false)}
         />
       )}
     </>
