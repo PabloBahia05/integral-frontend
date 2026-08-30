@@ -134,34 +134,49 @@ export default function EscanerBarcode({ onDetected, onClose }) {
           background: #fff;
           border-radius: 8px;
           padding: 16px;
-          width: 92%;
-          max-width: 420px;
+          width: min(92vw, 520px);
+          max-height: 90vh;
           box-shadow: 0 8px 30px rgba(10,58,92,0.35);
+          box-sizing: border-box;
+          overflow: hidden;
         }
+
         .escaner-video {
+          display: block;
           width: 100%;
+          max-width: 100%;
+          max-height: 70vh;
           border-radius: 4px;
           background: #000;
+          object-fit: contain;
         }
+
+        /* CELULAR */
         @media (max-width: 640px) {
           .escaner-overlay {
             background: #000;
+            padding: 0;
           }
+
           .escaner-box {
-            width: 100%;
-            max-width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100dvh;
+            max-width: none;
+            max-height: none;
             border-radius: 0;
             padding: 0;
             box-shadow: none;
             position: relative;
           }
+
           .escaner-video {
             width: 100%;
             height: 100%;
+            max-height: none;
             border-radius: 0;
             object-fit: contain;
           }
+
           .escaner-header {
             position: absolute;
             top: 0;
@@ -169,15 +184,22 @@ export default function EscanerBarcode({ onDetected, onClose }) {
             right: 0;
             margin: 0 !important;
             padding: 16px;
-            background: linear-gradient(rgba(0,0,0,0.55), transparent);
+            background: linear-gradient(
+              rgba(0,0,0,0.55),
+              transparent
+            );
             z-index: 1;
           }
+
           .escaner-header span {
             color: #fff !important;
           }
+
           .escaner-header button {
             color: #fff !important;
+            font-size: 30px !important;
           }
+
           .escaner-footer {
             position: absolute;
             bottom: 0;
@@ -185,7 +207,10 @@ export default function EscanerBarcode({ onDetected, onClose }) {
             right: 0;
             margin: 0 !important;
             padding: 16px;
-            background: linear-gradient(transparent, rgba(0,0,0,0.55));
+            background: linear-gradient(
+              transparent,
+              rgba(0,0,0,0.55)
+            );
             z-index: 1;
           }
           .escaner-footer.escaner-footer {
