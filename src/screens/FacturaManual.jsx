@@ -39,18 +39,31 @@ export default function FacturaManual({ clientes, authFetch, onVolver, onFaltanD
   }, []);
 
   const q = busqueda.trim().toLowerCase();
+  const qDigitos = soloDigitos(busqueda);
+  const palabras = q.split(/\s+/).filter(Boolean);
   const coincidencias =
     q.length < 2
       ? []
       : (clientes ?? [])
           .filter((c) => {
-            const tels = [c.telefono1, c.telefono2, c.wapp].map(soloDigitos).filter(Boolean);
-            return (
-              (c.nombre ?? "").toLowerCase().includes(q) ||
-              String(c.cuit ?? "").includes(q) ||
-              String(c.codcliente ?? "").includes(q) ||
-              tels.some((t) => t.includes(soloDigitos(q)))
-            );
+            const nombreNorm = (c.nombre ?? "").toLowerCase();
+            // Cada palabra tipeada tiene que aparecer en algún lado del
+            // nombre — así "daniel roque" encuentra a "ROQUE DANIEL" sin
+            // importar el orden en que esté guardado.
+            const coincideNombre = palabras.every((p) => nombreNorm.includes(p));
+            const coincideCuit = String(c.cuit ?? "").includes(q);
+            const coincideCodigo = String(c.codcliente ?? "").includes(q);
+            // Solo compara por teléfono si lo que se tipeó tiene DÍGITOS —
+            // si no, soloDigitos(q) da "" y CUALQUIER string "contiene" un
+            // string vacío en JS, lo que hacía matchear cualquier cliente
+            // con teléfono cargado sin importar lo que se buscara.
+            const coincideTelefono =
+              qDigitos.length > 0 &&
+              [c.telefono1, c.telefono2, c.wapp]
+                .map(soloDigitos)
+                .filter(Boolean)
+                .some((t) => t.includes(qDigitos));
+            return coincideNombre || coincideCuit || coincideCodigo || coincideTelefono;
           })
           .slice(0, 8);
 
