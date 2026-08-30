@@ -68,13 +68,23 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
     >
       <span
         className="detalle-produccion-label"
-        style={{ color: "#4a8ab5", fontFamily: "'Space Mono', monospace" }}
+        style={{
+          color: "#4a8ab5",
+          fontFamily: "'Space Mono', monospace",
+          flexShrink: 0,
+        }}
       >
         {label}
       </span>
       <span
         className="detalle-produccion-value"
-        style={{ color: "#0a3a5c", fontWeight: 600, textAlign: "right" }}
+        style={{
+          color: "#0a3a5c",
+          fontWeight: 600,
+          textAlign: "right",
+          minWidth: 0,
+          overflowWrap: "break-word",
+        }}
       >
         {valor}
       </span>
@@ -147,6 +157,7 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
             width: "90%",
             maxWidth: "420px",
             maxHeight: "85vh",
+            boxSizing: "border-box",
             overflowY: "auto",
             boxShadow: "0 8px 30px rgba(10,58,92,0.25)",
           }}
