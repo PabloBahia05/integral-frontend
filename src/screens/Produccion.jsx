@@ -802,9 +802,8 @@ export default function Produccion({ authFetch }) {
       {/* Estilos que dependen del ancho de pantalla van en <style> porque
           los inline styles no soportan media queries. En desktop el botón
           queda como un cartel ancho con el texto en una sola línea; en
-          celular el texto bajaba de tamaño se desbordaba del botón (se
-          veía como una franja de color sin texto legible), así que en
-          mobile se achica la letra y se permite el salto de línea. */}
+          celular se achica la letra y se fija la altura (height/min/max)
+          para que no pueda crecer si cambia el layout de la pantalla. */}
       <style>{`
         .produccion-btn-escanear-label {
           font-size: 18px;
@@ -813,13 +812,19 @@ export default function Produccion({ authFetch }) {
         }
         @media (max-width: 640px) {
           .produccion-btn-escanear {
-            padding: 14px 12px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 52px !important;
             min-height: 52px !important;
+            max-height: 52px !important;
+            padding: 0 12px !important;
+            margin: 10px auto !important;
           }
+
           .produccion-btn-escanear-label {
             font-size: 14px !important;
             letter-spacing: 0.3px !important;
-            white-space: normal !important;
+            white-space: nowrap !important;
             text-align: center;
           }
         }
@@ -844,15 +849,21 @@ export default function Produccion({ authFetch }) {
           alignItems: "center",
           justifyContent: "center",
           gap: "10px",
+
           width: "100%",
+          maxWidth: "600px",
+          height: "56px",
           minHeight: "56px",
-          margin: "10px 0",
-          padding: "16px 20px",
+          maxHeight: "56px",
+
+          margin: "10px auto",
+          padding: "0 20px",
+
           borderRadius: "6px",
           border: "1.5px solid #0a3a5c",
           background: "#0a3a5c",
           cursor: "pointer",
-          overflow: "visible",
+          overflow: "hidden",
         }}
         title="Escanear código de barras"
       >
