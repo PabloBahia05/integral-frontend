@@ -22,43 +22,12 @@ export default function EscanerBarcode({ onDetected, onClose }) {
   useEffect(() => {
     const reader = new BrowserMultiFormatReader();
     let detectado = false;
-    let intervaloZoom = null;
-    let intentosZoom = 0;
-
-    // Baja el zoom de la cámara al mínimo disponible (idealmente 1x).
-    // En muchos celulares (sobre todo Android) las `capabilities` del
-    // track no están disponibles apenas arranca el stream, así que en
-    // vez de un único intento se reintenta cada 300ms durante ~3s hasta
-    // que el control de zoom aparece y se puede corregir. Devuelve true
-    // si ya se pudo aplicar, para poder cortar el reintento.
-    const corregirZoom = () => {
-      try {
-        const stream = videoRef.current?.srcObject;
-        const track = stream?.getVideoTracks?.()[0];
-        const capacidades = track?.getCapabilities?.();
-        if (capacidades && "zoom" in capacidades) {
-          const objetivo = Math.min(
-            Math.max(1, capacidades.zoom.min ?? 1),
-            capacidades.zoom.max ?? 1,
-          );
-          track
-            .applyConstraints({ advanced: [{ zoom: objetivo }] })
-            .catch(() => {});
-          return true;
-        }
-      } catch {
-        // Si el navegador no soporta el control de zoom, seguimos igual.
-      }
-      return false;
-    };
 
     reader
       .decodeFromConstraints(
         {
           video: {
             facingMode: { ideal: "environment" },
-            zoom: { ideal: 1 },
-            advanced: [{ zoom: 1 }],
             width: { ideal: 1280 },
             height: { ideal: 720 },
             // Pide una relación de aspecto parecida a la de la pantalla
@@ -67,6 +36,15 @@ export default function EscanerBarcode({ onDetected, onClose }) {
             // 16:9 y el CSS tiene que recortar mucho para llenar una
             // pantalla de celular (que es bastante más alargada), y ese
             // recorte se ve como si la imagen estuviera "zoomeada".
+            //
+            // Nota: acá NO se toca el zoom de la cámara vía
+            // applyConstraints. Se probó forzarlo al mínimo reportado por
+            // capabilities.zoom, pero en algunos celulares ese "mínimo"
+            // no es el 1x real y el resultado terminaba MÁS zoomeado que
+            // el zoom por default del navegador (se veía bien un
+            // instante y a los pocos segundos, cuando la corrección se
+            // aplicaba, pasaba a verse mal). Mejor dejar que el
+            // navegador arranque con su zoom por default.
             aspectRatio:
               typeof window !== "undefined" && window.innerHeight
                 ? { ideal: window.innerWidth / window.innerHeight }
@@ -83,15 +61,6 @@ export default function EscanerBarcode({ onDetected, onClose }) {
       )
       .then((controls) => {
         controlsRef.current = controls;
-        if (!corregirZoom()) {
-          intervaloZoom = setInterval(() => {
-            intentosZoom += 1;
-            if (corregirZoom() || intentosZoom >= 10) {
-              clearInterval(intervaloZoom);
-              intervaloZoom = null;
-            }
-          }, 300);
-        }
       })
       .catch((e) => {
         console.error("Error abriendo la cámara:", e);
@@ -101,7 +70,6 @@ export default function EscanerBarcode({ onDetected, onClose }) {
       });
 
     return () => {
-      if (intervaloZoom) clearInterval(intervaloZoom);
       controlsRef.current?.stop();
     };
   }, [onDetected]);
