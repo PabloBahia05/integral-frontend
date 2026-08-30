@@ -342,6 +342,17 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
                       >
                         <strong>{c.nombre}</strong>
                         {c.cuit ? ` — CUIT ${c.cuit}` : c.dni ? ` — DNI ${c.dni}` : ""}
+                        {(c.telefono1 || c.telefono2 || c.wapp) && (
+                          <span style={{ color: "#5580a0" }}>
+                            {" "}— Tel. {c.telefono1 || c.telefono2 || c.wapp}
+                          </span>
+                        )}
+                        {(c.direccion || c.domicilio) && (
+                          <div style={{ fontSize: 11, color: "#8aabb8" }}>
+                            {c.direccion || c.domicilio}
+                            {c.localidad ? `, ${c.localidad}` : ""}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -358,9 +369,6 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
                 <label style={etiquetaEstilo}>Cliente</label>
                 <div
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
                     padding: "10px 12px",
                     border: "1px solid #c8dae8",
                     borderRadius: 4,
@@ -368,17 +376,37 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
                     fontSize: 13,
                   }}
                 >
-                  <span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <strong>{clienteSel.nombre}</strong>
-                    {clienteSel.cuit ? ` — CUIT ${clienteSel.cuit}` : clienteSel.dni ? ` — DNI ${clienteSel.dni}` : " — sin CUIT/DNI cargado"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setClienteSel(null)}
-                    style={{ background: "none", border: "none", color: "#a72a2a", cursor: "pointer", fontSize: 12 }}
-                  >
-                    Cambiar
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setClienteSel(null)}
+                      style={{ background: "none", border: "none", color: "#a72a2a", cursor: "pointer", fontSize: 12 }}
+                    >
+                      Cambiar
+                    </button>
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: "#5580a0", display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span>Código: {clienteSel.codcliente ?? "—"}</span>
+                    <span>
+                      {clienteSel.cuit ? `CUIT ${clienteSel.cuit}` : clienteSel.dni ? `DNI ${clienteSel.dni}` : "Sin CUIT/DNI cargado"}
+                    </span>
+                    {(clienteSel.telefono1 || clienteSel.telefono2 || clienteSel.wapp) && (
+                      <span>
+                        Tel.{" "}
+                        {[clienteSel.telefono1, clienteSel.telefono2, clienteSel.wapp]
+                          .filter(Boolean)
+                          .join(" / ")}
+                      </span>
+                    )}
+                    {(clienteSel.direccion || clienteSel.domicilio) && (
+                      <span>
+                        {clienteSel.direccion || clienteSel.domicilio}
+                        {clienteSel.localidad ? `, ${clienteSel.localidad}` : ""}
+                      </span>
+                    )}
+                    {clienteSel.email && <span>{clienteSel.email}</span>}
+                  </div>
                 </div>
               </div>
             )}
