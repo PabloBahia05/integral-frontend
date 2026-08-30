@@ -17,6 +17,7 @@ import Produccion from "./screens/Produccion";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
 import FacturasVenta from "./screens/FacturasVenta";
+import FacturaManual from "./screens/FacturaManual";
 import HistorialFacturas from "./screens/HistorialFacturas";
 import AfipIVA from "./screens/AfipIVA";
 import ActualizarPreciosExcel from "./screens/ActualizarPreciosExcel";
@@ -47,6 +48,7 @@ const SCREENS = {
   produccion: { label: "PRODUCCIÓN", icon: "🏭" },
   facturas: { label: "FACTURAS", icon: "🧾" },
   "facturas-venta": { label: "FACTURAS EMITIDAS", icon: "🧮" },
+  "factura-manual": { label: "FACTURAR (MANUAL)", icon: "🧾" },
   "historial-facturas": { label: "HISTORIAL FACTURAS", icon: "📋" },
   anviz: { label: "ASISTENCIA", icon: "🕐" },
   "afip-iva": { label: "AFIP IVA", icon: "🏦" },
@@ -1086,7 +1088,25 @@ function App() {
               />
             )}
             {screen === "facturas-venta" && (
-              <FacturasVenta authFetch={authFetch} />
+              <FacturasVenta
+                authFetch={authFetch}
+                onFacturar={() => setScreen("factura-manual")}
+              />
+            )}
+            {screen === "factura-manual" && (
+              <FacturaManual
+                clientes={clientes}
+                authFetch={authFetch}
+                onVolver={() => setScreen("facturas-venta")}
+                onFaltanDatosCliente={(info) =>
+                  irACliente(
+                    info.codcliente,
+                    info.nombreCliente,
+                    null,
+                    info.faltantes?.map((f) => f.field),
+                  )
+                }
+              />
             )}
             {screen === "produccion" && (
               <Produccion authFetch={authFetch} />
