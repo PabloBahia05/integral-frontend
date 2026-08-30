@@ -1315,7 +1315,7 @@ function App() {
         {puedo("presupuesto-mamparas", "ver") && <p onClick={() => { setScreen("presupuestos-tabla"); setSidebarOpen(false); }}>📋 Presupuestos Mamparas</p>}
         {puedo("productos", "ver") && <p onClick={() => { setScreen("productos"); setSidebarOpen(false); }}>🛒 Productos</p>}
         {puedo("lista-margenes", "ver") && <p onClick={() => { setScreen("lista-margenes"); fetchListas(); setSidebarOpen(false); }}>📊 Lista de Márgenes</p>}
-        {puedo("facturas", "ver") && <p onClick={() => { setScreen("facturas"); setSidebarOpen(false); }}>🧾 Facturas</p>}
+        {puedo("facturas", "ver") && <p onClick={() => { setScreen("facturas"); setSidebarOpen(false); }}>🧾 Facturas Compra</p>}
         {puedo("facturas-venta", "ver") && <p onClick={() => { setScreen("facturas-venta"); setSidebarOpen(false); }}>🧮 Facturas Emitidas</p>}
         {puedo("anviz", "ver") && <p onClick={() => { setScreen("anviz"); setSidebarOpen(false); }}>🕐 Asistencia</p>}
         {puedo("usuarios", "ver") && <p onClick={() => { setScreen("usuarios"); setSidebarOpen(false); }}>👤 Usuarios</p>}
@@ -1421,7 +1421,7 @@ function App() {
                 }}
               >
                 <span className="sub-card-icon">🧾</span>
-                <span className="sub-card-label">FACTURAS</span>
+                <span className="sub-card-label">FACTURAS COMPRA</span>
                 <span className="sub-card-desc">Gestión de comprobantes</span>
               </div>
               )}
@@ -1437,20 +1437,6 @@ function App() {
                 <span className="sub-card-icon">🧮</span>
                 <span className="sub-card-label">FACTURAS EMITIDAS</span>
                 <span className="sub-card-desc">CAE, QR AFIP y PDF de ventas</span>
-              </div>
-              )}
-              {puedo("afip-iva", "ver") && (
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#3b6fd4" }}
-                onClick={() => {
-                  setScreen("afip-iva");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">🏦</span>
-                <span className="sub-card-label">AFIP IVA</span>
-                <span className="sub-card-desc">Estado de IVA en tiempo real</span>
               </div>
               )}
               {puedo("ver-tablas", "ver") && (
