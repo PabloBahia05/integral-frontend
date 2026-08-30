@@ -34,6 +34,23 @@ export default function EscanerBarcode({ onDetected, onClose }) {
       )
       .then((controls) => {
         controlsRef.current = controls;
+        // Algunos celulares Android abren la cámara trasera con un lente
+        // en zoom por defecto (gran angular/teleobjetivo). Si el
+        // navegador expone el control de zoom, lo bajamos al mínimo.
+        try {
+          const stream = videoRef.current?.srcObject;
+          const track = stream?.getVideoTracks?.()[0];
+          const capacidades = track?.getCapabilities?.();
+          if (capacidades && "zoom" in capacidades) {
+            track
+              .applyConstraints({
+                advanced: [{ zoom: capacidades.zoom.min ?? 1 }],
+              })
+              .catch(() => {});
+          }
+        } catch {
+          // Si el navegador no soporta el control de zoom, seguimos igual.
+        }
       })
       .catch((e) => {
         console.error("Error abriendo la cámara:", e);
