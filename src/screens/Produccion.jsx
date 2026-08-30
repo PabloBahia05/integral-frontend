@@ -27,27 +27,52 @@ const ETAPAS = [
   { campo: "DESPACHO", label: "Despacho", usuario: "USDES" },
 ];
 
+// Detecta celular vs escritorio por JavaScript (ancho real de pantalla),
+// en vez de depender de @media queries en CSS. Se recalcula si el usuario
+// rota el celular o cambia el tamaño de la ventana.
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth <= breakpoint : false,
+  );
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= breakpoint);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 // ── Modal de detalle (se abre al clickear el código) ───────────────────────
 //
 // Solo muestra datos que ya vienen en la fila de `produccion` (no pega a
 // ningún endpoint nuevo): cliente, grupo, producto, módulo, color resuelto,
 // y el estado de las 4 etapas con su usuario y OP.
+//
+// El layout mobile vs desktop se resuelve acá mismo por JS (useIsMobile),
+// no con clases + @media: cada estilo de acá abajo ya es el valor final
+// para el dispositivo actual, sin depender de que ninguna cascada CSS
+// externa lo pise ni de que el navegador respete el media query.
 function DetalleProduccion({ row, nombreMelamina, onClose }) {
+  const isMobile = useIsMobile();
+
   if (!row) return null;
+
+  const fuente = "'Space Mono', monospace";
 
   const badgeEtapa = (valor) => (
     <span
-      className="detalle-produccion-badge"
       style={{
         display: "inline-block",
         background: valor === "SI" ? "#eaf7ea" : "#f3f3f3",
         color: valor === "SI" ? "#2e7d32" : "#888",
         border: `1px solid ${valor === "SI" ? "#a5d6a7" : "#ddd"}`,
         borderRadius: "4px",
-        padding: "2px 10px",
-        fontSize: "12px",
+        padding: isMobile ? "4px 12px" : "2px 10px",
+        fontSize: isMobile ? "15px" : "12px",
         fontWeight: 700,
-        fontFamily: "'Space Mono', monospace",
+        fontFamily: fuente,
       }}
     >
       {valor === "SI" ? "✓ SI" : "NO"}
@@ -56,28 +81,28 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
 
   const fila = (label, valor) => (
     <div
-      className="detalle-produccion-fila"
       style={{
         display: "flex",
         justifyContent: "space-between",
-        gap: "16px",
-        padding: "8px 0",
+        gap: isMobile ? "12px" : "16px",
+        padding: isMobile ? "16px 0" : "8px 0",
         borderBottom: "1px solid #eaf3fb",
-        fontSize: "13px",
+        fontSize: isMobile ? "19px" : "13px",
+        boxSizing: "border-box",
+        width: "100%",
       }}
     >
       <span
-        className="detalle-produccion-label"
         style={{
           color: "#4a8ab5",
-          fontFamily: "'Space Mono', monospace",
+          fontFamily: fuente,
           flexShrink: 0,
+          fontSize: isMobile ? "17px" : "13px",
         }}
       >
         {label}
       </span>
       <span
-        className="detalle-produccion-value"
         style={{
           color: "#0a3a5c",
           fontWeight: 600,
@@ -91,77 +116,40 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
     </div>
   );
 
+  const subTexto = {
+    fontSize: isMobile ? "15px" : "11px",
+    color: "#8aabb8",
+    fontFamily: fuente,
+  };
+
   return (
-    <>
-      {/* En pantallas angostas (celular) el modal pasa a ocupar toda la
-          pantalla en vez de quedar como cuadro chico centrado. Va en un
-          <style> porque los estilos inline no soportan media queries. */}
-      <style>{`
-        @media (max-width: 640px) {
-          .detalle-produccion-box {
-            width: 100% !important;
-            max-width: 100% !important;
-            height: 100% !important;
-            max-height: 100% !important;
-            border-radius: 0 !important;
-            padding: 32px 20px !important;
-          }
-          .detalle-produccion-fila {
-            font-size: 19px !important;
-            padding: 16px 0 !important;
-          }
-          .detalle-produccion-label {
-            font-size: 17px !important;
-          }
-          .detalle-produccion-value {
-            font-size: 19px !important;
-          }
-          .detalle-produccion-sub {
-            font-size: 15px !important;
-          }
-          .detalle-produccion-codigo {
-            font-size: 18px !important;
-            padding: 6px 14px !important;
-          }
-          .detalle-produccion-cerrar {
-            font-size: 30px !important;
-          }
-          .detalle-produccion-badge {
-            font-size: 15px !important;
-            padding: 4px 12px !important;
-          }
-          .detalle-produccion-usuario {
-            font-size: 15px !important;
-          }
-        }
-      `}</style>
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,58,92,0.35)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+      }}
+    >
       <div
-        onClick={onClose}
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(10,58,92,0.35)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 1000,
+          background: "#fff",
+          borderRadius: isMobile ? 0 : "8px",
+          padding: isMobile ? "32px 20px" : "24px",
+          width: isMobile ? "100%" : "90%",
+          maxWidth: isMobile ? "100%" : "420px",
+          height: isMobile ? "100%" : "auto",
+          maxHeight: isMobile ? "100%" : "85vh",
+          boxSizing: "border-box",
+          overflowY: "auto",
+          boxShadow: isMobile ? "none" : "0 8px 30px rgba(10,58,92,0.25)",
         }}
       >
-        <div
-          className="detalle-produccion-box"
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            background: "#fff",
-            borderRadius: "8px",
-            padding: "24px",
-            width: "90%",
-            maxWidth: "420px",
-            maxHeight: "85vh",
-            boxSizing: "border-box",
-            overflowY: "auto",
-            boxShadow: "0 8px 30px rgba(10,58,92,0.25)",
-          }}
-        >
         <div
           style={{
             display: "flex",
@@ -171,28 +159,26 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
           }}
         >
           <span
-            className="detalle-produccion-codigo"
             style={{
               display: "inline-block",
               background: "#0a3a5c",
               color: "#fff",
               borderRadius: "4px",
-              padding: "2px 10px",
-              fontSize: "13px",
+              padding: isMobile ? "6px 14px" : "2px 10px",
+              fontSize: isMobile ? "18px" : "13px",
               fontWeight: 700,
               letterSpacing: "0.5px",
-              fontFamily: "'Space Mono', monospace",
+              fontFamily: fuente,
             }}
           >
             {row.codpro ?? "—"}
           </span>
           <button
             onClick={onClose}
-            className="detalle-produccion-cerrar"
             style={{
               background: "none",
               border: "none",
-              fontSize: "20px",
+              fontSize: isMobile ? "30px" : "20px",
               lineHeight: 1,
               cursor: "pointer",
               color: "#8aabb8",
@@ -203,16 +189,7 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
           </button>
         </div>
 
-        <p
-          className="detalle-produccion-sub"
-          style={{
-            fontSize: "11px",
-            color: "#8aabb8",
-            fontFamily: "'Space Mono', monospace",
-            marginTop: 0,
-            marginBottom: "16px",
-          }}
-        >
+        <p style={{ ...subTexto, marginTop: 0, marginBottom: "16px" }}>
           Presupuesto N° {row.numeropres ? String(row.numeropres).padStart(4, "0") : "—"}
           {" · "}Rev. {row.revision ?? 0}
         </p>
@@ -224,16 +201,7 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
         {fila("Color", row.color ? nombreMelamina(row.color) : "Sin color")}
         {fila("OP", row.OP ?? "—")}
 
-        <p
-          className="detalle-produccion-sub"
-          style={{
-            fontSize: "11px",
-            color: "#8aabb8",
-            fontFamily: "'Space Mono', monospace",
-            marginTop: "16px",
-            marginBottom: "8px",
-          }}
-        >
+        <p style={{ ...subTexto, marginTop: "16px", marginBottom: "8px" }}>
           ETAPAS DE PROCESO
         </p>
 
@@ -251,9 +219,9 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
             return (
               <p
                 style={{
-                  fontSize: "13px",
+                  fontSize: isMobile ? "17px" : "13px",
                   color: "#8aabb8",
-                  fontFamily: "'Space Mono', monospace",
+                  fontFamily: fuente,
                   padding: "8px 0",
                 }}
               >
@@ -265,28 +233,34 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
           return completadas.map(({ campo, label, usuario }) => (
             <div
               key={campo}
-              className="detalle-produccion-fila"
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 gap: "12px",
-                padding: "8px 0",
+                padding: isMobile ? "16px 0" : "8px 0",
                 borderBottom: "1px solid #eaf3fb",
-                fontSize: "13px",
+                fontSize: isMobile ? "19px" : "13px",
+                boxSizing: "border-box",
+                width: "100%",
               }}
             >
               <span
-                className="detalle-produccion-label"
-                style={{ color: "#4a8ab5", fontFamily: "'Space Mono', monospace" }}
+                style={{
+                  color: "#4a8ab5",
+                  fontFamily: fuente,
+                  fontSize: isMobile ? "17px" : "13px",
+                }}
               >
                 {label}
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 {usuario && row[usuario] ? (
                   <span
-                    className="detalle-produccion-usuario"
-                    style={{ color: "#0a3a5c", fontSize: "12px" }}
+                    style={{
+                      color: "#0a3a5c",
+                      fontSize: isMobile ? "15px" : "12px",
+                    }}
                   >
                     {row[usuario]}
                   </span>
@@ -296,13 +270,13 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
             </div>
           ));
         })()}
-        </div>
       </div>
-    </>
+    </div>
   );
 }
 
 export default function Produccion({ authFetch }) {
+  const isMobile = useIsMobile();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -810,40 +784,9 @@ export default function Produccion({ authFetch }) {
         ]}
       />
 
-      {/* Estilos que dependen del ancho de pantalla van en <style> porque
-          los inline styles no soportan media queries. En desktop el botón
-          queda como un cartel ancho con el texto en una sola línea; en
-          celular se achica la letra y se fija la altura (height/min/max)
-          para que no pueda crecer si cambia el layout de la pantalla. */}
-      <style>{`
-        .produccion-btn-escanear-label {
-          font-size: 18px;
-          letter-spacing: 0.5px;
-          white-space: nowrap;
-        }
-        @media (max-width: 640px) {
-          .produccion-btn-escanear {
-            width: 100% !important;
-            max-width: 100% !important;
-            height: 52px !important;
-            min-height: 52px !important;
-            max-height: 52px !important;
-            padding: 0 12px !important;
-            margin: 10px 0 !important;
-          }
-
-          .produccion-btn-escanear-label {
-            font-size: clamp(10px, 3.6vw, 14px) !important;
-            letter-spacing: 0.2px !important;
-            white-space: nowrap !important;
-          }
-        }
-      `}</style>
-
       <button
         type="button"
         onClick={() => setEscaneando(true)}
-        className="produccion-btn-escanear"
         style={{
           WebkitAppearance: "none",
           appearance: "none",
@@ -856,12 +799,12 @@ export default function Produccion({ authFetch }) {
           gap: "10px",
 
           width: "100%",
-          height: "56px",
-          minHeight: "56px",
-          maxHeight: "56px",
+          height: isMobile ? "52px" : "56px",
+          minHeight: isMobile ? "52px" : "56px",
+          maxHeight: isMobile ? "52px" : "56px",
 
           margin: "10px 0",
-          padding: "0 20px",
+          padding: isMobile ? "0 12px" : "0 20px",
 
           borderRadius: "6px",
           border: "1.5px solid #0a3a5c",
@@ -872,18 +815,20 @@ export default function Produccion({ authFetch }) {
         title="Escanear código de barras"
       >
         <span
-          className="produccion-btn-escanear-label"
           style={{
             display: "block",
             width: "100%",
             maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
             textAlign: "left",
             color: "#ffffff",
             fontWeight: 700,
             lineHeight: "1.2",
             fontFamily: "'Space Mono', monospace",
+            fontSize: isMobile ? "clamp(10px, 3.6vw, 14px)" : "18px",
+            letterSpacing: isMobile ? "0.2px" : "0.5px",
           }}
         >
           📷 ESCANEAR CÓDIGO DE BARRAS
