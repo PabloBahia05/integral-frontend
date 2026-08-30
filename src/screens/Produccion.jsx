@@ -93,20 +93,27 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
             height: 100% !important;
             max-height: 100% !important;
             border-radius: 0 !important;
-            padding: 24px 20px !important;
+            padding: 32px 20px !important;
           }
           .detalle-produccion-fila {
-            font-size: 16px !important;
-            padding: 14px 0 !important;
+            font-size: 19px !important;
+            padding: 16px 0 !important;
           }
           .detalle-produccion-label {
-            font-size: 15px !important;
+            font-size: 17px !important;
           }
           .detalle-produccion-value {
-            font-size: 16px !important;
+            font-size: 19px !important;
           }
           .detalle-produccion-sub {
-            font-size: 13px !important;
+            font-size: 15px !important;
+          }
+          .detalle-produccion-codigo {
+            font-size: 18px !important;
+            padding: 6px 14px !important;
+          }
+          .detalle-produccion-cerrar {
+            font-size: 30px !important;
           }
         }
       `}</style>
@@ -145,6 +152,7 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
           }}
         >
           <span
+            className="detalle-produccion-codigo"
             style={{
               display: "inline-block",
               background: "#0a3a5c",
@@ -161,6 +169,7 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
           </span>
           <button
             onClick={onClose}
+            className="detalle-produccion-cerrar"
             style={{
               background: "none",
               border: "none",
@@ -780,35 +789,43 @@ export default function Produccion({ authFetch }) {
       />
 
       <button
+        type="button"
         onClick={() => setEscaneando(true)}
         style={{
+          WebkitAppearance: "none",
+          appearance: "none",
           boxSizing: "border-box",
+          position: "relative",
+          zIndex: 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: "10px",
           width: "100%",
+          minHeight: "56px",
           margin: "10px 0",
           padding: "16px 20px",
           borderRadius: "6px",
           border: "1.5px solid #0a3a5c",
           background: "#0a3a5c",
           cursor: "pointer",
+          overflow: "visible",
         }}
         title="Escanear código de barras"
       >
-        <span style={{ fontSize: "20px", lineHeight: 1 }}>📷</span>
         <span
           style={{
+            display: "inline-block",
             color: "#ffffff",
-            fontSize: "16px",
+            fontSize: "18px",
             fontWeight: 700,
             letterSpacing: "0.5px",
+            lineHeight: "1.2",
             fontFamily: "'Space Mono', monospace",
             whiteSpace: "nowrap",
           }}
         >
-          Escanear código de barras
+          ESCANEAR CÓDIGO DE BARRAS
         </span>
       </button>
 
