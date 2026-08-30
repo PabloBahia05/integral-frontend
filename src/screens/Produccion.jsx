@@ -752,6 +752,31 @@ export default function Produccion({ authFetch }) {
         ]}
       />
 
+      <button
+        onClick={() => setEscaneando(true)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "10px",
+          width: "100%",
+          margin: "10px 0",
+          padding: "16px 20px",
+          fontSize: "16px",
+          fontWeight: 700,
+          letterSpacing: "0.5px",
+          fontFamily: "'Space Mono', monospace",
+          borderRadius: "6px",
+          border: "1.5px solid #0a3a5c",
+          background: "#0a3a5c",
+          color: "#fff",
+          cursor: "pointer",
+        }}
+        title="Escanear código de barras"
+      >
+        📷 Escanear código de barras
+      </button>
+
       <div
         style={{
           display: "flex",
@@ -800,25 +825,6 @@ export default function Produccion({ authFetch }) {
           search={search}
           onSearch={setSearch}
         />
-        <button
-          onClick={() => setEscaneando(true)}
-          style={{
-            padding: "6px 14px",
-            fontSize: "12px",
-            fontWeight: 700,
-            letterSpacing: "0.5px",
-            fontFamily: "'Space Mono', monospace",
-            borderRadius: "4px",
-            border: "1.5px solid #0a3a5c",
-            background: "#0a3a5c",
-            color: "#fff",
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-          title="Escanear código de barras"
-        >
-          📷 Escanear
-        </button>
       </div>
 
       {loading ? (
