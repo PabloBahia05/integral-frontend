@@ -55,6 +55,7 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
 
   const fila = (label, valor) => (
     <div
+      className="detalle-produccion-fila"
       style={{
         display: "flex",
         justifyContent: "space-between",
@@ -64,10 +65,16 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
         fontSize: "13px",
       }}
     >
-      <span style={{ color: "#4a8ab5", fontFamily: "'Space Mono', monospace" }}>
+      <span
+        className="detalle-produccion-label"
+        style={{ color: "#4a8ab5", fontFamily: "'Space Mono', monospace" }}
+      >
         {label}
       </span>
-      <span style={{ color: "#0a3a5c", fontWeight: 600, textAlign: "right" }}>
+      <span
+        className="detalle-produccion-value"
+        style={{ color: "#0a3a5c", fontWeight: 600, textAlign: "right" }}
+      >
         {valor}
       </span>
     </div>
@@ -86,6 +93,20 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
             height: 100% !important;
             max-height: 100% !important;
             border-radius: 0 !important;
+            padding: 24px 20px !important;
+          }
+          .detalle-produccion-fila {
+            font-size: 16px !important;
+            padding: 14px 0 !important;
+          }
+          .detalle-produccion-label {
+            font-size: 15px !important;
+          }
+          .detalle-produccion-value {
+            font-size: 16px !important;
+          }
+          .detalle-produccion-sub {
+            font-size: 13px !important;
           }
         }
       `}</style>
@@ -155,6 +176,7 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
         </div>
 
         <p
+          className="detalle-produccion-sub"
           style={{
             fontSize: "11px",
             color: "#8aabb8",
@@ -175,6 +197,7 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
         {fila("OP", row.OP ?? "—")}
 
         <p
+          className="detalle-produccion-sub"
           style={{
             fontSize: "11px",
             color: "#8aabb8",
@@ -214,6 +237,7 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
           return completadas.map(({ campo, label, usuario }) => (
             <div
               key={campo}
+              className="detalle-produccion-fila"
               style={{
                 display: "flex",
                 justifyContent: "space-between",
@@ -224,7 +248,10 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
                 fontSize: "13px",
               }}
             >
-              <span style={{ color: "#4a8ab5", fontFamily: "'Space Mono', monospace" }}>
+              <span
+                className="detalle-produccion-label"
+                style={{ color: "#4a8ab5", fontFamily: "'Space Mono', monospace" }}
+              >
                 {label}
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
