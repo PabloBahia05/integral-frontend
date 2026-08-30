@@ -10,9 +10,12 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 // En pantallas angostas (celular) la cámara ocupa toda la pantalla: el
 // <video> se muestra con object-fit:contain (nunca recorta) y pide un
 // aspect ratio acorde a la pantalla real para minimizar el letterbox.
-// El título/botón de cerrar/texto de ayuda quedan flotando arriba y
-// abajo, superpuestos. En desktop se mantiene como cuadro chico
-// centrado.
+// Además, en vez de dejar que el navegador elija la lente trasera por
+// `facingMode` (que en algunos Android termina siendo la teleobjetivo,
+// con zoom óptico de fábrica), se enumeran las cámaras y se elige a
+// mano la trasera que no sea "tele". El título/botón de cerrar/texto de
+// ayuda quedan flotando arriba y abajo, superpuestos. En desktop se
+// mantiene como cuadro chico centrado.
 
 export default function EscanerBarcode({ onDetected, onClose }) {
   const videoRef = useRef(null);
@@ -22,54 +25,99 @@ export default function EscanerBarcode({ onDetected, onClose }) {
   useEffect(() => {
     const reader = new BrowserMultiFormatReader();
     let detectado = false;
+    let cancelado = false;
 
-    reader
-      .decodeFromConstraints(
-        {
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            // Pide una relación de aspecto parecida a la de la pantalla
-            // real del celular (alto/ancho, invertida porque el sensor
-            // entrega horizontal). Si no se pide esto, la cámara devuelve
-            // 16:9 y el CSS tiene que recortar mucho para llenar una
-            // pantalla de celular (que es bastante más alargada), y ese
-            // recorte se ve como si la imagen estuviera "zoomeada".
-            //
-            // Nota: acá NO se toca el zoom de la cámara vía
-            // applyConstraints. Se probó forzarlo al mínimo reportado por
-            // capabilities.zoom, pero en algunos celulares ese "mínimo"
-            // no es el 1x real y el resultado terminaba MÁS zoomeado que
-            // el zoom por default del navegador (se veía bien un
-            // instante y a los pocos segundos, cuando la corrección se
-            // aplicaba, pasaba a verse mal). Mejor dejar que el
-            // navegador arranque con su zoom por default.
-            aspectRatio:
-              typeof window !== "undefined" && window.innerHeight
-                ? { ideal: window.innerWidth / window.innerHeight }
-                : undefined,
-          },
-        },
-        videoRef.current,
-        (result) => {
-          if (detectado || !result) return;
-          detectado = true;
-          controlsRef.current?.stop();
-          onDetected(result.getText());
-        },
-      )
-      .then((controls) => {
-        controlsRef.current = controls;
-      })
-      .catch((e) => {
-        console.error("Error abriendo la cámara:", e);
-        setError(
-          "No se pudo acceder a la cámara. Revisá los permisos del navegador para este sitio.",
+    // En celulares con varias cámaras traseras (ancha, ultra-wide, tele),
+    // pedir solo `facingMode: 'environment'` a veces hace que el
+    // navegador elija la lente teleobjetivo (2x) en vez de la principal:
+    // el video llega "zoomeado" desde el propio sensor, antes de que
+    // cualquier CSS lo toque. Para evitar eso, primero se listan las
+    // cámaras disponibles y se elige a mano la trasera que NO tenga
+    // "tele"/"zoom" en el nombre (normalmente la principal/ancha).
+    const elegirCamaraTrasera = async () => {
+      try {
+        const dispositivos = await navigator.mediaDevices.enumerateDevices();
+        const camaras = dispositivos.filter((d) => d.kind === "videoinput");
+        const traseras = camaras.filter(
+          (d) => !/front|frontal|user/i.test(d.label),
         );
-      });
+        const candidatas = traseras.length ? traseras : camaras;
+        const principal = candidatas.find(
+          (d) => !/tele|zoom/i.test(d.label),
+        );
+        return (principal || candidatas[0])?.deviceId || null;
+      } catch {
+        return null;
+      }
+    };
+
+    const iniciar = async () => {
+      // Primero se pide cualquier cámara trasera solo para conseguir
+      // permiso: hasta que el usuario acepta, enumerateDevices() no
+      // devuelve las etiquetas (label) de cada cámara, y sin etiqueta no
+      // se puede saber cuál es la teleobjetivo.
+      let deviceId = null;
+      try {
+        const previo = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+        });
+        previo.getTracks().forEach((t) => t.stop());
+        deviceId = await elegirCamaraTrasera();
+      } catch {
+        // Si esto falla, se sigue igual con facingMode como respaldo.
+      }
+
+      if (cancelado) return;
+
+      const aspectRatio =
+        typeof window !== "undefined" && window.innerHeight
+          ? { ideal: window.innerWidth / window.innerHeight }
+          : undefined;
+
+      reader
+        .decodeFromConstraints(
+          {
+            video: deviceId
+              ? {
+                  deviceId: { exact: deviceId },
+                  width: { ideal: 1280 },
+                  height: { ideal: 720 },
+                  aspectRatio,
+                }
+              : {
+                  facingMode: { ideal: "environment" },
+                  width: { ideal: 1280 },
+                  height: { ideal: 720 },
+                  aspectRatio,
+                },
+          },
+          videoRef.current,
+          (result) => {
+            if (detectado || !result) return;
+            detectado = true;
+            controlsRef.current?.stop();
+            onDetected(result.getText());
+          },
+        )
+        .then((controls) => {
+          if (cancelado) {
+            controls.stop();
+            return;
+          }
+          controlsRef.current = controls;
+        })
+        .catch((e) => {
+          console.error("Error abriendo la cámara:", e);
+          setError(
+            "No se pudo acceder a la cámara. Revisá los permisos del navegador para este sitio.",
+          );
+        });
+    };
+
+    iniciar();
 
     return () => {
+      cancelado = true;
       controlsRef.current?.stop();
     };
   }, [onDetected]);
