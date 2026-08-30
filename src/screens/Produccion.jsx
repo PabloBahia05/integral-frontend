@@ -822,15 +822,10 @@ export default function Produccion({ authFetch }) {
           }
 
           .produccion-btn-escanear-label {
-            font-size: 14px !important;
-            letter-spacing: 0.3px !important;
+            font-size: clamp(10px, 3.6vw, 14px) !important;
+            letter-spacing: 0.2px !important;
             white-space: nowrap !important;
             text-align: center;
-          }
-        }
-        @media (max-width: 380px) {
-          .produccion-btn-escanear-label {
-            font-size: 12px !important;
           }
         }
       `}</style>
@@ -870,7 +865,10 @@ export default function Produccion({ authFetch }) {
         <span
           className="produccion-btn-escanear-label"
           style={{
-            display: "inline-block",
+            display: "block",
+            maxWidth: "100%",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
             color: "#ffffff",
             fontWeight: 700,
             lineHeight: "1.2",
