@@ -9,6 +9,35 @@ const tieneFreno = (accesorios, accesoriosDisponibles) =>
     const art = accesoriosDisponibles?.find((a) => a.articulo === nombre);
     return art && CODARTINT_FRENO.includes(String(art.codartint));
   });
+
+// Determina el "tipo" del ítem para filtrar el popover de accesorios por
+// la columna `aplicacion` del artículo (ver PresupuestoNuevo.jsx). Mismo
+// criterio que en TabCocina.jsx — reglas en orden, la primera que matchea
+// gana:
+//   - "ESQ": nombre empieza con "Esquinero Bajo" (prefijo, resto no
+//     importa) Y el artículo es de proveedor "DANIEL ROQUE SRL" (fabricado
+//     en casa, no comprado). El proveedor no viaja en `fila` — hay que
+//     resolverlo aparte contra el catálogo, ver resolverProveedorItem.
+//   - "CAJ" / "PTA": cajonera/correderas vs. puerta, por substring en
+//     cualquier parte del nombre.
+//   - null: no matchea ninguno, no se filtra nada para ese ítem.
+const tipoAccesorioParaItem = (fila, proveedor) => {
+  const nombreart = String(fila?.nombreart ?? "").trim().toUpperCase();
+  const articulo = String(fila?.articulo ?? "").trim().toUpperCase();
+  const esEsquineroBajo =
+    nombreart.startsWith("ESQUINERO BAJO") ||
+    articulo.startsWith("ESQUINERO BAJO");
+  if (
+    esEsquineroBajo &&
+    String(proveedor ?? "").trim().toUpperCase() === "DANIEL ROQUE SRL"
+  ) {
+    return "ESQ";
+  }
+  const nombre = `${nombreart} ${articulo}`;
+  if (nombre.includes("CAJ")) return "CAJ";
+  if (nombre.includes("PTA")) return "PTA";
+  return null;
+};
 // Tab "Placard": selector de familia (Placard/Frente/Auxiliares/Accesorios)
 // y la tabla editable de cada familia (agregar, editar inline, buscar
 // artículo con precio_un, eliminar).
@@ -64,10 +93,23 @@ export default function PlacardSection({
   // de un guardado/recarga previo.
   const resolverAreaItem = (fila) => {
     if (fila.area != null) return fila.area;
+    // fila.nombreart es el nombre REAL del catálogo; fila.articulo es el
+    // nombre que quedó guardado como display y puede diferir (ej. otra
+    // medida del mismo modelo) — mismo fix aplicado en TabCocina.jsx.
     const match = articulosFamilia.find(
-      (a) => a.articulo === fila.articulo || a.nombreart === fila.nombreart,
+      (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
     );
     return match ? (match.area ?? match.AREA ?? null) : null;
+  };
+
+  // Mismo patrón que resolverAreaItem, para saber el proveedor del artículo
+  // aunque `fila` no lo traiga. Se usa para clasificar el ítem como "ESQ"
+  // en tipoAccesorioParaItem (ver arriba del archivo).
+  const resolverProveedorItem = (fila) => {
+    const match = articulosFamilia.find(
+      (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
+    );
+    return match ? (match.proveedor ?? match.PROVEEDOR ?? null) : null;
   };
 
   // ── Freno general (toda la sección Placard) ───────────────
@@ -672,6 +714,7 @@ export default function PlacardSection({
                                       placardFamilia,
                                       idx,
                                       nombre,
+                                      resolverAreaItem(fila),
                                     );
                                     setPlacardFila((f) => ({
                                       ...f,
@@ -693,25 +736,40 @@ export default function PlacardSection({
                                     );
                                   },
                                   e,
+                                  tipoAccesorioParaItem(
+                                    fila,
+                                    resolverProveedorItem(fila),
+                                  ),
                                 )
                               }
-                              title="Agregar/quitar accesorios (autofreno, led, etc)"
+                              title={
+                                fila._accesoriosSinResolver
+                                  ? "⚠️ Este ítem tiene un accesorio guardado en la base que no se pudo encontrar en el catálogo (código huérfano o catálogo sin cargar todavía). El precio y/o la lista mostrada pueden estar incompletos — revisar antes de confiar en este total."
+                                  : "Agregar/quitar accesorios (autofreno, led, etc)"
+                              }
                               style={{
                                 padding: "4px 8px",
-                                background: fila.accesorios?.length
-                                  ? "#0a5c3a"
-                                  : "#fff",
-                                color: fila.accesorios?.length
-                                  ? "#fff"
-                                  : "#0a3a5c",
-                                border: "1px solid #7aaac8",
+                                background: fila._accesoriosSinResolver
+                                  ? "#b03a2e"
+                                  : fila.accesorios?.length
+                                    ? "#0a5c3a"
+                                    : "#fff",
+                                color:
+                                  fila._accesoriosSinResolver ||
+                                  fila.accesorios?.length
+                                    ? "#fff"
+                                    : "#0a3a5c",
+                                border: fila._accesoriosSinResolver
+                                  ? "1px solid #7a2015"
+                                  : "1px solid #7aaac8",
                                 borderRadius: 2,
                                 fontFamily: "'Space Mono',monospace",
                                 fontSize: 11,
                                 cursor: "pointer",
                               }}
                             >
-                              🔧 {fila.accesorios?.length ?? 0}
+                              {fila._accesoriosSinResolver ? "⚠️ " : "🔧 "}
+                              {fila.accesorios?.length ?? 0}
                             </button>
                           </td>
                           <td
@@ -966,6 +1024,7 @@ export default function PlacardSection({
                                       placardFamilia,
                                       idx,
                                       nombre,
+                                      resolverAreaItem(fila),
                                     ),
                                   () =>
                                     confirmarAccesoriosItem?.(
@@ -975,25 +1034,40 @@ export default function PlacardSection({
                                       resolverAreaItem(fila),
                                     ),
                                   e,
+                                  tipoAccesorioParaItem(
+                                    fila,
+                                    resolverProveedorItem(fila),
+                                  ),
                                 )
                               }
-                              title="Agregar/quitar accesorios (autofreno, led, etc)"
+                              title={
+                                fila._accesoriosSinResolver
+                                  ? "⚠️ Este ítem tiene un accesorio guardado en la base que no se pudo encontrar en el catálogo (código huérfano o catálogo sin cargar todavía). El precio y/o la lista mostrada pueden estar incompletos — revisar antes de confiar en este total."
+                                  : "Agregar/quitar accesorios (autofreno, led, etc)"
+                              }
                               style={{
                                 padding: "4px 8px",
-                                background: fila.accesorios?.length
-                                  ? "#0a5c3a"
-                                  : "#fff",
-                                color: fila.accesorios?.length
-                                  ? "#fff"
-                                  : "#0a3a5c",
-                                border: "1px solid #c8dae8",
+                                background: fila._accesoriosSinResolver
+                                  ? "#b03a2e"
+                                  : fila.accesorios?.length
+                                    ? "#0a5c3a"
+                                    : "#fff",
+                                color:
+                                  fila._accesoriosSinResolver ||
+                                  fila.accesorios?.length
+                                    ? "#fff"
+                                    : "#0a3a5c",
+                                border: fila._accesoriosSinResolver
+                                  ? "1px solid #7a2015"
+                                  : "1px solid #c8dae8",
                                 borderRadius: 2,
                                 fontFamily: "'Space Mono',monospace",
                                 fontSize: 11,
                                 cursor: "pointer",
                               }}
                             >
-                              🔧 {fila.accesorios?.length ?? 0}
+                              {fila._accesoriosSinResolver ? "⚠️ " : "🔧 "}
+                              {fila.accesorios?.length ?? 0}
                             </button>
                           </td>
                           <td
