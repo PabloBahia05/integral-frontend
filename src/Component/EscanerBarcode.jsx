@@ -40,19 +40,13 @@ export default function EscanerBarcode({ onDetected, onClose }) {
     let detectado = false;
     let cancelado = false;
 
-    // Un solo pedido de cámara (facingMode: environment). Se probó antes
-    // pedir permiso, soltar el stream y volver a abrirlo eligiendo la
-    // lente a mano por deviceId (para evitar la teleobjetivo en celulares
-    // con varias cámaras traseras), pero soltar y reabrir la cámara tan
-    // rápido rompía la apertura en varios Android — el hardware no llega
-    // a liberarse a tiempo y el segundo pedido falla. Mejor un solo
-    // pedido, aunque en algún celular puntual pueda elegir una lente con
-    // algo de zoom de fábrica.
-    const aspectRatio =
-      typeof window !== "undefined" && window.innerHeight
-        ? { ideal: window.innerWidth / window.innerHeight }
-        : undefined;
-
+    // Constraints simples: facingMode + resolución ideal, sin pedir
+    // aspectRatio. Se había agregado aspectRatio para recortar menos la
+    // imagen visualmente en pantallas angostas, pero en la práctica hacía
+    // que algunos celulares eligieran un modo de cámara con el enfoque
+    // roto (abría la cámara pero no lograba leer ningún código). El
+    // encuadre se sigue resolviendo solo con object-fit:contain más
+    // abajo, sin tocar las constraints de la cámara.
     reader
       .decodeFromConstraints(
         {
@@ -60,7 +54,6 @@ export default function EscanerBarcode({ onDetected, onClose }) {
             facingMode: { ideal: "environment" },
             width: { ideal: 1280 },
             height: { ideal: 720 },
-            aspectRatio,
           },
         },
         videoRef.current,
