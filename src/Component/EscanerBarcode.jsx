@@ -7,15 +7,31 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 // encontrar un código. Al primer resultado llama a `onDetected(texto)` y
 // se cierra solo (el padre es quien decide qué hacer con el código).
 //
-// En pantallas angostas (celular) la cámara ocupa toda la pantalla: el
-// <video> se muestra con object-fit:contain (nunca recorta) y pide un
-// aspect ratio acorde a la pantalla real para minimizar el letterbox.
-// Además, en vez de dejar que el navegador elija la lente trasera por
-// `facingMode` (que en algunos Android termina siendo la teleobjetivo,
-// con zoom óptico de fábrica), se enumeran las cámaras y se elige a
-// mano la trasera que no sea "tele". El título/botón de cerrar/texto de
-// ayuda quedan flotando arriba y abajo, superpuestos. En desktop se
-// mantiene como cuadro chico centrado.
+// El layout mobile vs desktop se resuelve por JS (useIsMobile), no con
+// @media queries: cada estilo ya es el valor final para el dispositivo
+// actual. En celular la cámara ocupa toda la pantalla, con object-fit:
+// contain (nunca recorta) y pide un aspect ratio acorde a la pantalla
+// real para minimizar el letterbox. Además, en vez de dejar que el
+// navegador elija la lente trasera por `facingMode` (que en algunos
+// Android termina siendo la teleobjetivo, con zoom óptico de fábrica),
+// se enumeran las cámaras y se elige a mano la trasera que no sea
+// "tele". En desktop se mantiene como cuadro chico centrado.
+
+// Detecta celular vs escritorio por JavaScript (ancho real de pantalla),
+// en vez de depender de @media queries en CSS.
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth <= breakpoint : false,
+  );
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= breakpoint);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [breakpoint]);
+
+  return isMobile;
+}
 
 export default function EscanerBarcode({ onDetected, onClose }) {
   const videoRef = useRef(null);
@@ -122,181 +138,137 @@ export default function EscanerBarcode({ onDetected, onClose }) {
     };
   }, [onDetected]);
 
+  const isMobile = useIsMobile();
+
   return (
-    <>
-      {/* Estilos que dependen del ancho de pantalla van acá porque los
-          inline styles no soportan media queries. */}
-      <style>{`
-        .escaner-overlay {
-          background: rgba(10,58,92,0.85);
-        }
-        .escaner-box {
-          background: #fff;
-          border-radius: 8px;
-          padding: 16px;
-          width: min(92vw, 520px);
-          max-height: 90vh;
-          box-shadow: 0 8px 30px rgba(10,58,92,0.35);
-          box-sizing: border-box;
-          overflow: hidden;
-        }
-
-        .escaner-video {
-          display: block;
-          width: 100%;
-          max-width: 100%;
-          max-height: 70vh;
-          border-radius: 4px;
-          background: #000;
-          object-fit: contain;
-        }
-
-        /* CELULAR */
-        @media (max-width: 640px) {
-          .escaner-overlay {
-            background: #000;
-            padding: 0;
-          }
-
-          .escaner-box {
-            width: 100vw;
-            height: 100dvh;
-            max-width: none;
-            max-height: none;
-            border-radius: 0;
-            padding: 0;
-            box-shadow: none;
-            position: relative;
-          }
-
-          .escaner-video {
-            width: 100%;
-            height: 100%;
-            max-height: none;
-            border-radius: 0;
-            object-fit: contain;
-          }
-
-          .escaner-header {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            margin: 0 !important;
-            padding: 16px;
-            background: linear-gradient(
-              rgba(0,0,0,0.55),
-              transparent
-            );
-            z-index: 1;
-          }
-
-          .escaner-header span {
-            color: #fff !important;
-          }
-
-          .escaner-header button {
-            color: #fff !important;
-            font-size: 30px !important;
-          }
-
-          .escaner-footer {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            margin: 0 !important;
-            padding: 16px;
-            background: linear-gradient(
-              transparent,
-              rgba(0,0,0,0.55)
-            );
-            z-index: 1;
-          }
-          .escaner-footer.escaner-footer {
-            color: #fff !important;
-          }
-        }
-      `}</style>
-
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 2000,
+        background: isMobile ? "#000" : "rgba(10,58,92,0.85)",
+        padding: isMobile ? 0 : undefined,
+      }}
+    >
       <div
-        onClick={onClose}
-        className="escaner-overlay"
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: "fixed",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 2000,
+          background: isMobile ? "#000" : "#fff",
+          borderRadius: isMobile ? 0 : "8px",
+          padding: isMobile ? 0 : "16px",
+          width: isMobile ? "100vw" : "min(92vw, 520px)",
+          height: isMobile ? "100dvh" : undefined,
+          maxHeight: isMobile ? "none" : "90vh",
+          boxShadow: isMobile ? "none" : "0 8px 30px rgba(10,58,92,0.35)",
+          boxSizing: "border-box",
+          overflow: "hidden",
+          position: isMobile ? "relative" : "static",
         }}
       >
-        <div className="escaner-box" onClick={(e) => e.stopPropagation()}>
-          <div
-            className="escaner-header"
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: isMobile ? 0 : "12px",
+            ...(isMobile
+              ? {
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  padding: "16px",
+                  background:
+                    "linear-gradient(rgba(0,0,0,0.55), transparent)",
+                  zIndex: 1,
+                }
+              : {}),
+          }}
+        >
+          <span
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "12px",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "#0a3a5c",
-                fontFamily: "'Space Mono', monospace",
-              }}
-            >
-              📷 Escaneá el código
-            </span>
-            <button
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: "26px",
-                lineHeight: 1,
-                cursor: "pointer",
-                color: "#8aabb8",
-              }}
-              aria-label="Cerrar"
-            >
-              ×
-            </button>
-          </div>
-
-          {error ? (
-            <p
-              style={{
-                fontSize: "13px",
-                color: "#e57373",
-                fontFamily: "'Space Mono', monospace",
-                padding: "0 16px",
-              }}
-            >
-              {error}
-            </p>
-          ) : (
-            <video ref={videoRef} muted playsInline className="escaner-video" />
-          )}
-
-          <p
-            className="escaner-footer"
-            style={{
-              fontSize: "11px",
-              color: "#8aabb8",
+              fontSize: "13px",
+              fontWeight: 700,
+              color: isMobile ? "#fff" : "#0a3a5c",
               fontFamily: "'Space Mono', monospace",
-              marginTop: "10px",
-              marginBottom: 0,
-              textAlign: "center",
             }}
           >
-            Apuntá la cámara al código de barras del ítem
-          </p>
+            📷 Escaneá el código
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: isMobile ? "30px" : "26px",
+              lineHeight: 1,
+              cursor: "pointer",
+              color: isMobile ? "#fff" : "#8aabb8",
+            }}
+            aria-label="Cerrar"
+          >
+            ×
+          </button>
         </div>
+
+        {error ? (
+          <p
+            style={{
+              fontSize: "13px",
+              color: "#e57373",
+              fontFamily: "'Space Mono', monospace",
+              padding: "0 16px",
+            }}
+          >
+            {error}
+          </p>
+        ) : (
+          <video
+            ref={videoRef}
+            muted
+            playsInline
+            style={{
+              display: "block",
+              width: "100%",
+              height: isMobile ? "100%" : undefined,
+              maxWidth: "100%",
+              maxHeight: isMobile ? "none" : "70vh",
+              borderRadius: isMobile ? 0 : "4px",
+              background: "#000",
+              objectFit: "contain",
+            }}
+          />
+        )}
+
+        <p
+          style={{
+            fontSize: "11px",
+            color: isMobile ? "#fff" : "#8aabb8",
+            fontFamily: "'Space Mono', monospace",
+            marginTop: isMobile ? 0 : "10px",
+            marginBottom: 0,
+            textAlign: "center",
+            ...(isMobile
+              ? {
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  padding: "16px",
+                  background:
+                    "linear-gradient(transparent, rgba(0,0,0,0.55))",
+                  zIndex: 1,
+                }
+              : {}),
+          }}
+        >
+          Apuntá la cámara al código de barras del ítem
+        </p>
       </div>
-    </>
+    </div>
   );
 }
