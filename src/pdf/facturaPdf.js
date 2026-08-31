@@ -262,7 +262,7 @@ export function armarFacturaPageHTML(f, emisor) {
 
       <div class="f-header">
         <div class="f-emisor">
-          <div class="f-razon">${emisor.razonSocial?.toUpperCase() ?? ""}</div>
+          <div class="f-razon">${(emisor.nombreFantasia || emisor.razonSocial)?.toUpperCase() ?? ""}</div>
           <div class="f-linea">Razón Social: ${emisor.razonSocial ?? ""}</div>
           <div class="f-linea">Domicilio Comercial: ${emisor.domicilio ?? ""}</div>
           ${emisor.telefono || emisor.web ? `<div class="f-linea">${emisor.web ? `http: ${emisor.web}` : ""}${emisor.web && emisor.telefono ? " - " : ""}${emisor.telefono ? `Tel./Fax ${emisor.telefono}` : ""}</div>` : ""}
