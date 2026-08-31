@@ -347,9 +347,14 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
                             {" "}— Tel. {c.telefono1 || c.telefono2 || c.wapp}
                           </span>
                         )}
-                        {(c.direccion || c.domicilio) && (
+                        {(c.nombre1 || c.nombre2) && (
                           <div style={{ fontSize: 11, color: "#8aabb8" }}>
-                            {c.direccion || c.domicilio}
+                            {[c.nombre1, c.nombre2].filter(Boolean).join(" / ")}
+                          </div>
+                        )}
+                        {c["domicilio fiscal"] && (
+                          <div style={{ fontSize: 11, color: "#8aabb8" }}>
+                            {c["domicilio fiscal"]}
                             {c.localidad ? `, ${c.localidad}` : ""}
                           </div>
                         )}
@@ -391,6 +396,9 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
                     <span>
                       {clienteSel.cuit ? `CUIT ${clienteSel.cuit}` : clienteSel.dni ? `DNI ${clienteSel.dni}` : "Sin CUIT/DNI cargado"}
                     </span>
+                    {(clienteSel.nombre1 || clienteSel.nombre2) && (
+                      <span>{[clienteSel.nombre1, clienteSel.nombre2].filter(Boolean).join(" / ")}</span>
+                    )}
                     {(clienteSel.telefono1 || clienteSel.telefono2 || clienteSel.wapp) && (
                       <span>
                         Tel.{" "}
@@ -399,13 +407,12 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
                           .join(" / ")}
                       </span>
                     )}
-                    {(clienteSel.direccion || clienteSel.domicilio) && (
+                    {clienteSel["domicilio fiscal"] && (
                       <span>
-                        {clienteSel.direccion || clienteSel.domicilio}
+                        {clienteSel["domicilio fiscal"]}
                         {clienteSel.localidad ? `, ${clienteSel.localidad}` : ""}
                       </span>
                     )}
-                    {clienteSel.email && <span>{clienteSel.email}</span>}
                   </div>
                 </div>
               </div>
