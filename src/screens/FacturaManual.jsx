@@ -8,6 +8,27 @@ const soloDigitos = (v) => String(v ?? "").replace(/\D/g, "");
 const fmt = (v) =>
   Number(v || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// Traduce el valor crudo de tipofact (tal como está cargado en Clientes.jsx,
+// ej. "RI", "A", "Responsable Inscripto") a una etiqueta legible. Si no
+// coincide con ningún alias conocido, se muestra el valor tal cual —
+// nunca se oculta información por no reconocer el formato.
+const ALIAS_CONDICION = {
+  RI: "Responsable Inscripto",
+  "RESPONSABLE INSCRIPTO": "Responsable Inscripto",
+  A: "Responsable Inscripto (Factura A)",
+  MT: "Monotributo",
+  MONOTRIBUTO: "Monotributo",
+  B: "Monotributo / Consumidor Final (Factura B)",
+  CF: "Consumidor Final",
+  "CONSUMIDOR FINAL": "Consumidor Final",
+  EX: "Exento",
+  EXENTO: "Exento",
+};
+function nombreCondicion(tipofact) {
+  const key = String(tipofact ?? "").trim().toUpperCase();
+  return ALIAS_CONDICION[key] || tipofact;
+}
+
 let nextItemId = 1;
 
 // FacturaManual.jsx — "Facturar" dentro de Facturas Emitidas: factura
@@ -99,6 +120,17 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
     setResultado(null);
     setError(null);
   };
+
+  // Chequeo ORIENTATIVO de datos mínimos para facturar — no reemplaza la
+  // validación real del backend (que es la que de verdad decide qué pide
+  // AFIP según tipofact), pero avisa antes de intentar facturar en vez de
+  // recién después de que el backend rechace con 400.
+  const faltantesCliente = clienteSel
+    ? [
+        !clienteSel.tipofact && { field: "tipofact", label: "Condición de facturación (tipofact)" },
+        !clienteSel.cuit && !clienteSel.dni && { field: "cuit", label: "CUIT o DNI" },
+      ].filter(Boolean)
+    : [];
 
   const qArt = busquedaArt.trim().toLowerCase();
   const coincidenciasArt =
@@ -374,15 +406,25 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
                 <label style={etiquetaEstilo}>Cliente</label>
                 <div
                   style={{
-                    padding: "10px 12px",
                     border: "1px solid #c8dae8",
                     borderRadius: 4,
                     background: "#fff",
                     fontSize: 13,
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <strong>{clienteSel.nombre}</strong>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 12px",
+                      borderBottom: "1px solid #eef4f9",
+                      background: "#eef4f9",
+                    }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#0a3a5c", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      Cliente
+                    </span>
                     <button
                       type="button"
                       onClick={() => setClienteSel(null)}
@@ -391,30 +433,89 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
                       Cambiar
                     </button>
                   </div>
-                  <div style={{ marginTop: 6, fontSize: 12, color: "#5580a0", display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span>Código: {clienteSel.codcliente ?? "—"}</span>
-                    <span>
-                      {clienteSel.cuit ? `CUIT ${clienteSel.cuit}` : clienteSel.dni ? `DNI ${clienteSel.dni}` : "Sin CUIT/DNI cargado"}
-                    </span>
+                  <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 5 }}>
+                    <FilaFicha label="Código" valor={clienteSel.codcliente ?? "—"} />
+                    <FilaFicha label="Razón social" valor={clienteSel.nombre} destacado />
                     {(clienteSel.nombre1 || clienteSel.nombre2) && (
-                      <span>{[clienteSel.nombre1, clienteSel.nombre2].filter(Boolean).join(" / ")}</span>
+                      <FilaFicha
+                        label="Nombre adj./lig."
+                        valor={[clienteSel.nombre1, clienteSel.nombre2].filter(Boolean).join(" / ")}
+                      />
                     )}
+                    <FilaFicha
+                      label="Documento"
+                      valor={
+                        clienteSel.cuit
+                          ? `CUIT ${clienteSel.cuit}`
+                          : clienteSel.dni
+                          ? `DNI ${clienteSel.dni}`
+                          : "Sin CUIT/DNI cargado"
+                      }
+                    />
+                    <FilaFicha
+                      label="IVA"
+                      valor={clienteSel.tipofact ? nombreCondicion(clienteSel.tipofact) : "Sin cargar"}
+                    />
                     {(clienteSel.telefono1 || clienteSel.telefono2 || clienteSel.wapp) && (
-                      <span>
-                        Tel.{" "}
-                        {[clienteSel.telefono1, clienteSel.telefono2, clienteSel.wapp]
+                      <FilaFicha
+                        label="Teléfono"
+                        valor={[clienteSel.telefono1, clienteSel.telefono2, clienteSel.wapp]
                           .filter(Boolean)
                           .join(" / ")}
-                      </span>
+                      />
                     )}
                     {clienteSel["domicilio fiscal"] && (
-                      <span>
-                        {clienteSel["domicilio fiscal"]}
-                        {clienteSel.localidad ? `, ${clienteSel.localidad}` : ""}
-                      </span>
+                      <FilaFicha
+                        label="Domicilio"
+                        valor={`${clienteSel["domicilio fiscal"]}${clienteSel.localidad ? `, ${clienteSel.localidad}` : ""}`}
+                      />
                     )}
                   </div>
                 </div>
+                {faltantesCliente.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      fontSize: 12,
+                      color: "#7a4a00",
+                      background: "#fff3d6",
+                      border: "1px solid #e0b84a",
+                      borderRadius: 4,
+                      padding: "10px 12px",
+                    }}
+                  >
+                    ⚠️ Para facturar a este cliente falta cargar:{" "}
+                    <strong>{faltantesCliente.map((f) => f.label).join(", ")}</strong>
+                    <div style={{ marginTop: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onFaltanDatosCliente?.({
+                            codcliente: clienteSel.codcliente,
+                            nombreCliente: clienteSel.nombre,
+                            faltantes: faltantesCliente.map((f) => ({ field: f.field })),
+                          })
+                        }
+                        disabled={!onFaltanDatosCliente}
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: 11,
+                          background: "#7a4a00",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 4,
+                          cursor: onFaltanDatosCliente ? "pointer" : "not-allowed",
+                        }}
+                      >
+                        Completar en la ficha del cliente
+                      </button>
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 10, color: "#a3752e" }}>
+                      Chequeo orientativo desde esta pantalla — el backend vuelve a validar al
+                      facturar y puede pedir algo más.
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -690,6 +791,17 @@ function PanelLateral({ titulo, children }) {
         {titulo}
       </div>
       <div style={{ padding: 12 }}>{children}</div>
+    </div>
+  );
+}
+
+function FilaFicha({ label, valor, destacado }) {
+  return (
+    <div style={{ display: "flex", gap: 8 }}>
+      <span style={{ width: 90, flexShrink: 0, fontSize: 11, color: "#5580a0", textTransform: "uppercase", letterSpacing: "0.03em", paddingTop: 1 }}>
+        {label}
+      </span>
+      <span style={{ fontSize: 13, color: "#0a3a5c", fontWeight: destacado ? 700 : 400 }}>{valor}</span>
     </div>
   );
 }
