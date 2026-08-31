@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 
 // ── Escáner de código de barras ─────────────────────────────────────────
@@ -86,7 +87,7 @@ export default function EscanerBarcode({ onDetected, onClose }) {
 
   const isMobile = useIsMobile();
 
-  return (
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -98,6 +99,8 @@ export default function EscanerBarcode({ onDetected, onClose }) {
         zIndex: 2000,
         background: isMobile ? "#000" : "rgba(10,58,92,0.85)",
         padding: isMobile ? 0 : undefined,
+        maxWidth: "100vw",
+        overflow: "hidden",
       }}
     >
       <div
@@ -215,6 +218,7 @@ export default function EscanerBarcode({ onDetected, onClose }) {
           Apuntá la cámara al código de barras del ítem
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
