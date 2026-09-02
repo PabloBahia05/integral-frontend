@@ -116,8 +116,9 @@ const FACTURA_CSS = `
 .f-footer-row { display: flex; border-bottom: 1.5px solid #111; }
 .f-observaciones { flex: 1; padding: 8px; font-size: 10px; border-right: 1.5px solid #111; }
 .f-totales { width: 210px; flex-shrink: 0; padding: 8px; font-size: 11px; }
-.f-totales .f-t-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.f-totales .f-t-row { display: flex; justify-content: space-between; margin-bottom: 4px; gap: 8px; }
 .f-totales .f-t-total { border-top: 1.5px solid #111; padding-top: 4px; font-weight: 700; }
+.f-totales .f-regimen-titulo { font-size: 9px; font-weight: 700; line-height: 1.3; border-bottom: 1px solid #111; padding-bottom: 5px; margin-bottom: 6px; }
 .f-monto-letras { padding: 6px 8px; font-size: 10px; border-bottom: 1.5px solid #111; display: flex; justify-content: space-between; align-items: center; }
 .f-cae-footer { display: flex; align-items: flex-start; padding-top: 8px; justify-content: space-between; }
 .f-arca { display: flex; align-items: center; gap: 8px; }
@@ -255,6 +256,44 @@ export function armarFacturaPageHTML(f, emisor) {
     : f.detalle || "Venta de mercadería / servicio";
   const codigoItem = f.numeropres ? String(f.numeropres).padStart(5, "0") : "S/N";
 
+  // Factura B (Cód.06): por Ley 27.743 (Régimen de Transparencia Fiscal al
+  // Consumidor) el comprobante NO discrimina Neto/IVA como una Factura A
+  // — solo declara el IVA ya contenido en el precio, con esta leyenda
+  // fija. Factura A/C siguen mostrando el desglose Neto/IVA/Total normal.
+  const esFacturaB = Number(f.tipo_cbte) === 6;
+  const piePagoHTML = esFacturaB
+    ? `
+      <div class="f-footer-row">
+        <div class="f-observaciones">
+          <strong>Observaciones:</strong><br />
+        </div>
+        <div class="f-totales">
+          <div class="f-regimen-titulo">Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)</div>
+          <div class="f-t-row"><span>IVA Contenido:</span><span>$ ${formatPeso(f.importe_iva)}</span></div>
+          <div class="f-t-row"><span>Otros Impuestos Nacionales Indirectos:</span><span>$ ${formatPeso(f.otros_impuestos_indirectos ?? 0)}</span></div>
+        </div>
+      </div>
+      <div class="f-monto-letras">
+        <span>${importeEnLetras(f.importe_total)}</span>
+        <span><strong>Total Comprobante</strong>&nbsp;&nbsp;$${formatPeso(f.importe_total)}</span>
+      </div>
+    `
+    : `
+      <div class="f-footer-row">
+        <div class="f-observaciones">
+          <strong>Observaciones:</strong><br />
+        </div>
+        <div class="f-totales">
+          <div class="f-t-row"><span>Importe Neto</span><span>${formatPeso(f.importe_neto)}</span></div>
+          <div class="f-t-row"><span>IVA 21%</span><span>${formatPeso(f.importe_iva)}</span></div>
+          <div class="f-t-row f-t-total"><span>Total Comprobante</span><span>${formatPeso(f.importe_total)}</span></div>
+        </div>
+      </div>
+      <div class="f-monto-letras">
+        <span>${importeEnLetras(f.importe_total)}</span>
+      </div>
+    `;
+
   return `
     <style>${FACTURA_CSS}</style>
     <div class="f-page">
@@ -293,7 +332,7 @@ export function armarFacturaPageHTML(f, emisor) {
         </div>
         <div class="f-cliente-der">
           <div><strong>Cliente N°</strong> ${String(f.codcliente).padStart(5, "0")}</div>
-          <div><strong>Condición de Venta:</strong> Contado</div>
+          <div><strong>Condición de Venta:</strong> ${f.condicion_venta || "Contado"}</div>
         </div>
       </div>
 
@@ -328,20 +367,7 @@ export function armarFacturaPageHTML(f, emisor) {
         </table>
       </div>
 
-      <div class="f-footer-row">
-        <div class="f-observaciones">
-          <strong>Observaciones:</strong><br />
-        </div>
-        <div class="f-totales">
-          <div class="f-t-row"><span>Importe Neto</span><span>${formatPeso(f.importe_neto)}</span></div>
-          <div class="f-t-row"><span>IVA 21%</span><span>${formatPeso(f.importe_iva)}</span></div>
-          <div class="f-t-row f-t-total"><span>Total Comprobante</span><span>${formatPeso(f.importe_total)}</span></div>
-        </div>
-      </div>
-
-      <div class="f-monto-letras">
-        <span>${importeEnLetras(f.importe_total)}</span>
-      </div>
+      ${piePagoHTML}
 
       <div class="f-cae-footer">
         <div class="f-arca">
