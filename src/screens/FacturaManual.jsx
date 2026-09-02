@@ -44,6 +44,10 @@ const CONDICIONES_VENTA = [
   "Otra",
 ];
 
+// Marcas de tarjeta más comunes para el desplegable — "Otra" cubre el
+// resto (tarjetas regionales, etc.) con texto libre.
+const MARCAS_TARJETA = ["VISA", "MASTERCARD", "AMEX", "CABAL", "NARANJA", "OTRA"];
+
 // FacturaManual.jsx — "Facturar" dentro de Facturas Emitidas: factura
 // libre, sin depender de un presupuesto/obra confirmada. Layout inspirado
 // en la pantalla de comprobante de venta de referencia (grilla de ítems +
@@ -62,7 +66,24 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
   const [clienteSel, setClienteSel] = useState(null);
   const [detalle, setDetalle] = useState("");
   const [condicionVenta, setCondicionVenta] = useState("Contado");
-  const [observaciones, setObservaciones] = useState("");
+  // Datos crudos de pago según condicionVenta — el texto final que se
+  // imprime en "Observaciones" NO se tipea acá: lo arma el backend
+  // combinando estos valores con la plantilla fija de cada medio de pago
+  // (ver armarObservaciones en facturasventa.routers.js). Un solo objeto
+  // en vez de un state por campo porque viajan juntos al backend y se
+  // resetean juntos en nuevaFactura().
+  const [pago, setPago] = useState({
+    marca: "VISA",
+    descripcion: "", // ej "HIPOTECARIO" — nombre/banco de la tarjeta, no siempre aplica
+    ultimos4: "",
+    cuotas: "",
+    banco: "",
+    numeroCheque: "",
+    alias: "",
+    textoOtra: "",
+  });
+  const actualizarPago = (campo) => (e) =>
+    setPago((prev) => ({ ...prev, [campo]: e.target.value }));
   const [items, setItems] = useState([]);
   const [itemFocoId, setItemFocoId] = useState(null); // último renglón tocado, para la foto del panel lateral
   const [busquedaArt, setBusquedaArt] = useState("");
@@ -238,11 +259,13 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
           codcliente: clienteSel.codcliente,
           detalle: detalle.trim() || null,
           condicion_venta: condicionVenta,
-          // Se manda tal cual lo tipeó el usuario (sin recortar líneas
-          // vacías intermedias ni normalizar mayúsculas) — solo se saca
-          // espacio en blanco sobrante al principio/final. El PDF lo
-          // muestra literal, respetando los saltos de línea.
-          observaciones: observaciones.trim() || null,
+          // El backend arma el texto final de "Observaciones" a partir de
+          // estos valores crudos + la condición de venta (ver
+          // armarObservaciones en el router) — acá no se manda texto ya
+          // formateado. Se manda el objeto completo; el backend usa solo
+          // los campos que corresponden a la condición elegida e ignora
+          // el resto (ej: si es "Contado", ignora todo esto).
+          pago,
           importe_total: totalFactura,
           items: filasCalculadas.map((it) => ({
             codartint: it.codartint,
@@ -280,7 +303,17 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
   const nuevaFactura = () => {
     setClienteSel(null);
     setDetalle("");
-    setObservaciones("");
+    setPago({
+      marca: "VISA",
+      descripcion: "",
+      ultimos4: "",
+      cuotas: "",
+      banco: "",
+      numeroCheque: "",
+      alias: "",
+      textoOtra: "",
+    });
+    setCondicionVenta("Contado");
     setItems([]);
     setItemFocoId(null);
     setResultado(null);
@@ -721,14 +754,8 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
             </div>
 
             <div>
-              <label style={etiquetaEstilo}>Observaciones (opcional)</label>
-              <textarea
-                rows={2}
-                placeholder="Se imprime tal cual en el comprobante, ej: Tarjeta VISA HIPOTECARIO 6376"
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                style={{ ...inputEstilo, resize: "vertical" }}
-              />
+              <label style={etiquetaEstilo}>Observaciones</label>
+              <CamposPago condicionVenta={condicionVenta} pago={pago} actualizarPago={actualizarPago} inputEstilo={inputEstilo} etiquetaEstilo={etiquetaEstilo} />
             </div>
 
             {error && <div style={{ fontSize: 12, color: "#a72a2a" }}>❌ {error}</div>}
@@ -818,6 +845,114 @@ function TotalCelda({ label, valor, destacado }) {
       <div style={{ fontWeight: destacado ? 700 : 500, color: destacado ? "#0a3a5c" : "#333", fontSize: destacado ? 15 : 12 }}>
         ${fmt(valor)}
       </div>
+    </div>
+  );
+}
+
+// Campos que se piden según condicionVenta — se mandan crudos al backend
+// (nunca como un texto ya armado), que es quien construye la leyenda
+// final de "Observaciones" con la plantilla fija de cada medio de pago
+// (ver armarObservaciones en facturasventa.routers.js). Para "Contado" y
+// "Cuenta Corriente" no se pide nada: esa condición ya se imprime sola en
+// el encabezado del comprobante y no hace falta repetirla en
+// Observaciones.
+function CamposPago({ condicionVenta, pago, actualizarPago, inputEstilo, etiquetaEstilo }) {
+  const filaEstilo = { display: "flex", gap: 8, flexWrap: "wrap" };
+  const campoEstilo = { flex: "1 1 120px", minWidth: 100 };
+  const miniEtiqueta = { ...etiquetaEstilo, fontSize: 10 };
+
+  if (condicionVenta === "Tarjeta de Crédito" || condicionVenta === "Tarjeta de Débito") {
+    return (
+      <div style={filaEstilo}>
+        <div style={campoEstilo}>
+          <label style={miniEtiqueta}>Marca</label>
+          <select value={pago.marca} onChange={actualizarPago("marca")} style={inputEstilo}>
+            {MARCAS_TARJETA.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+        <div style={campoEstilo}>
+          <label style={miniEtiqueta}>Nombre tarjeta (opcional)</label>
+          <input
+            type="text"
+            placeholder="Ej: HIPOTECARIO"
+            value={pago.descripcion}
+            onChange={actualizarPago("descripcion")}
+            style={inputEstilo}
+          />
+        </div>
+        <div style={{ flex: "0 1 90px", minWidth: 80 }}>
+          <label style={miniEtiqueta}>Últimos 4 dígitos</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            placeholder="6376"
+            value={pago.ultimos4}
+            onChange={(e) => actualizarPago("ultimos4")({ target: { value: soloDigitos(e.target.value).slice(0, 4) } })}
+            style={inputEstilo}
+          />
+        </div>
+        {condicionVenta === "Tarjeta de Crédito" && (
+          <div style={{ flex: "0 1 90px", minWidth: 80 }}>
+            <label style={miniEtiqueta}>Cuotas (opcional)</label>
+            <input
+              type="number"
+              min={1}
+              placeholder="1"
+              value={pago.cuotas}
+              onChange={actualizarPago("cuotas")}
+              style={inputEstilo}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (condicionVenta === "Cheque") {
+    return (
+      <div style={filaEstilo}>
+        <div style={campoEstilo}>
+          <label style={miniEtiqueta}>Banco (opcional)</label>
+          <input type="text" value={pago.banco} onChange={actualizarPago("banco")} style={inputEstilo} />
+        </div>
+        <div style={campoEstilo}>
+          <label style={miniEtiqueta}>N° de cheque (opcional)</label>
+          <input type="text" value={pago.numeroCheque} onChange={actualizarPago("numeroCheque")} style={inputEstilo} />
+        </div>
+      </div>
+    );
+  }
+
+  if (condicionVenta === "Transferencia") {
+    return (
+      <div style={filaEstilo}>
+        <div style={campoEstilo}>
+          <label style={miniEtiqueta}>Banco / Alias / CBU (opcional)</label>
+          <input type="text" value={pago.alias} onChange={actualizarPago("alias")} style={inputEstilo} />
+        </div>
+      </div>
+    );
+  }
+
+  if (condicionVenta === "Otra") {
+    return (
+      <textarea
+        rows={2}
+        placeholder="Se imprime tal cual, ej: Permuta por mercadería"
+        value={pago.textoOtra}
+        onChange={actualizarPago("textoOtra")}
+        style={{ ...inputEstilo, resize: "vertical" }}
+      />
+    );
+  }
+
+  // Contado / Cuenta Corriente: sin campos adicionales.
+  return (
+    <div style={{ fontSize: 11, color: "#7a94a8", fontStyle: "italic" }}>
+      No requiere datos adicionales — la condición de venta ya figura en el comprobante.
     </div>
   );
 }
