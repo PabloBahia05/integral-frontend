@@ -153,6 +153,26 @@ function tipoYNroDocReceptor(row) {
 
 const soloDigitos = (v) => Number(String(v ?? "").replace(/\D/g, "")) || 0;
 
+// Observaciones es texto libre cargado a mano en FacturaManual.jsx y se
+// imprime tal cual lo tipeó el usuario — pero "tal cual" en el HTML que
+// después convierte html2canvas/html2pdf, no en el DOM real, así que hay
+// que escapar manualmente los caracteres que romperían el markup (< > & "
+// '), o un simple "<" en las observaciones podría cortar el resto del
+// comprobante. Los saltos de línea del textarea se preservan como <br />.
+function escaparHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+function observacionesHTML(f) {
+  const texto = (f.observaciones ?? "").toString();
+  if (!texto.trim()) return "";
+  return escaparHtml(texto).replace(/\n/g, "<br />");
+}
+
 // DD/MM/AAAA — para "Fecha de Emisión" y "Fecha de Vto. para el pago" en
 // el comprobante (sin hora, como en el modelo real).
 const formatearFechaCorta = (iso) =>
@@ -261,11 +281,13 @@ export function armarFacturaPageHTML(f, emisor) {
   // — solo declara el IVA ya contenido en el precio, con esta leyenda
   // fija. Factura A/C siguen mostrando el desglose Neto/IVA/Total normal.
   const esFacturaB = Number(f.tipo_cbte) === 6;
+  const observacionesTexto = observacionesHTML(f);
   const piePagoHTML = esFacturaB
     ? `
       <div class="f-footer-row">
         <div class="f-observaciones">
           <strong>Observaciones:</strong><br />
+          ${observacionesTexto}
         </div>
         <div class="f-totales">
           <div class="f-regimen-titulo">Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)</div>
@@ -282,6 +304,7 @@ export function armarFacturaPageHTML(f, emisor) {
       <div class="f-footer-row">
         <div class="f-observaciones">
           <strong>Observaciones:</strong><br />
+          ${observacionesTexto}
         </div>
         <div class="f-totales">
           <div class="f-t-row"><span>Importe Neto</span><span>${formatPeso(f.importe_neto)}</span></div>
