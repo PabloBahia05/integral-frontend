@@ -62,6 +62,7 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
   const [clienteSel, setClienteSel] = useState(null);
   const [detalle, setDetalle] = useState("");
   const [condicionVenta, setCondicionVenta] = useState("Contado");
+  const [observaciones, setObservaciones] = useState("");
   const [items, setItems] = useState([]);
   const [itemFocoId, setItemFocoId] = useState(null); // último renglón tocado, para la foto del panel lateral
   const [busquedaArt, setBusquedaArt] = useState("");
@@ -237,6 +238,11 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
           codcliente: clienteSel.codcliente,
           detalle: detalle.trim() || null,
           condicion_venta: condicionVenta,
+          // Se manda tal cual lo tipeó el usuario (sin recortar líneas
+          // vacías intermedias ni normalizar mayúsculas) — solo se saca
+          // espacio en blanco sobrante al principio/final. El PDF lo
+          // muestra literal, respetando los saltos de línea.
+          observaciones: observaciones.trim() || null,
           importe_total: totalFactura,
           items: filasCalculadas.map((it) => ({
             codartint: it.codartint,
@@ -274,6 +280,7 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
   const nuevaFactura = () => {
     setClienteSel(null);
     setDetalle("");
+    setObservaciones("");
     setItems([]);
     setItemFocoId(null);
     setResultado(null);
@@ -709,6 +716,17 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
                 placeholder="Ej: adicional de obra, arreglo puntual, etc."
                 value={detalle}
                 onChange={(e) => setDetalle(e.target.value)}
+                style={{ ...inputEstilo, resize: "vertical" }}
+              />
+            </div>
+
+            <div>
+              <label style={etiquetaEstilo}>Observaciones (opcional)</label>
+              <textarea
+                rows={2}
+                placeholder="Se imprime tal cual en el comprobante, ej: Tarjeta VISA HIPOTECARIO 6376"
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
                 style={{ ...inputEstilo, resize: "vertical" }}
               />
             </div>
