@@ -31,6 +31,19 @@ function nombreCondicion(tipofact) {
 
 let nextItemId = 1;
 
+// Opciones estándar de "Condición de Venta" que usa AFIP en el
+// comprobante impreso. Se resuelve acá (antes de emitir) porque después
+// de generada la factura ya no se puede modificar.
+const CONDICIONES_VENTA = [
+  "Contado",
+  "Cuenta Corriente",
+  "Cheque",
+  "Tarjeta de Crédito",
+  "Tarjeta de Débito",
+  "Transferencia",
+  "Otra",
+];
+
 // FacturaManual.jsx — "Facturar" dentro de Facturas Emitidas: factura
 // libre, sin depender de un presupuesto/obra confirmada. Layout inspirado
 // en la pantalla de comprobante de venta de referencia (grilla de ítems +
@@ -48,6 +61,7 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
   const [busqueda, setBusqueda] = useState("");
   const [clienteSel, setClienteSel] = useState(null);
   const [detalle, setDetalle] = useState("");
+  const [condicionVenta, setCondicionVenta] = useState("Contado");
   const [items, setItems] = useState([]);
   const [itemFocoId, setItemFocoId] = useState(null); // último renglón tocado, para la foto del panel lateral
   const [busquedaArt, setBusquedaArt] = useState("");
@@ -222,6 +236,7 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
         body: JSON.stringify({
           codcliente: clienteSel.codcliente,
           detalle: detalle.trim() || null,
+          condicion_venta: condicionVenta,
           importe_total: totalFactura,
           items: filasCalculadas.map((it) => ({
             codartint: it.codartint,
@@ -670,6 +685,21 @@ export default function FacturaManual({ clientes, productos, authFetch, onVolver
                   </div>
                 </div>
               )}
+            </div>
+
+            <div>
+              <label style={etiquetaEstilo}>Condición de Venta</label>
+              <select
+                value={condicionVenta}
+                onChange={(e) => setCondicionVenta(e.target.value)}
+                style={inputEstilo}
+              >
+                {CONDICIONES_VENTA.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
