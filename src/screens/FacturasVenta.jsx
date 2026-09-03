@@ -3,7 +3,7 @@ import DataTable from "../Component/DataTable";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import { formatPeso } from "../pdf/pdfMotorComun";
-import { verFacturaPDF } from "../pdf/facturaPdf";
+import { verFacturaPDF, descargarFacturaPDF } from "../pdf/facturaPdf";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -72,6 +72,13 @@ export default function FacturasVenta({ authFetch, onFacturar }) {
     });
   };
 
+  const guardarPDF = (row) => {
+    if (!emisor) return;
+    descargarFacturaPDF(row, emisor, {
+      setGenerando: (v) => setGenerandoPDFId(v ? row.id : null),
+    });
+  };
+
   const COLUMNS = [
     { key: "nro_comprobante", label: "N° Comprobante", render: (_v, row) => `${String(row.pto_vta).padStart(4, "0")}-${String(row.nro_comprobante).padStart(8, "0")}` },
     { key: "tipo_cbte",       label: "Tipo",           render: (_v, row) => `Factura ${TIPO_CBTE_LABEL[row.tipo_cbte] ?? row.tipo_cbte}` },
@@ -85,25 +92,46 @@ export default function FacturasVenta({ authFetch, onFacturar }) {
       key: "pdf",
       label: "",
       render: (_v, row) => (
-        <button
-          type="button"
-          disabled={!emisor || generandoPDFId === row.id}
-          onClick={(e) => {
-            e.stopPropagation();
-            generarPDF(row);
-          }}
-          style={{
-            padding: "4px 10px",
-            fontSize: 12,
-            background: "#0a3a5c",
-            color: "#fff",
-            border: "none",
-            borderRadius: 4,
-            cursor: emisor ? "pointer" : "not-allowed",
-          }}
-        >
-          {generandoPDFId === row.id ? "Generando..." : "👁 Ver PDF"}
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            type="button"
+            disabled={!emisor || generandoPDFId === row.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              generarPDF(row);
+            }}
+            style={{
+              padding: "4px 10px",
+              fontSize: 12,
+              background: "#0a3a5c",
+              color: "#fff",
+              border: "none",
+              borderRadius: 4,
+              cursor: emisor ? "pointer" : "not-allowed",
+            }}
+          >
+            {generandoPDFId === row.id ? "Generando..." : "👁 Ver PDF"}
+          </button>
+          <button
+            type="button"
+            disabled={!emisor || generandoPDFId === row.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              guardarPDF(row);
+            }}
+            style={{
+              padding: "4px 10px",
+              fontSize: 12,
+              background: "#0a3a5c",
+              color: "#fff",
+              border: "none",
+              borderRadius: 4,
+              cursor: emisor ? "pointer" : "not-allowed",
+            }}
+          >
+            {generandoPDFId === row.id ? "Generando..." : "💾 Guardar PDF"}
+          </button>
+        </div>
       ),
     },
   ];
