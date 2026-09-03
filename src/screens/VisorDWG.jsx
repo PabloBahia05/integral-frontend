@@ -1,0 +1,309 @@
+import React, { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+
+/**
+ * Visor 3D de un mueble convertido desde DXF (exportado nativamente, con
+ * datos ACIS completos).
+ *
+ * Uso:
+ *   <VisorDWG file={archivoDxfSeleccionado} apiUrl="/api/dwg" />
+ *
+ * Sube el .dxf al microservicio /convert, recibe el JSON de malla (paneles
+ * como sólidos cerrados por convex hull, agujeros como cilindros, textos
+ * como sprites que miran a cámara) y lo renderiza con Three.js. Control de
+ * cámara implementado a mano (sin three/examples) para no depender de una
+ * ruta de CDN que puede no existir según el proveedor.
+ */
+export default function VisorDWG({ file, apiUrl }) {
+  const containerRef = useRef(null);
+  const [status, setStatus] = useState("idle"); // idle | uploading | ready | error
+  const [errorMsg, setErrorMsg] = useState("");
+  const [meta, setMeta] = useState(null);
+  const [holesVisible, setHolesVisible] = useState(true);
+  const [textsVisible, setTextsVisible] = useState(true);
+  const holeMeshRef = useRef(null);
+  const textGroupRef = useRef(null);
+
+  // 1) Subir el archivo y pedir la conversión
+  useEffect(() => {
+    if (!file) return;
+    let cancelled = false;
+
+    async function upload() {
+      setStatus("uploading");
+      setErrorMsg("");
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch(`${apiUrl}/convert`, { method: "POST", body: form });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.detail || `Error ${res.status}`);
+        }
+        const data = await res.json();
+        if (!cancelled) {
+          setMeta(data);
+          setStatus("ready");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setErrorMsg(err.message);
+          setStatus("error");
+        }
+      }
+    }
+    upload();
+    return () => { cancelled = true; };
+  }, [file, apiUrl]);
+
+  // 2) Renderizar con Three.js cuando llega la malla
+  useEffect(() => {
+    if (status !== "ready" || !meta || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1d23);
+
+    const camera = new THREE.PerspectiveCamera(
+      45, container.clientWidth / container.clientHeight, 0.1, 5000
+    );
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    // --- Paneles (sólidos, ya vienen triangulados como convex hull) ---
+    const panelGeo = new THREE.BufferGeometry();
+    panelGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(meta.panel_mesh.positions), 3));
+    panelGeo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(meta.panel_mesh.normals), 3));
+    panelGeo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(meta.panel_mesh.colors), 3));
+    panelGeo.setIndex(meta.panel_mesh.indices);
+
+    panelGeo.computeBoundingBox();
+    const bbox = panelGeo.boundingBox;
+    const center = new THREE.Vector3();
+    bbox.getCenter(center);
+    panelGeo.translate(-center.x, -center.y, -center.z);
+    panelGeo.computeBoundingSphere();
+    const radius = panelGeo.boundingSphere.radius || 50;
+
+    const panelMat = new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 0.7, metalness: 0.04, side: THREE.DoubleSide,
+    });
+    scene.add(new THREE.Mesh(panelGeo, panelMat));
+
+    const edges = new THREE.EdgesGeometry(panelGeo, 25);
+    scene.add(new THREE.LineSegments(
+      edges, new THREE.LineBasicMaterial({ color: 0x2b2418, opacity: 0.3, transparent: true })
+    ));
+
+    // --- Agujeros ---
+    let holeMesh = null;
+    if (meta.hole_mesh.indices.length > 0) {
+      const holeGeo = new THREE.BufferGeometry();
+      holeGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(meta.hole_mesh.positions), 3));
+      holeGeo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(meta.hole_mesh.normals), 3));
+      holeGeo.setIndex(meta.hole_mesh.indices);
+      holeGeo.translate(-center.x, -center.y, -center.z);
+      holeMesh = new THREE.Mesh(
+        holeGeo,
+        new THREE.MeshStandardMaterial({ color: 0x1c1a16, roughness: 0.9, metalness: 0.1 })
+      );
+      scene.add(holeMesh);
+      holeMeshRef.current = holeMesh;
+    }
+
+    // --- Etiquetas de texto (sprites canvas, siempre miran a cámara) ---
+    function makeTextSprite(text) {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const fontSize = 48;
+      ctx.font = `bold ${fontSize}px monospace`;
+      const w = Math.max(64, ctx.measureText(text).width + 20);
+      canvas.width = w;
+      canvas.height = fontSize + 16;
+      ctx.font = `bold ${fontSize}px monospace`;
+      ctx.fillStyle = "rgba(20,22,28,0.55)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#ffffff";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 10, canvas.height / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: true, depthWrite: false }));
+      const scale = radius * 0.05;
+      sprite.scale.set(scale * (canvas.width / canvas.height), scale, 1);
+      return sprite;
+    }
+
+    const textGroup = new THREE.Group();
+    (meta.texts || []).forEach((t) => {
+      const sprite = makeTextSprite(t.text);
+      sprite.position.set(t.pos[0] - center.x, t.pos[1] - center.y, t.pos[2] - center.z);
+      textGroup.add(sprite);
+    });
+    scene.add(textGroup);
+    textGroupRef.current = textGroup;
+
+    // --- Luces ---
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const dir1 = new THREE.DirectionalLight(0xffffff, 0.9);
+    dir1.position.set(radius * 1.5, radius * 2, radius * 1.2);
+    scene.add(dir1);
+    const dir2 = new THREE.DirectionalLight(0xaac8ff, 0.35);
+    dir2.position.set(-radius * 1.5, radius * 0.5, -radius * 1.5);
+    scene.add(dir2);
+
+    const grid = new THREE.GridHelper(radius * 3, 20, 0x3a3f4a, 0x2a2e36);
+    grid.position.y = bbox.min.y - center.y;
+    scene.add(grid);
+
+    // --- Control de cámara (orbit manual, sin dependencia externa) ---
+    const spherical = { radius: radius * 2.6, theta: Math.PI * 0.28, phi: Math.PI * 0.38 };
+    const target = new THREE.Vector3(0, 0, 0);
+    const minR = radius * 0.3, maxR = radius * 6;
+
+    function updateCamera() {
+      const s = Math.sin(spherical.phi) * spherical.radius;
+      camera.position.set(
+        s * Math.sin(spherical.theta) + target.x,
+        Math.cos(spherical.phi) * spherical.radius + target.y,
+        s * Math.cos(spherical.theta) + target.z
+      );
+      camera.lookAt(target);
+    }
+    updateCamera();
+
+    let dragging = false, lastX = 0, lastY = 0, lastPinch = null;
+    const down = (x, y) => { dragging = true; lastX = x; lastY = y; };
+    const move = (x, y) => {
+      if (!dragging) return;
+      spherical.theta -= (x - lastX) * 0.006;
+      spherical.phi = Math.max(0.05, Math.min(Math.PI - 0.05, spherical.phi - (y - lastY) * 0.006));
+      lastX = x; lastY = y;
+      updateCamera();
+    };
+    const up = () => { dragging = false; };
+    const zoom = (delta) => {
+      spherical.radius = Math.max(minR, Math.min(maxR, spherical.radius * (1 + delta)));
+      updateCamera();
+    };
+
+    const el = renderer.domElement;
+    const onMouseDown = (e) => down(e.clientX, e.clientY);
+    const onMouseMove = (e) => move(e.clientX, e.clientY);
+    const onWheel = (e) => { e.preventDefault(); zoom(e.deltaY * 0.001); };
+    const onTouchStart = (e) => {
+      if (e.touches.length === 1) down(e.touches[0].clientX, e.touches[0].clientY);
+      else if (e.touches.length === 2) {
+        dragging = false;
+        const [a, b] = e.touches;
+        lastPinch = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      }
+    };
+    const onTouchMove = (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1) move(e.touches[0].clientX, e.touches[0].clientY);
+      else if (e.touches.length === 2 && lastPinch !== null) {
+        const [a, b] = e.touches;
+        const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        zoom((lastPinch - dist) * 0.005);
+        lastPinch = dist;
+      }
+    };
+    const onTouchEnd = (e) => { if (e.touches.length === 0) { dragging = false; lastPinch = null; } };
+    const onResize = () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    };
+
+    el.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", up);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    window.addEventListener("resize", onResize);
+
+    let rafId;
+    const animate = () => {
+      rafId = requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      el.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", up);
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("resize", onResize);
+      renderer.dispose();
+      container.removeChild(renderer.domElement);
+    };
+  }, [status, meta]);
+
+  useEffect(() => {
+    if (holeMeshRef.current) holeMeshRef.current.visible = holesVisible;
+  }, [holesVisible]);
+
+  useEffect(() => {
+    if (textGroupRef.current) textGroupRef.current.visible = textsVisible;
+  }, [textsVisible]);
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%", minHeight: 400 }}>
+      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+
+      {status === "uploading" && (
+        <div style={overlayStyle}>Convirtiendo DXF...</div>
+      )}
+      {status === "error" && (
+        <div style={{ ...overlayStyle, color: "#ffb4b4" }}>
+          No se pudo procesar el archivo: {errorMsg}
+        </div>
+      )}
+
+      {status === "ready" && meta && (
+        <>
+          <div style={infoStyle}>
+            <strong>{meta.solid_count} piezas</strong> · {meta.hole_count} perforaciones · {meta.text_count} etiquetas
+            {meta.excluded_count > 0 && (
+              <div style={{ marginTop: 4, fontSize: 11, color: "#8a8f98" }}>
+                ({meta.excluded_count} objeto(s) descartado(s) por estar fuera de los límites del modelo)
+              </div>
+            )}
+          </div>
+          <div style={{ position: "absolute", top: 12, right: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+            <button style={buttonStyle} onClick={() => setHolesVisible((v) => !v)}>
+              {holesVisible ? "Ocultar" : "Mostrar"} perforaciones
+            </button>
+            <button style={buttonStyle} onClick={() => setTextsVisible((v) => !v)}>
+              {textsVisible ? "Ocultar" : "Mostrar"} etiquetas
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const overlayStyle = {
+  position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+  color: "#cfd3da", fontFamily: "system-ui, sans-serif", fontSize: 14,
+};
+const infoStyle = {
+  position: "absolute", top: 12, left: 12, background: "rgba(20,22,28,0.65)",
+  color: "#cfd3da", padding: "8px 12px", borderRadius: 8, fontSize: 13,
+  fontFamily: "system-ui, sans-serif", maxWidth: 240,
+};
+const buttonStyle = {
+  background: "rgba(20,22,28,0.65)",
+  color: "#cfd3da", border: "1px solid #3a3f4a", borderRadius: 8,
+  padding: "8px 12px", fontSize: 12, cursor: "pointer",
+};
