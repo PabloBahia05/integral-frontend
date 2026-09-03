@@ -394,7 +394,7 @@ export function armarFacturaPageHTML(f, emisor) {
 
       <div class="f-cae-footer">
         <div class="f-arca">
-          <img src="${qrSrc}" crossorigin="anonymous" style="width:78px; height:78px;" />
+          <img src="${qrSrc}" data-qr="1" style="width:78px; height:78px;" />
           <div>
             <div class="f-arca-nombre">ARCA</div>
             <div class="f-arca-desc">AGENCIA DE RECAUDACION<br />Y CONTROL ADUANERO</div>
@@ -435,6 +435,39 @@ function cargarHtml2pdf() {
   });
 }
 
+// Trae una imagen externa y la convierte a data: URI ANTES de que
+// html2canvas la vea. Por qué: se probó (con html2pdf.js real, en un
+// escenario donde la petición al QR falla por red/CORS) que si
+// html2canvas intenta buscar la imagen en vivo durante la captura y esa
+// petición falla, el PDF que arma html2pdf/jsPDF sale con el stream JPEG
+// corrupto — no solo se pierde el QR, se corta TODO el comprobante desde
+// ahí en adelante (el visor decodifica lo que puede del archivo dañado y
+// se detiene, dejando el resto en blanco). Precargando a data: URI antes
+// de la captura, html2canvas ya no depende de ninguna red durante el
+// render: si la carga falla, el catch de abajo deja el comprobante sin
+// QR (mejor eso que un PDF entero corrupto) y si funciona, la imagen
+// queda embebida de antemano y html2canvas no tiene nada que buscar.
+function precargarImagenComoDataURL(url, timeoutMs = 4000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { signal: controller.signal })
+    .then((resp) => {
+      if (!resp.ok) throw new Error(`QR respondió ${resp.status}`);
+      return resp.blob();
+    })
+    .then(
+      (blob) =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        })
+    )
+    .catch(() => null) // sin QR es preferible a un PDF corrupto
+    .finally(() => clearTimeout(timer));
+}
+
 // Renderiza pageHTML off-screen (sin afectar el layout visible) y devuelve
 // una blob URL con el PDF ya armado. Separado a propósito de
 // descargarPDF() (pdfMotorComun.js): ese motor está armado específicamente
@@ -463,6 +496,17 @@ function generarBlobUrlFactura(pageHTML) {
     if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
   };
 
+  const imgQr = contenedor.querySelector("img[data-qr]");
+  const precargaQr = imgQr
+    ? precargarImagenComoDataURL(imgQr.src).then((dataUrl) => {
+        if (dataUrl) {
+          imgQr.src = dataUrl; // ya no depende de red durante la captura
+        } else {
+          imgQr.remove(); // no se pudo traer: mejor sin QR que un PDF corrupto
+        }
+      })
+    : Promise.resolve();
+
   const opciones = {
     // margin: [arriba, izquierda, abajo, derecha] en mm. Izquierda en 0 a
     // propósito: esta versión de html2pdf.js recorta el contenido en vez
@@ -472,16 +516,22 @@ function generarBlobUrlFactura(pageHTML) {
     // reintroducir ese bug.
     margin: [10, 0, 10, 4],
     filename: "factura.pdf",
-    image: { type: "jpeg", quality: 0.98 },
+    // "png" en vez de "jpeg": se detectó que esta build de html2pdf.js
+    // puede generar un JPEG corrupto (el visor del PDF decodifica hasta
+    // donde puede y corta el resto de la hoja en blanco) bajo ciertas
+    // condiciones de red al generar el comprobante. PNG usa un encoder
+    // sin pérdida y distinto, evita ese problema puntual. El archivo pesa
+    // un poco más, pero para una sola hoja A4 la diferencia es mínima.
+    image: { type: "png" },
     html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
   };
 
   return cargarHtml2pdf()
-    // Pequeña espera para que el <img> del QR (servicio externo) termine
-    // de cargar antes de que html2canvas tome la captura — si no, algunas
-    // veces la imagen todavía no resolvió y sale en blanco.
-    .then(() => new Promise((resolve) => setTimeout(resolve, 400)))
+    .then(() => precargaQr)
+    // Pequeña espera adicional para que termine de asentar el reflow
+    // después de reemplazar el src de la imagen por el data: URI.
+    .then(() => new Promise((resolve) => setTimeout(resolve, 150)))
     .then(() => window.html2pdf().set(opciones).from(contenedor).output("bloburl"))
     .finally(limpiar);
 }
