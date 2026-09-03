@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { verFacturaPDF, imprimirFacturaPDF } from "../pdf/facturaPdf";
+import { verFacturaPDF, imprimirFacturaPDF, descargarFacturaPDF } from "../pdf/facturaPdf";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -170,6 +170,24 @@ export default function BotonFacturar({ numeropres, authFetch, onFacturaGenerada
             }}
           >
             🖨️ Imprimir
+          </button>
+          <button
+            type="button"
+            disabled={!puedeVerPdf || cargandoPdf}
+            onClick={() =>
+              descargarFacturaPDF(filaFactura, emisor, { setGenerando: setCargandoPdf })
+            }
+            style={{
+              padding: "5px 12px",
+              fontSize: 12,
+              background: puedeVerPdf ? "#0a3a5c" : "#c8dae8",
+              color: puedeVerPdf ? "#fff" : "#99aabb",
+              border: "none",
+              borderRadius: 4,
+              cursor: puedeVerPdf && !cargandoPdf ? "pointer" : "not-allowed",
+            }}
+          >
+            💾 Guardar PDF
           </button>
           {!puedeVerPdf && (
             <span style={{ fontSize: 11, color: "#8aabb8", alignSelf: "center" }}>
