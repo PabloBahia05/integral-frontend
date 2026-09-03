@@ -56,7 +56,7 @@ export default function VisorDWGPage() {
 
       <div style={{ flex: 1, position: "relative" }}>
         {file ? (
-          <VisorDWG file={file} apiUrl="/api/dwg" />
+          <VisorDWG file={file} apiUrl={`${import.meta.env.VITE_API_URL}/api/dwg`} />
         ) : (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center",
