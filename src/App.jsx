@@ -24,6 +24,7 @@ import ActualizarPreciosExcel from "./screens/ActualizarPreciosExcel";
 import VehiculosMantenimiento from "./screens/VehiculosMantenimiento";
 import CuentaCorriente from "./screens/CuentaCorriente";
 import TestFacturacionAFIP from "./screens/TestFacturacionAFIP"; // TEMPORAL: pantalla de prueba AFIP, borrar cuando ya no haga falta
+import VisorDWGPage from "./screens/VisorDWGPage";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState } from "react";
@@ -57,6 +58,7 @@ const SCREENS = {
   "vehiculos-mantenimiento": { label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚" },
   "cuenta-corriente": { label: "CLIENTES ACTIVOS", icon: "💰" },
   "test-afip-facturar": { label: "TEST AFIP FACTURAR", icon: "🧪" }, // TEMPORAL
+  "visor-dwg": { label: "VISOR 3D MÓDULOS", icon: "📐" },
 };
 
 const buttons = [
@@ -124,6 +126,13 @@ const buttons = [
     icon: "🏭",
     color: "#8d6e63",
     screen: "produccion",
+  },
+  {
+    id: 17,
+    label: "VISOR 3D MÓDULOS",
+    icon: "📐",
+    color: "#00838f",
+    screen: "visor-dwg",
   },
 ];
 
@@ -1230,6 +1239,9 @@ function App() {
               <TestFacturacionAFIP authFetch={authFetch} />
             )}
 
+            {/* ── Visor 3D DWG/DXF ── */}
+            {screen === "visor-dwg" && <VisorDWGPage />}
+
             {/* ── Facturas ── */}
             {screen === "facturas" && <Facturas proveedores={proveedores} token={token} />}
 
@@ -1342,6 +1354,7 @@ function App() {
         {puedo("usuarios", "ver") && <p onClick={() => { setScreen("usuarios"); setSidebarOpen(false); }}>👤 Usuarios</p>}
         {puedo("actualizar-precios", "ver") && <p onClick={() => { setScreen("actualizar-precios"); setSidebarOpen(false); }}>💲 Actualizar Precios</p>}
         {puedo("vehiculos-mantenimiento", "ver") && <p onClick={() => { setScreen("vehiculos-mantenimiento"); setSidebarOpen(false); }}>🚚 Vehículos - Mantenimiento</p>}
+        {puedo("visor-dwg", "ver") && <p onClick={() => { setScreen("visor-dwg"); setSidebarOpen(false); }}>📐 Visor 3D Módulos</p>}
         <p onClick={logout} style={{ color: "#cc3333" }}>🚪 Cerrar sesión</p>
       </div>
 
