@@ -542,10 +542,19 @@ export function verFacturaPDF(f, emisor, { setGenerando } = {}) {
 // de impresión nativo del navegador sobre ese HTML — sin pasar por
 // html2canvas/html2pdf en ningún momento (ver comentario en
 // armarFacturaImprimibleHTML).
-export function imprimirFacturaPDF(f, emisor, { setGenerando } = {}) {
+//
+// Esta misma función de base sirve tanto para "Imprimir" como para
+// "Guardar/Descargar PDF": en el diálogo nativo de impresión, tanto en
+// PC (Chrome/Edge: impresora "Guardar como PDF") como en celular
+// (Chrome Android: destino "Guardar como PDF"; Safari iOS: opción
+// "Guardar en Archivos" o "Guardar como PDF" al fondo de la hoja de
+// compartir) el usuario puede elegir guardar el archivo en vez de
+// imprimirlo en papel. `tituloBoton` solo cambia el texto de los
+// mensajes de error para que coincida con el botón que lo disparó.
+function dispararDialogoImpresion(f, emisor, { setGenerando, tituloBoton = "la factura" } = {}) {
   setGenerando?.(true);
 
-  armarPageHTMLConQrEmbebido(f, emisor)
+  return armarPageHTMLConQrEmbebido(f, emisor)
     .then((pageHTML) => {
       const iframe = document.createElement("iframe");
       iframe.style.cssText =
@@ -563,10 +572,10 @@ export function imprimirFacturaPDF(f, emisor, { setGenerando } = {}) {
           iframe.contentWindow.focus();
           iframe.contentWindow.print();
         } catch (err) {
-          console.error("No se pudo abrir el diálogo de impresión:", err);
-          // Fallback: si por lo que sea no se pudo imprimir desde el iframe,
-          // al menos mostrar la factura en una pestaña para que la impriman
-          // manualmente con Ctrl+P.
+          console.error(`No se pudo abrir el diálogo para ${tituloBoton}:`, err);
+          // Fallback: si por lo que sea no se pudo abrir el diálogo desde el
+          // iframe, al menos mostrar la factura en una pestaña para que el
+          // usuario la guarde/imprima manualmente con Ctrl+P.
           const ventana = window.open("", "_blank");
           if (ventana) {
             ventana.document.open();
@@ -583,8 +592,23 @@ export function imprimirFacturaPDF(f, emisor, { setGenerando } = {}) {
       iframe.srcdoc = armarFacturaImprimibleHTML(pageHTML);
     })
     .catch((err) => {
-      console.error("Error armando la factura:", err);
+      console.error(`Error armando ${tituloBoton}:`, err);
       alert("Ocurrió un error generando la factura. Probá de nuevo.");
       setGenerando?.(false);
     });
+}
+
+export function imprimirFacturaPDF(f, emisor, opts = {}) {
+  return dispararDialogoImpresion(f, emisor, { ...opts, tituloBoton: "la impresión" });
+}
+
+// Botón "Guardar PDF" / "Descargar PDF": dispara el mismo diálogo nativo
+// de impresión, con el foco puesto en que el usuario elija guardar el
+// archivo (destino "Guardar como PDF") en vez de mandarlo a una
+// impresora física. No hay forma de forzar una descarga silenciosa sin
+// el diálogo del navegador (por seguridad, ningún navegador lo permite),
+// así que esta es la vía confiable — misma que ya usa "Imprimir", sin el
+// riesgo de corrupción de html2canvas.
+export function descargarFacturaPDF(f, emisor, opts = {}) {
+  return dispararDialogoImpresion(f, emisor, { ...opts, tituloBoton: "la descarga" });
 }
