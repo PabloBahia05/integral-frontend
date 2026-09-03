@@ -89,7 +89,7 @@ function importeEnLetras(monto) {
 // no pisar sus clases.
 const FACTURA_CSS = `
 .f-page, .f-page * { box-sizing: border-box; }
-.f-page { width: 750px; margin: 10px 30px 10px 10px; padding: 16px 20px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; border: 1.5px solid #111; }
+.f-page { width: 750px; height: 270mm; display: flex; flex-direction: column; margin: 10px 30px 10px 10px; padding: 16px 20px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; border: 1.5px solid #111; }
 .f-original { text-align: center; font-weight: 700; font-size: 13px; letter-spacing: 0.1em; border-bottom: 1.5px solid #111; padding-bottom: 6px; margin-bottom: 8px; }
 .f-header { display: flex; border-bottom: 1.5px solid #111; padding-bottom: 8px; margin-bottom: 8px; }
 .f-emisor { flex: 1.3; padding-right: 10px; border-right: 1.5px solid #111; }
@@ -112,13 +112,14 @@ const FACTURA_CSS = `
 .f-items tbody td { padding: 5px 6px; vertical-align: top; }
 .f-items tbody td.f-right { text-align: right; }
 .f-items tbody td.f-center { text-align: center; }
-.f-items-body { min-height: 340px; border-bottom: 1.5px solid #111; }
+.f-items-body { flex: 1 1 auto; min-height: 0; border-bottom: 1.5px solid #111; }
 .f-footer-row { display: flex; border-bottom: 1.5px solid #111; }
 .f-observaciones { flex: 1; padding: 8px; font-size: 10px; border-right: 1.5px solid #111; }
+.f-observaciones.f-observaciones-sola { border-right: none; }
 .f-totales { width: 210px; flex-shrink: 0; padding: 8px; font-size: 11px; }
-.f-totales .f-t-row { display: flex; justify-content: space-between; margin-bottom: 4px; gap: 8px; }
+.f-totales .f-t-row, .f-observaciones .f-t-row { display: flex; justify-content: space-between; margin-bottom: 4px; gap: 8px; }
 .f-totales .f-t-total { border-top: 1.5px solid #111; padding-top: 4px; font-weight: 700; }
-.f-totales .f-regimen-titulo { font-size: 9px; font-weight: 700; line-height: 1.3; border-bottom: 1px solid #111; padding-bottom: 5px; margin-bottom: 6px; }
+.f-regimen-titulo { font-size: 9px; font-weight: 700; line-height: 1.3; border-bottom: 1px solid #111; padding-bottom: 5px; margin-bottom: 6px; margin-top: 6px; }
 .f-monto-letras { padding: 6px 8px; font-size: 10px; border-bottom: 1.5px solid #111; display: flex; justify-content: space-between; align-items: center; }
 .f-cae-footer { display: flex; align-items: flex-start; padding-top: 8px; justify-content: space-between; }
 .f-arca { display: flex; align-items: center; gap: 8px; }
@@ -280,24 +281,24 @@ export function armarFacturaPageHTML(f, emisor) {
   // Consumidor) el comprobante NO discrimina Neto/IVA como una Factura A
   // — solo declara el IVA ya contenido en el precio, con esta leyenda
   // fija. Factura A/C siguen mostrando el desglose Neto/IVA/Total normal.
+  // En Factura B, este bloque va DENTRO del cuadro de Observaciones (no al
+  // lado, en un cuadro de Totales separado) — así lo pidieron.
   const esFacturaB = Number(f.tipo_cbte) === 6;
   const observacionesTexto = observacionesHTML(f);
   const piePagoHTML = esFacturaB
     ? `
       <div class="f-footer-row">
-        <div class="f-observaciones">
+        <div class="f-observaciones f-observaciones-sola">
           <strong>Observaciones:</strong><br />
           ${observacionesTexto}
-        </div>
-        <div class="f-totales">
           <div class="f-regimen-titulo">Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)</div>
-          <div class="f-t-row"><span>IVA Contenido:</span><span>$ ${formatPeso(f.importe_iva)}</span></div>
-          <div class="f-t-row"><span>Otros Impuestos Nacionales Indirectos:</span><span>$ ${formatPeso(f.otros_impuestos_indirectos ?? 0)}</span></div>
+          <div class="f-t-row"><span>IVA Contenido:</span><span>${formatPeso(f.importe_iva)}</span></div>
+          <div class="f-t-row"><span>Otros Impuestos Nacionales Indirectos:</span><span>${formatPeso(f.otros_impuestos_indirectos ?? 0)}</span></div>
         </div>
       </div>
       <div class="f-monto-letras">
         <span>${importeEnLetras(f.importe_total)}</span>
-        <span><strong>Total Comprobante</strong>&nbsp;&nbsp;$${formatPeso(f.importe_total)}</span>
+        <span><strong>Total Comprobante</strong>&nbsp;&nbsp;${formatPeso(f.importe_total)}</span>
       </div>
     `
     : `
@@ -419,35 +420,16 @@ export function nombreArchivoFactura(f) {
   return `FACTURA_${letra}_${nroCompleto}.pdf`;
 }
 
-// Carga html2pdf.js del CDN (mismo que usa pdfMotorComun.js) si todavía no
-// está en la página — reusar la instancia global evita bajarlo dos veces
-// si el usuario ya generó un PDF de presupuesto en esta sesión.
-function cargarHtml2pdf() {
-  if (window.html2pdf) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src =
-      "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-    script.onload = resolve;
-    script.onerror = () =>
-      reject(new Error("No se pudo cargar el generador de PDF."));
-    document.head.appendChild(script);
-  });
-}
 
-// Trae una imagen externa y la convierte a data: URI ANTES de que
-// html2canvas la vea. Por qué: se probó (con html2pdf.js real, en un
-// escenario donde la petición al QR falla por red/CORS) que si
-// html2canvas intenta buscar la imagen en vivo durante la captura y esa
-// petición falla, el PDF que arma html2pdf/jsPDF sale con el stream JPEG
-// corrupto — no solo se pierde el QR, se corta TODO el comprobante desde
-// ahí en adelante (el visor decodifica lo que puede del archivo dañado y
-// se detiene, dejando el resto en blanco). Precargando a data: URI antes
-// de la captura, html2canvas ya no depende de ninguna red durante el
-// render: si la carga falla, el catch de abajo deja el comprobante sin
-// QR (mejor eso que un PDF entero corrupto) y si funciona, la imagen
-// queda embebida de antemano y html2canvas no tiene nada que buscar.
-function precargarImagenComoDataURL(url, timeoutMs = 4000) {
+// Trae la imagen del QR y la convierte a data: URI ANTES de escribir el
+// documento imprimible. Por qué: en una prueba real se vio que si el
+// navegador todavía está esperando esa imagen externa (api.qrserver.com)
+// justo cuando arranca a imprimir/paginar, corta ahí todo el resto del
+// comprobante (CAE, ARCA, "Página 1 de 1" desaparecen). Con la imagen ya
+// embebida de antemano, no hay ninguna espera de red pendiente en el
+// momento de imprimir. Si la descarga falla, se sigue igual sin QR — es
+// preferible a arriesgar que se pierda el resto de la hoja.
+function precargarQrComoDataURL(url, timeoutMs = 4000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   return fetch(url, { signal: controller.signal })
@@ -464,135 +446,109 @@ function precargarImagenComoDataURL(url, timeoutMs = 4000) {
           reader.readAsDataURL(blob);
         })
     )
-    .catch(() => null) // sin QR es preferible a un PDF corrupto
+    .catch(() => null)
     .finally(() => clearTimeout(timer));
 }
 
-// Renderiza pageHTML off-screen (sin afectar el layout visible) y devuelve
-// una blob URL con el PDF ya armado. Separado a propósito de
-// descargarPDF() (pdfMotorComun.js): ese motor está armado específicamente
-// para los presupuestos — busca `.page` (acá la clase es `.f-page`) y
-// SIEMPRE reserva 38mm arriba para estampar el logo de Daniel Roque en
-// cada hoja, lo que pisaría el encabezado propio de la factura (razón
-// social, CUIT, etc. en texto).
-function generarBlobUrlFactura(pageHTML) {
-  // El contenedor va en el flujo NORMAL del documento (position: static,
-  // sin fixed ni offsets negativos) — un offset negativo enorme
-  // (left:-9999px) es un patrón conocido por generar corte/desplazamiento
-  // en html2canvas cuando calcula mal el área a capturar. Para que no
-  // ocupe espacio visible ni genere un "flash" en pantalla, se envuelve
-  // en un wrapper con height:0;overflow:hidden.
-  const wrapper = document.createElement("div");
-  wrapper.style.cssText = "height:0; overflow:hidden;";
-
-  const contenedor = document.createElement("div");
-  contenedor.style.cssText = "width:770px; background:#fff;";
-  contenedor.innerHTML = pageHTML;
-
-  wrapper.appendChild(contenedor);
-  document.body.appendChild(wrapper);
-
-  const limpiar = () => {
-    if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
-  };
-
-  const imgQr = contenedor.querySelector("img[data-qr]");
-  const precargaQr = imgQr
-    ? precargarImagenComoDataURL(imgQr.src).then((dataUrl) => {
-        if (dataUrl) {
-          imgQr.src = dataUrl; // ya no depende de red durante la captura
-        } else {
-          imgQr.remove(); // no se pudo traer: mejor sin QR que un PDF corrupto
-        }
-      })
-    : Promise.resolve();
-
-  const opciones = {
-    // margin: [arriba, izquierda, abajo, derecha] en mm. Izquierda en 0 a
-    // propósito: esta versión de html2pdf.js recorta el contenido en vez
-    // de escalarlo cuando el margen izquierdo/derecho es distinto de cero
-    // en AMBOS lados a la vez. Se deja 0 a la izquierda y se agrega un
-    // margen chico a la derecha (4mm) para angostar el comprobante sin
-    // reintroducir ese bug.
-    margin: [10, 0, 10, 4],
-    filename: "factura.pdf",
-    // "png" en vez de "jpeg": se detectó que esta build de html2pdf.js
-    // puede generar un JPEG corrupto (el visor del PDF decodifica hasta
-    // donde puede y corta el resto de la hoja en blanco) bajo ciertas
-    // condiciones de red al generar el comprobante. PNG usa un encoder
-    // sin pérdida y distinto, evita ese problema puntual. El archivo pesa
-    // un poco más, pero para una sola hoja A4 la diferencia es mínima.
-    image: { type: "png" },
-    html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
-    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-  };
-
-  return cargarHtml2pdf()
-    .then(() => precargaQr)
-    // Pequeña espera adicional para que termine de asentar el reflow
-    // después de reemplazar el src de la imagen por el data: URI.
-    .then(() => new Promise((resolve) => setTimeout(resolve, 150)))
-    .then(() => window.html2pdf().set(opciones).from(contenedor).output("bloburl"))
-    .finally(limpiar);
+// Arma pageHTML y, si el QR se pudo descargar a tiempo, lo deja embebido
+// como data: URI en vez de la URL en vivo (ver precargarQrComoDataURL).
+function armarPageHTMLConQrEmbebido(f, emisor) {
+  const qrUrlEnVivo = armarQrUrl(f, emisor);
+  return precargarQrComoDataURL(qrUrlEnVivo).then((dataUrl) => {
+    const pageHTML = armarFacturaPageHTML(f, emisor);
+    return dataUrl ? pageHTML.replace(qrUrlEnVivo, dataUrl) : pageHTML;
+  });
 }
 
-// Genera el PDF de la factura y lo abre en una pestaña nueva para
-// visualizarlo — desde ahí el usuario tiene los botones nativos del visor
-// del navegador para descargar o imprimir si quiere.
+// Arma el documento HTML completo e imprimible (no un fragmento para
+// insertar en otra página, como pageHTML) — con su propio @page para que
+// el navegador imprima/"guarde como PDF" con el tamaño y márgenes
+// correctos, sin depender de html2canvas/html2pdf en absoluto. Esto
+// reemplaza al viejo generarBlobUrlFactura() (rasterizaba la hoja con
+// html2canvas y la convertía a imagen): esa vía quedó descartada después
+// de reproducir, en pruebas controladas, que la conversión a imagen podía
+// salir corrupta (el visor del PDF cortaba el comprobante a mitad de
+// camino) bajo ciertas condiciones — con impresión nativa no hay imagen
+// intermedia que pueda corromperse: es el mismo texto e HTML reales que
+// arma armarFacturaPageHTML, y el navegador lo pagina él mismo.
+function armarFacturaImprimibleHTML(pageHTML) {
+  return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Factura</title>
+<style>
+  /* margin acá reemplaza al viejo margin:[10,0,10,4] de html2pdf (mismos
+     valores, mm) — el navegador reserva este espacio en cada hoja impresa
+     sin que haga falta envolver nada en un contenedor con margen manual. */
+  @page { size: A4; margin: 10mm 4mm 10mm 0mm; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body { font-family: Arial, Helvetica, sans-serif; }
+  ${FACTURA_CSS}
+</style>
+</head>
+<body>
+${pageHTML}
+</body>
+</html>`;
+}
+
+// Genera el HTML de la factura y lo abre en una pestaña nueva — ahí el
+// navegador la muestra como una página normal (con el mismo aspecto que
+// el comprobante impreso) y el usuario tiene Ctrl+P / el menú de
+// impresión del navegador para guardarla como PDF o imprimirla si quiere.
 //
 // IMPORTANTE: llamar esto de forma SINCRÓNICA desde el onClick del botón
 // (sin ningún `await` antes) — la pestaña se abre en blanco ACÁ MISMO,
-// antes de cualquier promesa, porque si se abre después la mayoría de los
-// navegadores la bloquean como pop-up al perder la asociación directa con
-// el click del usuario.
+// antes de cualquier operación async, porque si se abre después la
+// mayoría de los navegadores la bloquean como pop-up al perder la
+// asociación directa con el click del usuario.
 export function verFacturaPDF(f, emisor, { setGenerando } = {}) {
   setGenerando?.(true);
 
   const ventana = window.open("", "_blank");
-  if (ventana) {
-    ventana.document.write(
-      "<p style='font-family:sans-serif;padding:24px;'>Generando el PDF...</p>",
+  if (!ventana) {
+    alert(
+      "El navegador bloqueó la ventana de la factura. Habilitá los pop-ups para este sitio e intentá de nuevo."
     );
+    setGenerando?.(false);
+    return;
   }
 
-  const pageHTML = armarFacturaPageHTML(f, emisor);
-
-  generarBlobUrlFactura(pageHTML)
-    .then((url) => {
-      if (ventana && !ventana.closed) {
-        ventana.location.href = url;
-      } else {
-        const reintento = window.open(url, "_blank");
-        if (!reintento) {
-          alert(
-            "El navegador bloqueó la ventana del PDF. Habilitá los pop-ups para este sitio e intentá de nuevo.",
-          );
-        }
-      }
-    })
-    .catch((err) => {
-      console.error("Error generando PDF de factura:", err);
-      alert("Ocurrió un error generando el PDF. Probá de nuevo.");
-      if (ventana && !ventana.closed) ventana.close();
-    })
-    .finally(() => setGenerando?.(false));
+  try {
+    armarPageHTMLConQrEmbebido(f, emisor)
+      .then((pageHTML) => {
+        ventana.document.open();
+        ventana.document.write(armarFacturaImprimibleHTML(pageHTML));
+        ventana.document.close();
+      })
+      .catch((err) => {
+        console.error("Error armando la factura:", err);
+        alert("Ocurrió un error generando la factura. Probá de nuevo.");
+        ventana.close();
+      })
+      .finally(() => setGenerando?.(false));
+  } catch (err) {
+    console.error("Error armando la factura:", err);
+    alert("Ocurrió un error generando la factura. Probá de nuevo.");
+    ventana.close();
+    setGenerando?.(false);
+  }
 }
 
-// Genera el PDF y dispara directamente el diálogo de impresión del
-// navegador (sin pasar por una pestaña visible primero) usando un iframe
-// oculto. Si por lo que sea el navegador no deja disparar `print()` desde
-// el iframe, cae de nuevo a abrir la pestaña de vista previa.
+// Arma la factura en un iframe oculto y dispara directamente el diálogo
+// de impresión nativo del navegador sobre ese HTML — sin pasar por
+// html2canvas/html2pdf en ningún momento (ver comentario en
+// armarFacturaImprimibleHTML).
 export function imprimirFacturaPDF(f, emisor, { setGenerando } = {}) {
   setGenerando?.(true);
 
-  const pageHTML = armarFacturaPageHTML(f, emisor);
-
-  generarBlobUrlFactura(pageHTML)
-    .then((url) => {
+  armarPageHTMLConQrEmbebido(f, emisor)
+    .then((pageHTML) => {
       const iframe = document.createElement("iframe");
       iframe.style.cssText =
         "position:fixed; right:0; bottom:0; width:0; height:0; border:0;";
-      iframe.src = url;
       document.body.appendChild(iframe);
 
       const limpiarIframe = () => {
@@ -607,14 +563,27 @@ export function imprimirFacturaPDF(f, emisor, { setGenerando } = {}) {
           iframe.contentWindow.print();
         } catch (err) {
           console.error("No se pudo abrir el diálogo de impresión:", err);
-          window.open(url, "_blank");
+          // Fallback: si por lo que sea no se pudo imprimir desde el iframe,
+          // al menos mostrar la factura en una pestaña para que la impriman
+          // manualmente con Ctrl+P.
+          const ventana = window.open("", "_blank");
+          if (ventana) {
+            ventana.document.open();
+            ventana.document.write(armarFacturaImprimibleHTML(pageHTML));
+            ventana.document.close();
+          }
         }
         limpiarIframe();
+        setGenerando?.(false);
       };
+
+      // srcdoc en vez de un blob URL: el HTML se inyecta directo, sin
+      // conversión intermedia de ningún tipo.
+      iframe.srcdoc = armarFacturaImprimibleHTML(pageHTML);
     })
     .catch((err) => {
-      console.error("Error generando PDF de factura:", err);
-      alert("Ocurrió un error generando el PDF. Probá de nuevo.");
-    })
-    .finally(() => setGenerando?.(false));
+      console.error("Error armando la factura:", err);
+      alert("Ocurrió un error generando la factura. Probá de nuevo.");
+      setGenerando?.(false);
+    });
 }
