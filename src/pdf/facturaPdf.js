@@ -288,13 +288,14 @@ export function armarFacturaPageHTML(f, emisor) {
   const piePagoHTML = esFacturaB
     ? `
       <div class="f-footer-row">
-        <div class="f-observaciones f-observaciones-sola">
+        <div class="f-observaciones">
           <strong>Observaciones:</strong><br />
           ${observacionesTexto}
           <div class="f-regimen-titulo">Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)</div>
           <div class="f-t-row"><span>IVA Contenido:</span><span>${formatPeso(f.importe_iva)}</span></div>
           <div class="f-t-row"><span>Otros Impuestos Nacionales Indirectos:</span><span>${formatPeso(f.otros_impuestos_indirectos ?? 0)}</span></div>
         </div>
+        <div class="f-totales"></div>
       </div>
       <div class="f-monto-letras">
         <span>${importeEnLetras(f.importe_total)}</span>
@@ -383,9 +384,9 @@ export function armarFacturaPageHTML(f, emisor) {
               <td>${detalleItem}</td>
               <td class="f-right"></td>
               <td class="f-right"></td>
-              <td class="f-right">${formatPeso(f.importe_neto)}</td>
+              <td class="f-right">${formatPeso(f.importe_total)}</td>
               <td class="f-right">0.00</td>
-              <td class="f-right">${formatPeso(f.importe_neto)}</td>
+              <td class="f-right">${formatPeso(f.importe_total)}</td>
             </tr>
           </tbody>
         </table>
