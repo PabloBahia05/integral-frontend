@@ -730,14 +730,18 @@ export default function Produccion({ authFetch }) {
   };
 
   // Columnas de cada etapa (Domus/Perforado/Armado/Despacho), agrupadas por
-  // etapa para poder elegir cuáles mostrar según el filtro activo. Cada una
-  // sigue el mismo patrón: select SI/NO que guarda al cambiar, y si tiene
-  // usuario asociado, un input de texto al lado que guarda al salir del
-  // campo.
+  // etapa para poder elegir cuáles mostrar según el filtro activo.
+  //
+  // El select SI/NO de Domus/Perforado/Armado se sacó de la tabla (siguen
+  // editables desde el modal de detalle o quedan solo como filtro arriba);
+  // Despacho conserva su select porque no se pidió sacarlo. Los campos de
+  // usuario (Perforado/Armado/Despacho) se mantienen igual.
+  const ETAPAS_SIN_SELECT = ["DOMUS", "PERFORADO", "ARMADO"];
   const columnasPorEtapa = {};
   ETAPAS.forEach(({ campo, label, usuario }) => {
-    const cols = [
-      {
+    const cols = [];
+    if (!ETAPAS_SIN_SELECT.includes(campo)) {
+      cols.push({
         key: campo,
         label,
         render: (v, row) => (
@@ -751,8 +755,8 @@ export default function Produccion({ authFetch }) {
             <option value="SI">SI</option>
           </select>
         ),
-      },
-    ];
+      });
+    }
     if (usuario) {
       cols.push({
         key: usuario,
