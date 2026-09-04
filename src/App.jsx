@@ -1240,7 +1240,7 @@ function App() {
             )}
 
             {/* ── Visor 3D DWG/DXF ── */}
-            {screen === "visor-dwg" && <VisorDWGPage />}
+            {screen === "visor-dwg" && <VisorDWGPage token={token} />}
 
             {/* ── Facturas ── */}
             {screen === "facturas" && <Facturas proveedores={proveedores} token={token} />}
