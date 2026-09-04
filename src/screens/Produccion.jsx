@@ -5,7 +5,7 @@ import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
 import EscanerBarcode from "../Component/EscanerBarcode";
-import VisorDWG from "../Component/VisorDWG";
+import VisorDWG from "./VisorDWG";
 
 const API = "https://integral-backend-production.up.railway.app";
 
