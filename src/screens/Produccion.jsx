@@ -301,8 +301,9 @@ export default function Produccion({ authFetch }) {
   // de detalle que se abre al clickear la columna "Cód.".
   const [escaneando, setEscaneando] = useState(false);
 
-  // Fila para la que está abierto el modal del visor 3D (columna "🧊 Ver",
-  // ver VisorDWG.jsx en modo producción).
+  // Fila para la que está abierto el modal del visor 3D (columna "🧊 Ver").
+  // El visor guarda/lee el modelo por codpro contra la tabla modelos_3d
+  // (independiente de produccion, ver modelos3d.routes.js).
   const [modelo3D, setModelo3D] = useState(null);
 
   // Melaminas disponibles para el desplegable de `color` (ver
@@ -1025,8 +1026,8 @@ export default function Produccion({ authFetch }) {
               ✕
             </button>
             <VisorDWG
-              produccionId={modelo3D.id}
-              produccionApiUrl={API}
+              codigo={modelo3D.codpro}
+              modelosApiUrl={API}
               apiUrl={`${API}/api/dwg`}
             />
           </div>
