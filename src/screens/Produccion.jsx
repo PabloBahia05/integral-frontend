@@ -5,6 +5,7 @@ import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
 import EscanerBarcode from "../Component/EscanerBarcode";
+import VisorDWG from "../Component/VisorDWG";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -299,6 +300,10 @@ export default function Produccion({ authFetch }) {
   // detectar un código busca la fila por `codpro` y abre el mismo modal
   // de detalle que se abre al clickear la columna "Cód.".
   const [escaneando, setEscaneando] = useState(false);
+
+  // Fila para la que está abierto el modal del visor 3D (columna "🧊 Ver",
+  // ver VisorDWG.jsx en modo producción).
+  const [modelo3D, setModelo3D] = useState(null);
 
   // Melaminas disponibles para el desplegable de `color` (ver
   // GET /productos/melaminas en articulos_controller.js — filtra
@@ -678,6 +683,32 @@ export default function Produccion({ authFetch }) {
         </select>
       ),
     },
+    {
+      key: "modelo3d",
+      label: "3D",
+      render: (v, row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setModelo3D(row);
+          }}
+          title="Ver módulo en 3D"
+          style={{
+            background: "#eaf3fb",
+            color: "#0a3a5c",
+            border: "1px solid #b8d6ef",
+            borderRadius: "4px",
+            padding: "3px 10px",
+            fontSize: "12px",
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "'Space Mono', monospace",
+          }}
+        >
+          🧊 Ver
+        </button>
+      ),
+    },
   ];
 
   const columnaOP = {
@@ -949,6 +980,57 @@ export default function Produccion({ authFetch }) {
           onDetected={handleCodigoDetectado}
           onClose={() => setEscaneando(false)}
         />
+      )}
+
+      {modelo3D && (
+        <div
+          onClick={() => setModelo3D(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "90%",
+              maxWidth: 900,
+              height: "80vh",
+              background: "#0f1115",
+              borderRadius: 10,
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <button
+              onClick={() => setModelo3D(null)}
+              style={{
+                position: "absolute",
+                top: 10,
+                right: 10,
+                zIndex: 10,
+                background: "rgba(20,22,28,0.65)",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                padding: "6px 10px",
+                cursor: "pointer",
+              }}
+            >
+              ✕
+            </button>
+            <VisorDWG
+              produccionId={modelo3D.id}
+              produccionApiUrl={API}
+              apiUrl={`${API}/api/dwg`}
+            />
+          </div>
+        </div>
       )}
     </>
   );
