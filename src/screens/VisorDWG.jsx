@@ -8,17 +8,18 @@ import * as THREE from "three";
  * Uso (standalone, subiendo un archivo elegido afuera):
  *   <VisorDWG file={archivoDxfSeleccionado} apiUrl="/api/dwg" />
  *
- * Uso (modo producción, cargando/guardando el módulo de un ítem):
+ * Uso (modo producción, cargando/guardando el módulo de un codpro):
  *   <VisorDWG
- *     produccionId={row.id}
- *     produccionApiUrl={API}
+ *     codigo={row.codpro}
+ *     modelosApiUrl={API}
  *     apiUrl={`${API}/api/dwg`}
  *   />
- *   Al montar hace GET a /produccion/:id/modelo-3d. Si ya hay un modelo
- *   guardado lo renderiza directo (sin volver a convertir); si no hay,
- *   muestra un input propio para subir el .dxf, lo convierte vía
- *   /convert y guarda el resultado con POST a la misma ruta para no
- *   tener que reconvertir la próxima vez que se abra.
+ *   Al montar hace GET a /modelos-3d/:codigo (tabla `modelos_3d`, separada
+ *   de `produccion`). Si ya hay un modelo guardado lo renderiza directo
+ *   (sin volver a convertir); si no hay, muestra un input propio para
+ *   subir el .dxf, lo convierte vía /convert y guarda el resultado con
+ *   POST a la misma ruta para no tener que reconvertir la próxima vez
+ *   que se abra.
  *
  * Sube el .dxf al microservicio /convert, recibe el JSON de malla (paneles
  * como sólidos cerrados por convex hull, agujeros como cilindros, textos
@@ -26,10 +27,10 @@ import * as THREE from "three";
  * cámara implementado a mano (sin three/examples) para no depender de una
  * ruta de CDN que puede no existir según el proveedor.
  */
-export default function VisorDWG({ file: externalFile, apiUrl, token, produccionId, produccionApiUrl }) {
+export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, modelosApiUrl }) {
   const containerRef = useRef(null);
   const inputRef = useRef(null);
-  const [status, setStatus] = useState(produccionId ? "checking" : "idle");
+  const [status, setStatus] = useState(codigo ? "checking" : "idle");
   // idle | checking | needs-upload | uploading | ready | error
   const [errorMsg, setErrorMsg] = useState("");
   const [meta, setMeta] = useState(null);
@@ -46,9 +47,9 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, produccion
   }, [externalFile]);
 
   // Modo producción: al montar, preguntar si ya hay un módulo guardado
-  // antes de pedir el .dxf.
+  // (tabla modelos_3d) antes de pedir el .dxf.
   useEffect(() => {
-    if (!produccionId) return;
+    if (!codigo) return;
     let cancelled = false;
 
     async function check() {
@@ -56,7 +57,7 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, produccion
       setErrorMsg("");
       try {
         const res = await fetch(
-          `${produccionApiUrl}/produccion/${produccionId}/modelo-3d`,
+          `${modelosApiUrl}/modelos-3d/${codigo}`,
           { headers: token ? { Authorization: `Bearer ${token}` } : {} }
         );
         if (res.status === 404) {
@@ -78,7 +79,7 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, produccion
     }
     check();
     return () => { cancelled = true; };
-  }, [produccionId, produccionApiUrl, token]);
+  }, [codigo, modelosApiUrl, token]);
 
   function handleFileChange(e) {
     const f = e.target.files?.[0];
@@ -91,8 +92,8 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, produccion
   }
 
   function handleReemplazar() {
-    if (!produccionId) return;
-    fetch(`${produccionApiUrl}/produccion/${produccionId}/modelo-3d`, {
+    if (!codigo) return;
+    fetch(`${modelosApiUrl}/modelos-3d/${codigo}`, {
       method: "DELETE",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     }).catch((err) => console.error("Error borrando modelo 3D:", err));
@@ -128,9 +129,9 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, produccion
         setStatus("ready");
 
         // Modo producción: además de renderizar, guardamos el resultado
-        // para no tener que reconvertir la próxima vez que se abra.
-        if (produccionId) {
-          fetch(`${produccionApiUrl}/produccion/${produccionId}/modelo-3d`, {
+        // en modelos_3d para no tener que reconvertir la próxima vez.
+        if (codigo) {
+          fetch(`${modelosApiUrl}/modelos-3d/${codigo}`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -148,7 +149,7 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, produccion
     }
     upload();
     return () => { cancelled = true; };
-  }, [file, apiUrl, token, produccionId, produccionApiUrl]);
+  }, [file, apiUrl, token, codigo, modelosApiUrl]);
 
   // 2) Renderizar con Three.js cuando llega la malla
   useEffect(() => {
@@ -360,7 +361,7 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, produccion
 
       {status === "needs-upload" && (
         <div style={{ ...overlayStyle, display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
-          <span>Este ítem todavía no tiene un módulo 3D cargado.</span>
+          <span>Este código todavía no tiene un módulo 3D cargado.</span>
           <input ref={inputRef} type="file" accept=".dxf" onChange={handleFileChange} style={{ display: "none" }} />
           <button
             onClick={() => inputRef.current?.click()}
@@ -397,7 +398,7 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, produccion
             <button style={buttonStyle} onClick={() => setTextsVisible((v) => !v)}>
               {textsVisible ? "Ocultar" : "Mostrar"} etiquetas
             </button>
-            {produccionId && (
+            {codigo && (
               <button style={buttonStyle} onClick={handleReemplazar}>
                 Reemplazar módulo
               </button>
