@@ -14,7 +14,7 @@ import * as THREE from "three";
  * cámara implementado a mano (sin three/examples) para no depender de una
  * ruta de CDN que puede no existir según el proveedor.
  */
-export default function VisorDWG({ file, apiUrl }) {
+export default function VisorDWG({ file, apiUrl, token }) {
   const containerRef = useRef(null);
   const [status, setStatus] = useState("idle"); // idle | uploading | ready | error
   const [errorMsg, setErrorMsg] = useState("");
@@ -35,7 +35,11 @@ export default function VisorDWG({ file, apiUrl }) {
       try {
         const form = new FormData();
         form.append("file", file);
-        const res = await fetch(`${apiUrl}/convert`, { method: "POST", body: form });
+        const res = await fetch(`${apiUrl}/convert`, {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: form,
+        });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.detail || `Error ${res.status}`);
@@ -54,7 +58,7 @@ export default function VisorDWG({ file, apiUrl }) {
     }
     upload();
     return () => { cancelled = true; };
-  }, [file, apiUrl]);
+  }, [file, apiUrl, token]);
 
   // 2) Renderizar con Three.js cuando llega la malla
   useEffect(() => {

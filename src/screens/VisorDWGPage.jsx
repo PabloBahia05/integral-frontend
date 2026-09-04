@@ -8,7 +8,7 @@ import VisorDWG from "./VisorDWG";
  * Agregar como ruta en tu router, ej.:
  *   <Route path="/visor-dwg" element={<VisorDWGPage />} />
  */
-export default function VisorDWGPage() {
+export default function VisorDWGPage({ token }) {
   const [file, setFile] = useState(null);
   const inputRef = useRef(null);
 
@@ -56,7 +56,7 @@ export default function VisorDWGPage() {
 
       <div style={{ flex: 1, position: "relative" }}>
         {file ? (
-          <VisorDWG file={file} apiUrl={`${import.meta.env.VITE_API_URL}/api/dwg`} />
+          <VisorDWG file={file} token={token} apiUrl={`${import.meta.env.VITE_API_URL}/api/dwg`} />
         ) : (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center",
