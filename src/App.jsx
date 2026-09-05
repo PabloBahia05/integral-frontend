@@ -1,4 +1,3 @@
-import Anviz from "./screens/Anviz";
 import Usuarios from "./screens/Usuarios";
 import Clientes from "./screens/Clientes";
 import Productos from "./screens/Productos";
@@ -52,7 +51,6 @@ const SCREENS = {
   "facturas-venta": { label: "FACTURAS EMITIDAS", icon: "🧮" },
   "factura-manual": { label: "FACTURAR (MANUAL)", icon: "🧾" },
   "historial-facturas": { label: "HISTORIAL FACTURAS", icon: "📋" },
-  anviz: { label: "ASISTENCIA", icon: "🕐" },
   "afip-iva": { label: "AFIP IVA", icon: "🏦" },
   usuarios: { label: "USUARIOS", icon: "👤" },
   "actualizar-precios": { label: "ACTUALIZAR PRECIOS", icon: "💲" },
@@ -142,13 +140,6 @@ const buttons = [
     icon: "💬",
     color: "#25d366",
     screen: "chat",
-  },
-  {
-    id: 19,
-    label: "ASISTENCIA",
-    icon: "🕐",
-    color: "#6366f1",
-    screen: "anviz",
   },
 ];
 
@@ -971,7 +962,6 @@ function App() {
               "mueble-especial",
               "facturas",
               "historial-facturas",
-              "anviz",
               "afip-iva",
               "usuarios",
               "actualizar-precios",
@@ -1205,7 +1195,6 @@ function App() {
                 }
               />
             )}
-            {screen === "anviz" && <Anviz onBack={() => setScreen(null)} />}
             {screen === "afip-iva" && <AfipIVA onBack={() => setScreen(null)} token={token} />}
             {screen === "usuarios" && (
               <Usuarios onBack={() => setScreen(null)} />
@@ -1411,7 +1400,6 @@ function App() {
         {puedo("lista-margenes", "ver") && <p onClick={() => { setScreen("lista-margenes"); fetchListas(); setSidebarOpen(false); }}>📊 Lista de Márgenes</p>}
         {puedo("facturas", "ver") && <p onClick={() => { setScreen("facturas"); setSidebarOpen(false); }}>🧾 Facturas Compra</p>}
         {puedo("facturas-venta", "ver") && <p onClick={() => { setScreen("facturas-venta"); setSidebarOpen(false); }}>🧮 Facturas Emitidas</p>}
-        {puedo("anviz", "ver") && <p onClick={() => { setScreen("anviz"); setSidebarOpen(false); }}>🕐 Asistencia</p>}
         {puedo("usuarios", "ver") && <p onClick={() => { setScreen("usuarios"); setSidebarOpen(false); }}>👤 Usuarios</p>}
         {puedo("actualizar-precios", "ver") && <p onClick={() => { setScreen("actualizar-precios"); setSidebarOpen(false); }}>💲 Actualizar Precios</p>}
         {puedo("vehiculos-mantenimiento", "ver") && <p onClick={() => { setScreen("vehiculos-mantenimiento"); setSidebarOpen(false); }}>🚚 Vehículos - Mantenimiento</p>}
