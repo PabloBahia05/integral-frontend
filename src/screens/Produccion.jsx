@@ -498,7 +498,7 @@ export default function Produccion({ authFetch, token }) {
         (r.grupo ?? "").toLowerCase().includes(q) ||
         (r.producto ?? "").toLowerCase().includes(q) ||
         (r.modulo ?? "").toLowerCase().includes(q) ||
-        nombreMelamina(r.color).toLowerCase().includes(q) ||
+        (r.color ? nombreMelamina(r.color) : "").toLowerCase().includes(q) ||
         (r.OP ?? "").toLowerCase().includes(q) ||
         (r.USPER ?? "").toLowerCase().includes(q) ||
         (r.USARM ?? "").toLowerCase().includes(q) ||
