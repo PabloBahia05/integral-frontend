@@ -92,6 +92,7 @@ const PANEL_BOTONES = [
   { id: "produccion", label: "Producción" },
   { id: "visor-dwg", label: "Visor 3D Módulos" },
   { id: "chat", label: "Chat" },
+  { id: "anviz", label: "Asistencia" },
 ];
 
 // ── Componente Permisos ──────────────────────────────────────────────────────
