@@ -1,6 +1,36 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
+// THREE.EdgesGeometry/WireframeGeometry solo conservan la posición de cada
+// vértice, no otros atributos — así que para el modo "Líneas (CAD)" con
+// agujeros de colores reales (uno por capa/color del DXF), armamos las
+// aristas a mano: una línea por cada lado de cada triángulo, arrastrando
+// el color del vértice de origen. Al no filtrar por ángulo (a diferencia
+// de EdgesGeometry) salen más líneas de las estrictamente necesarias en
+// geometrías con muchas caras, pero para una malla de agujero (un cilindro
+// de pocos segmentos) es liviano y no se nota.
+function buildColoredEdgeGeometry(positions, colors, indices) {
+  const linePositions = [];
+  const lineColors = [];
+  for (let i = 0; i < indices.length; i += 3) {
+    const [ia, ib, ic] = [indices[i], indices[i + 1], indices[i + 2]];
+    for (const [p, q] of [[ia, ib], [ib, ic], [ic, ia]]) {
+      linePositions.push(
+        positions[p * 3], positions[p * 3 + 1], positions[p * 3 + 2],
+        positions[q * 3], positions[q * 3 + 1], positions[q * 3 + 2]
+      );
+      lineColors.push(
+        colors[p * 3], colors[p * 3 + 1], colors[p * 3 + 2],
+        colors[q * 3], colors[q * 3 + 1], colors[q * 3 + 2]
+      );
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(linePositions, 3));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(lineColors, 3));
+  return geo;
+}
+
 /**
  * Visor 3D de un mueble convertido desde DXF (exportado nativamente, con
  * datos ACIS completos).
@@ -239,10 +269,23 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
       scene.add(holeMesh);
       holeMeshRef.current = holeMesh;
 
-      const holeEdges = new THREE.LineSegments(
-        new THREE.EdgesGeometry(holeGeo, 1),
-        new THREE.LineBasicMaterial({ color: 0xe8eef5 })
-      );
+      const holeEdges = meta.hole_mesh.colors
+        ? new THREE.LineSegments(
+            (() => {
+              const geo = buildColoredEdgeGeometry(
+                meta.hole_mesh.positions,
+                meta.hole_mesh.colors,
+                meta.hole_mesh.indices
+              );
+              geo.translate(-center.x, -center.y, -center.z);
+              return geo;
+            })(),
+            new THREE.LineBasicMaterial({ vertexColors: true })
+          )
+        : new THREE.LineSegments(
+            new THREE.EdgesGeometry(holeGeo, 1),
+            new THREE.LineBasicMaterial({ color: 0xe8eef5 })
+          );
       holeEdges.visible = viewMode === "lineas";
       scene.add(holeEdges);
       holeEdgesRef.current = holeEdges;
