@@ -238,6 +238,45 @@ function App() {
     return permisos?.[rol]?.[modulo]?.[accion] ?? false;
   };
 
+  // ── Orden del panel principal por rol ────────────────────
+  const [ordenPanel, setOrdenPanel] = useState({});
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API}/orden-panel`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((rows) => {
+        // rows: [{ rol, modulo, orden }, ...]
+        const map = {};
+        rows.forEach(({ rol, modulo, orden }) => {
+          map[rol] = map[rol] ?? [];
+          map[rol][orden] = modulo;
+        });
+        const limpio = {};
+        Object.keys(map).forEach((rol) => {
+          limpio[rol] = map[rol].filter(Boolean);
+        });
+        setOrdenPanel(limpio);
+      })
+      .catch(console.error);
+  }, [token]);
+
+  // Reordena `buttons` según el orden guardado para el rol del usuario.
+  // Los botones que no estén en el orden guardado (screens nuevos, chat,
+  // test-afip-facturar, etc.) se agregan al final en su orden original.
+  const buttonsOrdenados = (() => {
+    const rol = usuario?.rol ?? "operario";
+    const orden = ordenPanel[rol];
+    if (!orden || orden.length === 0) return buttons;
+    const porScreen = new Map(buttons.map((b) => [b.screen, b]));
+    const ordenados = orden.map((screenId) => porScreen.get(screenId)).filter(Boolean);
+    const yaUsados = new Set(ordenados.map((b) => b.screen));
+    const faltantes = buttons.filter((b) => !yaUsados.has(b.screen));
+    return [...ordenados, ...faltantes];
+  })();
+
   // ── Proveedores ──────────────────────────────────────────
   const [proveedores, setProveedores] = useState([]);
   const [selectedProveedor, setSelectedProveedor] = useState(null);
@@ -1220,6 +1259,8 @@ function App() {
                 semanasAnio={semanasAnio}
                 tablaInicial={tablaInicialVerTablas}
                 token={token}
+                puedo={puedo}
+                rol={usuario?.rol ?? "operario"}
               />
             )}
 
@@ -1415,7 +1456,7 @@ function App() {
               </div>
             </div>
             <div className="grid">
-              {buttons
+              {buttonsOrdenados
                 .filter((btn) => puedo(btn.screen, "ver"))
                 .map((btn) => (
                 <ActionButton
