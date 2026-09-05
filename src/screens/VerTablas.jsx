@@ -78,12 +78,101 @@ const MODULOS = [
 // confirmadas contra cada pantalla real — ajustar si alguna no coincide
 // con los botones que esa pantalla realmente tiene.
 
+// Botones del panel principal (App.jsx) — mantener sincronizado con el
+// array `buttons` de App.jsx si se agrega/saca un botón del dashboard.
+const PANEL_BOTONES = [
+  { id: "clientes", label: "Clientes" },
+  { id: "productos", label: "Productos" },
+  { id: "presupuesto-nuevo", label: "Presup. Nuevo" },
+  { id: "ver-tablas", label: "Ver Tablas" },
+  { id: "lista-presupuestos-2", label: "Lista Presupuestos" },
+  { id: "cuenta-corriente", label: "Clientes Activos" },
+  { id: "obras-confirmadas", label: "Obras Confirmadas" },
+  { id: "produccion", label: "Producción" },
+  { id: "visor-dwg", label: "Visor 3D Módulos" },
+];
+
 // ── Componente Permisos ──────────────────────────────────────────────────────
 function GestorPermisos({ onBack, token }) {
   const [permisos, setPermisos] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+
+  // ── Orden del panel principal por rol ──
+  const [ordenPanel, setOrdenPanel] = useState({}); // { rol: [modulo, modulo, ...] }
+  const [rolOrden, setRolOrden] = useState(ROLES[0]);
+  const [arrastrando, setArrastrando] = useState(null); // índice que se está arrastrando
+
+  useEffect(() => {
+    fetch(`${API}/orden-panel`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((rows) => {
+        // rows: [{ rol, modulo, orden }, ...]
+        const map = {};
+        rows.forEach(({ rol, modulo, orden }) => {
+          map[rol] = map[rol] ?? [];
+          map[rol][orden] = modulo;
+        });
+        const completo = {};
+        ROLES.forEach((rol) => {
+          const guardado = (map[rol] ?? []).filter(Boolean);
+          // agrega al final cualquier botón nuevo que no esté guardado todavía
+          const faltantes = PANEL_BOTONES.map((b) => b.id).filter(
+            (id) => !guardado.includes(id),
+          );
+          completo[rol] = [...guardado, ...faltantes];
+        });
+        setOrdenPanel(completo);
+      })
+      .catch(() => {
+        const completo = {};
+        ROLES.forEach((rol) => {
+          completo[rol] = PANEL_BOTONES.map((b) => b.id);
+        });
+        setOrdenPanel(completo);
+      });
+  }, []);
+
+  const moverItem = (rol, desde, hasta) => {
+    if (hasta < 0 || hasta >= (ordenPanel[rol]?.length ?? 0)) return;
+    setOrdenPanel((prev) => {
+      const lista = [...(prev[rol] ?? [])];
+      const [item] = lista.splice(desde, 1);
+      lista.splice(hasta, 0, item);
+      return { ...prev, [rol]: lista };
+    });
+  };
+
+  const guardarOrden = async () => {
+    setSaving(true);
+    setMsg("");
+    const rows = [];
+    ROLES.forEach((rol) => {
+      (ordenPanel[rol] ?? []).forEach((modulo, i) => {
+        rows.push({ rol, modulo, orden: i });
+      });
+    });
+    try {
+      const res = await fetch(`${API}/orden-panel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ orden: rows }),
+      });
+      if (!res.ok) throw new Error();
+      setMsg("✅ Orden guardado correctamente");
+    } catch {
+      setMsg("❌ Error al guardar el orden");
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMsg(""), 3000);
+    }
+  };
 
   useEffect(() => {
     fetch(`${API}/permisos`, {
@@ -186,6 +275,20 @@ function GestorPermisos({ onBack, token }) {
     .rol-badge.operario { background:#e0eef8; color:#0a3a5c; }
     .perm-msg { font-size:12px; margin-left:auto; }
     .mod-separator td { background:#e8f4ff !important; font-weight:700; color:#0a3a5c; font-size:11px; letter-spacing:1px; padding:6px 12px; }
+    .orden-roles { display:flex; gap:8px; margin:14px 0 6px; flex-wrap:wrap; }
+    .orden-rol-tab { border:1px solid #cfe3f2; background:#fff; border-radius:6px; padding:4px 10px; cursor:pointer; }
+    .orden-rol-tab.active { border-color:#4361ee; background:#eef2ff; }
+    .orden-note { font-size:12px; color:#6699bb; margin-bottom:12px; }
+    .orden-lista { display:flex; flex-direction:column; gap:6px; max-width:420px; }
+    .orden-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid #e0eef8;
+      border-radius:6px; background:#f8fbff; cursor:grab; user-select:none; }
+    .orden-item.dragging { opacity:0.4; border-style:dashed; }
+    .orden-handle { color:#99bbcc; font-size:14px; }
+    .orden-label { flex:1; font-size:12px; color:#0a3a5c; font-weight:700; }
+    .orden-flechas { display:flex; gap:4px; }
+    .orden-flecha { width:22px; height:22px; border:1px solid #cfe3f2; background:#fff; border-radius:4px;
+      cursor:pointer; font-size:11px; line-height:1; }
+    .orden-flecha:disabled { opacity:0.3; cursor:default; }
   `;
 
   if (loading) return <div className="perm-wrap"><style>{PS}</style><p style={{color:"#99bbcc"}}>Cargando permisos...</p></div>;
@@ -255,6 +358,74 @@ function GestorPermisos({ onBack, token }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* ── Orden del Panel Principal ── */}
+      <div className="perm-header" style={{ marginTop: 36 }}>
+        <span className="perm-title">↕️ Orden del Panel Principal</span>
+        <button
+          className="perm-btn"
+          style={{ marginLeft: "auto" }}
+          onClick={guardarOrden}
+          disabled={saving}
+        >
+          {saving ? "Guardando..." : "💾 Guardar orden"}
+        </button>
+      </div>
+      <div className="orden-roles">
+        {ROLES.map((rol) => (
+          <button
+            key={rol}
+            className={`orden-rol-tab ${rol === rolOrden ? "active" : ""}`}
+            onClick={() => setRolOrden(rol)}
+          >
+            <span className={`rol-badge ${rol}`}>{rol.toUpperCase()}</span>
+          </button>
+        ))}
+      </div>
+      <p className="orden-note">
+        Arrastrá los botones para cambiar el orden en que aparecen en el panel
+        principal para el rol <strong>{rolOrden.toUpperCase()}</strong>.
+      </p>
+      <div className="orden-lista">
+        {(ordenPanel[rolOrden] ?? []).map((moduloId, i) => {
+          const boton = PANEL_BOTONES.find((b) => b.id === moduloId);
+          return (
+            <div
+              key={moduloId}
+              className={`orden-item ${arrastrando === i ? "dragging" : ""}`}
+              draggable
+              onDragStart={() => setArrastrando(i)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => {
+                if (arrastrando !== null && arrastrando !== i) {
+                  moverItem(rolOrden, arrastrando, i);
+                }
+                setArrastrando(null);
+              }}
+              onDragEnd={() => setArrastrando(null)}
+            >
+              <span className="orden-handle">⠿</span>
+              <span className="orden-label">{boton?.label ?? moduloId}</span>
+              <div className="orden-flechas">
+                <button
+                  className="orden-flecha"
+                  onClick={() => moverItem(rolOrden, i, i - 1)}
+                  disabled={i === 0}
+                >
+                  ↑
+                </button>
+                <button
+                  className="orden-flecha"
+                  onClick={() => moverItem(rolOrden, i, i + 1)}
+                  disabled={i === (ordenPanel[rolOrden]?.length ?? 0) - 1}
+                >
+                  ↓
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
