@@ -143,6 +143,13 @@ const buttons = [
     color: "#25d366",
     screen: "chat",
   },
+  {
+    id: 19,
+    label: "ASISTENCIA",
+    icon: "🕐",
+    color: "#6366f1",
+    screen: "anviz",
+  },
 ];
 
 const HOME_SECTIONS = {
@@ -1483,22 +1490,6 @@ function App() {
             </button>
             <p className="sub-title">⚙️ Administración</p>
             <div className="sub-grid">
-              {puedo("anviz", "ver") && (
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#6366f1" }}
-                onClick={() => {
-                  setScreen("anviz");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">🕐</span>
-                <span className="sub-card-label">ASISTENCIA</span>
-                <span className="sub-card-desc">
-                  Control de accesos y usuarios
-                </span>
-              </div>
-              )}
               {puedo("facturas", "ver") && (
               <div
                 className="sub-card"
