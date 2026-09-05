@@ -61,86 +61,43 @@ const SCREENS = {
   chat: { label: "CHAT", icon: "💬" },
 };
 
-const buttons = [
-  {
-    id: 1,
-    label: "CLIENTES",
-    icon: "👥",
-    color: "#eb56d7",
-    screen: "clientes",
-  },
-  {
-    id: 2,
-    label: "PRODUCTOS",
-    icon: "🛒",
-    color: "#ff6b6b",
-    screen: "productos",
-  },
-  {
-    id: 6,
-    label: "PRESUP. NUEVO",
-    icon: "📝",
-    color: "#ff9a3c",
-    screen: "presupuesto-nuevo",
-  },
-  {
-    id: 7,
-    label: "VER TABLAS",
-    icon: "🗃️",
-    color: "#00c9a7",
-    screen: "ver-tablas",
-  },
-  {
-    id: 14,
-    label: "LISTA PRESUPUESTOS",
-    icon: "⚡",
-    color: "#7b61ff",
-    screen: "lista-presupuestos-2",
-  },
-  {
-    id: 12,
-    label: "CLIENTES ACTIVOS",
-    icon: "💰",
-    color: "#e67e22",
-    screen: "cuenta-corriente",
-  },
-  {
-    id: 13,
-    label: "OBRAS CONFIRMADAS",
-    icon: "✅",
-    color: "#00b4d8",
-    screen: "obras-confirmadas",
-  },
+// Pantallas administrables desde el Gestor de Menú (VerTablas → Permisos).
+// `ubicacionDefault` es dónde aparece la pantalla si el rol todavía no tiene
+// una configuración guardada en `orden_panel`. `id` se usa también como
+// nombre de `screen`. Mantener sincronizado con el array `PANTALLAS_MENU`
+// de VerTablas.jsx si se agrega/saca alguna pantalla.
+const PANTALLAS_MENU = [
+  { id: "clientes", label: "CLIENTES", icon: "👥", color: "#eb56d7", ubicacionDefault: "principal" },
+  { id: "productos", label: "PRODUCTOS", icon: "🛒", color: "#ff6b6b", ubicacionDefault: "principal" },
+  { id: "presupuesto-nuevo", label: "PRESUP. NUEVO", icon: "📝", color: "#ff9a3c", ubicacionDefault: "principal" },
+  { id: "ver-tablas", label: "VER TABLAS", icon: "🗃️", color: "#00c9a7", ubicacionDefault: "principal" },
+  { id: "lista-presupuestos-2", label: "LISTA PRESUPUESTOS", icon: "⚡", color: "#7b61ff", ubicacionDefault: "principal" },
+  { id: "cuenta-corriente", label: "CLIENTES ACTIVOS", icon: "💰", color: "#e67e22", ubicacionDefault: "principal" },
+  { id: "obras-confirmadas", label: "OBRAS CONFIRMADAS", icon: "✅", color: "#00b4d8", ubicacionDefault: "principal" },
   {
     // TEMPORAL: pantalla de prueba del circuito React -> Node -> Python -> AFIP.
     // Borrar este bloque (y el import de arriba) cuando ya no haga falta.
-    id: 16,
+    id: "test-afip-facturar",
     label: "TEST AFIP",
     icon: "🧪",
     color: "#9b59b6",
-    screen: "test-afip-facturar",
+    ubicacionDefault: "principal",
   },
-  {
-    id: 15,
-    label: "PRODUCCIÓN",
-    icon: "🏭",
-    color: "#8d6e63",
-    screen: "produccion",
-  },
-  {
-    id: 17,
-    label: "VISOR 3D MÓDULOS",
-    icon: "📐",
-    color: "#00838f",
-    screen: "visor-dwg",
-  },
-  {
-    id: 18,
-    label: "CHAT",
-    icon: "💬",
-    color: "#25d366",
-    screen: "chat",
-  },
+  { id: "produccion", label: "PRODUCCIÓN", icon: "🏭", color: "#8d6e63", ubicacionDefault: "principal" },
+  { id: "visor-dwg", label: "VISOR 3D MÓDULOS", icon: "📐", color: "#00838f", ubicacionDefault: "principal" },
+  { id: "chat", label: "CHAT", icon: "💬", color: "#25d366", ubicacionDefault: "principal" },
+  { id: "presupuesto-mamparas", label: "PRESUPUESTO MAMPARAS", icon: "🪟", color: "#4895ef", ubicacionDefault: "lateral" },
+  { id: "presupuesto-muebles", label: "PRESUPUESTO MUEBLES", icon: "🪵", color: "#a0785a", ubicacionDefault: "lateral" },
+  { id: "presupuestos-tabla", label: "PRESUPUESTOS MAMPARAS", icon: "📋", color: "#4895ef", ubicacionDefault: "lateral" },
+  { id: "presupuestos-vanitory-tabla", label: "PRESUPUESTOS VANITORY", icon: "🛁", color: "#5390d9", ubicacionDefault: "lateral" },
+  { id: "presupuesto-amoblamiento", label: "PRESUPUESTO AMOBLAMIENTO", icon: "🪑", color: "#a0785a", ubicacionDefault: "lateral" },
+  { id: "lista-margenes", label: "LISTA DE MÁRGENES", icon: "📊", color: "#7209b7", ubicacionDefault: "lateral" },
+  { id: "mueble-especial", label: "MUEBLE ESPECIAL", icon: "🪚", color: "#a0785a", ubicacionDefault: "lateral" },
+  { id: "facturas", label: "FACTURAS COMPRA", icon: "🧾", color: "#27ae60", ubicacionDefault: "lateral" },
+  { id: "historial-facturas", label: "HISTORIAL FACTURAS", icon: "📋", color: "#16a085", ubicacionDefault: "lateral" },
+  { id: "afip-iva", label: "AFIP IVA", icon: "🏦", color: "#2980b9", ubicacionDefault: "lateral" },
+  { id: "usuarios", label: "USUARIOS", icon: "👤", color: "#c0392b", ubicacionDefault: "lateral" },
+  { id: "actualizar-precios", label: "ACTUALIZAR PRECIOS", icon: "💲", color: "#f1c40f", ubicacionDefault: "lateral" },
 ];
 
 const HOME_SECTIONS = {
@@ -236,7 +193,8 @@ function App() {
     return permisos?.[rol]?.[modulo]?.[accion] ?? false;
   };
 
-  // ── Orden del panel principal por rol ────────────────────
+  // ── Menú (Principal / Lateral) por rol ───────────────────
+  // ordenPanel[rol] = [{ modulo, ubicacion }, ...] en el orden guardado.
   const [ordenPanel, setOrdenPanel] = useState({});
 
   useEffect(() => {
@@ -246,11 +204,14 @@ function App() {
     })
       .then((r) => r.json())
       .then((rows) => {
-        // rows: [{ rol, modulo, orden }, ...]
+        // rows: [{ rol, modulo, orden, ubicacion }, ...]
         const map = {};
-        rows.forEach(({ rol, modulo, orden }) => {
+        rows.forEach(({ rol, modulo, orden, ubicacion }) => {
           map[rol] = map[rol] ?? [];
-          map[rol][orden] = modulo;
+          map[rol][orden] = {
+            modulo,
+            ubicacion: ubicacion === "principal" ? "principal" : "lateral",
+          };
         });
         const limpio = {};
         Object.keys(map).forEach((rol) => {
@@ -261,19 +222,26 @@ function App() {
       .catch(console.error);
   }, [token]);
 
-  // Reordena `buttons` según el orden guardado para el rol del usuario.
-  // Los botones que no estén en el orden guardado (screens nuevos, chat,
-  // test-afip-facturar, etc.) se agregan al final en su orden original.
-  const buttonsOrdenados = (() => {
+  // Arma la lista de pantallas para una columna ("principal" o "lateral"),
+  // respetando el orden guardado para el rol y agregando al final —en su
+  // ubicación por defecto— cualquier pantalla nueva que todavía no tenga
+  // configuración guardada. Solo incluye pantallas que el rol puede ver.
+  const pantallasPor = (ubicacion) => {
     const rol = usuario?.rol ?? "operario";
-    const orden = ordenPanel[rol];
-    if (!orden || orden.length === 0) return buttons;
-    const porScreen = new Map(buttons.map((b) => [b.screen, b]));
-    const ordenados = orden.map((screenId) => porScreen.get(screenId)).filter(Boolean);
-    const yaUsados = new Set(ordenados.map((b) => b.screen));
-    const faltantes = buttons.filter((b) => !yaUsados.has(b.screen));
-    return [...ordenados, ...faltantes];
-  })();
+    const guardado = ordenPanel[rol] ?? [];
+    const yaUsados = new Set(guardado.map((g) => g.modulo));
+    const faltantes = PANTALLAS_MENU.filter((p) => !yaUsados.has(p.id)).map(
+      (p) => ({ modulo: p.id, ubicacion: p.ubicacionDefault }),
+    );
+    return [...guardado, ...faltantes]
+      .filter((item) => item.ubicacion === ubicacion)
+      .map((item) => PANTALLAS_MENU.find((p) => p.id === item.modulo))
+      .filter(Boolean)
+      .filter((p) => puedo(p.id, "ver"));
+  };
+
+  const panelPrincipal = pantallasPor("principal");
+  const panelLateral = pantallasPor("lateral");
 
   // ── Proveedores ──────────────────────────────────────────
   const [proveedores, setProveedores] = useState([]);
@@ -787,11 +755,11 @@ function App() {
     setActive(btn.id);
     setTimeout(() => setActive(null), 300);
 
-    if (btn.screen) {
-      setScreen(btn.screen);
+    if (btn.id) {
+      setScreen(btn.id);
       addLog(`${btn.icon} Abriendo ${btn.label}`);
-      if (btn.screen === "presupuestos-tabla") fetchPresupuestosMamparas();
-      if (btn.screen === "lista-margenes") fetchListas();
+      if (btn.id === "presupuestos-tabla") fetchPresupuestosMamparas();
+      if (btn.id === "lista-margenes") fetchListas();
       return;
     }
 
@@ -947,42 +915,21 @@ function App() {
             </button>
             <div className="side-divider" />
             <h3>Navegación</h3>
-            {[
-              "clientes",
-              "productos",
-              "presupuesto-mamparas",
-              "presupuesto-muebles",
-              "presupuestos-tabla",
-              "presupuestos-vanitory-tabla",
-              "presupuesto-amoblamiento",
-              "presupuesto-nuevo",
-              "lista-presupuestos-2",
-              "ver-tablas",
-              "lista-margenes",
-              "mueble-especial",
-              "facturas",
-              "historial-facturas",
-              "afip-iva",
-              "usuarios",
-              "actualizar-precios",
-              "chat",
-            ]
-            .filter((s) => puedo(s, "ver"))
-            .map((s) => (
+            {panelLateral.map((p) => (
               <button
-                key={s}
-                className={`side-btn ${screen === s ? "active" : ""}`}
+                key={p.id}
+                className={`side-btn ${screen === p.id ? "active" : ""}`}
                 onClick={() => {
-                  setScreen(s);
-                  if (s === "presupuestos-tabla") fetchPresupuestosMamparas();
-                  if (s === "lista-margenes") fetchListas();
-                  if (s === "ver-tablas") setTablaInicialVerTablas(null);
+                  setScreen(p.id);
+                  if (p.id === "presupuestos-tabla") fetchPresupuestosMamparas();
+                  if (p.id === "lista-margenes") fetchListas();
+                  if (p.id === "ver-tablas") setTablaInicialVerTablas(null);
                   setSidebarOpen(false);
                 }}
-                title={SCREENS[s].label}
+                title={p.label}
               >
-                <span>{SCREENS[s].icon}</span>
-                <span className="btn-label">&nbsp;{SCREENS[s].label}</span>
+                <span>{p.icon}</span>
+                <span className="btn-label">&nbsp;{p.label}</span>
               </button>
             ))}
             <div className="side-divider" />
@@ -1451,9 +1398,7 @@ function App() {
               </div>
             </div>
             <div className="grid">
-              {buttonsOrdenados
-                .filter((btn) => puedo(btn.screen, "ver"))
-                .map((btn) => (
+              {panelPrincipal.map((btn) => (
                 <ActionButton
                   key={btn.id}
                   label={btn.label}
