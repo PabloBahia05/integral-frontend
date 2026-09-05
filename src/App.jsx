@@ -83,16 +83,13 @@ const PANTALLAS_MENU = [
   { id: "lista-margenes", label: "LISTA DE MÁRGENES", icon: "📊", color: "#7209b7", ubicacionDefault: "lateral" },
   { id: "mueble-especial", label: "MUEBLE ESPECIAL", icon: "🪚", color: "#a0785a", ubicacionDefault: "lateral" },
   { id: "facturas", label: "FACTURAS COMPRA", icon: "🧾", color: "#27ae60", ubicacionDefault: "lateral" },
+  { id: "facturas-venta", label: "FACTURAS EMITIDAS", icon: "🧮", color: "#16a085", ubicacionDefault: "lateral" },
   { id: "historial-facturas", label: "HISTORIAL FACTURAS", icon: "📋", color: "#16a085", ubicacionDefault: "lateral" },
   { id: "afip-iva", label: "AFIP IVA", icon: "🏦", color: "#2980b9", ubicacionDefault: "lateral" },
   { id: "usuarios", label: "USUARIOS", icon: "👤", color: "#c0392b", ubicacionDefault: "lateral" },
   { id: "actualizar-precios", label: "ACTUALIZAR PRECIOS", icon: "💲", color: "#f1c40f", ubicacionDefault: "lateral" },
+  { id: "vehiculos-mantenimiento", label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚", color: "#8d6e63", ubicacionDefault: "lateral" },
 ];
-
-const HOME_SECTIONS = {
-  main: "main",
-  admin: "admin",
-};
 
 export default function Root() {
   return (
@@ -124,7 +121,6 @@ function App() {
   const [log, setLog] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const [homeSection, setHomeSection] = useState(HOME_SECTIONS.main);
 
   const [clientes, setClientes] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -1301,21 +1297,6 @@ function App() {
         .data-summary { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
         .sum-chip { background: #fff; border: 1px solid #a0cce8; border-radius: 20px; padding: 4px 12px; font-size: 11px; color: #4a6a8c; }
         .sum-chip strong { color: #0a3a5c; }
-        .home-section-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 24px; }
-        .home-section-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 10px; background: #fff; border: 1px solid #a0cce8; border-radius: 4px; cursor: pointer; transition: all 0.15s; font-family: \'Space Mono\', monospace; font-size: 11px; color: #0a3a5c; letter-spacing: 1px; text-align: center; }
-        .home-section-card:hover { background: #0a3a5c; color: #fff; border-color: #0a3a5c; transform: translateY(-1px); }
-        .home-section-card .hs-icon { font-size: 22px; }
-        .sub-back { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; background: none; border: 1px solid #a0cce8; border-radius: 3px; padding: 6px 14px; cursor: pointer; font-family: \'Space Mono\', monospace; font-size: 12px; color: #0a3a5c; transition: all 0.15s; }
-        .sub-back:hover { background: #0a3a5c; color: #fff; }
-        .sub-title { font-family: \'Syne\', sans-serif; font-size: 20px; font-weight: 800; color: #0a3a5c; margin-bottom: 20px; }
-        .sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
-        .sub-card { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; background: #fff; border: 1px solid #a0cce8; border-radius: 3px; cursor: pointer; transition: all 0.15s; font-family: \'Space Mono\', monospace; }
-        .sub-card:hover { background: var(--sc-color); border-color: var(--sc-color); color: #fff; transform: translateY(-1px); }
-        .sub-card-icon { font-size: 20px; }
-        .sub-card-label { font-size: 12px; font-weight: 700; color: #0a3a5c; letter-spacing: 1px; }
-        .sub-card:hover .sub-card-label { color: #fff; }
-        .sub-card-desc { font-size: 11px; color: #6699bb; }
-        .sub-card:hover .sub-card-desc { color: #cce; }
         @keyframes fadeIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
 
         @media (max-width: 600px) {
@@ -1323,9 +1304,7 @@ function App() {
           .wrapper { width: 100%; max-width: 100vw; padding: 24px 16px; border-radius: 0; border-left: none; border-right: none; box-sizing: border-box; }
           .title { font-size: 20px; }
           .subtitle { font-size: 10px; letter-spacing: 2px; }
-          .home-section-cards { grid-template-columns: 1fr 1fr; }
           .grid { grid-template-columns: 1fr; }
-          .sub-grid { grid-template-columns: 1fr; }
           .data-summary { gap: 6px; }
           .sum-chip { font-size: 10px; padding: 3px 8px; }
           .top-bar { margin-bottom: 20px; }
@@ -1391,107 +1370,18 @@ function App() {
         )}
 
         {/* ── Sección principal ── */}
-        {homeSection === HOME_SECTIONS.main && (
-          <>
-            <div className="home-section-cards">
-              <div
-                className="home-section-card"
-                onClick={() => setHomeSection(HOME_SECTIONS.admin)}
-              >
-                <span className="hs-icon">⚙️</span>
-                ADMINISTRACIÓN
-              </div>
-            </div>
-            <div className="grid">
-              {panelPrincipal.map((btn) => (
-                <ActionButton
-                  key={btn.id}
-                  label={btn.label}
-                  icon={btn.icon}
-                  color={btn.color}
-                  isActive={active === btn.id}
-                  onClick={() => handlePanelButton(btn)}
-                />
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* ── Administración ── */}
-        {homeSection === HOME_SECTIONS.admin && (
-          <>
-            <button
-              className="sub-back"
-              onClick={() => setHomeSection(HOME_SECTIONS.main)}
-            >
-              ← Volver
-            </button>
-            <p className="sub-title">⚙️ Administración</p>
-            <div className="sub-grid">
-              {puedo("facturas", "ver") && (
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#27ae60" }}
-                onClick={() => {
-                  setScreen("facturas");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">🧾</span>
-                <span className="sub-card-label">FACTURAS COMPRA</span>
-                <span className="sub-card-desc">Gestión de comprobantes</span>
-              </div>
-              )}
-              {puedo("facturas-venta", "ver") && (
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#16a085" }}
-                onClick={() => {
-                  setScreen("facturas-venta");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">🧮</span>
-                <span className="sub-card-label">FACTURAS EMITIDAS</span>
-                <span className="sub-card-desc">CAE, QR AFIP y PDF de ventas</span>
-              </div>
-              )}
-              {puedo("ver-tablas", "ver") && (
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#e67e22" }}
-                onClick={() => {
-                  setTablaInicialVerTablas("proveedores");
-                  setScreen("ver-tablas");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">🏭</span>
-                <span className="sub-card-label">PROVEEDORES</span>
-                <span className="sub-card-desc">
-                  PlacaSur, Aglolam, Cantochap
-                </span>
-              </div>
-              )}
-              {puedo("vehiculos-mantenimiento", "ver") && (
-              <div
-                className="sub-card"
-                style={{ "--sc-color": "#8d6e63" }}
-                onClick={() => {
-                  setScreen("vehiculos-mantenimiento");
-                  setHomeSection(HOME_SECTIONS.main);
-                }}
-              >
-                <span className="sub-card-icon">🚚</span>
-                <span className="sub-card-label">VEHÍCULOS - MANTENIMIENTO</span>
-                <span className="sub-card-desc">
-                  Registros de mantenimiento y costos
-                </span>
-              </div>
-              )}
-            </div>
-          </>
-        )}
+        <div className="grid">
+          {panelPrincipal.map((btn) => (
+            <ActionButton
+              key={btn.id}
+              label={btn.label}
+              icon={btn.icon}
+              color={btn.color}
+              isActive={active === btn.id}
+              onClick={() => handlePanelButton(btn)}
+            />
+          ))}
+        </div>
 
         {/* ── Facturas ── */}
         <div className="log">
