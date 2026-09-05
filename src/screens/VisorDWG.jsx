@@ -73,6 +73,7 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
   const panelMeshRef = useRef(null);
   const edgesSolidRef = useRef(null);
   const edgesWireRef = useRef(null);
+  const outlineGroupRef = useRef(null);
   const textGroupRef = useRef(null);
 
   // Modo standalone: si el `file` que nos pasan desde afuera cambia, lo
@@ -235,16 +236,17 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
     scene.add(edgesSolid);
     edgesSolidRef.current = edgesSolid;
 
-    // Aristas "completas" (umbral 1°, todas las líneas del contorno real):
-    // el modo "Líneas (CAD)" — arranca oculto, se muestra al togglear.
-    // Verde porque es el color estándar de las líneas de contorno/corte en
-    // el CAD original (no viene del DXF: los 3DSOLID no traen ese dato,
-    // ver nota en converter.py — es una aproximación visual fija).
+    // Aristas "completas" (umbral 1°, todas las líneas del contorno real
+    // derivado del sólido — envolvente convexa): fallback para modelos
+    // guardados ANTES de que el conversor capturara los contornos reales
+    // (LWPOLYLINE, ver bloque "outlineGroup" más abajo). Si el modelo ya
+    // trae esos contornos reales, esta capa queda oculta.
+    const hasOutlines = Array.isArray(meta.outlines) && meta.outlines.length > 0;
     const edgesWire = new THREE.LineSegments(
       new THREE.EdgesGeometry(panelGeo, 1),
       new THREE.LineBasicMaterial({ color: 0x33cc33 })
     );
-    edgesWire.visible = viewMode === "lineas";
+    edgesWire.visible = viewMode === "lineas" && !hasOutlines;
     scene.add(edgesWire);
     edgesWireRef.current = edgesWire;
 
@@ -293,6 +295,31 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
       scene.add(holeEdges);
       holeEdgesRef.current = holeEdges;
     }
+
+    // --- Contorno real del CAD (LWPOLYLINE, con el color real de su capa) ---
+    // Reemplaza el contorno genérico de arriba (edgesWire) cuando el JSON
+    // trae estas líneas — es fiel al dibujo original (verde/cyan/magenta
+    // según la capa TCHW####), no una aproximación. Si el modelo se
+    // guardó antes de este cambio, `meta.outlines` no existe y queda
+    // oculto (fallback a edgesWire).
+    let outlineGroup = null;
+    if (hasOutlines) {
+      outlineGroup = new THREE.Group();
+      meta.outlines.forEach((o) => {
+        if (!o.points || o.points.length < 2) return;
+        const pts = o.points.map(
+          (p) => new THREE.Vector3(p[0] - center.x, p[1] - center.y, p[2] - center.z)
+        );
+        const geo = new THREE.BufferGeometry().setFromPoints(pts);
+        const mat = new THREE.LineBasicMaterial({
+          color: new THREE.Color(o.color[0], o.color[1], o.color[2]),
+        });
+        outlineGroup.add(o.closed ? new THREE.LineLoop(geo, mat) : new THREE.Line(geo, mat));
+      });
+      outlineGroup.visible = viewMode === "lineas";
+      scene.add(outlineGroup);
+    }
+    outlineGroupRef.current = outlineGroup;
 
     // --- Etiquetas de texto (sprites canvas, siempre miran a cámara) ---
     function makeTextSprite(text) {
@@ -430,9 +457,11 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
   }, [status, meta]);
 
   useEffect(() => {
+    const hasOutlines = !!outlineGroupRef.current;
     if (panelMeshRef.current) panelMeshRef.current.visible = viewMode === "solido";
     if (edgesSolidRef.current) edgesSolidRef.current.visible = viewMode === "solido";
-    if (edgesWireRef.current) edgesWireRef.current.visible = viewMode === "lineas";
+    if (edgesWireRef.current) edgesWireRef.current.visible = viewMode === "lineas" && !hasOutlines;
+    if (outlineGroupRef.current) outlineGroupRef.current.visible = viewMode === "lineas";
     if (holeMeshRef.current) holeMeshRef.current.visible = holesVisible && viewMode === "solido";
     if (holeEdgesRef.current) holeEdgesRef.current.visible = holesVisible && viewMode === "lineas";
   }, [viewMode, holesVisible]);
