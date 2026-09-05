@@ -37,7 +37,12 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
   const [file, setFile] = useState(externalFile ?? null);
   const [holesVisible, setHolesVisible] = useState(true);
   const [textsVisible, setTextsVisible] = useState(true);
+  const [viewMode, setViewMode] = useState("solido"); // "solido" | "lineas"
   const holeMeshRef = useRef(null);
+  const holeEdgesRef = useRef(null);
+  const panelMeshRef = useRef(null);
+  const edgesSolidRef = useRef(null);
+  const edgesWireRef = useRef(null);
   const textGroupRef = useRef(null);
 
   // Modo standalone: si el `file` que nos pasan desde afuera cambia, lo
@@ -185,12 +190,30 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
     const panelMat = new THREE.MeshStandardMaterial({
       vertexColors: true, roughness: 0.7, metalness: 0.04, side: THREE.DoubleSide,
     });
-    scene.add(new THREE.Mesh(panelGeo, panelMat));
+    const panelMesh = new THREE.Mesh(panelGeo, panelMat);
+    panelMesh.visible = viewMode === "solido";
+    scene.add(panelMesh);
+    panelMeshRef.current = panelMesh;
 
-    const edges = new THREE.EdgesGeometry(panelGeo, 25);
-    scene.add(new THREE.LineSegments(
-      edges, new THREE.LineBasicMaterial({ color: 0x2b2418, opacity: 0.3, transparent: true })
-    ));
+    // Aristas "sutiles" (solo entre caras con ángulo pronunciado, umbral 25°):
+    // se usan como refuerzo visual sobre el sólido, modo por default.
+    const edgesSolid = new THREE.LineSegments(
+      new THREE.EdgesGeometry(panelGeo, 25),
+      new THREE.LineBasicMaterial({ color: 0x2b2418, opacity: 0.3, transparent: true })
+    );
+    edgesSolid.visible = viewMode === "solido";
+    scene.add(edgesSolid);
+    edgesSolidRef.current = edgesSolid;
+
+    // Aristas "completas" (umbral 1°, todas las líneas del contorno real):
+    // el modo "Líneas (CAD)" — arranca oculto, se muestra al togglear.
+    const edgesWire = new THREE.LineSegments(
+      new THREE.EdgesGeometry(panelGeo, 1),
+      new THREE.LineBasicMaterial({ color: 0xe8eef5 })
+    );
+    edgesWire.visible = viewMode === "lineas";
+    scene.add(edgesWire);
+    edgesWireRef.current = edgesWire;
 
     // --- Agujeros ---
     let holeMesh = null;
@@ -204,8 +227,17 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
         holeGeo,
         new THREE.MeshStandardMaterial({ color: 0x1c1a16, roughness: 0.9, metalness: 0.1 })
       );
+      holeMesh.visible = viewMode === "solido";
       scene.add(holeMesh);
       holeMeshRef.current = holeMesh;
+
+      const holeEdges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(holeGeo, 1),
+        new THREE.LineBasicMaterial({ color: 0xe8eef5 })
+      );
+      holeEdges.visible = viewMode === "lineas";
+      scene.add(holeEdges);
+      holeEdgesRef.current = holeEdges;
     }
 
     // --- Etiquetas de texto (sprites canvas, siempre miran a cámara) ---
@@ -344,8 +376,12 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
   }, [status, meta]);
 
   useEffect(() => {
-    if (holeMeshRef.current) holeMeshRef.current.visible = holesVisible;
-  }, [holesVisible]);
+    if (panelMeshRef.current) panelMeshRef.current.visible = viewMode === "solido";
+    if (edgesSolidRef.current) edgesSolidRef.current.visible = viewMode === "solido";
+    if (edgesWireRef.current) edgesWireRef.current.visible = viewMode === "lineas";
+    if (holeMeshRef.current) holeMeshRef.current.visible = holesVisible && viewMode === "solido";
+    if (holeEdgesRef.current) holeEdgesRef.current.visible = holesVisible && viewMode === "lineas";
+  }, [viewMode, holesVisible]);
 
   useEffect(() => {
     if (textGroupRef.current) textGroupRef.current.visible = textsVisible;
@@ -392,6 +428,20 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
             )}
           </div>
           <div style={{ position: "absolute", top: 12, right: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                style={{ ...buttonStyle, flex: 1, ...(viewMode === "solido" ? activeButtonStyle : {}) }}
+                onClick={() => setViewMode("solido")}
+              >
+                Sólido
+              </button>
+              <button
+                style={{ ...buttonStyle, flex: 1, ...(viewMode === "lineas" ? activeButtonStyle : {}) }}
+                onClick={() => setViewMode("lineas")}
+              >
+                Líneas (CAD)
+              </button>
+            </div>
             <button style={buttonStyle} onClick={() => setHolesVisible((v) => !v)}>
               {holesVisible ? "Ocultar" : "Mostrar"} perforaciones
             </button>
@@ -423,4 +473,9 @@ const buttonStyle = {
   background: "rgba(20,22,28,0.65)",
   color: "#cfd3da", border: "1px solid #3a3f4a", borderRadius: 8,
   padding: "8px 12px", fontSize: 12, cursor: "pointer",
+};
+const activeButtonStyle = {
+  background: "#2b6cb0",
+  color: "#fff",
+  borderColor: "#2b6cb0",
 };
