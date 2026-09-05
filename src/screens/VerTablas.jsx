@@ -69,6 +69,7 @@ const MODULOS = [
   { id: "vehiculos-mantenimiento",   label: "Vehículos - Mantenim.",  acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "cuenta-corriente",          label: "Clientes Activos",       acciones: ["ver", "editar"] },
   { id: "visor-dwg",                 label: "Visor 3D Módulos",       acciones: ["ver"] },
+  { id: "chat",                      label: "Chat",                   acciones: ["ver"] },
   { id: "usuarios",                  label: "Usuarios",               acciones: ["ver", "crear", "editar", "eliminar"] },
 ];
 // NOTA: los módulos nuevos (actualizar-precios, presupuesto-muebles,
@@ -90,6 +91,7 @@ const PANEL_BOTONES = [
   { id: "obras-confirmadas", label: "Obras Confirmadas" },
   { id: "produccion", label: "Producción" },
   { id: "visor-dwg", label: "Visor 3D Módulos" },
+  { id: "chat", label: "Chat" },
 ];
 
 // ── Componente Permisos ──────────────────────────────────────────────────────
