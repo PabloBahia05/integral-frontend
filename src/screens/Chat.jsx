@@ -15,7 +15,15 @@ import { useState, useEffect, useRef, useCallback } from "react";
  * visible desde cualquier pantalla, esta conexión conviene subirla a
  * App.jsx / un contexto global en vez de vivir acá.
  */
-export default function Chat({ authFetch, token, usuario, API }) {
+export default function Chat({
+  authFetch,
+  token,
+  usuario,
+  API,
+  conversacionInicial,
+  onConversacionInicialUsada,
+  onConversacionActivaChange,
+}) {
   const [usuarios, setUsuarios] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
   const [mensajes, setMensajes] = useState([]);
@@ -42,6 +50,24 @@ export default function Chat({ authFetch, token, usuario, API }) {
   useEffect(() => {
     cargarUsuarios();
   }, [cargarUsuarios]);
+
+  // Si venimos de "Responder" en el aviso global de mensaje, abrimos esa
+  // conversación apenas tengamos la lista de usuarios cargada.
+  useEffect(() => {
+    if (!conversacionInicial || usuarios.length === 0) return;
+    const u = usuarios.find((x) => x.id === conversacionInicial);
+    if (u) seleccionarUsuario(u);
+    onConversacionInicialUsada?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversacionInicial, usuarios]);
+
+  // Avisa a App.jsx qué conversación está abierta, para que el aviso
+  // global de mensajes no interrumpa si ya se está viendo esa charla.
+  useEffect(() => {
+    onConversacionActivaChange?.(seleccionado?.id ?? null);
+    return () => onConversacionActivaChange?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seleccionado]);
 
   // Conexión WebSocket — token por query string porque el WebSocket nativo
   // no permite mandar headers custom (Authorization).
