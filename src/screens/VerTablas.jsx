@@ -92,7 +92,6 @@ const PANTALLAS_MENU = [
   { id: "produccion", label: "Producción", icon: "🏭", ubicacionDefault: "principal" },
   { id: "visor-dwg", label: "Visor 3D Módulos", icon: "📐", ubicacionDefault: "principal" },
   { id: "chat", label: "Chat", icon: "💬", ubicacionDefault: "principal" },
-  { id: "test-afip-facturar", label: "Test AFIP Facturar", icon: "🧪", ubicacionDefault: "principal" }, // TEMPORAL
   { id: "presupuesto-mamparas", label: "Presup. Mamparas", icon: "🪟", ubicacionDefault: "lateral" },
   { id: "presupuesto-muebles", label: "Presup. Muebles", icon: "🪵", ubicacionDefault: "lateral" },
   { id: "presupuestos-tabla", label: "Lista Presup. Mamparas", icon: "📋", ubicacionDefault: "lateral" },
