@@ -14,6 +14,7 @@ import PresupuestoNuevo from "./screens/PresupuestoNuevo";
 import ListaPresupuestos from "./screens/ListaPresupuestos";
 import ObrasConfirmadas from "./screens/ObrasConfirmadas";
 import Produccion from "./screens/Produccion";
+import Chat from "./screens/Chat";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
 import FacturasVenta from "./screens/FacturasVenta";
@@ -23,6 +24,7 @@ import AfipIVA from "./screens/AfipIVA";
 import ActualizarPreciosExcel from "./screens/ActualizarPreciosExcel";
 import VehiculosMantenimiento from "./screens/VehiculosMantenimiento";
 import CuentaCorriente from "./screens/CuentaCorriente";
+import TestFacturacionAFIP from "./screens/TestFacturacionAFIP"; // TEMPORAL: pantalla de prueba AFIP, borrar cuando ya no haga falta
 import VisorDWGPage from "./screens/VisorDWGPage";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
@@ -56,7 +58,9 @@ const SCREENS = {
   "actualizar-precios": { label: "ACTUALIZAR PRECIOS", icon: "💲" },
   "vehiculos-mantenimiento": { label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚" },
   "cuenta-corriente": { label: "CLIENTES ACTIVOS", icon: "💰" },
+  "test-afip-facturar": { label: "TEST AFIP FACTURAR", icon: "🧪" }, // TEMPORAL
   "visor-dwg": { label: "VISOR 3D MÓDULOS", icon: "📐" },
+  chat: { label: "CHAT", icon: "💬" },
 };
 
 const buttons = [
@@ -110,6 +114,15 @@ const buttons = [
     screen: "obras-confirmadas",
   },
   {
+    // TEMPORAL: pantalla de prueba del circuito React -> Node -> Python -> AFIP.
+    // Borrar este bloque (y el import de arriba) cuando ya no haga falta.
+    id: 16,
+    label: "TEST AFIP",
+    icon: "🧪",
+    color: "#9b59b6",
+    screen: "test-afip-facturar",
+  },
+  {
     id: 15,
     label: "PRODUCCIÓN",
     icon: "🏭",
@@ -122,6 +135,13 @@ const buttons = [
     icon: "📐",
     color: "#00838f",
     screen: "visor-dwg",
+  },
+  {
+    id: 18,
+    label: "CHAT",
+    icon: "💬",
+    color: "#25d366",
+    screen: "chat",
   },
 ];
 
@@ -210,39 +230,6 @@ function App() {
       })
       .catch(console.error);
   }, [token]);
-
-  // ── Orden del panel principal (por rol) ──────────────────
-  const [ordenPanel, setOrdenPanel] = useState({});
-
-  useEffect(() => {
-    if (!token) return;
-    fetch(`${API}/orden-panel`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.json())
-      .then((rows) => {
-        const map = {};
-        rows.forEach(({ rol, modulo, orden }) => {
-          map[rol] = map[rol] ?? {};
-          map[rol][modulo] = orden;
-        });
-        setOrdenPanel(map);
-      })
-      .catch(console.error);
-  }, [token]);
-
-  // ordena `buttons` según el orden guardado para el rol actual;
-  // los botones sin orden guardado quedan al final, en el orden original
-  const ordenarPorRol = (lista) => {
-    const rol = usuario?.rol ?? "operario";
-    const mapaOrden = ordenPanel?.[rol];
-    if (!mapaOrden) return lista;
-    return [...lista].sort((a, b) => {
-      const oa = mapaOrden[a.screen] ?? 9999;
-      const ob = mapaOrden[b.screen] ?? 9999;
-      return oa - ob;
-    });
-  };
 
   // puedo("productos", "crear") → true/false
   const puedo = (modulo, accion) => {
@@ -942,6 +929,7 @@ function App() {
               "afip-iva",
               "usuarios",
               "actualizar-precios",
+              "chat",
             ]
             .filter((s) => puedo(s, "ver"))
             .map((s) => (
@@ -1143,6 +1131,9 @@ function App() {
             {screen === "produccion" && (
               <Produccion authFetch={authFetch} token={token} />
             )}
+            {screen === "chat" && (
+              <Chat authFetch={authFetch} token={token} usuario={usuario} API={API} />
+            )}
             {screen === "presupuesto-amoblamiento" &&
               amoblamientoVista === "selector" && (
                 <PresupuestoAmoblamiento
@@ -1229,7 +1220,6 @@ function App() {
                 semanasAnio={semanasAnio}
                 tablaInicial={tablaInicialVerTablas}
                 token={token}
-                puedo={puedo}
               />
             )}
 
@@ -1255,6 +1245,11 @@ function App() {
                 }}
                 onBack={() => setScreen(null)}
               />
+            )}
+
+            {/* ── Test Facturación AFIP (TEMPORAL, borrar cuando ya no haga falta) ── */}
+            {screen === "test-afip-facturar" && (
+              <TestFacturacionAFIP authFetch={authFetch} />
             )}
 
             {/* ── Visor 3D DWG/DXF ── */}
@@ -1381,11 +1376,6 @@ function App() {
           <div>
             <h1 className="title">Panel de Control</h1>
             <p className="subtitle">Sistema integral</p>
-            <p className="subtitle" style={{ marginTop: 2 }}>
-              👤 {usuario?.nombre ?? usuario?.usuario ?? usuario?.email ?? "—"}
-              {" · "}
-              <span style={{ textTransform: "uppercase" }}>{usuario?.rol ?? "—"}</span>
-            </p>
           </div>
           <button className="menu-btn" onClick={() => setSidebarOpen(true)}>
             ☰
@@ -1425,7 +1415,7 @@ function App() {
               </div>
             </div>
             <div className="grid">
-              {ordenarPorRol(buttons)
+              {buttons
                 .filter((btn) => puedo(btn.screen, "ver"))
                 .map((btn) => (
                 <ActionButton
