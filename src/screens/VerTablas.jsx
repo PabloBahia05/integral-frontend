@@ -18,7 +18,6 @@ import Proveedores from "./Proveedores";
 import Feriados from "./Feriados";
 import SemanasAnio from "./SemanasAnio";
 import UsuariosApp from "./UsuariosApp";
-import Anviz from "./Anviz";
 import Usuarios from "./Usuarios";
 import Selector from "./Selector";
 import {
@@ -60,12 +59,11 @@ const MODULOS = [
       "clientes", "productos", "escritorio-tipos", "despensero-tipos",
       "formulas", "margen", "presupuestos-mamparas-tabla", "presupuestos-puertas-tabla",
       "colocacion", "asociaciones", "asociaciones-form", "form-std", "asoc-form-std",
-      "lista", "feriados", "semanas-anio", "usuarios-app", "anviz", "permisos",
+      "lista", "feriados", "semanas-anio", "usuarios-app", "permisos",
       "selector", "texto-sena",
     ],
   },
   { id: "lista-margenes",            label: "Lista Márgenes",         acciones: ["ver", "editar"] },
-  { id: "anviz",                     label: "Asistencia",             acciones: ["ver", "crear", "eliminar"] },
   { id: "vehiculos-mantenimiento",   label: "Vehículos - Mantenim.",  acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "cuenta-corriente",          label: "Clientes Activos",       acciones: ["ver", "editar"] },
   { id: "visor-dwg",                 label: "Visor 3D Módulos",       acciones: ["ver"] },
@@ -92,7 +90,6 @@ const PANEL_BOTONES = [
   { id: "produccion", label: "Producción" },
   { id: "visor-dwg", label: "Visor 3D Módulos" },
   { id: "chat", label: "Chat" },
-  { id: "anviz", label: "Asistencia" },
 ];
 
 // ── Componente Permisos ──────────────────────────────────────────────────────
@@ -756,7 +753,6 @@ const TABLAS = [
   { id: "feriados", label: "Feriados", icon: "📅", color: "#ffb703" },
   { id: "semanas-anio", label: "Semanas y Horas Esperadas", icon: "🗓️", color: "#3a86ff" },
   { id: "usuarios-app", label: "Usuarios App",    icon: "🔐", color: "#e63946" },
-  { id: "anviz",        label: "Accesos Anviz",   icon: "🕐", color: "#0a7a3c" },
   { id: "permisos",     label: "Permisos por Rol", icon: "🛡️", color: "#6366f1" },
   { id: "selector",     label: "Selector",         icon: "🎛️", color: "#118ab2" },
   { id: "texto-sena",   label: "Texto de Seña",    icon: "✍️", color: "#ff9f1c" },
@@ -1121,14 +1117,6 @@ export default function VerTablas({
       <div>
         {back}
         <UsuariosApp token={token} />
-      </div>
-    );
-
-  // ── anviz ──
-  if (tablaActiva === "anviz")
-    return (
-      <div>
-        <Anviz onBack={volver} />
       </div>
     );
 
