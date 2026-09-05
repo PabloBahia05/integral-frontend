@@ -1119,7 +1119,7 @@ function App() {
               />
             )}
             {screen === "produccion" && (
-              <Produccion authFetch={authFetch} />
+              <Produccion authFetch={authFetch} token={token} />
             )}
             {screen === "presupuesto-amoblamiento" &&
               amoblamientoVista === "selector" && (
