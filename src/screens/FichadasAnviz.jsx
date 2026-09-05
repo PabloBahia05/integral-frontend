@@ -62,14 +62,18 @@ function asignarDirecciones(fichadas) {
 }
 
 // ─── Fetcher genérico ────────────────────────────────────────────────────────
-async function apiFetch(path) {
-  const res = await fetch(`${API}${path}`);
+// Todas las rutas del backend requieren `Authorization: Bearer <token>`
+// (ver server.js: authMiddleware global, excepto /login y /anviz/*), así que
+// este componente necesita recibir el token de sesión para poder llamarlas.
+async function apiFetch(path, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`${API}${path}`, { headers });
   if (!res.ok) throw new Error(`HTTP ${res.status} en ${path}`);
   return res.json();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function FichadasAnviz() {
+export default function FichadasAnviz({ token, onBack }) {
   // ── Estado principal ───────────────────────────────────────────────────────
   const [fichadas, setFichadas] = useState([]);
   const [usuarios, setUsuarios] = useState([]); // para el <select>
@@ -97,10 +101,10 @@ export default function FichadasAnviz() {
   const cargarPresencia = useCallback(async () => {
     try {
       const params = new URLSearchParams({ fecha_desde: hoy(), fecha_hasta: hoy(), limit: 1000 });
-      const data = await apiFetch(`/fichadas?${params}`);
+      const data = await apiFetch(`/fichadas?${params}`, token);
       setFichadasHoy(asignarDirecciones(Array.isArray(data) ? data : []));
     } catch {}
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     cargarPresencia();
@@ -111,10 +115,10 @@ export default function FichadasAnviz() {
 
   // ── Cargar usuarios (una vez) ──────────────────────────────────────────────
   useEffect(() => {
-    apiFetch("/empleados")
+    apiFetch("/empleados", token)
       .then(setUsuarios)
       .catch(() => {});
-  }, []);
+  }, [token]);
 
   // ── Cargar fichadas ────────────────────────────────────────────────────────
   const cargarFichadas = useCallback(async () => {
@@ -126,7 +130,7 @@ export default function FichadasAnviz() {
       if (filtroHasta) params.set("fecha_hasta", filtroHasta);
       if (filtroUser) params.set("user_id", filtroUser);
 
-      const data = await apiFetch(`/fichadas?${params}`);
+      const data = await apiFetch(`/fichadas?${params}`, token);
       setFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
       setUltimoSync(new Date());
       setPagina(1);
@@ -135,7 +139,7 @@ export default function FichadasAnviz() {
     } finally {
       setCargando(false);
     }
-  }, [filtroDesde, filtroHasta, filtroUser]);
+  }, [filtroDesde, filtroHasta, filtroUser, token]);
 
   useEffect(() => {
     cargarFichadas();
@@ -145,14 +149,14 @@ export default function FichadasAnviz() {
   useEffect(() => {
     const poll = async () => {
       try {
-        const data = await apiFetch("/anviz/status");
+        const data = await apiFetch("/anviz/status", token);
         setAgente(data);
       } catch {}
     };
     poll();
     const iv = setInterval(poll, 30_000);
     return () => clearInterval(iv);
-  }, []);
+  }, [token]);
 
   // ── WebSocket: recibir fichadas en tiempo real ─────────────────────────────
   useEffect(() => {
@@ -262,6 +266,11 @@ export default function FichadasAnviz() {
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div style={s.header}>
         <div style={s.headerLeft}>
+          {onBack && (
+            <button style={s.btnIcon} onClick={onBack} title="Volver">
+              ←
+            </button>
+          )}
           <div style={s.iconBox}>
             <IconReloj />
           </div>

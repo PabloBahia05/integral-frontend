@@ -68,6 +68,8 @@ const MODULOS = [
   { id: "cuenta-corriente",          label: "Clientes Activos",       acciones: ["ver", "editar"] },
   { id: "visor-dwg",                 label: "Visor 3D Módulos",       acciones: ["ver"] },
   { id: "chat",                      label: "Chat",                   acciones: ["ver"] },
+  { id: "asistencia",                label: "Asistencia",             acciones: ["ver"] },
+  { id: "fichadas",                  label: "Control de Fichadas",    acciones: ["ver"] },
   { id: "usuarios",                  label: "Usuarios",               acciones: ["ver", "crear", "editar", "eliminar"] },
 ];
 // NOTA: los módulos nuevos (actualizar-precios, presupuesto-muebles,
@@ -106,6 +108,8 @@ const PANTALLAS_MENU = [
   { id: "usuarios", label: "Usuarios", icon: "👤", ubicacionDefault: "lateral" },
   { id: "actualizar-precios", label: "Actualizar Precios", icon: "💲", ubicacionDefault: "lateral" },
   { id: "vehiculos-mantenimiento", label: "Vehículos - Mantenim.", icon: "🚚", ubicacionDefault: "lateral" },
+  { id: "asistencia", label: "Asistencia", icon: "⏰", ubicacionDefault: "lateral" },
+  { id: "fichadas", label: "Control de Fichadas", icon: "🕒", ubicacionDefault: "lateral" },
 ];
 
 // ── Componente Permisos ──────────────────────────────────────────────────────
