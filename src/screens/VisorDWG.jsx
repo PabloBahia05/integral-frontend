@@ -237,9 +237,12 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
 
     // Aristas "completas" (umbral 1°, todas las líneas del contorno real):
     // el modo "Líneas (CAD)" — arranca oculto, se muestra al togglear.
+    // Verde porque es el color estándar de las líneas de contorno/corte en
+    // el CAD original (no viene del DXF: los 3DSOLID no traen ese dato,
+    // ver nota en converter.py — es una aproximación visual fija).
     const edgesWire = new THREE.LineSegments(
       new THREE.EdgesGeometry(panelGeo, 1),
-      new THREE.LineBasicMaterial({ color: 0xe8eef5 })
+      new THREE.LineBasicMaterial({ color: 0x33cc33 })
     );
     edgesWire.visible = viewMode === "lineas";
     scene.add(edgesWire);
