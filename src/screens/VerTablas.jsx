@@ -137,12 +137,21 @@ function GestorPermisos({ onBack, token }) {
   }, []);
 
   const moverItem = (rol, desde, hasta) => {
-    if (hasta < 0 || hasta >= (ordenPanel[rol]?.length ?? 0)) return;
     setOrdenPanel((prev) => {
-      const lista = [...(prev[rol] ?? [])];
-      const [item] = lista.splice(desde, 1);
-      lista.splice(hasta, 0, item);
-      return { ...prev, [rol]: lista };
+      const todas = prev[rol] ?? [];
+      const slots = [];
+      todas.forEach((id, idx) => {
+        if (rol === "admin" || get(rol, id, "ver")) slots.push(idx);
+      });
+      if (hasta < 0 || hasta >= slots.length) return prev;
+      const visibles = slots.map((idx) => todas[idx]);
+      const [item] = visibles.splice(desde, 1);
+      visibles.splice(hasta, 0, item);
+      const nuevoTodas = [...todas];
+      slots.forEach((idx, i) => {
+        nuevoTodas[idx] = visibles[i];
+      });
+      return { ...prev, [rol]: nuevoTodas };
     });
   };
 
@@ -216,6 +225,11 @@ function GestorPermisos({ onBack, token }) {
     (ordenTablas[rol] ?? []).filter(
       (tablaId) => rol === "admin" || get(rol, "ver-tablas-botones", tablaId),
     );
+
+  // Subconjunto de ordenPanel[rol] que ese rol tiene permitido ver
+  // (permiso "ver" del módulo correspondiente), en el orden guardado.
+  const visiblesPanel = (rol) =>
+    (ordenPanel[rol] ?? []).filter((id) => rol === "admin" || get(rol, id, "ver"));
 
   // Mueve una pantalla dentro del subconjunto visible para `rol` (índices
   // relativos a ese subconjunto), preservando la posición de las pantallas
@@ -478,10 +492,11 @@ function GestorPermisos({ onBack, token }) {
       </div>
       <p className="orden-note">
         Arrastrá los botones para cambiar el orden en que aparecen en el panel
-        principal para el rol <strong>{rolOrden.toUpperCase()}</strong>.
+        principal para el rol <strong>{rolOrden.toUpperCase()}</strong>. Solo
+        se listan los botones que ese rol tiene permitido ver.
       </p>
       <div className="orden-lista">
-        {(ordenPanel[rolOrden] ?? []).map((moduloId, i) => {
+        {visiblesPanel(rolOrden).map((moduloId, i, arr) => {
           const boton = PANEL_BOTONES.find((b) => b.id === moduloId);
           return (
             <div
@@ -511,7 +526,7 @@ function GestorPermisos({ onBack, token }) {
                 <button
                   className="orden-flecha"
                   onClick={() => moverItem(rolOrden, i, i + 1)}
-                  disabled={i === (ordenPanel[rolOrden]?.length ?? 0) - 1}
+                  disabled={i === arr.length - 1}
                 >
                   ↓
                 </button>
@@ -519,6 +534,12 @@ function GestorPermisos({ onBack, token }) {
             </div>
           );
         })}
+        {visiblesPanel(rolOrden).length === 0 && (
+          <p className="orden-note">
+            El rol {rolOrden.toUpperCase()} no tiene ningún botón permitido en
+            el panel principal.
+          </p>
+        )}
       </div>
 
       {/* ── Orden de Pantallas dentro de "Ver Tablas" ── */}
