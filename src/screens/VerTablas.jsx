@@ -77,19 +77,34 @@ const MODULOS = [
 // confirmadas contra cada pantalla real — ajustar si alguna no coincide
 // con los botones que esa pantalla realmente tiene.
 
-// Botones del panel principal (App.jsx) — mantener sincronizado con el
-// array `buttons` de App.jsx si se agrega/saca un botón del dashboard.
-const PANEL_BOTONES = [
-  { id: "clientes", label: "Clientes" },
-  { id: "productos", label: "Productos" },
-  { id: "presupuesto-nuevo", label: "Presup. Nuevo" },
-  { id: "ver-tablas", label: "Ver Tablas" },
-  { id: "lista-presupuestos-2", label: "Lista Presupuestos" },
-  { id: "cuenta-corriente", label: "Clientes Activos" },
-  { id: "obras-confirmadas", label: "Obras Confirmadas" },
-  { id: "produccion", label: "Producción" },
-  { id: "visor-dwg", label: "Visor 3D Módulos" },
-  { id: "chat", label: "Chat" },
+// Pantallas administrables desde el Gestor de Menú (Principal / Lateral).
+// `ubicacionDefault` es donde aparece la pantalla si el rol todavía no tiene
+// una configuración guardada. Mantener sincronizado con el array
+// `PANTALLAS_MENU` de App.jsx si se agrega/saca alguna pantalla.
+const PANTALLAS_MENU = [
+  { id: "clientes", label: "Clientes", icon: "👥", ubicacionDefault: "principal" },
+  { id: "productos", label: "Productos", icon: "🛒", ubicacionDefault: "principal" },
+  { id: "presupuesto-nuevo", label: "Presup. Nuevo", icon: "📝", ubicacionDefault: "principal" },
+  { id: "ver-tablas", label: "Ver Tablas", icon: "🗃️", ubicacionDefault: "principal" },
+  { id: "lista-presupuestos-2", label: "Lista Presupuestos", icon: "⚡", ubicacionDefault: "principal" },
+  { id: "cuenta-corriente", label: "Clientes Activos", icon: "💰", ubicacionDefault: "principal" },
+  { id: "obras-confirmadas", label: "Obras Confirmadas", icon: "✅", ubicacionDefault: "principal" },
+  { id: "produccion", label: "Producción", icon: "🏭", ubicacionDefault: "principal" },
+  { id: "visor-dwg", label: "Visor 3D Módulos", icon: "📐", ubicacionDefault: "principal" },
+  { id: "chat", label: "Chat", icon: "💬", ubicacionDefault: "principal" },
+  { id: "test-afip-facturar", label: "Test AFIP Facturar", icon: "🧪", ubicacionDefault: "principal" }, // TEMPORAL
+  { id: "presupuesto-mamparas", label: "Presup. Mamparas", icon: "🪟", ubicacionDefault: "lateral" },
+  { id: "presupuesto-muebles", label: "Presup. Muebles", icon: "🪵", ubicacionDefault: "lateral" },
+  { id: "presupuestos-tabla", label: "Lista Presup. Mamparas", icon: "📋", ubicacionDefault: "lateral" },
+  { id: "presupuestos-vanitory-tabla", label: "Lista Presup. Vanitory", icon: "🛁", ubicacionDefault: "lateral" },
+  { id: "presupuesto-amoblamiento", label: "Presup. Amoblamiento", icon: "🪑", ubicacionDefault: "lateral" },
+  { id: "lista-margenes", label: "Lista de Márgenes", icon: "📊", ubicacionDefault: "lateral" },
+  { id: "mueble-especial", label: "Mueble Especial", icon: "🪚", ubicacionDefault: "lateral" },
+  { id: "facturas", label: "Facturas Compra", icon: "🧾", ubicacionDefault: "lateral" },
+  { id: "historial-facturas", label: "Historial Facturas", icon: "📋", ubicacionDefault: "lateral" },
+  { id: "afip-iva", label: "AFIP IVA", icon: "🏦", ubicacionDefault: "lateral" },
+  { id: "usuarios", label: "Usuarios", icon: "👤", ubicacionDefault: "lateral" },
+  { id: "actualizar-precios", label: "Actualizar Precios", icon: "💲", ubicacionDefault: "lateral" },
 ];
 
 // ── Componente Permisos ──────────────────────────────────────────────────────
@@ -102,7 +117,7 @@ function GestorPermisos({ onBack, token }) {
   // ── Orden del panel principal por rol ──
   const [ordenPanel, setOrdenPanel] = useState({}); // { rol: [modulo, modulo, ...] }
   const [rolOrden, setRolOrden] = useState(ROLES[0]);
-  const [arrastrando, setArrastrando] = useState(null); // índice que se está arrastrando
+  const [arrastrando, setArrastrando] = useState(null); // { ubicacion, modulo } que se está arrastrando
 
   useEffect(() => {
     fetch(`${API}/orden-panel`, {
@@ -110,19 +125,24 @@ function GestorPermisos({ onBack, token }) {
     })
       .then((r) => r.json())
       .then((rows) => {
-        // rows: [{ rol, modulo, orden }, ...]
+        // rows: [{ rol, modulo, orden, ubicacion }, ...]
         const map = {};
-        rows.forEach(({ rol, modulo, orden }) => {
+        rows.forEach(({ rol, modulo, orden, ubicacion }) => {
           map[rol] = map[rol] ?? [];
-          map[rol][orden] = modulo;
+          map[rol][orden] = {
+            modulo,
+            ubicacion: ubicacion === "principal" ? "principal" : "lateral",
+          };
         });
         const completo = {};
         ROLES.forEach((rol) => {
           const guardado = (map[rol] ?? []).filter(Boolean);
-          // agrega al final cualquier botón nuevo que no esté guardado todavía
-          const faltantes = PANEL_BOTONES.map((b) => b.id).filter(
-            (id) => !guardado.includes(id),
-          );
+          // agrega al final cualquier pantalla nueva que no esté guardada
+          // todavía, en su ubicación por defecto
+          const yaUsados = new Set(guardado.map((g) => g.modulo));
+          const faltantes = PANTALLAS_MENU.filter(
+            (p) => !yaUsados.has(p.id),
+          ).map((p) => ({ modulo: p.id, ubicacion: p.ubicacionDefault }));
           completo[rol] = [...guardado, ...faltantes];
         });
         setOrdenPanel(completo);
@@ -130,18 +150,28 @@ function GestorPermisos({ onBack, token }) {
       .catch(() => {
         const completo = {};
         ROLES.forEach((rol) => {
-          completo[rol] = PANEL_BOTONES.map((b) => b.id);
+          completo[rol] = PANTALLAS_MENU.map((p) => ({
+            modulo: p.id,
+            ubicacion: p.ubicacionDefault,
+          }));
         });
         setOrdenPanel(completo);
       });
   }, []);
 
-  const moverItem = (rol, desde, hasta) => {
+  // Reordena dentro de una misma columna (principal o lateral), preservando
+  // la posición de las pantallas que no pertenecen a esa columna o que el
+  // rol no tiene permitido ver.
+  const moverItem = (rol, ubicacion, desde, hasta) => {
     setOrdenPanel((prev) => {
       const todas = prev[rol] ?? [];
       const slots = [];
-      todas.forEach((id, idx) => {
-        if (rol === "admin" || get(rol, id, "ver")) slots.push(idx);
+      todas.forEach((item, idx) => {
+        if (
+          item.ubicacion === ubicacion &&
+          (rol === "admin" || get(rol, item.modulo, "ver"))
+        )
+          slots.push(idx);
       });
       if (hasta < 0 || hasta >= slots.length) return prev;
       const visibles = slots.map((idx) => todas[idx]);
@@ -155,13 +185,24 @@ function GestorPermisos({ onBack, token }) {
     });
   };
 
+  // Mueve una pantalla de una columna a la otra (principal <-> lateral).
+  const moverUbicacion = (rol, modulo, nuevaUbicacion) => {
+    setOrdenPanel((prev) => {
+      const todas = prev[rol] ?? [];
+      const nuevoTodas = todas.map((item) =>
+        item.modulo === modulo ? { ...item, ubicacion: nuevaUbicacion } : item,
+      );
+      return { ...prev, [rol]: nuevoTodas };
+    });
+  };
+
   const guardarOrden = async () => {
     setSaving(true);
     setMsg("");
     const rows = [];
     ROLES.forEach((rol) => {
-      (ordenPanel[rol] ?? []).forEach((modulo, i) => {
-        rows.push({ rol, modulo, orden: i });
+      (ordenPanel[rol] ?? []).forEach((item, i) => {
+        rows.push({ rol, modulo: item.modulo, orden: i, ubicacion: item.ubicacion });
       });
     });
     try {
@@ -174,9 +215,9 @@ function GestorPermisos({ onBack, token }) {
         body: JSON.stringify({ orden: rows }),
       });
       if (!res.ok) throw new Error();
-      setMsg("✅ Orden guardado correctamente");
+      setMsg("✅ Menú guardado correctamente");
     } catch {
-      setMsg("❌ Error al guardar el orden");
+      setMsg("❌ Error al guardar el menú");
     } finally {
       setSaving(false);
       setTimeout(() => setMsg(""), 3000);
@@ -226,10 +267,15 @@ function GestorPermisos({ onBack, token }) {
       (tablaId) => rol === "admin" || get(rol, "ver-tablas-botones", tablaId),
     );
 
-  // Subconjunto de ordenPanel[rol] que ese rol tiene permitido ver
-  // (permiso "ver" del módulo correspondiente), en el orden guardado.
-  const visiblesPanel = (rol) =>
-    (ordenPanel[rol] ?? []).filter((id) => rol === "admin" || get(rol, id, "ver"));
+  // Subconjunto de ordenPanel[rol] en una columna (principal/lateral) que
+  // ese rol tiene permitido ver (permiso "ver" del módulo correspondiente),
+  // en el orden guardado.
+  const visiblesPanel = (rol, ubicacion) =>
+    (ordenPanel[rol] ?? []).filter(
+      (item) =>
+        item.ubicacion === ubicacion &&
+        (rol === "admin" || get(rol, item.modulo, "ver")),
+    );
 
   // Mueve una pantalla dentro del subconjunto visible para `rol` (índices
   // relativos a ese subconjunto), preservando la posición de las pantallas
@@ -396,6 +442,12 @@ function GestorPermisos({ onBack, token }) {
     .orden-flecha { width:22px; height:22px; border:1px solid #cfe3f2; background:#fff; border-radius:4px;
       cursor:pointer; font-size:11px; line-height:1; }
     .orden-flecha:disabled { opacity:0.3; cursor:default; }
+    .menu-columnas { display:flex; gap:20px; flex-wrap:wrap; }
+    .menu-columna { flex:1; min-width:280px; background:#f2f8fd; border:1px solid #dceaf5; border-radius:8px; padding:14px; }
+    .menu-columna-titulo { font-size:12px; font-weight:800; color:#0a3a5c; letter-spacing:0.5px; margin:0 0 10px; }
+    @media (max-width: 700px) {
+      .menu-columnas { flex-direction:column; }
+    }
   `;
 
   if (loading) return <div className="perm-wrap"><style>{PS}</style><p style={{color:"#99bbcc"}}>Cargando permisos...</p></div>;
@@ -467,16 +519,16 @@ function GestorPermisos({ onBack, token }) {
         </table>
       </div>
 
-      {/* ── Orden del Panel Principal ── */}
+      {/* ── Gestor de Menú (Principal / Lateral) ── */}
       <div className="perm-header" style={{ marginTop: 36 }}>
-        <span className="perm-title">↕️ Orden del Panel Principal</span>
+        <span className="perm-title">🧭 Gestor de Menú (Principal / Lateral)</span>
         <button
           className="perm-btn"
           style={{ marginLeft: "auto" }}
           onClick={guardarOrden}
           disabled={saving}
         >
-          {saving ? "Guardando..." : "💾 Guardar orden"}
+          {saving ? "Guardando..." : "💾 Guardar menú"}
         </button>
       </div>
       <div className="orden-roles">
@@ -490,56 +542,109 @@ function GestorPermisos({ onBack, token }) {
           </button>
         ))}
       </div>
+      {msg && <p className="orden-note">{msg}</p>}
       <p className="orden-note">
-        Arrastrá los botones para cambiar el orden en que aparecen en el panel
-        principal para el rol <strong>{rolOrden.toUpperCase()}</strong>. Solo
-        se listan los botones que ese rol tiene permitido ver.
+        Arrastrá cada pantalla a la columna donde debe aparecer para el rol{" "}
+        <strong>{rolOrden.toUpperCase()}</strong>: en la pantalla principal
+        (grilla de botones grandes) o en el menú lateral. Dentro de cada
+        columna también podés reordenar arrastrando o con las flechas, y
+        moverla de columna con la flecha ➡️/⬅️. Solo se listan las pantallas
+        que ese rol tiene permitido ver.
       </p>
-      <div className="orden-lista">
-        {visiblesPanel(rolOrden).map((moduloId, i, arr) => {
-          const boton = PANEL_BOTONES.find((b) => b.id === moduloId);
+      <div className="menu-columnas">
+        {[
+          { ubicacion: "principal", titulo: "🏠 Pantalla Principal" },
+          { ubicacion: "lateral", titulo: "📑 Menú Lateral" },
+        ].map(({ ubicacion, titulo }) => {
+          const items = visiblesPanel(rolOrden, ubicacion);
           return (
             <div
-              key={moduloId}
-              className={`orden-item ${arrastrando === i ? "dragging" : ""}`}
-              draggable
-              onDragStart={() => setArrastrando(i)}
+              key={ubicacion}
+              className="menu-columna"
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => {
-                if (arrastrando !== null && arrastrando !== i) {
-                  moverItem(rolOrden, arrastrando, i);
+                if (arrastrando && arrastrando.ubicacion !== ubicacion) {
+                  moverUbicacion(rolOrden, arrastrando.modulo, ubicacion);
                 }
                 setArrastrando(null);
               }}
-              onDragEnd={() => setArrastrando(null)}
             >
-              <span className="orden-handle">⠿</span>
-              <span className="orden-label">{boton?.label ?? moduloId}</span>
-              <div className="orden-flechas">
-                <button
-                  className="orden-flecha"
-                  onClick={() => moverItem(rolOrden, i, i - 1)}
-                  disabled={i === 0}
-                >
-                  ↑
-                </button>
-                <button
-                  className="orden-flecha"
-                  onClick={() => moverItem(rolOrden, i, i + 1)}
-                  disabled={i === arr.length - 1}
-                >
-                  ↓
-                </button>
+              <p className="menu-columna-titulo">{titulo}</p>
+              <div className="orden-lista">
+                {items.map((item, i, arr) => {
+                  const pantalla = PANTALLAS_MENU.find((p) => p.id === item.modulo);
+                  return (
+                    <div
+                      key={item.modulo}
+                      className={`orden-item ${arrastrando?.modulo === item.modulo ? "dragging" : ""}`}
+                      draggable
+                      onDragStart={() => setArrastrando({ ubicacion, modulo: item.modulo })}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.stopPropagation();
+                        if (arrastrando) {
+                          if (arrastrando.ubicacion === ubicacion) {
+                            const desde = items.findIndex(
+                              (it) => it.modulo === arrastrando.modulo,
+                            );
+                            moverItem(rolOrden, ubicacion, desde, i);
+                          } else {
+                            moverUbicacion(rolOrden, arrastrando.modulo, ubicacion);
+                          }
+                        }
+                        setArrastrando(null);
+                      }}
+                      onDragEnd={() => setArrastrando(null)}
+                    >
+                      <span className="orden-handle">⠿</span>
+                      <span className="orden-label">
+                        {pantalla?.icon} {pantalla?.label ?? item.modulo}
+                      </span>
+                      <div className="orden-flechas">
+                        <button
+                          className="orden-flecha"
+                          onClick={() => moverItem(rolOrden, ubicacion, i, i - 1)}
+                          disabled={i === 0}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          className="orden-flecha"
+                          onClick={() => moverItem(rolOrden, ubicacion, i, i + 1)}
+                          disabled={i === arr.length - 1}
+                        >
+                          ↓
+                        </button>
+                        <button
+                          className="orden-flecha"
+                          title={
+                            ubicacion === "principal"
+                              ? "Mover a menú lateral"
+                              : "Mover a pantalla principal"
+                          }
+                          onClick={() =>
+                            moverUbicacion(
+                              rolOrden,
+                              item.modulo,
+                              ubicacion === "principal" ? "lateral" : "principal",
+                            )
+                          }
+                        >
+                          {ubicacion === "principal" ? "➡️" : "⬅️"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {items.length === 0 && (
+                  <p className="orden-note">
+                    Sin pantallas en esta columna para {rolOrden.toUpperCase()}.
+                  </p>
+                )}
               </div>
             </div>
           );
         })}
-        {visiblesPanel(rolOrden).length === 0 && (
-          <p className="orden-note">
-            El rol {rolOrden.toUpperCase()} no tiene ningún botón permitido en
-            el panel principal.
-          </p>
-        )}
       </div>
 
       {/* ── Orden de Pantallas dentro de "Ver Tablas" ── */}
