@@ -237,16 +237,18 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
     edgesSolidRef.current = edgesSolid;
 
     // Aristas "completas" (umbral 1°, todas las líneas del contorno real
-    // derivado del sólido — envolvente convexa): fallback para modelos
-    // guardados ANTES de que el conversor capturara los contornos reales
-    // (LWPOLYLINE, ver bloque "outlineGroup" más abajo). Si el modelo ya
-    // trae esos contornos reales, esta capa queda oculta.
-    const hasOutlines = Array.isArray(meta.outlines) && meta.outlines.length > 0;
+    // derivado del sólido — envolvente convexa): SIEMPRE se muestra en modo
+    // "Líneas", como base. No todos los paneles tienen una LWPOLYLINE de
+    // contorno real en el DXF (no hay vínculo directo entre 3DSOLID y su
+    // contorno 2D, ver nota en converter.py) — si ocultáramos esta capa
+    // cuando existen otros contornos reales, los paneles sin LWPOLYLINE
+    // quedarían invisibles en modo Líneas. El contorno real (más abajo,
+    // "outlineGroup") se dibuja ENCIMA de esta base, no en su lugar.
     const edgesWire = new THREE.LineSegments(
       new THREE.EdgesGeometry(panelGeo, 1),
       new THREE.LineBasicMaterial({ color: 0x33cc33 })
     );
-    edgesWire.visible = viewMode === "lineas" && !hasOutlines;
+    edgesWire.visible = viewMode === "lineas";
     scene.add(edgesWire);
     edgesWireRef.current = edgesWire;
 
@@ -297,13 +299,13 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
     }
 
     // --- Contorno real del CAD (LWPOLYLINE, con el color real de su capa) ---
-    // Reemplaza el contorno genérico de arriba (edgesWire) cuando el JSON
-    // trae estas líneas — es fiel al dibujo original (verde/cyan/magenta
-    // según la capa TCHW####), no una aproximación. Si el modelo se
-    // guardó antes de este cambio, `meta.outlines` no existe y queda
-    // oculto (fallback a edgesWire).
+    // Se dibuja ENCIMA de edgesWire (no en su lugar) — donde exista, agrega
+    // el color/detalle real (verde/cyan/magenta según la capa TCHW####);
+    // donde no exista para un panel puntual, ese panel igual queda
+    // delineado por edgesWire. Si el modelo se guardó antes de este
+    // cambio, `meta.outlines` no existe y este grupo queda vacío.
     let outlineGroup = null;
-    if (hasOutlines) {
+    if (Array.isArray(meta.outlines) && meta.outlines.length > 0) {
       outlineGroup = new THREE.Group();
       meta.outlines.forEach((o) => {
         if (!o.points || o.points.length < 2) return;
@@ -457,10 +459,9 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
   }, [status, meta]);
 
   useEffect(() => {
-    const hasOutlines = !!outlineGroupRef.current;
     if (panelMeshRef.current) panelMeshRef.current.visible = viewMode === "solido";
     if (edgesSolidRef.current) edgesSolidRef.current.visible = viewMode === "solido";
-    if (edgesWireRef.current) edgesWireRef.current.visible = viewMode === "lineas" && !hasOutlines;
+    if (edgesWireRef.current) edgesWireRef.current.visible = viewMode === "lineas";
     if (outlineGroupRef.current) outlineGroupRef.current.visible = viewMode === "lineas";
     if (holeMeshRef.current) holeMeshRef.current.visible = holesVisible && viewMode === "solido";
     if (holeEdgesRef.current) holeEdgesRef.current.visible = holesVisible && viewMode === "lineas";
