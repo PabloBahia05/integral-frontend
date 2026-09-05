@@ -59,7 +59,7 @@ const MODULOS = [
       "clientes", "productos", "escritorio-tipos", "despensero-tipos",
       "formulas", "margen", "presupuestos-mamparas-tabla", "presupuestos-puertas-tabla",
       "colocacion", "asociaciones", "asociaciones-form", "form-std", "asoc-form-std",
-      "lista", "feriados", "semanas-anio", "usuarios-app", "permisos",
+      "lista", "proveedores", "feriados", "semanas-anio", "usuarios-app", "permisos",
       "selector", "texto-sena",
     ],
   },
@@ -100,10 +100,12 @@ const PANTALLAS_MENU = [
   { id: "lista-margenes", label: "Lista de Márgenes", icon: "📊", ubicacionDefault: "lateral" },
   { id: "mueble-especial", label: "Mueble Especial", icon: "🪚", ubicacionDefault: "lateral" },
   { id: "facturas", label: "Facturas Compra", icon: "🧾", ubicacionDefault: "lateral" },
+  { id: "facturas-venta", label: "Facturas Emitidas", icon: "🧮", ubicacionDefault: "lateral" },
   { id: "historial-facturas", label: "Historial Facturas", icon: "📋", ubicacionDefault: "lateral" },
   { id: "afip-iva", label: "AFIP IVA", icon: "🏦", ubicacionDefault: "lateral" },
   { id: "usuarios", label: "Usuarios", icon: "👤", ubicacionDefault: "lateral" },
   { id: "actualizar-precios", label: "Actualizar Precios", icon: "💲", ubicacionDefault: "lateral" },
+  { id: "vehiculos-mantenimiento", label: "Vehículos - Mantenim.", icon: "🚚", ubicacionDefault: "lateral" },
 ];
 
 // ── Componente Permisos ──────────────────────────────────────────────────────
@@ -854,6 +856,7 @@ const TABLAS = [
     color: "#8338ec",
   },
   { id: "lista", label: "Lista Margen", icon: "📊", color: "#20b2aa" },
+  { id: "proveedores", label: "Proveedores", icon: "🏭", color: "#e67e22" },
   { id: "feriados", label: "Feriados", icon: "📅", color: "#ffb703" },
   { id: "semanas-anio", label: "Semanas y Horas Esperadas", icon: "🗓️", color: "#3a86ff" },
   { id: "usuarios-app", label: "Usuarios App",    icon: "🔐", color: "#e63946" },
