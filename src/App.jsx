@@ -1196,6 +1196,7 @@ function App() {
                 semanasAnio={semanasAnio}
                 tablaInicial={tablaInicialVerTablas}
                 token={token}
+                puedo={puedo}
               />
             )}
 
