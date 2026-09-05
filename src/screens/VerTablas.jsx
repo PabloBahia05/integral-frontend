@@ -35,20 +35,37 @@ const ROLES = ["admin", "gestor", "produccion", "operario"];
 const MODULOS = [
   { id: "clientes",                  label: "Clientes",               acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "productos",                 label: "Productos",              acciones: ["ver", "crear", "editar", "eliminar"] },
+  { id: "actualizar-precios",        label: "Actualizar Precios",     acciones: ["ver", "subir"] },
+  { id: "presupuesto-muebles",       label: "Presup. Muebles",        acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "presupuesto-mamparas",      label: "Presup. Mamparas",       acciones: ["ver", "crear", "editar", "eliminar"] },
+  { id: "presupuestos-tabla",        label: "Lista Presup. Mamparas", acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "presupuesto-nuevo",         label: "Presup. Nuevo",          acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "presupuesto-vanitory",      label: "Presup. Vanitory",       acciones: ["ver", "crear", "editar", "eliminar"] },
+  { id: "presupuestos-vanitory-tabla", label: "Lista Presup. Vanitory", acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "presupuesto-amoblamiento",  label: "Presup. Amoblamiento",   acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "mueble-especial",           label: "Mueble Especial",        acciones: ["ver", "crear", "editar", "eliminar"] },
-  { id: "presupuestos-nuevo-tabla",  label: "Lista Presupuestos",     acciones: ["ver", "crear", "editar", "eliminar"] },
-  { id: "lista-presupuestos-2",      label: "Lista Presupuestos 2",   acciones: ["ver"] },
+  { id: "lista-presupuestos-2",      label: "Lista Presupuestos",     acciones: ["ver"] },
+  { id: "obras-confirmadas",         label: "Obras Confirmadas",      acciones: ["ver", "editar"] },
+  { id: "produccion",                label: "Producción",             acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "facturas",                  label: "Facturas",               acciones: ["ver", "subir", "eliminar"] },
+  { id: "facturas-venta",            label: "Facturas Emitidas",      acciones: ["ver", "eliminar"] },
+  { id: "factura-manual",            label: "Facturar (Manual)",      acciones: ["ver", "crear"] },
   { id: "historial-facturas",        label: "Historial Facturas",     acciones: ["ver"] },
+  { id: "afip-iva",                  label: "AFIP IVA",               acciones: ["ver", "editar"] },
   { id: "ver-tablas",                label: "Ver Tablas",             acciones: ["ver", "editar"] },
   { id: "lista-margenes",            label: "Lista Márgenes",         acciones: ["ver", "editar"] },
   { id: "anviz",                     label: "Asistencia",             acciones: ["ver", "crear", "eliminar"] },
+  { id: "vehiculos-mantenimiento",   label: "Vehículos - Mantenim.",  acciones: ["ver", "crear", "editar", "eliminar"] },
+  { id: "cuenta-corriente",          label: "Clientes Activos",       acciones: ["ver", "editar"] },
+  { id: "visor-dwg",                 label: "Visor 3D Módulos",       acciones: ["ver"] },
   { id: "usuarios",                  label: "Usuarios",               acciones: ["ver", "crear", "editar", "eliminar"] },
 ];
+// NOTA: los módulos nuevos (actualizar-precios, presupuesto-muebles,
+// presupuestos-tabla, obras-confirmadas, produccion, facturas-venta,
+// factura-manual, afip-iva, vehiculos-mantenimiento, cuenta-corriente,
+// visor-dwg) se agregaron con acciones "razonables" a criterio, no
+// confirmadas contra cada pantalla real — ajustar si alguna no coincide
+// con los botones que esa pantalla realmente tiene.
 
 // ── Componente Permisos ──────────────────────────────────────────────────────
 function GestorPermisos({ onBack, token }) {
