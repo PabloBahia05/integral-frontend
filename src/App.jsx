@@ -1347,6 +1347,11 @@ function App() {
           <div>
             <h1 className="title">Panel de Control</h1>
             <p className="subtitle">Sistema integral</p>
+            <p className="subtitle" style={{ marginTop: 2 }}>
+              👤 {usuario?.nombre ?? usuario?.usuario ?? usuario?.email ?? "—"}
+              {" · "}
+              <span style={{ textTransform: "uppercase" }}>{usuario?.rol ?? "—"}</span>
+            </p>
           </div>
           <button className="menu-btn" onClick={() => setSidebarOpen(true)}>
             ☰
