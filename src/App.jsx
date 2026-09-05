@@ -24,6 +24,8 @@ import ActualizarPreciosExcel from "./screens/ActualizarPreciosExcel";
 import VehiculosMantenimiento from "./screens/VehiculosMantenimiento";
 import CuentaCorriente from "./screens/CuentaCorriente";
 import VisorDWGPage from "./screens/VisorDWGPage";
+import Anviz from "./screens/Anviz";
+import FichadasAnviz from "./screens/FichadasAnviz";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState } from "react";
@@ -89,6 +91,8 @@ const PANTALLAS_MENU = [
   { id: "usuarios", label: "USUARIOS", icon: "👤", color: "#c0392b", ubicacionDefault: "lateral" },
   { id: "actualizar-precios", label: "ACTUALIZAR PRECIOS", icon: "💲", color: "#f1c40f", ubicacionDefault: "lateral" },
   { id: "vehiculos-mantenimiento", label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚", color: "#8d6e63", ubicacionDefault: "lateral" },
+  { id: "asistencia", label: "ASISTENCIA", icon: "⏰", color: "#6366f1", ubicacionDefault: "lateral" },
+  { id: "fichadas", label: "CONTROL DE FICHADAS", icon: "🕒", color: "#4f46e5", ubicacionDefault: "lateral" },
 ];
 
 export default function Root() {
@@ -1212,6 +1216,16 @@ function App() {
               />
             )}
 
+            {/* ── Asistencia (Anviz: fichadas, vacaciones, feriados, justificaciones) ── */}
+            {screen === "asistencia" && (
+              <Anviz onBack={() => setScreen(null)} />
+            )}
+
+            {/* ── Control de Fichadas (panel simple de presencia/fichadas) ── */}
+            {screen === "fichadas" && (
+              <FichadasAnviz token={token} onBack={() => setScreen(null)} />
+            )}
+
             {/* ── Clientes Activos (ex Cuenta Corriente) ── */}
             {screen === "cuenta-corriente" && (
               <CuentaCorriente
@@ -1329,6 +1343,8 @@ function App() {
         {puedo("actualizar-precios", "ver") && <p onClick={() => { setScreen("actualizar-precios"); setSidebarOpen(false); }}>💲 Actualizar Precios</p>}
         {puedo("vehiculos-mantenimiento", "ver") && <p onClick={() => { setScreen("vehiculos-mantenimiento"); setSidebarOpen(false); }}>🚚 Vehículos - Mantenimiento</p>}
         {puedo("visor-dwg", "ver") && <p onClick={() => { setScreen("visor-dwg"); setSidebarOpen(false); }}>📐 Visor 3D Módulos</p>}
+        {puedo("asistencia", "ver") && <p onClick={() => { setScreen("asistencia"); setSidebarOpen(false); }}>⏰ Asistencia</p>}
+        {puedo("fichadas", "ver") && <p onClick={() => { setScreen("fichadas"); setSidebarOpen(false); }}>🕒 Control de Fichadas</p>}
         <p onClick={logout} style={{ color: "#cc3333" }}>🚪 Cerrar sesión</p>
       </div>
 
