@@ -174,6 +174,99 @@ function GestorPermisos({ onBack, token }) {
     }
   };
 
+  // ── Orden de las pantallas dentro de "Ver Tablas", por rol ──
+  const [ordenTablas, setOrdenTablas] = useState({}); // { rol: [tablaId, tablaId, ...] }
+  const [arrastrandoTabla, setArrastrandoTabla] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API}/orden-tablas`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((rows) => {
+        // rows: [{ rol, modulo, orden }, ...]  (modulo = id de la tabla)
+        const map = {};
+        rows.forEach(({ rol, modulo, orden }) => {
+          map[rol] = map[rol] ?? [];
+          map[rol][orden] = modulo;
+        });
+        const completo = {};
+        ROLES.forEach((rol) => {
+          const guardado = (map[rol] ?? []).filter(Boolean);
+          // agrega al final cualquier pantalla nueva que no esté guardada todavía
+          const faltantes = TABLAS.map((t) => t.id).filter(
+            (id) => !guardado.includes(id),
+          );
+          completo[rol] = [...guardado, ...faltantes];
+        });
+        setOrdenTablas(completo);
+      })
+      .catch(() => {
+        const completo = {};
+        ROLES.forEach((rol) => {
+          completo[rol] = TABLAS.map((t) => t.id);
+        });
+        setOrdenTablas(completo);
+      });
+  }, []);
+
+  // Subconjunto de ordenTablas[rol] que ese rol tiene permitido ver
+  // (según la matriz "ver-tablas-botones"), en el orden guardado.
+  const visiblesTablas = (rol) =>
+    (ordenTablas[rol] ?? []).filter(
+      (tablaId) => rol === "admin" || get(rol, "ver-tablas-botones", tablaId),
+    );
+
+  // Mueve una pantalla dentro del subconjunto visible para `rol` (índices
+  // relativos a ese subconjunto), preservando la posición de las pantallas
+  // que ese rol no tiene permitido ver.
+  const moverItemTabla = (rol, desde, hasta) => {
+    setOrdenTablas((prev) => {
+      const todas = prev[rol] ?? [];
+      const slots = [];
+      todas.forEach((id, idx) => {
+        if (rol === "admin" || get(rol, "ver-tablas-botones", id)) slots.push(idx);
+      });
+      if (hasta < 0 || hasta >= slots.length) return prev;
+      const visibles = slots.map((idx) => todas[idx]);
+      const [item] = visibles.splice(desde, 1);
+      visibles.splice(hasta, 0, item);
+      const nuevoTodas = [...todas];
+      slots.forEach((idx, i) => {
+        nuevoTodas[idx] = visibles[i];
+      });
+      return { ...prev, [rol]: nuevoTodas };
+    });
+  };
+
+  const guardarOrdenTablas = async () => {
+    setSaving(true);
+    setMsg("");
+    const rows = [];
+    ROLES.forEach((rol) => {
+      (ordenTablas[rol] ?? []).forEach((modulo, i) => {
+        rows.push({ rol, modulo, orden: i });
+      });
+    });
+    try {
+      const res = await fetch(`${API}/orden-tablas`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ orden: rows }),
+      });
+      if (!res.ok) throw new Error();
+      setMsg("✅ Orden guardado correctamente");
+    } catch {
+      setMsg("❌ Error al guardar el orden");
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMsg(""), 3000);
+    }
+  };
+
   useEffect(() => {
     fetch(`${API}/permisos`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -427,6 +520,84 @@ function GestorPermisos({ onBack, token }) {
           );
         })}
       </div>
+
+      {/* ── Orden de Pantallas dentro de "Ver Tablas" ── */}
+      <div className="perm-header" style={{ marginTop: 36 }}>
+        <span className="perm-title">↕️ Orden de Pantallas (Ver Tablas)</span>
+        <button
+          className="perm-btn"
+          style={{ marginLeft: "auto" }}
+          onClick={guardarOrdenTablas}
+          disabled={saving}
+        >
+          {saving ? "Guardando..." : "💾 Guardar orden"}
+        </button>
+      </div>
+      <div className="orden-roles">
+        {ROLES.map((rol) => (
+          <button
+            key={rol}
+            className={`orden-rol-tab ${rol === rolOrden ? "active" : ""}`}
+            onClick={() => setRolOrden(rol)}
+          >
+            <span className={`rol-badge ${rol}`}>{rol.toUpperCase()}</span>
+          </button>
+        ))}
+      </div>
+      <p className="orden-note">
+        Arrastrá para cambiar el orden en que aparecen las pantallas dentro de
+        "Ver Tablas" para el rol <strong>{rolOrden.toUpperCase()}</strong>. Solo
+        se listan las pantallas que ese rol tiene permitido ver (definido arriba,
+        en "Ver Tablas · Botones").
+      </p>
+      <div className="orden-lista">
+        {visiblesTablas(rolOrden).map((tablaId, i, arr) => {
+          const tabla = TABLAS.find((t) => t.id === tablaId);
+          return (
+            <div
+              key={tablaId}
+              className={`orden-item ${arrastrandoTabla === i ? "dragging" : ""}`}
+              draggable
+              onDragStart={() => setArrastrandoTabla(i)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => {
+                if (arrastrandoTabla !== null && arrastrandoTabla !== i) {
+                  moverItemTabla(rolOrden, arrastrandoTabla, i);
+                }
+                setArrastrandoTabla(null);
+              }}
+              onDragEnd={() => setArrastrandoTabla(null)}
+            >
+              <span className="orden-handle">⠿</span>
+              <span className="orden-label">
+                {tabla?.icon} {tabla?.label ?? tablaId}
+              </span>
+              <div className="orden-flechas">
+                <button
+                  className="orden-flecha"
+                  onClick={() => moverItemTabla(rolOrden, i, i - 1)}
+                  disabled={i === 0}
+                >
+                  ↑
+                </button>
+                <button
+                  className="orden-flecha"
+                  onClick={() => moverItemTabla(rolOrden, i, i + 1)}
+                  disabled={i === arr.length - 1}
+                >
+                  ↓
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {visiblesTablas(rolOrden).length === 0 && (
+          <p className="orden-note">
+            El rol {rolOrden.toUpperCase()} no tiene ninguna pantalla permitida
+            en "Ver Tablas".
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -622,10 +793,48 @@ export default function VerTablas({
   tablaInicial,
   token,
   puedo = () => true,
+  rol = "operario",
 }) {
   const [tablaActiva, setTablaActiva] = useState(tablaInicial ?? null);
   const [modal, setModal] = useState(null);
   const [selectedLista, setSelectedLista] = useState(null);
+
+  // ── Orden de pantallas dentro de "Ver Tablas", ya guardado por el admin ──
+  const [ordenTablas, setOrdenTablas] = useState({});
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API}/orden-tablas`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((rows) => {
+        const map = {};
+        rows.forEach(({ rol: r, modulo, orden }) => {
+          map[r] = map[r] ?? [];
+          map[r][orden] = modulo;
+        });
+        const limpio = {};
+        Object.keys(map).forEach((r) => {
+          limpio[r] = map[r].filter(Boolean);
+        });
+        setOrdenTablas(limpio);
+      })
+      .catch(console.error);
+  }, [token]);
+
+  // Pantallas que el rol actual tiene permitido ver, en el orden guardado.
+  // Las que no tengan orden guardado se agregan al final en el orden original.
+  const tablasVisibles = (() => {
+    const permitidas = TABLAS.filter((tabla) => puedo("ver-tablas-botones", tabla.id));
+    const orden = ordenTablas[rol];
+    if (!orden || orden.length === 0) return permitidas;
+    const porId = new Map(permitidas.map((t) => [t.id, t]));
+    const ordenadas = orden.map((id) => porId.get(id)).filter(Boolean);
+    const yaUsadas = new Set(ordenadas.map((t) => t.id));
+    const faltantes = permitidas.filter((t) => !yaUsadas.has(t.id));
+    return [...ordenadas, ...faltantes];
+  })();
 
   const volver = () => {
     setTablaActiva(null);
@@ -924,7 +1133,7 @@ export default function VerTablas({
         subtitle="Seleccioná una tabla para gestionar"
       />
       <div className="presup-grid">
-        {TABLAS.filter((tabla) => puedo("ver-tablas-botones", tabla.id)).map((tabla) => (
+        {tablasVisibles.map((tabla) => (
           <button
             key={tabla.id}
             className="presup-card ver-tablas-card"
