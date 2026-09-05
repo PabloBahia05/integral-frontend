@@ -23,7 +23,6 @@ import AfipIVA from "./screens/AfipIVA";
 import ActualizarPreciosExcel from "./screens/ActualizarPreciosExcel";
 import VehiculosMantenimiento from "./screens/VehiculosMantenimiento";
 import CuentaCorriente from "./screens/CuentaCorriente";
-import TestFacturacionAFIP from "./screens/TestFacturacionAFIP"; // TEMPORAL: pantalla de prueba AFIP, borrar cuando ya no haga falta
 import VisorDWGPage from "./screens/VisorDWGPage";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
@@ -56,7 +55,6 @@ const SCREENS = {
   "actualizar-precios": { label: "ACTUALIZAR PRECIOS", icon: "💲" },
   "vehiculos-mantenimiento": { label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚" },
   "cuenta-corriente": { label: "CLIENTES ACTIVOS", icon: "💰" },
-  "test-afip-facturar": { label: "TEST AFIP FACTURAR", icon: "🧪" }, // TEMPORAL
   "visor-dwg": { label: "VISOR 3D MÓDULOS", icon: "📐" },
   chat: { label: "CHAT", icon: "💬" },
 };
@@ -74,15 +72,6 @@ const PANTALLAS_MENU = [
   { id: "lista-presupuestos-2", label: "LISTA PRESUPUESTOS", icon: "⚡", color: "#7b61ff", ubicacionDefault: "principal" },
   { id: "cuenta-corriente", label: "CLIENTES ACTIVOS", icon: "💰", color: "#e67e22", ubicacionDefault: "principal" },
   { id: "obras-confirmadas", label: "OBRAS CONFIRMADAS", icon: "✅", color: "#00b4d8", ubicacionDefault: "principal" },
-  {
-    // TEMPORAL: pantalla de prueba del circuito React -> Node -> Python -> AFIP.
-    // Borrar este bloque (y el import de arriba) cuando ya no haga falta.
-    id: "test-afip-facturar",
-    label: "TEST AFIP",
-    icon: "🧪",
-    color: "#9b59b6",
-    ubicacionDefault: "principal",
-  },
   { id: "produccion", label: "PRODUCCIÓN", icon: "🏭", color: "#8d6e63", ubicacionDefault: "principal" },
   { id: "visor-dwg", label: "VISOR 3D MÓDULOS", icon: "📐", color: "#00838f", ubicacionDefault: "principal" },
   { id: "chat", label: "CHAT", icon: "💬", color: "#25d366", ubicacionDefault: "principal" },
@@ -121,6 +110,15 @@ function AuthGate() {
 
 function App() {
   const { usuario, token, authFetch, logout } = useAuth();
+  // Nombre a mostrar en la leyenda de usuario (distintos backends/versiones
+  // de AuthContext pueden mandar el nombre en campos distintos).
+  const nombreUsuario =
+    usuario?.nombre ??
+    usuario?.nombreUsuario ??
+    usuario?.usuario ??
+    usuario?.username ??
+    usuario?.email ??
+    null;
   const [screen, setScreen] = useState(null);
   const [active, setActive] = useState(null);
   const [log, setLog] = useState([]);
@@ -1231,11 +1229,6 @@ function App() {
               />
             )}
 
-            {/* ── Test Facturación AFIP (TEMPORAL, borrar cuando ya no haga falta) ── */}
-            {screen === "test-afip-facturar" && (
-              <TestFacturacionAFIP authFetch={authFetch} />
-            )}
-
             {/* ── Visor 3D DWG/DXF ── */}
             {screen === "visor-dwg" && <VisorDWGPage token={token} />}
 
@@ -1287,6 +1280,12 @@ function App() {
         .top-bar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
         .title { font-family: \'Syne\', sans-serif; font-size: 28px; font-weight: 800; color: #0a3a5c; letter-spacing: -0.5px; }
         .subtitle { font-size: 11px; color: #6699bb; letter-spacing: 3px; text-transform: uppercase; margin-top: 6px; }
+        .user-badge { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #0a3a5c; margin-top: 8px; font-weight: 600; }
+        .rol-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; }
+        .rol-chip.rol-admin { background: #fde8e8; color: #c0392b; }
+        .rol-chip.rol-gestor { background: #fff3cd; color: #856404; }
+        .rol-chip.rol-produccion { background: #e2f0d9; color: #2e6b34; }
+        .rol-chip.rol-operario { background: #e0eef8; color: #0a3a5c; }
         .menu-btn { background: none; border: 1px solid #a0cce8; border-radius: 3px; padding: 6px 12px; cursor: pointer; font-size: 18px; color: #0a3a5c; transition: all 0.2s; }
         .menu-btn:hover { background: #0a3a5c; color: white; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 32px; }
@@ -1359,6 +1358,12 @@ function App() {
           <div>
             <h1 className="title">Panel de Control</h1>
             <p className="subtitle">Sistema integral</p>
+            <p className="user-badge">
+              👤 {nombreUsuario ?? "Usuario"}{" "}
+              <span className={`rol-chip rol-${usuario?.rol ?? "operario"}`}>
+                {(usuario?.rol ?? "operario").toUpperCase()}
+              </span>
+            </p>
           </div>
           <button className="menu-btn" onClick={() => setSidebarOpen(true)}>
             ☰
