@@ -211,6 +211,39 @@ function App() {
       .catch(console.error);
   }, [token]);
 
+  // ── Orden del panel principal (por rol) ──────────────────
+  const [ordenPanel, setOrdenPanel] = useState({});
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API}/orden-panel`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((rows) => {
+        const map = {};
+        rows.forEach(({ rol, modulo, orden }) => {
+          map[rol] = map[rol] ?? {};
+          map[rol][modulo] = orden;
+        });
+        setOrdenPanel(map);
+      })
+      .catch(console.error);
+  }, [token]);
+
+  // ordena `buttons` según el orden guardado para el rol actual;
+  // los botones sin orden guardado quedan al final, en el orden original
+  const ordenarPorRol = (lista) => {
+    const rol = usuario?.rol ?? "operario";
+    const mapaOrden = ordenPanel?.[rol];
+    if (!mapaOrden) return lista;
+    return [...lista].sort((a, b) => {
+      const oa = mapaOrden[a.screen] ?? 9999;
+      const ob = mapaOrden[b.screen] ?? 9999;
+      return oa - ob;
+    });
+  };
+
   // puedo("productos", "crear") → true/false
   const puedo = (modulo, accion) => {
     const rol = usuario?.rol ?? "operario";
@@ -1392,7 +1425,7 @@ function App() {
               </div>
             </div>
             <div className="grid">
-              {buttons
+              {ordenarPorRol(buttons)
                 .filter((btn) => puedo(btn.screen, "ver"))
                 .map((btn) => (
                 <ActionButton
