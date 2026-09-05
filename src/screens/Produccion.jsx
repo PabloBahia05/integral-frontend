@@ -276,7 +276,7 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
   );
 }
 
-export default function Produccion({ authFetch }) {
+export default function Produccion({ authFetch, token }) {
   const isMobile = useIsMobile();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1033,6 +1033,7 @@ export default function Produccion({ authFetch }) {
               codigo={modelo3D.codpro}
               modelosApiUrl={API}
               apiUrl={`${API}/api/dwg`}
+              token={token}
             />
           </div>
         </div>
