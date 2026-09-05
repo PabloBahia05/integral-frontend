@@ -216,16 +216,24 @@ export default function VisorDWG({ file: externalFile, apiUrl, token, codigo, mo
     edgesWireRef.current = edgesWire;
 
     // --- Agujeros ---
+    // Color por vértice (viene resuelto desde el DXF: capa o color propio
+    // de cada CIRCLE, ver converter.py del dwg-converter) — mismo esquema
+    // que ya usan los paneles (vertexColors).
     let holeMesh = null;
     if (meta.hole_mesh.indices.length > 0) {
       const holeGeo = new THREE.BufferGeometry();
       holeGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(meta.hole_mesh.positions), 3));
       holeGeo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(meta.hole_mesh.normals), 3));
+      if (meta.hole_mesh.colors) {
+        holeGeo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(meta.hole_mesh.colors), 3));
+      }
       holeGeo.setIndex(meta.hole_mesh.indices);
       holeGeo.translate(-center.x, -center.y, -center.z);
       holeMesh = new THREE.Mesh(
         holeGeo,
-        new THREE.MeshStandardMaterial({ color: 0x1c1a16, roughness: 0.9, metalness: 0.1 })
+        meta.hole_mesh.colors
+          ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.1 })
+          : new THREE.MeshStandardMaterial({ color: 0x1c1a16, roughness: 0.9, metalness: 0.1 })
       );
       holeMesh.visible = viewMode === "solido";
       scene.add(holeMesh);
