@@ -53,6 +53,17 @@ const MODULOS = [
   { id: "historial-facturas",        label: "Historial Facturas",     acciones: ["ver"] },
   { id: "afip-iva",                  label: "AFIP IVA",               acciones: ["ver", "editar"] },
   { id: "ver-tablas",                label: "Ver Tablas",             acciones: ["ver", "editar"] },
+  {
+    id: "ver-tablas-botones",
+    label: "Ver Tablas · Botones",
+    acciones: [
+      "clientes", "productos", "escritorio-tipos", "despensero-tipos",
+      "formulas", "margen", "presupuestos-mamparas-tabla", "presupuestos-puertas-tabla",
+      "colocacion", "asociaciones", "asociaciones-form", "form-std", "asoc-form-std",
+      "lista", "feriados", "semanas-anio", "usuarios-app", "anviz", "permisos",
+      "selector", "texto-sena",
+    ],
+  },
   { id: "lista-margenes",            label: "Lista Márgenes",         acciones: ["ver", "editar"] },
   { id: "anviz",                     label: "Asistencia",             acciones: ["ver", "crear", "eliminar"] },
   { id: "vehiculos-mantenimiento",   label: "Vehículos - Mantenim.",  acciones: ["ver", "crear", "editar", "eliminar"] },
@@ -439,6 +450,7 @@ export default function VerTablas({
   semanasAnio,
   tablaInicial,
   token,
+  puedo = () => true,
 }) {
   const [tablaActiva, setTablaActiva] = useState(tablaInicial ?? null);
   const [modal, setModal] = useState(null);
@@ -741,7 +753,7 @@ export default function VerTablas({
         subtitle="Seleccioná una tabla para gestionar"
       />
       <div className="presup-grid">
-        {TABLAS.map((tabla) => (
+        {TABLAS.filter((tabla) => puedo("ver-tablas-botones", tabla.id)).map((tabla) => (
           <button
             key={tabla.id}
             className="presup-card ver-tablas-card"
