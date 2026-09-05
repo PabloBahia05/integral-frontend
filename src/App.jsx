@@ -28,7 +28,7 @@ import Anviz from "./screens/Anviz";
 import FichadasAnviz from "./screens/FichadasAnviz";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
 const API = "https://integral-backend-production.up.railway.app";
@@ -161,6 +161,28 @@ function App() {
   const [selectedLista, setSelectedLista] = useState(null);
   const [modal, setModal] = useState(null);
 
+  // ── Aviso global de mensajes de chat entrantes ───────────
+  // Se muestra sin importar la pantalla en la que esté el usuario.
+  const [avisoMensaje, setAvisoMensaje] = useState(null); // { remitenteId, remitenteNombre, contenido }
+  const [conversacionAAbrir, setConversacionAAbrir] = useState(null);
+  const [conversacionAbiertaActual, setConversacionAbiertaActual] = useState(null);
+  const [usuariosChat, setUsuariosChat] = useState([]);
+
+  const screenRef = useRef(null);
+  useEffect(() => {
+    screenRef.current = screen;
+  }, [screen]);
+
+  const conversacionAbiertaRef = useRef(null);
+  useEffect(() => {
+    conversacionAbiertaRef.current = conversacionAbiertaActual;
+  }, [conversacionAbiertaActual]);
+
+  const usuariosChatRef = useRef([]);
+  useEffect(() => {
+    usuariosChatRef.current = usuariosChat;
+  }, [usuariosChat]);
+
   // ── authFetch ahora viene de useAuth() (ver arriba) ──────
 
   // ── Permisos del usuario logueado ────────────────────────
@@ -183,6 +205,73 @@ function App() {
       })
       .catch(console.error);
   }, [token]);
+
+  // Lista de usuarios de chat, para poder mostrar el nombre del remitente
+  // en el aviso global aunque el chat nunca se haya abierto en la sesión.
+  useEffect(() => {
+    if (!token) return;
+    authFetch(`${API}/chat/usuarios`)
+      .then((r) => r.json())
+      .then((data) => setUsuariosChat(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [token, authFetch]);
+
+  // WebSocket global de chat: se mantiene conectado en cualquier pantalla
+  // para poder avisar de un mensaje nuevo aunque el chat no esté abierto.
+  useEffect(() => {
+    if (!token || !usuario) return;
+    const wsUrl = `${API.replace(/^http/, "ws")}?token=${encodeURIComponent(token)}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (data?.tipo !== "chat:nuevo_mensaje" || !data.mensaje) return;
+      const m = data.mensaje;
+      if (m.destinatario_id !== usuario.id) return;
+
+      // Si ya está viendo esa conversación en el chat, no interrumpir
+      // con el aviso a pantalla completa: el mensaje ya aparece ahí.
+      if (
+        screenRef.current === "chat" &&
+        conversacionAbiertaRef.current === m.remitente_id
+      ) {
+        return;
+      }
+
+      const remitente = usuariosChatRef.current.find((u) => u.id === m.remitente_id);
+      setAvisoMensaje({
+        remitenteId: m.remitente_id,
+        remitenteNombre: remitente
+          ? `${remitente.nombre ?? ""} ${remitente.apellido ?? ""}`.trim()
+          : "Nuevo mensaje",
+        contenido: m.contenido,
+      });
+    };
+
+    return () => ws.close();
+  }, [token, usuario, API]);
+
+  const cerrarAvisoMensaje = () => {
+    if (avisoMensaje) {
+      authFetch(`${API}/chat/${avisoMensaje.remitenteId}/leido`, {
+        method: "PUT",
+      }).catch(() => {});
+    }
+    setAvisoMensaje(null);
+  };
+
+  const responderAvisoMensaje = () => {
+    if (avisoMensaje) {
+      setConversacionAAbrir(avisoMensaje.remitenteId);
+      setScreen("chat");
+    }
+    setAvisoMensaje(null);
+  };
 
   // puedo("productos", "crear") → true/false
   const puedo = (modulo, accion) => {
@@ -786,13 +875,66 @@ function App() {
     @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #cce7f9; min-height: 100vh; font-family: 'Space Mono', monospace; }
+
+    .aviso-mensaje-overlay {
+      position: fixed; inset: 0; z-index: 999999;
+      background: linear-gradient(135deg, #ff9d1f, #ff6a00);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      animation: avisoMensajeFadeIn 0.2s ease;
+    }
+    @keyframes avisoMensajeFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .aviso-mensaje-caja {
+      background: #fff; border-radius: 12px; padding: 32px 28px;
+      max-width: 460px; width: 100%; text-align: center;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+      font-family: 'Space Mono', monospace;
+    }
+    .aviso-mensaje-icono { font-size: 40px; margin-bottom: 12px; }
+    .aviso-mensaje-remitente {
+      font-weight: 800; font-size: 15px; color: #b35400;
+      letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px;
+    }
+    .aviso-mensaje-texto {
+      font-size: 15px; color: #333; line-height: 1.5;
+      white-space: pre-wrap; word-break: break-word;
+      margin-bottom: 24px; max-height: 220px; overflow-y: auto;
+    }
+    .aviso-mensaje-botones { display: flex; gap: 12px; }
+    .aviso-btn {
+      flex: 1; padding: 12px 16px; border: none; border-radius: 6px;
+      font-family: 'Space Mono', monospace; font-weight: 700; font-size: 13px;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .aviso-btn:hover { opacity: 0.85; }
+    .aviso-btn-responder { background: #0a3a5c; color: #fff; }
+    .aviso-btn-aceptar { background: #eee; color: #333; }
   `;
+
+  const AvisoMensaje = avisoMensaje ? (
+    <div className="aviso-mensaje-overlay">
+      <div className="aviso-mensaje-caja">
+        <div className="aviso-mensaje-icono">✉️</div>
+        <div className="aviso-mensaje-remitente">{avisoMensaje.remitenteNombre}</div>
+        <div className="aviso-mensaje-texto">{avisoMensaje.contenido}</div>
+        <div className="aviso-mensaje-botones">
+          <button className="aviso-btn aviso-btn-responder" onClick={responderAvisoMensaje}>
+            💬 Responder
+          </button>
+          <button className="aviso-btn aviso-btn-aceptar" onClick={cerrarAvisoMensaje}>
+            ✓ Aceptar
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   // ── PANTALLAS ────────────────────────────────────────────
   if (screen && !puedo(screen, "ver")) {
     return (
       <>
         <style>{GLOBAL_STYLE}</style>
+        {AvisoMensaje}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "'Space Mono', monospace", gap: 16 }}>
           <span style={{ fontSize: 48 }}>🚫</span>
           <p style={{ color: "#0a3a5c", fontWeight: 700, fontSize: 18, letterSpacing: 2 }}>ACCESO DENEGADO</p>
@@ -871,6 +1013,7 @@ function App() {
           }
         `}
         </style>
+        {AvisoMensaje}
 
         <div className="screen-layout">
           <div
@@ -1113,7 +1256,15 @@ function App() {
               <Produccion authFetch={authFetch} token={token} />
             )}
             {screen === "chat" && (
-              <Chat authFetch={authFetch} token={token} usuario={usuario} API={API} />
+              <Chat
+                authFetch={authFetch}
+                token={token}
+                usuario={usuario}
+                API={API}
+                conversacionInicial={conversacionAAbrir}
+                onConversacionInicialUsada={() => setConversacionAAbrir(null)}
+                onConversacionActivaChange={setConversacionAbiertaActual}
+              />
             )}
             {screen === "presupuesto-amoblamiento" &&
               amoblamientoVista === "selector" && (
@@ -1325,6 +1476,7 @@ function App() {
         }
       `}
       </style>
+      {AvisoMensaje}
 
       <div
         className={`overlay ${sidebarOpen ? "open" : ""}`}
