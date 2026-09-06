@@ -1102,7 +1102,7 @@ export default function Produccion({ authFetch, token }) {
         <ActionBar
           selected={selected}
           onNew={null}
-          onEdit={null}
+          onEdit={selected ? () => setDetalle(selected) : null}
           onDelete={selected ? () => setAEliminar(selected) : null}
           search={search}
           onSearch={setSearch}
