@@ -414,7 +414,7 @@ export default function AsociacionesForm({
       .then((r) => r.json())
       .then(setFamilias)
       .catch(() => {});
-    authFetch(`${API}/formulas`)
+    authFetch(`${API}/formulas-produccion`)
       .then((r) => r.json())
       .then(setFormulas)
       .catch(() => {});
@@ -509,10 +509,13 @@ export default function AsociacionesForm({
 
   const handleSlotForm = (slot, codform) => {
     const found = formulas.find((f) => f.codform === codform);
+    const preview = found
+      ? `V1: ${found.formula ?? ""}${found.formula2 ? ` | V2: ${found.formula2}` : ""}`
+      : "";
     setForm((f) => ({
       ...f,
       [`codf${slot}`]: codform,
-      [`form${slot}`]: found ? (found.formula ?? "") : "",
+      [`form${slot}`]: preview,
       // Si se borra la fórmula, limpiar también el título
       ...(!codform ? { [`titulo${slot}`]: "" } : {}),
     }));
@@ -545,10 +548,10 @@ export default function AsociacionesForm({
       <div className="aform-root">
         <div className="aform-header">
           <div className="aform-header-left">
-            <span className="aform-eyebrow">Gestión de fórmulas</span>
+            <span className="aform-eyebrow">Gestión de fórmulas de producción</span>
             <div className="aform-title">
               <div className="aform-title-icon">🧮</div>
-              Asociaciones de Fórmulas
+              Asociaciones de Fórmulas — Producción
             </div>
           </div>
         </div>
