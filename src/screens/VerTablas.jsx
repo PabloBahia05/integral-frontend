@@ -10,6 +10,7 @@ import PresupuestosMamparasTabla from "./PresupuestosMamparasTabla";
 import PresupuestosPuertasTabla from "./PresupuestosPuertasTabla";
 import Colocacion from "./Colocacion";
 import Asociaciones from "./Asociaciones";
+import AsociacionesForm from "./AsociacionesForm";
 import FormStd from "./FormStd";
 import AsocFormStd from "./AsocFormStd";
 import Lista from "./Lista";
@@ -57,7 +58,7 @@ const MODULOS = [
     acciones: [
       "clientes", "productos", "escritorio-tipos", "despensero-tipos",
       "formulas", "margen", "presupuestos-mamparas-tabla", "presupuestos-puertas-tabla",
-      "colocacion", "asociaciones", "form-std", "asoc-form-std",
+      "colocacion", "asociaciones", "asociaciones-form", "form-std", "asoc-form-std",
       "lista", "proveedores", "feriados", "semanas-anio", "usuarios-app", "permisos",
       "selector", "texto-sena",
     ],
@@ -845,6 +846,12 @@ const TABLAS = [
   },
   { id: "colocacion", label: "Colocación", icon: "📐", color: "#f77f00" },
   { id: "asociaciones", label: "Asociaciones", icon: "🔗", color: "#6a994e" },
+  {
+    id: "asociaciones-form",
+    label: "Asoc. Fórmulas",
+    icon: "🧮",
+    color: "#e63946",
+  },
   { id: "form-std", label: "Fórmulas Estándar", icon: "🧮", color: "#8338ec" },
   {
     id: "asoc-form-std",
@@ -893,6 +900,9 @@ export default function VerTablas({
   asociaciones,
   asociacionesCRUD,
   selectedAsociacion,
+  asociacionesForm,
+  asociacionesFormCRUD,
+  selectedAsociacionForm,
   formStd,
   formStdCRUD,
   selectedFormStd,
@@ -1102,6 +1112,22 @@ export default function VerTablas({
           modal={modal}
           {...localCRUD(asociacionesCRUD ?? {})}
           onSelect={(row) => asociacionesCRUD?.onSelect?.(row)}
+          token={token}
+        />
+      </div>
+    );
+
+  if (tablaActiva === "asociaciones-form")
+    return (
+      <div>
+        {back}
+        <AsociacionesForm
+          asociacionesForm={asociacionesForm ?? []}
+          productos={productos ?? []}
+          selected={selectedAsociacionForm}
+          modal={modal}
+          {...localCRUD(asociacionesFormCRUD ?? {})}
+          onSelect={(row) => asociacionesFormCRUD?.onSelect?.(row)}
           token={token}
         />
       </div>
