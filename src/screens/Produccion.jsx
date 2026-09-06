@@ -475,15 +475,27 @@ export default function Produccion({ authFetch, token }) {
     );
   };
 
+  // Campos numéricos (medidas): a diferencia de OP/USPER/etc, acá "0" es un
+  // valor válido y hay que mandar Number, no string, para que coincida con
+  // el tipo DECIMAL de la columna en MySQL.
+  const CAMPOS_NUMERICOS = ["ancho", "profundidad", "alto"];
+
   const handleTextoCampoBlur = async (row, campo) => {
     const key = `${row.id}-${campo}`;
     setGuardandoCampo(key);
     setErrorCampo(null);
+    const esNumerico = CAMPOS_NUMERICOS.includes(campo);
+    const valorCrudo = row[campo];
+    const valor = esNumerico
+      ? valorCrudo === "" || valorCrudo === null || valorCrudo === undefined
+        ? null
+        : Number(valorCrudo)
+      : valorCrudo || null;
     try {
       const res = await authFetch(`${API}/produccion/${row.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [campo]: row[campo] || null }),
+        body: JSON.stringify({ [campo]: valor }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (e) {
@@ -769,6 +781,31 @@ export default function Produccion({ authFetch, token }) {
         />
       ),
     },
+    // Medidas del módulo (mm), usadas también para calcular las fórmulas
+    // del CSV de producción (ver handleDescargarCSV/panelCSV más abajo).
+    // Se editan igual que OP/USPER/etc.: inline, se guardan al salir del
+    // campo, vía el mismo PUT /produccion/:id genérico.
+    ...["ancho", "profundidad", "alto"].map((campoMedida) => ({
+      key: campoMedida,
+      label: campoMedida.charAt(0).toUpperCase() + campoMedida.slice(1),
+      render: (v, row) => (
+        <input
+          type="number"
+          step="0.1"
+          value={row[campoMedida] ?? ""}
+          placeholder="—"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) =>
+            handleTextoCampoChange(row.id, campoMedida, e.target.value)
+          }
+          onBlur={() => handleTextoCampoBlur(row, campoMedida)}
+          style={{
+            ...estiloInput(row, campoMedida, guardandoCampo, errorCampo),
+            maxWidth: "90px",
+          }}
+        />
+      ),
+    })),
     {
       key: "color",
       label: "Color",
