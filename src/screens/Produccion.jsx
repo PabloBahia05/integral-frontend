@@ -28,6 +28,27 @@ const ETAPAS = [
   { campo: "DESPACHO", label: "Despacho", usuario: "USDES" },
 ];
 
+// Decodifica el payload de un JWT (base64url) sin librerías externas, solo
+// para leer el rol del usuario logueado y decidir qué columnas mostrar.
+// Si el token no existe o no se puede parsear, devuelve null (fail-safe:
+// nunca rompe el render, en el peor caso se ve la columna de más).
+function decodeJWT(token) {
+  if (!token) return null;
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join(""),
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 // Detecta celular vs escritorio por JavaScript (ancho real de pantalla),
 // en vez de depender de @media queries en CSS. Se recalcula si el usuario
 // rota el celular o cambia el tamaño de la ventana.
@@ -278,6 +299,12 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
 
 export default function Produccion({ authFetch, token }) {
   const isMobile = useIsMobile();
+
+  // Rol del usuario logueado (viene del JWT). El botón CSV (descarga de
+  // resultados de fórmulas) queda oculto para operarios; el resto de la
+  // pantalla se comporta igual para todos los roles.
+  const rol = decodeJWT(token)?.rol;
+  const esOperario = rol === "operario";
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -313,6 +340,13 @@ export default function Produccion({ authFetch, token }) {
   // resultados (Valor 1 / Valor 2 de cada fórmula).
   const [generandoCSV, setGenerandoCSV] = useState(null);
   const [errorCSV, setErrorCSV] = useState(null);
+
+  // Panel provisorio: se abre cuando el backend responde 422 (a la fila le
+  // falta codartint/ancho/alto para poder calcular las fórmulas asociadas).
+  // Carga esos 3 datos a mano, los guarda en produccion, y reintenta la
+  // descarga del CSV.
+  const [panelCSV, setPanelCSV] = useState(null);
+  const [guardandoPanelCSV, setGuardandoPanelCSV] = useState(false);
 
   // Melaminas disponibles para el desplegable de `color` (ver
   // GET /productos/melaminas en articulos_controller.js — filtra
@@ -470,7 +504,20 @@ export default function Produccion({ authFetch, token }) {
     setErrorCSV(null);
     try {
       const res = await authFetch(`${API}/produccion/${row.id}/formulas-csv`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (res.status === 422) {
+        // Faltan codartint/ancho/alto — pedirlos con el panel provisorio.
+        setPanelCSV({
+          row,
+          codartint: row.codartint ?? "",
+          ancho: row.ancho ?? "",
+          alto: row.alto ?? "",
+        });
+        return;
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `HTTP ${res.status}`);
+      }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -483,9 +530,41 @@ export default function Produccion({ authFetch, token }) {
     } catch (e) {
       console.error("Error generando CSV:", e);
       setErrorCSV(row.id);
-      alert("No se pudo generar el CSV.");
+      alert(e.message || "No se pudo generar el CSV.");
     } finally {
       setGenerandoCSV(null);
+    }
+  };
+
+  // Guarda codartint/ancho/alto cargados en el panel provisorio y reintenta
+  // la descarga del CSV con esos datos ya puestos en la fila.
+  const handleGuardarPanelCSV = async () => {
+    if (!panelCSV) return;
+    const { row, codartint, ancho, alto } = panelCSV;
+    setGuardandoPanelCSV(true);
+    try {
+      const body = {
+        codartint: codartint || null,
+        ancho: ancho === "" ? null : Number(ancho),
+        alto: alto === "" ? null : Number(alto),
+      };
+      const res = await authFetch(`${API}/produccion/${row.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const filaActualizada = { ...row, ...body };
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, ...body } : r)),
+      );
+      setPanelCSV(null);
+      handleDescargarCSV(filaActualizada);
+    } catch (e) {
+      console.error("Error guardando datos para el CSV:", e);
+      alert("No se pudieron guardar los datos. Probá de nuevo.");
+    } finally {
+      setGuardandoPanelCSV(false);
     }
   };
 
@@ -859,10 +938,17 @@ export default function Produccion({ authFetch, token }) {
     ARMADO: [...columnasPorEtapa.DOMUS, ...columnasPorEtapa.PERFORADO],
   };
 
+  // A los operarios no se les muestra la columna CSV (descarga de
+  // resultados de fórmulas) — se filtra acá, después de armar
+  // columnasBase, para no tocar el resto de la lógica de columnas.
+  const columnasBaseSegunRol = esOperario
+    ? columnasBase.filter((c) => c.key !== "csv")
+    : columnasBase;
+
   const columns = filtroEtapa
-    ? [...columnasBase, ...columnasEtapasSegunFiltro[filtroEtapa]]
+    ? [...columnasBaseSegunRol, ...columnasEtapasSegunFiltro[filtroEtapa]]
     : [
-        ...columnasBase,
+        ...columnasBaseSegunRol,
         columnaOP,
         ...ETAPAS.flatMap(({ campo }) => columnasPorEtapa[campo]),
       ];
@@ -1100,6 +1186,153 @@ export default function Produccion({ authFetch, token }) {
               apiUrl={`${API}/api/dwg`}
               token={token}
             />
+          </div>
+        </div>
+      )}
+      {panelCSV && (
+        <div
+          onClick={() => !guardandoPanelCSV && setPanelCSV(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "90%",
+              maxWidth: 420,
+              background: "#fff",
+              borderRadius: 10,
+              padding: "20px 22px",
+              fontFamily: "'Space Mono', monospace",
+              color: "#0a3a5c",
+            }}
+          >
+            <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>
+              Faltan datos para calcular las fórmulas
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#4a8ab5" }}>
+              Cargá el artículo vinculado y las medidas de{" "}
+              <strong>{panelCSV.row.producto ?? panelCSV.row.codpro}</strong>{" "}
+              para poder generar el CSV. Se guardan en este ítem de
+              producción.
+            </p>
+
+            <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+              Artículo vinculado (código interno)
+            </label>
+            <input
+              type="text"
+              value={panelCSV.codartint}
+              onChange={(e) =>
+                setPanelCSV((p) => ({ ...p, codartint: e.target.value }))
+              }
+              placeholder="Ej: KITMP000"
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "6px 8px",
+                fontSize: 13,
+                fontFamily: "'Space Mono',monospace",
+                border: "1.5px solid #b8d6ef",
+                borderRadius: 4,
+                marginBottom: 12,
+              }}
+            />
+
+            <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+                  Ancho
+                </label>
+                <input
+                  type="number"
+                  value={panelCSV.ancho}
+                  onChange={(e) =>
+                    setPanelCSV((p) => ({ ...p, ancho: e.target.value }))
+                  }
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "6px 8px",
+                    fontSize: 13,
+                    fontFamily: "'Space Mono',monospace",
+                    border: "1.5px solid #b8d6ef",
+                    borderRadius: 4,
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+                  Alto
+                </label>
+                <input
+                  type="number"
+                  value={panelCSV.alto}
+                  onChange={(e) =>
+                    setPanelCSV((p) => ({ ...p, alto: e.target.value }))
+                  }
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "6px 8px",
+                    fontSize: 13,
+                    fontFamily: "'Space Mono',monospace",
+                    border: "1.5px solid #b8d6ef",
+                    borderRadius: 4,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                onClick={() => setPanelCSV(null)}
+                disabled={guardandoPanelCSV}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "1.5px solid #b8d6ef",
+                  background: "#fff",
+                  color: "#4a8ab5",
+                  cursor: "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleGuardarPanelCSV}
+                disabled={
+                  guardandoPanelCSV ||
+                  !panelCSV.codartint ||
+                  panelCSV.ancho === "" ||
+                  panelCSV.alto === ""
+                }
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "none",
+                  background: "#1a7a44",
+                  color: "#fff",
+                  cursor: guardandoPanelCSV ? "wait" : "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  opacity: guardandoPanelCSV ? 0.6 : 1,
+                }}
+              >
+                {guardandoPanelCSV ? "Generando…" : "Guardar y generar CSV"}
+              </button>
+            </div>
           </div>
         </div>
       )}
