@@ -26,6 +26,7 @@ import CuentaCorriente from "./screens/CuentaCorriente";
 import VisorDWGPage from "./screens/VisorDWGPage";
 import Anviz from "./screens/Anviz";
 import FichadasAnviz from "./screens/FichadasAnviz";
+import FlujoFondos from "./screens/FlujoFondos";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState, useRef } from "react";
@@ -58,6 +59,7 @@ const SCREENS = {
   "vehiculos-mantenimiento": { label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚" },
   "cuenta-corriente": { label: "CLIENTES ACTIVOS", icon: "💰" },
   "visor-dwg": { label: "VISOR 3D MÓDULOS", icon: "📐" },
+  "flujo-fondos": { label: "FLUJO DE FONDOS", icon: "💵" },
   chat: { label: "CHAT", icon: "💬" },
 };
 
@@ -93,6 +95,7 @@ const PANTALLAS_MENU = [
   { id: "vehiculos-mantenimiento", label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚", color: "#8d6e63", ubicacionDefault: "lateral" },
   { id: "asistencia", label: "ASISTENCIA", icon: "⏰", color: "#6366f1", ubicacionDefault: "lateral" },
   { id: "fichadas", label: "CONTROL DE FICHADAS", icon: "🕒", color: "#4f46e5", ubicacionDefault: "lateral" },
+  { id: "flujo-fondos", label: "FLUJO DE FONDOS", icon: "💵", color: "#2e8b57", ubicacionDefault: "lateral" },
 ];
 
 export default function Root() {
@@ -131,6 +134,8 @@ function App() {
   const [tiposEscritorio, setTiposEscritorio] = useState([]);
   const [tiposDespensero, setTiposDespensero] = useState([]);
   const [formulas, setFormulas] = useState([]);
+  const [formulasProduccion, setFormulasProduccion] = useState([]);
+  const [selectedFormulaProduccion, setSelectedFormulaProduccion] = useState(null);
   const [margen, setMargen] = useState([]);
   const [listas, setListas] = useState([]);
   const [presupuestosMamparas, setPresupuestosMamparas] = useState([]);
@@ -407,6 +412,12 @@ function App() {
       .then(setFormulas)
       .catch(console.error);
 
+  const fetchFormulasProduccion = () =>
+    authFetch(`${API}/formulas-produccion`)
+      .then((r) => r.json())
+      .then(setFormulasProduccion)
+      .catch(console.error);
+
   const fetchAsociaciones = () =>
     authFetch(`${API}/asociaciones`)
       .then((r) => r.json())
@@ -471,6 +482,7 @@ function App() {
     if (puedeVer("ver-tablas"))              fetchTiposEscritorio();
     if (puedeVer("ver-tablas"))              fetchTiposDespensero();
     if (puedeVer("ver-tablas"))              fetchFormulas();
+    if (puedeVer("ver-tablas"))              fetchFormulasProduccion();
     if (puedeVer("lista-margenes"))          fetchMargen();
     if (puedeVer("presupuestos-tabla"))      fetchPresupuestosMamparas();
     if (puedeVer("ver-tablas"))              fetchPresupuestosPuertas();
@@ -705,6 +717,14 @@ function App() {
     setSelectedFormula,
     fetchFormulas,
     "Fórmula",
+  );
+  const formulasProduccionCRUD = makeCRUD(
+    "formulas-produccion",
+    formulasProduccion,
+    setFormulasProduccion,
+    setSelectedFormulaProduccion,
+    fetchFormulasProduccion,
+    "Fórmula de Producción",
   );
   const presupuestosMamparasCRUD = makeCRUD(
     "presupuestos-mamparas",
@@ -1316,6 +1336,9 @@ function App() {
                 formulas={formulas}
                 formulasCRUD={formulasCRUD}
                 selectedFormula={selectedFormula}
+                formulasProduccion={formulasProduccion}
+                formulasProduccionCRUD={formulasProduccionCRUD}
+                selectedFormulaProduccion={selectedFormulaProduccion}
                 margen={margen}
                 margenCRUD={margenCRUD}
                 selectedMargen={selectedMargen}
@@ -1392,6 +1415,11 @@ function App() {
 
             {/* ── Visor 3D DWG/DXF ── */}
             {screen === "visor-dwg" && <VisorDWGPage token={token} />}
+
+            {/* ── Flujo de Fondos ── */}
+            {screen === "flujo-fondos" && (
+              <FlujoFondos token={token} authFetch={authFetch} onBack={() => setScreen(null)} />
+            )}
 
             {/* ── Facturas ── */}
             {screen === "facturas" && <Facturas proveedores={proveedores} token={token} />}
