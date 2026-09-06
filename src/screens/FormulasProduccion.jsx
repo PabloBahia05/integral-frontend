@@ -13,7 +13,8 @@ const COLUMNS = [
   { key: "rubro", label: "Rubro" },
   { key: "familia", label: "Familia" },
   { key: "descripcion", label: "Descripción" },
-  { key: "formula", label: "Fórmula" },
+  { key: "formula", label: "Fórmula (Valor 1)" },
+  { key: "formula2", label: "Fórmula (Valor 2)" },
 ];
 
 const EMPTY = {
@@ -21,6 +22,7 @@ const EMPTY = {
   codart: "",
   descripcion: "",
   formula: "",
+  formula2: "",
   rubro: "",
   familia: "",
 };
@@ -34,7 +36,13 @@ const CAMPOS_ARTICULO = [
 ];
 
 // ── Selector de artículo + campo para insertar variable en la fórmula ──
-function InsertarVariable({ formulaRef, setForm, rubro, artsDeFamilia }) {
+function InsertarVariable({
+  formulaRef,
+  setForm,
+  rubro,
+  artsDeFamilia,
+  field = "formula",
+}) {
   const [artElegido, setArtElegido] = useState(null);
   const [campoElegido, setCampoElegido] = useState("precio");
 
@@ -51,14 +59,14 @@ function InsertarVariable({ formulaRef, setForm, rubro, artsDeFamilia }) {
       const end = el.selectionEnd ?? el.value.length;
       setForm((p) => ({
         ...p,
-        formula: p.formula.slice(0, start) + variable + p.formula.slice(end),
+        [field]: p[field].slice(0, start) + variable + p[field].slice(end),
       }));
       setTimeout(() => {
         el.focus();
         el.setSelectionRange(start + variable.length, start + variable.length);
       }, 10);
     } else {
-      setForm((p) => ({ ...p, formula: p.formula + variable }));
+      setForm((p) => ({ ...p, [field]: p[field] + variable }));
     }
     setArtElegido(null);
     setCampoElegido("precio");
@@ -197,7 +205,13 @@ function InsertarVariable({ formulaRef, setForm, rubro, artsDeFamilia }) {
 }
 
 // ── Selector para anidar otra fórmula ────────────────────────────────────
-function InsertarFormula({ formulaRef, setForm, formulas, codformActual }) {
+function InsertarFormula({
+  formulaRef,
+  setForm,
+  formulas,
+  codformActual,
+  field = "formula",
+}) {
   const [elegida, setElegida] = useState("");
 
   const insertar = () => {
@@ -209,14 +223,14 @@ function InsertarFormula({ formulaRef, setForm, formulas, codformActual }) {
       const end = el.selectionEnd ?? el.value.length;
       setForm((p) => ({
         ...p,
-        formula: p.formula.slice(0, start) + variable + p.formula.slice(end),
+        [field]: p[field].slice(0, start) + variable + p[field].slice(end),
       }));
       setTimeout(() => {
         el.focus();
         el.setSelectionRange(start + variable.length, start + variable.length);
       }, 10);
     } else {
-      setForm((p) => ({ ...p, formula: p.formula + variable }));
+      setForm((p) => ({ ...p, [field]: p[field] + variable }));
     }
     setElegida("");
   };
@@ -325,7 +339,7 @@ function InsertarFormula({ formulaRef, setForm, formulas, codformActual }) {
 }
 
 // ── Insertar margen del artículo vinculado (codart del form) ────────────
-function InsertarMargen({ formulaRef, setForm, codart }) {
+function InsertarMargen({ formulaRef, setForm, codart, field = "formula" }) {
   const { authFetch } = useAuth();
   const [margenInfo, setMargenInfo] = useState(null);
   const [cargando, setCargando] = useState(false);
@@ -359,14 +373,14 @@ function InsertarMargen({ formulaRef, setForm, codart }) {
       const end = el.selectionEnd ?? el.value.length;
       setForm((p) => ({
         ...p,
-        formula: p.formula.slice(0, start) + variable + p.formula.slice(end),
+        [field]: p[field].slice(0, start) + variable + p[field].slice(end),
       }));
       setTimeout(() => {
         el.focus();
         el.setSelectionRange(start + variable.length, start + variable.length);
       }, 10);
     } else {
-      setForm((p) => ({ ...p, formula: p.formula + variable }));
+      setForm((p) => ({ ...p, [field]: p[field] + variable }));
     }
   };
 
@@ -477,6 +491,210 @@ function InsertarMargen({ formulaRef, setForm, codart }) {
   );
 }
 
+// ── Bloque completo de edición/verificación de UNA columna de fórmula ───
+// Se usa dos veces: una para "formula" (Valor 1) y otra para "formula2" (Valor 2)
+function BloqueFormula({
+  titulo,
+  field,
+  formulaRef,
+  form,
+  setForm,
+  rubroElegido,
+  artsPorRubro,
+  formulas,
+  verifResult,
+  onVerificar,
+}) {
+  return (
+    <div className="form-group">
+      <label className="form-label">{titulo} *</label>
+      <InsertarVariable
+        formulaRef={formulaRef}
+        setForm={setForm}
+        rubro={rubroElegido}
+        artsDeFamilia={artsPorRubro}
+        field={field}
+      />
+      <InsertarMargen
+        formulaRef={formulaRef}
+        setForm={setForm}
+        codart={form.codartint}
+        field={field}
+      />
+      <InsertarFormula
+        formulaRef={formulaRef}
+        setForm={setForm}
+        formulas={formulas}
+        codformActual={form.codform}
+        field={field}
+      />
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <input
+          ref={formulaRef}
+          className="form-input"
+          placeholder="Ej: ancho * alto * precio_KITMP000"
+          value={form[field]}
+          onChange={(e) => {
+            setForm((p) => ({ ...p, [field]: e.target.value }));
+            onVerificar.reset();
+          }}
+          style={{ flex: 1, marginBottom: 0 }}
+        />
+        <button
+          type="button"
+          onClick={() => onVerificar.run(field)}
+          style={{
+            padding: "10px 16px",
+            borderRadius: 4,
+            border: "1.5px solid #2277bb",
+            background: "#fff",
+            color: "#2277bb",
+            cursor: "pointer",
+            fontFamily: "monospace",
+            fontSize: 13,
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+          }}
+        >
+          ✓ Verificar
+        </button>
+      </div>
+
+      {verifResult && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: "10px 14px",
+            borderRadius: 5,
+            fontSize: 12,
+            background: verifResult.ok ? "#e8f8f0" : "#fdf0f0",
+            border: `1px solid ${verifResult.ok ? "#6dcc99" : "#f0a0a0"}`,
+            color: verifResult.ok ? "#1a7a44" : "#c0392b",
+          }}
+        >
+          {verifResult.ok ? (
+            <>
+              <strong>✅ Fórmula válida</strong>
+              <br />
+              Resultado con valores de prueba (ancho=100, alto=200,
+              cantidad=1, colocacion=5000):
+              <br />
+              <strong style={{ fontSize: 15 }}>
+                = {verifResult.resultado}
+              </strong>
+              {verifResult.preciosUsados &&
+                Object.keys(verifResult.preciosUsados).length > 0 && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 11,
+                      color: "#2d7a50",
+                    }}
+                  >
+                    Precios usados de BD:{" "}
+                    {Object.entries(verifResult.preciosUsados)
+                      .filter(
+                        ([k]) =>
+                          k.startsWith("precio_") &&
+                          k !== "precio_vidrio" &&
+                          k !== "precio",
+                      )
+                      .map(
+                        ([k, v]) =>
+                          `${k} = $${Number(v).toLocaleString("es-AR")}`,
+                      )
+                      .join(" · ")}
+                  </div>
+                )}
+            </>
+          ) : (
+            <>
+              <strong>❌ Error en la fórmula</strong>
+              <br />
+              {verifResult.error}
+            </>
+          )}
+        </div>
+      )}
+      <div
+        style={{
+          marginTop: 8,
+          padding: "10px 12px",
+          background: "#f0f6fb",
+          border: "1px solid #c0d8ee",
+          borderRadius: 5,
+          fontSize: 11,
+          lineHeight: 1.8,
+          color: "#4a6a80",
+        }}
+      >
+        <strong style={{ color: "#0a3a5c" }}>Variables de artículo</strong>{" "}
+        (datos traídos de la BD):
+        <br />
+        <code
+          style={{
+            background: "#e0eef8",
+            padding: "1px 5px",
+            borderRadius: 3,
+            marginRight: 4,
+          }}
+        >
+          precio_CODART
+        </code>
+        <code
+          style={{
+            background: "#e0eef8",
+            padding: "1px 5px",
+            borderRadius: 3,
+            marginRight: 4,
+          }}
+        >
+          ancho_CODART
+        </code>
+        <code
+          style={{
+            background: "#e0eef8",
+            padding: "1px 5px",
+            borderRadius: 3,
+          }}
+        >
+          alto_CODART
+        </code>
+        <br />
+        <strong style={{ color: "#1a7a44" }}>Fórmulas anidadas</strong>{" "}
+        (referencias a otras fórmulas de producción):
+        <br />
+        <code
+          style={{
+            background: "#d4f0e0",
+            padding: "1px 5px",
+            borderRadius: 3,
+            marginRight: 4,
+          }}
+        >
+          FORM_CODFORMULA
+        </code>
+        <span style={{ fontSize: 10, color: "#2d8a55" }}>
+          el resultado de esa fórmula se reemplaza aquí
+        </span>
+        <br />
+        <strong style={{ color: "#c0392b" }}>⚠️ Importante:</strong> usá
+        minúsculas y{" "}
+        <code
+          style={{
+            background: "#e0eef8",
+            padding: "1px 4px",
+            borderRadius: 3,
+          }}
+        >
+          *
+        </code>{" "}
+        para multiplicar.
+      </div>
+    </div>
+  );
+}
+
 // ── Componente principal ─────────────────────────────────────────────────
 export default function FormulasProduccion({
   formulas,
@@ -499,14 +717,18 @@ export default function FormulasProduccion({
   const [familiaElegida, setFamiliaElegida] = useState("");
   const [rubroElegido, setRubroElegido] = useState("");
   const formulaRef = useRef(null);
+  const formula2Ref = useRef(null);
   const [verifResult, setVerifResult] = useState(null);
+  const [verifResult2, setVerifResult2] = useState(null);
 
-  const verificarFormula = async () => {
-    if (!form.formula.trim()) {
-      setVerifResult({ ok: false, error: "La fórmula está vacía." });
+  const verificarFormula = async (field = "formula") => {
+    const setResult = field === "formula2" ? setVerifResult2 : setVerifResult;
+    const valorFormula = form[field] ?? "";
+    if (!valorFormula.trim()) {
+      setResult({ ok: false, error: "La fórmula está vacía." });
       return;
     }
-    setVerifResult(null);
+    setResult(null);
     const variables = { ancho: 100, alto: 200, cantidad: 1, colocacion: 5000 };
     const codart_modelo = form.codartint || null;
     try {
@@ -516,7 +738,7 @@ export default function FormulasProduccion({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            formula: form.formula,
+            formula: valorFormula,
             variables,
             codart_modelo,
           }),
@@ -524,19 +746,19 @@ export default function FormulasProduccion({
       );
       const data = await res.json();
       if (!res.ok) {
-        setVerifResult({
+        setResult({
           ok: false,
           error: data.error ?? "Error desconocido.",
         });
       } else {
-        setVerifResult({
+        setResult({
           ok: true,
           resultado: data.resultado,
           preciosUsados: data.variables,
         });
       }
     } catch {
-      setVerifResult({
+      setResult({
         ok: false,
         error: "No se pudo conectar con el servidor.",
       });
@@ -658,6 +880,8 @@ export default function FormulasProduccion({
     setFamiliaElegida("");
     setRubroElegido("");
     setArtsPorRubro([]);
+    setVerifResult(null);
+    setVerifResult2(null);
     onOpenModal("nuevo");
   };
 
@@ -705,6 +929,7 @@ export default function FormulasProduccion({
       codartint: selected.codart ?? "",
       descripcion: selected.descripcion ?? "",
       formula: selected.formula ?? "",
+      formula2: selected.formula2 ?? "",
       rubro: selected.rubro ?? "",
       familia: selected.familia ?? "",
     });
@@ -712,6 +937,8 @@ export default function FormulasProduccion({
     setFamiliaElegida("");
     setRubroElegido("");
     setArtsPorRubro([]);
+    setVerifResult(null);
+    setVerifResult2(null);
     onOpenModal("editar");
     await cargarCascadaDeArticulo(selected.codart ?? "", selected.rubro);
   };
@@ -723,6 +950,7 @@ export default function FormulasProduccion({
       codartint: selected.codart ?? "",
       descripcion: selected.descripcion ?? "",
       formula: selected.formula ?? "",
+      formula2: selected.formula2 ?? "",
       rubro: selected.rubro ?? "",
       familia: selected.familia ?? "",
     });
@@ -730,6 +958,8 @@ export default function FormulasProduccion({
     setFamiliaElegida("");
     setRubroElegido("");
     setArtsPorRubro([]);
+    setVerifResult(null);
+    setVerifResult2(null);
     onOpenModal("nuevo");
     await cargarCascadaDeArticulo(selected.codart ?? "", selected.rubro);
   };
@@ -740,7 +970,11 @@ export default function FormulasProduccion({
       return;
     }
     if (!form.formula.trim()) {
-      setError("La fórmula es obligatoria.");
+      setError("La fórmula del Valor 1 es obligatoria.");
+      return;
+    }
+    if (!form.formula2.trim()) {
+      setError("La fórmula del Valor 2 es obligatoria.");
       return;
     }
 
@@ -778,6 +1012,7 @@ export default function FormulasProduccion({
       onCloseModal();
       setForm(EMPTY);
       setVerifResult(null);
+      setVerifResult2(null);
     }
   };
 
@@ -1018,193 +1253,31 @@ export default function FormulasProduccion({
             )}
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Fórmula *</label>
-            <InsertarVariable
-              formulaRef={formulaRef}
-              setForm={setForm}
-              rubro={rubroElegido}
-              artsDeFamilia={artsPorRubro}
-            />
-            <InsertarMargen
-              formulaRef={formulaRef}
-              setForm={setForm}
-              codart={form.codartint}
-            />
-            <InsertarFormula
-              formulaRef={formulaRef}
-              setForm={setForm}
-              formulas={formulas}
-              codformActual={form.codform}
-            />
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                ref={formulaRef}
-                className="form-input"
-                placeholder="Ej: ancho * alto * precio_KITMP000"
-                value={form.formula}
-                onChange={(e) => {
-                  setForm((p) => ({ ...p, formula: e.target.value }));
-                  setVerifResult(null);
-                }}
-                style={{ flex: 1, marginBottom: 0 }}
-              />
-              <button
-                type="button"
-                onClick={verificarFormula}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 4,
-                  border: "1.5px solid #2277bb",
-                  background: "#fff",
-                  color: "#2277bb",
-                  cursor: "pointer",
-                  fontFamily: "monospace",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                ✓ Verificar
-              </button>
-            </div>
+          <BloqueFormula
+            titulo="Fórmula — Valor 1"
+            field="formula"
+            formulaRef={formulaRef}
+            form={form}
+            setForm={setForm}
+            rubroElegido={rubroElegido}
+            artsPorRubro={artsPorRubro}
+            formulas={formulas}
+            verifResult={verifResult}
+            onVerificar={{ run: verificarFormula, reset: () => setVerifResult(null) }}
+          />
 
-            {verifResult && (
-              <div
-                style={{
-                  marginTop: 8,
-                  padding: "10px 14px",
-                  borderRadius: 5,
-                  fontSize: 12,
-                  background: verifResult.ok ? "#e8f8f0" : "#fdf0f0",
-                  border: `1px solid ${verifResult.ok ? "#6dcc99" : "#f0a0a0"}`,
-                  color: verifResult.ok ? "#1a7a44" : "#c0392b",
-                }}
-              >
-                {verifResult.ok ? (
-                  <>
-                    <strong>✅ Fórmula válida</strong>
-                    <br />
-                    Resultado con valores de prueba (ancho=100, alto=200,
-                    cantidad=1, colocacion=5000):
-                    <br />
-                    <strong style={{ fontSize: 15 }}>
-                      = {verifResult.resultado}
-                    </strong>
-                    {verifResult.preciosUsados &&
-                      Object.keys(verifResult.preciosUsados).length > 0 && (
-                        <div
-                          style={{
-                            marginTop: 6,
-                            fontSize: 11,
-                            color: "#2d7a50",
-                          }}
-                        >
-                          Precios usados de BD:{" "}
-                          {Object.entries(verifResult.preciosUsados)
-                            .filter(
-                              ([k]) =>
-                                k.startsWith("precio_") &&
-                                k !== "precio_vidrio" &&
-                                k !== "precio",
-                            )
-                            .map(
-                              ([k, v]) =>
-                                `${k} = $${Number(v).toLocaleString("es-AR")}`,
-                            )
-                            .join(" · ")}
-                        </div>
-                      )}
-                  </>
-                ) : (
-                  <>
-                    <strong>❌ Error en la fórmula</strong>
-                    <br />
-                    {verifResult.error}
-                  </>
-                )}
-              </div>
-            )}
-            <div
-              style={{
-                marginTop: 8,
-                padding: "10px 12px",
-                background: "#f0f6fb",
-                border: "1px solid #c0d8ee",
-                borderRadius: 5,
-                fontSize: 11,
-                lineHeight: 1.8,
-                color: "#4a6a80",
-              }}
-            >
-              <strong style={{ color: "#0a3a5c" }}>
-                Variables de artículo
-              </strong>{" "}
-              (datos traídos de la BD):
-              <br />
-              <code
-                style={{
-                  background: "#e0eef8",
-                  padding: "1px 5px",
-                  borderRadius: 3,
-                  marginRight: 4,
-                }}
-              >
-                precio_CODART
-              </code>
-              <code
-                style={{
-                  background: "#e0eef8",
-                  padding: "1px 5px",
-                  borderRadius: 3,
-                  marginRight: 4,
-                }}
-              >
-                ancho_CODART
-              </code>
-              <code
-                style={{
-                  background: "#e0eef8",
-                  padding: "1px 5px",
-                  borderRadius: 3,
-                }}
-              >
-                alto_CODART
-              </code>
-              <br />
-              <strong style={{ color: "#1a7a44" }}>
-                Fórmulas anidadas
-              </strong>{" "}
-              (referencias a otras fórmulas de producción):
-              <br />
-              <code
-                style={{
-                  background: "#d4f0e0",
-                  padding: "1px 5px",
-                  borderRadius: 3,
-                  marginRight: 4,
-                }}
-              >
-                FORM_CODFORMULA
-              </code>
-              <span style={{ fontSize: 10, color: "#2d8a55" }}>
-                el resultado de esa fórmula se reemplaza aquí
-              </span>
-              <br />
-              <strong style={{ color: "#c0392b" }}>⚠️ Importante:</strong> usá
-              minúsculas y{" "}
-              <code
-                style={{
-                  background: "#e0eef8",
-                  padding: "1px 4px",
-                  borderRadius: 3,
-                }}
-              >
-                *
-              </code>{" "}
-              para multiplicar.
-            </div>
-          </div>
+          <BloqueFormula
+            titulo="Fórmula — Valor 2"
+            field="formula2"
+            formulaRef={formula2Ref}
+            form={form}
+            setForm={setForm}
+            rubroElegido={rubroElegido}
+            artsPorRubro={artsPorRubro}
+            formulas={formulas}
+            verifResult={verifResult2}
+            onVerificar={{ run: verificarFormula, reset: () => setVerifResult2(null) }}
+          />
 
           <div className="form-actions">
             <button className="btn-cancel" onClick={onCloseModal}>
