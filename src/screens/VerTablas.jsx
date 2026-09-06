@@ -71,6 +71,7 @@ const MODULOS = [
   { id: "chat",                      label: "Chat",                   acciones: ["ver"] },
   { id: "asistencia",                label: "Asistencia",             acciones: ["ver"] },
   { id: "fichadas",                  label: "Control de Fichadas",    acciones: ["ver"] },
+  { id: "flujo-fondos",              label: "Flujo de Fondos",        acciones: ["ver", "crear", "editar", "eliminar"] },
   { id: "usuarios",                  label: "Usuarios",               acciones: ["ver", "crear", "editar", "eliminar"] },
 ];
 // NOTA: los módulos nuevos (actualizar-precios, presupuesto-muebles,
@@ -93,7 +94,7 @@ const PANTALLAS_MENU = [
   { id: "cuenta-corriente", label: "Clientes Activos", icon: "💰", ubicacionDefault: "principal" },
   { id: "obras-confirmadas", label: "Obras Confirmadas", icon: "✅", ubicacionDefault: "principal" },
   { id: "produccion", label: "Producción", icon: "🏭", ubicacionDefault: "principal" },
-  { id: "visor-dwg", label: "Visor 3D Módulos", icon: "📐", ubicacionDefault: "principal" },
+  { id: "visor-dwg", label: "Visor 3D Módulos", icon: "📐", ubicacionDefault: "lateral" },
   { id: "chat", label: "Chat", icon: "💬", ubicacionDefault: "principal" },
   { id: "presupuesto-mamparas", label: "Presup. Mamparas", icon: "🪟", ubicacionDefault: "lateral" },
   { id: "presupuesto-muebles", label: "Presup. Muebles", icon: "🪵", ubicacionDefault: "lateral" },
@@ -111,6 +112,7 @@ const PANTALLAS_MENU = [
   { id: "vehiculos-mantenimiento", label: "Vehículos - Mantenim.", icon: "🚚", ubicacionDefault: "lateral" },
   { id: "asistencia", label: "Asistencia", icon: "⏰", ubicacionDefault: "lateral" },
   { id: "fichadas", label: "Control de Fichadas", icon: "🕒", ubicacionDefault: "lateral" },
+  { id: "flujo-fondos", label: "Flujo de Fondos", icon: "💵", ubicacionDefault: "lateral" },
 ];
 
 // ── Componente Permisos ──────────────────────────────────────────────────────
