@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import ScreenHeader from "../Component/ScreenHeader";
 import Clientes from "./Clientes";
 import Productos from "./Productos";
-import TiposEscritorio from "./TiposEscritorio";
-import TiposDespensero from "./TiposDespensero";
 import Formulas from "./Formulas";
 import FormulasProduccion from "./FormulasProduccion";
 import Margen from "./Margen";
@@ -57,7 +55,7 @@ const MODULOS = [
     id: "ver-tablas-botones",
     label: "Ver Tablas · Botones",
     acciones: [
-      "clientes", "productos", "escritorio-tipos", "despensero-tipos",
+      "clientes", "productos",
       "formulas", "formulas-produccion", "margen", "presupuestos-mamparas-tabla", "presupuestos-puertas-tabla",
       "colocacion", "asociaciones", "asociaciones-form", "form-std", "asoc-form-std",
       "lista", "proveedores", "feriados", "semanas-anio", "usuarios-app", "permisos",
@@ -821,18 +819,6 @@ function TextoSenaEditor({ onBack, token }) {
 const TABLAS = [
   { id: "clientes", label: "Clientes", icon: "👥", color: "#eb56d7" },
   { id: "productos", label: "Productos", icon: "🛒", color: "#ff6b6b" },
-  {
-    id: "escritorio-tipos",
-    label: "Tipos de Escritorio",
-    icon: "🖥️",
-    color: "#f4a261",
-  },
-  {
-    id: "despensero-tipos",
-    label: "Tipos de Despensero",
-    icon: "🗄️",
-    color: "#2ec4b6",
-  },
   { id: "formulas", label: "Fórmulas", icon: "🧮", color: "#e63946" },
   { id: "formulas-produccion", label: "Fórmulas Producción", icon: "🏭", color: "#e63946" },
   { id: "margen", label: "Márgenes", icon: "📊", color: "#2a9d8f" },
@@ -880,12 +866,6 @@ export default function VerTablas({
   productos,
   productosCRUD,
   selectedProducto,
-  tiposEscritorio,
-  tiposEscritorioRUD,
-  selectedTipoEscritorio,
-  tiposDespensero,
-  tiposDespenseroRUD,
-  selectedTipoDespensero,
   formulas,
   formulasCRUD,
   selectedFormula,
@@ -1012,31 +992,6 @@ export default function VerTablas({
           selected={selectedProducto}
           modal={modal}
           {...localCRUD(productosCRUD)}
-        />
-      </div>
-    );
-  if (tablaActiva === "escritorio-tipos")
-    return (
-      <div>
-        {back}
-        <TiposEscritorio
-          tiposEscritorio={tiposEscritorio ?? []}
-          selected={selectedTipoEscritorio}
-          modal={modal}
-          {...localCRUD(tiposEscritorioRUD ?? {})}
-        />
-      </div>
-    );
-  if (tablaActiva === "despensero-tipos")
-    return (
-      <div>
-        {back}
-        <TiposDespensero
-          tiposDespensero={tiposDespensero ?? []}
-          selected={selectedTipoDespensero}
-          modal={modal}
-          {...localCRUD(tiposDespenseroRUD ?? {})}
-          onSelect={(row) => tiposDespenseroRUD?.onSelect?.(row)}
         />
       </div>
     );
