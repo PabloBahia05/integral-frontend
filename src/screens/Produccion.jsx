@@ -306,6 +306,14 @@ export default function Produccion({ authFetch, token }) {
   // (independiente de produccion, ver modelos3d.routes.js).
   const [modelo3D, setModelo3D] = useState(null);
 
+  // Fila para la que se está generando/descargando el CSV de resultados de
+  // fórmulas (columna "CSV"). Pide GET /produccion/:id/formulas-csv — el
+  // backend resuelve las fórmulas de producción asociadas al artículo de
+  // esa fila (vía Asociación de Fórmulas) y devuelve un CSV con los
+  // resultados (Valor 1 / Valor 2 de cada fórmula).
+  const [generandoCSV, setGenerandoCSV] = useState(null);
+  const [errorCSV, setErrorCSV] = useState(null);
+
   // Melaminas disponibles para el desplegable de `color` (ver
   // GET /productos/melaminas en articulos_controller.js — filtra
   // articulos por rubro "melamina"/"MELAMINA"). Se guarda el `codartint`
@@ -449,6 +457,35 @@ export default function Produccion({ authFetch, token }) {
       setErrorCampo(key);
     } finally {
       setGuardandoCampo(null);
+    }
+  };
+
+  // ── Descarga de CSV con resultados de fórmulas de producción ───────────
+  // NOTA: el endpoint /produccion/:id/formulas-csv todavía no existe en el
+  // backend — falta construirlo cuando esté lista la pantalla de Asociación
+  // de Fórmulas (qué fórmulas aplican a qué artículo).
+
+  const handleDescargarCSV = async (row) => {
+    setGenerandoCSV(row.id);
+    setErrorCSV(null);
+    try {
+      const res = await authFetch(`${API}/produccion/${row.id}/formulas-csv`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${row.codpro || row.id}-formulas.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Error generando CSV:", e);
+      setErrorCSV(row.id);
+      alert("No se pudo generar el CSV.");
+    } finally {
+      setGenerandoCSV(null);
     }
   };
 
@@ -707,6 +744,34 @@ export default function Produccion({ authFetch, token }) {
           }}
         >
           🧊 Ver
+        </button>
+      ),
+    },
+    {
+      key: "csv",
+      label: "CSV",
+      render: (v, row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDescargarCSV(row);
+          }}
+          disabled={generandoCSV === row.id}
+          title="Descargar CSV con resultados de fórmulas"
+          style={{
+            background: errorCSV === row.id ? "#fdf0f0" : "#eafbf0",
+            color: errorCSV === row.id ? "#c0392b" : "#1a7a44",
+            border: `1px solid ${errorCSV === row.id ? "#f0a0a0" : "#a5d6a7"}`,
+            borderRadius: "4px",
+            padding: "3px 10px",
+            fontSize: "12px",
+            fontWeight: 700,
+            cursor: generandoCSV === row.id ? "wait" : "pointer",
+            fontFamily: "'Space Mono', monospace",
+            opacity: generandoCSV === row.id ? 0.6 : 1,
+          }}
+        >
+          {generandoCSV === row.id ? "…" : "📄 CSV"}
         </button>
       ),
     },
