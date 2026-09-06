@@ -5,6 +5,7 @@ import Productos from "./Productos";
 import TiposEscritorio from "./TiposEscritorio";
 import TiposDespensero from "./TiposDespensero";
 import Formulas from "./Formulas";
+import FormulasProduccion from "./FormulasProduccion";
 import Margen from "./Margen";
 import PresupuestosMamparasTabla from "./PresupuestosMamparasTabla";
 import PresupuestosPuertasTabla from "./PresupuestosPuertasTabla";
@@ -57,7 +58,7 @@ const MODULOS = [
     label: "Ver Tablas · Botones",
     acciones: [
       "clientes", "productos", "escritorio-tipos", "despensero-tipos",
-      "formulas", "margen", "presupuestos-mamparas-tabla", "presupuestos-puertas-tabla",
+      "formulas", "formulas-produccion", "margen", "presupuestos-mamparas-tabla", "presupuestos-puertas-tabla",
       "colocacion", "asociaciones", "asociaciones-form", "form-std", "asoc-form-std",
       "lista", "proveedores", "feriados", "semanas-anio", "usuarios-app", "permisos",
       "selector", "texto-sena",
@@ -831,6 +832,7 @@ const TABLAS = [
     color: "#2ec4b6",
   },
   { id: "formulas", label: "Fórmulas", icon: "🧮", color: "#e63946" },
+  { id: "formulas-produccion", label: "Fórmulas Producción", icon: "🏭", color: "#e63946" },
   { id: "margen", label: "Márgenes", icon: "📊", color: "#2a9d8f" },
   {
     id: "presupuestos-mamparas-tabla",
@@ -885,6 +887,9 @@ export default function VerTablas({
   formulas,
   formulasCRUD,
   selectedFormula,
+  formulasProduccion,
+  formulasProduccionCRUD,
+  selectedFormulaProduccion,
   margen,
   margenCRUD,
   selectedMargen,
@@ -1042,6 +1047,18 @@ export default function VerTablas({
           selected={selectedFormula}
           modal={modal}
           {...localCRUD(formulasCRUD ?? {})}
+        />
+      </div>
+    );
+  if (tablaActiva === "formulas-produccion")
+    return (
+      <div>
+        {back}
+        <FormulasProduccion
+          formulas={formulasProduccion ?? []}
+          selected={selectedFormulaProduccion}
+          modal={modal}
+          {...localCRUD(formulasProduccionCRUD ?? {})}
         />
       </div>
     );
