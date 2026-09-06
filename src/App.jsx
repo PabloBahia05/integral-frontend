@@ -144,6 +144,8 @@ function App() {
     useState(null);
   const [asociaciones, setAsociaciones] = useState([]);
   const [selectedAsociacion, setSelectedAsociacion] = useState(null);
+  const [asociacionesForm, setAsociacionesForm] = useState([]);
+  const [selectedAsociacionForm, setSelectedAsociacionForm] = useState(null);
   const [formStd, setFormStd] = useState([]);
   const [selectedFormStd, setSelectedFormStd] = useState(null);
   const [asocFormStd, setAsocFormStd] = useState([]);
@@ -411,6 +413,12 @@ function App() {
       .then(setAsociaciones)
       .catch(console.error);
 
+  const fetchAsociacionesForm = () =>
+    authFetch(`${API}/asociaciones-form`)
+      .then((r) => r.json())
+      .then(setAsociacionesForm)
+      .catch(console.error);
+
   const fetchFormStd = () =>
     authFetch(`${API}/form-std`)
       .then((r) => r.json())
@@ -468,6 +476,7 @@ function App() {
     if (puedeVer("ver-tablas"))              fetchPresupuestosPuertas();
     if (puedeVer("presupuestos-vanitory-tabla")) fetchPresupuestosVanitory();
     if (puedeVer("ver-tablas"))              fetchAsociaciones();
+    if (puedeVer("ver-tablas"))              fetchAsociacionesForm();
     if (puedeVer("ver-tablas"))              fetchFormStd();
     if (puedeVer("ver-tablas"))              fetchAsocFormStd();
     if (puedeVer("lista-margenes"))          fetchListas();
@@ -736,6 +745,14 @@ function App() {
     setSelectedAsociacion,
     fetchAsociaciones,
     "Asociación",
+  );
+  const asociacionesFormCRUD = makeCRUD(
+    "asociaciones-form",
+    asociacionesForm,
+    setAsociacionesForm,
+    setSelectedAsociacionForm,
+    fetchAsociacionesForm,
+    "Asociación de Fórmula",
   );
   const formStdCRUD = makeCRUD(
     "form-std",
@@ -1311,6 +1328,9 @@ function App() {
                 asociaciones={asociaciones}
                 asociacionesCRUD={asociacionesCRUD}
                 selectedAsociacion={selectedAsociacion}
+                asociacionesForm={asociacionesForm}
+                asociacionesFormCRUD={asociacionesFormCRUD}
+                selectedAsociacionForm={selectedAsociacionForm}
                 formStd={formStd}
                 formStdCRUD={formStdCRUD}
                 selectedFormStd={selectedFormStd}
