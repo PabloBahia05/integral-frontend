@@ -76,36 +76,53 @@ function useIsMobile(breakpoint = 640) {
 // no con clases + @media: cada estilo de acá abajo ya es el valor final
 // para el dispositivo actual, sin depender de que ninguna cascada CSS
 // externa lo pise ni de que el navegador respete el media query.
-function DetalleProduccion({ row, nombreMelamina, onClose }) {
+function DetalleProduccion({
+  row,
+  melaminas,
+  onClose,
+  onModuloChange,
+  onModuloBlur,
+  onColorChange,
+  onTextoCampoChange,
+  onTextoCampoBlur,
+  onEtapaChange,
+  guardandoId,
+  errorGuardadoId,
+  guardandoColorId,
+  errorColorId,
+  guardandoCampo,
+  errorCampo,
+}) {
   const isMobile = useIsMobile();
 
   if (!row) return null;
 
   const fuente = "'Space Mono', monospace";
 
-  const badgeEtapa = (valor) => (
-    <span
-      style={{
-        display: "inline-block",
-        background: valor === "SI" ? "#eaf7ea" : "#f3f3f3",
-        color: valor === "SI" ? "#2e7d32" : "#888",
-        border: `1px solid ${valor === "SI" ? "#a5d6a7" : "#ddd"}`,
-        borderRadius: "4px",
-        padding: isMobile ? "4px 12px" : "2px 10px",
-        fontSize: isMobile ? "15px" : "12px",
-        fontWeight: 700,
-        fontFamily: fuente,
-      }}
-    >
-      {valor === "SI" ? "✓ SI" : "NO"}
-    </span>
-  );
+  // Estilo común para los inputs/selects editables del modal — mismo
+  // criterio visual que estiloInput() de la tabla (amarillo mientras
+  // guarda, rojo si falló), adaptado al layout de dos columnas del modal.
+  const estiloInputModal = (activo, error) => ({
+    width: "100%",
+    boxSizing: "border-box",
+    padding: isMobile ? "10px 12px" : "6px 8px",
+    fontSize: isMobile ? "16px" : "13px",
+    fontFamily: fuente,
+    border: `1.5px solid ${error ? "#e57373" : "#b8d6ef"}`,
+    borderRadius: "4px",
+    background: activo ? "#fffbe6" : "#fff",
+    color: "#0a3a5c",
+    textAlign: "right",
+  });
 
-  const fila = (label, valor) => (
+  // Fila label + valor/control, mismo layout para lectura y edición: el
+  // valor puede ser texto plano o un input/select.
+  const fila = (label, contenido) => (
     <div
       style={{
         display: "flex",
         justifyContent: "space-between",
+        alignItems: "center",
         gap: isMobile ? "12px" : "16px",
         padding: isMobile ? "16px 0" : "8px 0",
         borderBottom: "1px solid #eaf3fb",
@@ -124,17 +141,19 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
       >
         {label}
       </span>
-      <span
+      <div
         style={{
           color: "#0a3a5c",
           fontWeight: 600,
           textAlign: "right",
           minWidth: 0,
+          maxWidth: isMobile ? "60%" : "180px",
+          width: "100%",
           overflowWrap: "break-word",
         }}
       >
-        {valor}
-      </span>
+        {contenido}
+      </div>
     </div>
   );
 
@@ -219,79 +238,145 @@ function DetalleProduccion({ row, nombreMelamina, onClose }) {
         {fila("Cliente", row.cliente_nombre ?? "(sin cliente)")}
         {fila("Grupo", row.grupo ?? "—")}
         {fila("Producto", row.producto ?? "—")}
-        {fila("Módulo", row.modulo ?? "Sin cargar")}
-        {fila("Color", row.color ? nombreMelamina(row.color) : "Sin color")}
-        {fila("OP", row.OP ?? "—")}
+
+        {fila(
+          "Módulo",
+          <input
+            type="text"
+            value={row.modulo ?? ""}
+            placeholder="Sin cargar"
+            onChange={(e) => onModuloChange(row.id, e.target.value)}
+            onBlur={() => onModuloBlur(row)}
+            maxLength={50}
+            style={estiloInputModal(
+              guardandoId === row.id,
+              errorGuardadoId === row.id,
+            )}
+          />,
+        )}
+
+        {["ancho", "profundidad", "alto"].map((campoMedida) => {
+          const key = `${row.id}-${campoMedida}`;
+          return fila(
+            campoMedida.charAt(0).toUpperCase() + campoMedida.slice(1),
+            <input
+              type="number"
+              step="0.1"
+              value={row[campoMedida] ?? ""}
+              placeholder="—"
+              onChange={(e) =>
+                onTextoCampoChange(row.id, campoMedida, e.target.value)
+              }
+              onBlur={() => onTextoCampoBlur(row, campoMedida)}
+              style={estiloInputModal(
+                guardandoCampo === key,
+                errorCampo === key,
+              )}
+            />,
+          );
+        })}
+
+        {fila(
+          "Color",
+          <select
+            value={row.color ?? ""}
+            onChange={(e) => onColorChange(row, e.target.value)}
+            style={estiloInputModal(
+              guardandoColorId === row.id,
+              errorColorId === row.id,
+            )}
+          >
+            <option value="">Sin color</option>
+            {melaminas.map((m) => (
+              <option key={m.codartint} value={m.codartint}>
+                {m.articulo}
+              </option>
+            ))}
+          </select>,
+        )}
+
+        {fila(
+          "OP",
+          <input
+            type="text"
+            value={row.OP ?? ""}
+            placeholder="—"
+            onChange={(e) => onTextoCampoChange(row.id, "OP", e.target.value)}
+            onBlur={() => onTextoCampoBlur(row, "OP")}
+            maxLength={10}
+            style={estiloInputModal(
+              guardandoCampo === `${row.id}-OP`,
+              errorCampo === `${row.id}-OP`,
+            )}
+          />,
+        )}
 
         <p style={{ ...subTexto, marginTop: "16px", marginBottom: "8px" }}>
           ETAPAS DE PROCESO
         </p>
 
-        {(() => {
-          // Solo se listan las etapas que ya tienen algún dato cargado (SI
-          // marcado, o un usuario asociado) — si una etapa sigue en NO y sin
-          // usuario, no se muestra fila para no ensuciar el detalle con
-          // "NO" en todo lo que todavía no se hizo.
-          const completadas = ETAPAS.filter(
-            ({ campo, usuario }) =>
-              row[campo] === "SI" || (usuario && row[usuario]),
-          );
-
-          if (completadas.length === 0) {
-            return (
-              <p
-                style={{
-                  fontSize: isMobile ? "17px" : "13px",
-                  color: "#8aabb8",
-                  fontFamily: fuente,
-                  padding: "8px 0",
-                }}
-              >
-                Sin etapas completadas todavía.
-              </p>
-            );
-          }
-
-          return completadas.map(({ campo, label, usuario }) => (
+        {ETAPAS.map(({ campo, label, usuario }) => {
+          const keyEtapa = `${row.id}-${campo}`;
+          const keyUsuario = usuario ? `${row.id}-${usuario}` : null;
+          return (
             <div
               key={campo}
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "12px",
                 padding: isMobile ? "16px 0" : "8px 0",
                 borderBottom: "1px solid #eaf3fb",
-                fontSize: isMobile ? "19px" : "13px",
-                boxSizing: "border-box",
-                width: "100%",
               }}
             >
-              <span
+              <div
                 style={{
                   color: "#4a8ab5",
                   fontFamily: fuente,
                   fontSize: isMobile ? "17px" : "13px",
+                  marginBottom: "6px",
                 }}
               >
                 {label}
-              </span>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                {usuario && row[usuario] ? (
-                  <span
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <select
+                  value={row[campo] ?? "NO"}
+                  onChange={(e) => onEtapaChange(row, campo, e.target.value)}
+                  style={{
+                    ...estiloInputModal(
+                      guardandoCampo === keyEtapa,
+                      errorCampo === keyEtapa,
+                    ),
+                    maxWidth: "90px",
+                    textAlign: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <option value="NO">NO</option>
+                  <option value="SI">SI</option>
+                </select>
+                {usuario && (
+                  <input
+                    type="text"
+                    value={row[usuario] ?? ""}
+                    placeholder="Usuario"
+                    onChange={(e) =>
+                      onTextoCampoChange(row.id, usuario, e.target.value)
+                    }
+                    onBlur={() => onTextoCampoBlur(row, usuario)}
+                    maxLength={50}
                     style={{
-                      color: "#0a3a5c",
-                      fontSize: isMobile ? "15px" : "12px",
+                      ...estiloInputModal(
+                        guardandoCampo === keyUsuario,
+                        errorCampo === keyUsuario,
+                      ),
+                      flex: 1,
+                      textAlign: "left",
                     }}
-                  >
-                    {row[usuario]}
-                  </span>
-                ) : null}
-                {badgeEtapa(row[campo] ?? "NO")}
+                  />
+                )}
               </div>
             </div>
-          ));
-        })()}
+          );
+        })}
       </div>
     </div>
   );
@@ -1162,9 +1247,21 @@ export default function Produccion({ authFetch, token }) {
 
       {detalle && (
         <DetalleProduccion
-          row={detalle}
-          nombreMelamina={nombreMelamina}
+          row={rows.find((r) => r.id === detalle.id) ?? detalle}
+          melaminas={melaminas}
           onClose={() => setDetalle(null)}
+          onModuloChange={handleModuloChange}
+          onModuloBlur={handleModuloBlur}
+          onColorChange={handleColorChange}
+          onTextoCampoChange={handleTextoCampoChange}
+          onTextoCampoBlur={handleTextoCampoBlur}
+          onEtapaChange={handleEtapaChange}
+          guardandoId={guardandoId}
+          errorGuardadoId={errorGuardadoId}
+          guardandoColorId={guardandoColorId}
+          errorColorId={errorColorId}
+          guardandoCampo={guardandoCampo}
+          errorCampo={errorCampo}
         />
       )}
 
