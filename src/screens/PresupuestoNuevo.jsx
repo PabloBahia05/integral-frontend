@@ -898,6 +898,10 @@ export default function PresupuestoNuevo({
   };
 
   // ── Persistencia de imágenes (tabla presupuesto_imagenes) ──────────────
+  // Se manda un objeto por imagen (no solo la URL) para que el tamaño
+  // elegido (anchoPct) y el "poner al lado de la siguiente" (juntarSiguiente)
+  // sobrevivan al guardar una revisión, igual que ya sobrevive el orden
+  // (dado por la posición dentro del array de cada grupo).
   const guardarImagenesPresupuesto = async (numPres, rev) => {
     const imagenes = imagenesFinal.filter((im) => im.tipo === "imagen");
     const porGrupo = new Map();
@@ -905,11 +909,17 @@ export default function PresupuestoNuevo({
       const key = im.grupo || null;
       if (!porGrupo.has(key)) porGrupo.set(key, []);
       const arr = porGrupo.get(key);
-      if (arr.length < MAX_IMAGENES_POR_GRUPO) arr.push(im.url);
+      if (arr.length < MAX_IMAGENES_POR_GRUPO) {
+        arr.push({
+          url: im.url,
+          anchoPct: im.anchoPct ?? 100,
+          juntarSiguiente: !!im.juntarSiguiente,
+        });
+      }
     });
-    const grupos = Array.from(porGrupo.entries()).map(([grupo, urls]) => ({
+    const grupos = Array.from(porGrupo.entries()).map(([grupo, imgs]) => ({
       grupo,
-      imagenes: urls,
+      imagenes: imgs,
     }));
     try {
       await authFetch(`${API}/presupuesto-imagenes/${numPres}/${rev ?? 0}`, {
@@ -1046,20 +1056,23 @@ export default function PresupuestoNuevo({
       const cargadas = [];
       filas.forEach((fila) => {
         const grupo = fila.grupo ?? fila.GRUPO ?? null;
-        const urls = (fila.imagenes ?? []).filter(Boolean);
-        urls.forEach((url, i) => {
+        const items = (fila.imagenes ?? []).filter(Boolean);
+        items.forEach((item, i) => {
+          // El backend ya devuelve { url, anchoPct, juntarSiguiente } por
+          // imagen (ver presupuesto_imagenes.controller.js). Se contempla
+          // igual el caso de un string suelto por compatibilidad hacia
+          // atrás, por si queda algún dato viejo circulando.
+          const esObjeto = item && typeof item === "object";
+          const url = esObjeto ? item.url : item;
+          if (!url) return;
           cargadas.push({
             id: `${fila.id ?? numPres}-${grupo ?? "sin-grupo"}-${i}`,
             tipo: "imagen",
             nombre: `imagen-${i + 1}.jpg`,
             url,
             grupo,
-            // anchoPct no se persiste todavía en presupuesto_imagenes (solo
-            // guarda grupo + urls) — al recargar un presupuesto siempre
-            // vuelve a 100%, aunque se haya elegido otro tamaño antes de
-            // guardar. Si hace falta que sobreviva al reload, hay que
-            // agregar una columna en esa tabla.
-            anchoPct: 100,
+            anchoPct: esObjeto && item.anchoPct != null ? Number(item.anchoPct) : 100,
+            juntarSiguiente: esObjeto ? !!item.juntarSiguiente : false,
           });
         });
       });
