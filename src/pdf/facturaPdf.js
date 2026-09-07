@@ -116,9 +116,9 @@ const FACTURA_CSS = `
 .f-footer-row { display: flex; border-bottom: 1.5px solid #111; }
 .f-observaciones { flex: 1; padding: 8px; font-size: 10px; border-right: 1.5px solid #111; }
 .f-observaciones.f-observaciones-sola { border-right: none; }
-.f-totales { width: 210px; flex-shrink: 0; padding: 8px; font-size: 11px; }
+.f-totales { width: 260px; flex-shrink: 0; padding: 8px; font-size: 11px; }
 .f-totales .f-t-row, .f-observaciones .f-t-row { display: flex; justify-content: space-between; margin-bottom: 4px; gap: 8px; }
-.f-totales .f-t-total { border-top: 1.5px solid #111; padding-top: 4px; font-weight: 700; font-size: 22px; }
+.f-totales .f-t-total { border-top: 1.5px solid #111; padding-top: 4px; font-weight: 700; font-size: 18px; }
 .f-regimen-titulo { font-size: 9px; font-weight: 700; line-height: 1.3; border-bottom: 1px solid #111; padding-bottom: 5px; margin-bottom: 6px; margin-top: 6px; }
 .f-monto-letras { padding: 6px 8px; font-size: 10px; border-bottom: 1.5px solid #111; display: flex; justify-content: space-between; align-items: center; }
 .f-cae-footer { display: flex; align-items: flex-start; padding-top: 8px; justify-content: space-between; }
@@ -311,7 +311,7 @@ export function armarFacturaPageHTML(f, emisor) {
         <div class="f-totales">
           <div class="f-t-row"><span>Importe Neto</span><span>${formatPeso(f.importe_neto)}</span></div>
           <div class="f-t-row"><span>IVA 21%</span><span>${formatPeso(f.importe_iva)}</span></div>
-          <div class="f-t-row f-t-total"><span>Total Comprobante</span><span>${formatPeso(f.importe_total)}</span></div>
+          <div class="f-t-row f-t-total"><span>Total</span><span>${formatPeso(f.importe_total)}</span></div>
         </div>
       </div>
       <div class="f-monto-letras">
