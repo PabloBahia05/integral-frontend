@@ -160,6 +160,8 @@ export default function CuentaCorriente({
     numeropres: "",
     monto: "",
     concepto: "Anticipo",
+    detalle: "",
+    forma_pago: "Efectivo",
     fecha: hoyISO(),
   });
   const [errorRecibo, setErrorRecibo] = useState("");
@@ -170,6 +172,8 @@ export default function CuentaCorriente({
       numeropres: "",
       monto: "",
       concepto: "Anticipo",
+      detalle: "",
+      forma_pago: "Efectivo",
       fecha: hoyISO(),
     });
     setErrorRecibo("");
@@ -215,6 +219,8 @@ export default function CuentaCorriente({
           revision: obraElegida?.revision ?? null,
           monto: montoNum,
           concepto: formRecibo.concepto || "Anticipo",
+          detalle: formRecibo.detalle,
+          forma_pago: formRecibo.forma_pago,
           fecha: formRecibo.fecha,
         }),
       });
@@ -945,6 +951,42 @@ export default function CuentaCorriente({
                   setFormRecibo((f) => ({ ...f, concepto: e.target.value }))
                 }
                 placeholder="Ej: Anticipo, seña..."
+                style={{ width: "100%", marginBottom: 12 }}
+              />
+
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
+                Forma de pago
+              </label>
+              <select
+                className="pn-field-select"
+                value={formRecibo.forma_pago}
+                onChange={(e) =>
+                  setFormRecibo((f) => ({ ...f, forma_pago: e.target.value }))
+                }
+                style={{ width: "100%", marginBottom: 12 }}
+              >
+                <option value="Efectivo">Efectivo</option>
+                <option value="Cheque">Cheque</option>
+                <option value="Transferencia">Transferencia</option>
+                <option value="Tarjeta">Tarjeta</option>
+              </select>
+
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
+                Detalle (opcional)
+              </label>
+              <input
+                className="pn-field-input"
+                value={formRecibo.detalle}
+                onChange={(e) =>
+                  setFormRecibo((f) => ({ ...f, detalle: e.target.value }))
+                }
+                placeholder="Ej: Nº de cheque, banco, últimos dígitos..."
                 style={{ width: "100%" }}
               />
             </div>

@@ -33,6 +33,8 @@ const EMPTY_RECIBO = () => ({
   numeropres: "",
   monto: "",
   concepto: "Anticipo",
+  detalle: "",
+  forma_pago: "Efectivo",
   fecha: hoy(),
 });
 
@@ -217,6 +219,8 @@ export default function FlujoFondos({ token }) {
           revision: obraElegida?.revision ?? null,
           monto: montoNum,
           concepto: formRecibo.concepto || "Anticipo",
+          detalle: formRecibo.detalle,
+          forma_pago: formRecibo.forma_pago,
           fecha: formRecibo.fecha,
         }),
       });
@@ -813,6 +817,34 @@ export default function FlujoFondos({ token }) {
                       setFormRecibo((f) => ({ ...f, concepto: e.target.value }))
                     }
                     placeholder="Ej: Anticipo, seña…"
+                  />
+                </div>
+
+                <div className="ff-fld">
+                  <span className="ff-fld-lbl">Forma de pago</span>
+                  <select
+                    className="ff-sel"
+                    value={formRecibo.forma_pago}
+                    onChange={(e) =>
+                      setFormRecibo((f) => ({ ...f, forma_pago: e.target.value }))
+                    }
+                  >
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                  </select>
+                </div>
+
+                <div className="ff-fld full">
+                  <span className="ff-fld-lbl">Detalle (opcional)</span>
+                  <input
+                    className="ff-inp"
+                    value={formRecibo.detalle}
+                    onChange={(e) =>
+                      setFormRecibo((f) => ({ ...f, detalle: e.target.value }))
+                    }
+                    placeholder="Ej: Nº de cheque, banco, últimos dígitos…"
                   />
                 </div>
               </div>
