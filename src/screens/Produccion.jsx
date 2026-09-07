@@ -462,12 +462,24 @@ export default function Produccion({ authFetch, token }) {
 
   // ── Fetch ──────────────────────────────────────────────────────────────
 
+  const [errorCarga, setErrorCarga] = useState(null);
+
   const fetchProduccion = () => {
     setLoading(true);
+    setErrorCarga(null);
     authFetch(`${API}/produccion`)
-      .then((r) => r.json())
-      .then((data) => setRows(Array.isArray(data) ? data : []))
-      .catch(console.error)
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok) {
+          throw new Error(data?.error || `HTTP ${r.status}`);
+        }
+        setRows(Array.isArray(data) ? data : []);
+      })
+      .catch((e) => {
+        console.error(e);
+        setErrorCarga(e.message);
+        setRows([]);
+      })
       .finally(() => setLoading(false));
   };
 
@@ -1203,6 +1215,16 @@ export default function Produccion({ authFetch, token }) {
           }}
         >
           ⏳ Cargando producción...
+        </p>
+      ) : errorCarga ? (
+        <p
+          style={{
+            padding: "24px",
+            color: "#c0392b",
+            fontFamily: "'Space Mono',monospace",
+          }}
+        >
+          ⚠ No se pudo cargar producción: {errorCarga}
         </p>
       ) : filtered.length === 0 ? (
         <p
