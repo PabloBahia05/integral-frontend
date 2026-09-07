@@ -351,17 +351,17 @@ function DetalleArticulo({ producto }) {
     (f) => f && f !== "null",
   );
   return (
-    <div className="detalle-panel">
-      <div className="detalle-foto">
+    <div className="detalle-panel" style={{ overflow: "auto" }}>
+      <div className="detalle-foto" style={{ float: "left", margin: "0 16px 12px 0" }}>
         {fotos.length > 0 ? (
           <div
             style={{
               display: "flex",
               flexDirection: "column",
               gap: 8,
-              width: "100%",
+              width: 260,
               maxWidth: 260,
-              margin: "0 auto",
+              margin: 0,
             }}
           >
             {fotos.map((f, i) => (
