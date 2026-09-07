@@ -142,6 +142,8 @@ const EMPTY = {
   area: "",
   unidad: "",
   artfoto: "",
+  artfoto2: "",
+  artfoto3: "",
   precio: "",
   proveedor: "",
   cantidad: "",
@@ -251,7 +253,7 @@ async function uploadImageToCloud(file, token) {
   return (await res.json()).url;
 }
 
-function FotoUpload({ value, onChange, token }) {
+function FotoUpload({ value, onChange, token, label = "Foto del artículo" }) {
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -272,7 +274,7 @@ function FotoUpload({ value, onChange, token }) {
 
   return (
     <div className="form-field">
-      <label className="form-label">Foto del artículo</label>
+      <label className="form-label">{label}</label>
       <div
         className={`foto-dropzone${dragging ? " foto-dropzone--active" : ""}`}
         onDrop={(e) => {
@@ -345,15 +347,38 @@ function DetalleArticulo({ producto }) {
         </span>
       </div>
     );
+  const fotos = [producto.artfoto, producto.artfoto2, producto.artfoto3].filter(
+    (f) => f && f !== "null",
+  );
   return (
     <div className="detalle-panel">
       <div className="detalle-foto">
-        {producto.artfoto && producto.artfoto !== "null" ? (
-          <img
-            src={producto.artfoto}
-            alt={producto.articulo}
-            className="detalle-img"
-          />
+        {fotos.length > 0 ? (
+          fotos.length === 1 ? (
+            <img
+              src={fotos[0]}
+              alt={producto.articulo}
+              className="detalle-img"
+            />
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${fotos.length}, 1fr)`,
+                gap: 6,
+              }}
+            >
+              {fotos.map((f, i) => (
+                <img
+                  key={i}
+                  src={f}
+                  alt={`${producto.articulo} ${i + 1}`}
+                  className="detalle-img"
+                  style={{ width: "100%" }}
+                />
+              ))}
+            </div>
+          )
         ) : (
           <div className="detalle-sin-foto">
             <span>🖼️</span>
@@ -724,6 +749,10 @@ export default function Productos({
       unidad: s(art.unidad),
       artfoto:
         art.artfoto && art.artfoto !== "null" ? art.artfoto : "",
+      artfoto2:
+        art.artfoto2 && art.artfoto2 !== "null" ? art.artfoto2 : "",
+      artfoto3:
+        art.artfoto3 && art.artfoto3 !== "null" ? art.artfoto3 : "",
       precio: recalculado.precio || s(art.precio),
       proveedor: s(art.proveedor),
       cantidad: s(art.cantidad),
@@ -792,6 +821,8 @@ export default function Productos({
       area: form.area || null,
       unidad: form.unidad || null,
       artfoto: form.artfoto || null,
+      artfoto2: form.artfoto2 || null,
+      artfoto3: form.artfoto3 || null,
       precio: toDecimal(form.precio),
       proveedor: form.proveedor || null,
       cantidad: toInt(form.cantidad),
@@ -1560,6 +1591,19 @@ export default function Productos({
                 value={form.artfoto}
                 onChange={(val) => setForm((p) => ({ ...p, artfoto: val }))}
                 token={token}
+                label="Foto del artículo 1"
+              />
+              <FotoUpload
+                value={form.artfoto2}
+                onChange={(val) => setForm((p) => ({ ...p, artfoto2: val }))}
+                token={token}
+                label="Foto del artículo 2"
+              />
+              <FotoUpload
+                value={form.artfoto3}
+                onChange={(val) => setForm((p) => ({ ...p, artfoto3: val }))}
+                token={token}
+                label="Foto del artículo 3"
               />
             </div>
             <div>
