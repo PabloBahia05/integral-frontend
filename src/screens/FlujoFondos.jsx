@@ -253,7 +253,7 @@ export default function FlujoFondos({ token }) {
             </div>
           </div>
           <div className="ff-saldo">
-            <div className="ff-saldo-lbl">Saldo acumulado</div>
+            <div className="ff-saldo-lbl">Efectivo en caja</div>
             <div className={`ff-saldo-val ${saldoActual >= 0 ? "pos" : "neg"}`}>
               {fmtMoneda(saldoActual)}
             </div>
@@ -389,17 +389,19 @@ export default function FlujoFondos({ token }) {
               <thead>
                 <tr>
                   <th>Fecha</th>
-                  <th>Tipo</th>
-                  <th>Concepto</th>
-                  <th>Origen</th>
-                  <th>Monto</th>
-                  <th>Saldo</th>
+                  <th>Cliente</th>
+                  <th>Proveedor</th>
+                  <th>Rubro</th>
+                  <th>Ingreso</th>
+                  <th>Egreso</th>
+                  <th>Efectivo en caja</th>
+                  <th>Forma de pago</th>
                 </tr>
               </thead>
               <tbody>
                 {movimientos.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={8}>
                       <div className="ff-empty">
                         <div style={{ fontSize: 28 }}>💤</div>
                         Sin movimientos en el período elegido
@@ -408,34 +410,31 @@ export default function FlujoFondos({ token }) {
                   </tr>
                 ) : (
                   movimientos.map((m, i) => (
-                    <tr key={`${m.origen}-${m.refId}-${i}`}>
+                    <tr key={`${m.origen}-${m.refId}-${i}`} title={m.concepto}>
                       <td>{fmtFecha(m.fecha)}</td>
+                      <td>{m.cliente || "—"}</td>
+                      <td>{m.proveedor || "—"}</td>
+                      <td>{m.rubro || "—"}</td>
                       <td>
-                        <span className={`ff-badge ${m.tipo}`}>
-                          {m.tipo === "ingreso" ? "Ingreso" : "Egreso"}
-                        </span>
-                      </td>
-                      <td>{m.concepto}</td>
-                      <td>
-                        <span className="ff-origen">
-                          {m.origen === "cobro"
-                            ? "Cuenta corriente"
-                            : m.origen === "factura"
-                              ? "Factura proveedor"
-                              : "Gasto manual"}
-                        </span>
+                        {m.tipo === "ingreso" ? (
+                          <span className="ff-monto ingreso">{fmtMoneda(m.monto)}</span>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td>
-                        <span className={`ff-monto ${m.tipo}`}>
-                          {m.tipo === "ingreso" ? "+" : "-"}
-                          {fmtMoneda(m.monto)}
-                        </span>
+                        {m.tipo === "egreso" ? (
+                          <span className="ff-monto egreso">{fmtMoneda(m.monto)}</span>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td>
                         <span className="ff-saldo-cell">
                           {fmtMoneda(m.saldo_acumulado)}
                         </span>
                       </td>
+                      <td>{m.forma_pago || "—"}</td>
                     </tr>
                   ))
                 )}
