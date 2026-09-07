@@ -36,12 +36,16 @@ export function generarPdfRecibo(recibo, cliente, obra, setGenerandoPDF) {
   <span>Tel: ${cliente?.telefono1 || "—"}</span>
   <span>${obra ? `Obra: Presupuesto N° ${obra.numeropres} rev.${obra.revision}` : "Sin obra vinculada"}</span>
 </div>
+<div class="info-line">
+  <span>Forma de pago: ${recibo.forma_pago || "—"}</span>
+</div>
 
 <div class="body">
   <div style="text-align:center; margin: 50px 0 60px;">
     <div style="font-size: 12px; color:#555;">La suma de</div>
     <div style="font-size: 30px; font-weight:700; margin-top:10px;">${formatPeso(recibo.monto)}</div>
     <div style="font-size:12px; margin-top: 12px;">En concepto de: ${recibo.concepto || "Anticipo"}</div>
+    ${recibo.detalle ? `<div style="font-size:12px; margin-top: 6px; color:#555;">${recibo.detalle}</div>` : ""}
   </div>
 
   <div style="display:flex; justify-content:space-between; margin-top:100px;">
