@@ -354,31 +354,33 @@ function DetalleArticulo({ producto }) {
     <div className="detalle-panel">
       <div className="detalle-foto">
         {fotos.length > 0 ? (
-          fotos.length === 1 ? (
-            <img
-              src={fotos[0]}
-              alt={producto.articulo}
-              className="detalle-img"
-            />
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${fotos.length}, 1fr)`,
-                gap: 6,
-              }}
-            >
-              {fotos.map((f, i) => (
-                <img
-                  key={i}
-                  src={f}
-                  alt={`${producto.articulo} ${i + 1}`}
-                  className="detalle-img"
-                  style={{ width: "100%" }}
-                />
-              ))}
-            </div>
-          )
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              width: "100%",
+              maxWidth: 260,
+              margin: "0 auto",
+            }}
+          >
+            {fotos.map((f, i) => (
+              <img
+                key={i}
+                src={f}
+                alt={`${producto.articulo} ${i + 1}`}
+                className="detalle-img"
+                style={{
+                  width: "100%",
+                  maxWidth: "100%",
+                  height: 180,
+                  objectFit: "cover",
+                  borderRadius: 8,
+                  display: "block",
+                }}
+              />
+            ))}
+          </div>
         ) : (
           <div className="detalle-sin-foto">
             <span>🖼️</span>
