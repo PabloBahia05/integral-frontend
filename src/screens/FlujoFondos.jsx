@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { generarPdfRecibo } from "../pdf/pdfRecibo";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -28,6 +29,13 @@ const EMPTY_GASTO = () => ({
   proveedor: "",
 });
 
+const EMPTY_RECIBO = () => ({
+  numeropres: "",
+  monto: "",
+  concepto: "Anticipo",
+  fecha: hoy(),
+});
+
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
 
@@ -53,6 +61,7 @@ const CSS = `
 
   .btn-add { padding:10px 20px; background:linear-gradient(135deg,#059669,#047857); color:#fff; border:none; border-radius:10px; font-family:'Syne',sans-serif; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(5,150,105,.3); white-space:nowrap; transition:transform .15s; }
   .btn-add:hover { transform:translateY(-1px); }
+  .btn-recibo { background:linear-gradient(135deg,#2563eb,#1d4ed8); box-shadow:0 4px 12px rgba(37,99,235,.3); }
 
   .ff-card { background:#fff; border-radius:16px; box-shadow:0 2px 16px rgba(15,31,53,.07); overflow:hidden; border:1px solid #e8edf5; margin-bottom:24px; }
   .ff-card-hdr { padding:16px 20px; border-bottom:1.5px solid #f0f4f8; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
@@ -131,6 +140,100 @@ export default function FlujoFondos({ token }) {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(EMPTY_GASTO());
   const [error, setError] = useState("");
+
+  // ── Recibo ───────────────────────────────────────────────────────────
+  const [modalRecibo, setModalRecibo] = useState(false);
+  const [clienteQuery, setClienteQuery] = useState("");
+  const [clienteResultados, setClienteResultados] = useState([]);
+  const [clienteElegido, setClienteElegido] = useState(null);
+  const [obrasCliente, setObrasCliente] = useState([]);
+  const [loadingObrasCliente, setLoadingObrasCliente] = useState(false);
+  const [formRecibo, setFormRecibo] = useState(EMPTY_RECIBO());
+  const [errorRecibo, setErrorRecibo] = useState("");
+  const [guardandoRecibo, setGuardandoRecibo] = useState(false);
+
+  const openRecibo = () => {
+    setClienteQuery("");
+    setClienteResultados([]);
+    setClienteElegido(null);
+    setObrasCliente([]);
+    setFormRecibo(EMPTY_RECIBO());
+    setErrorRecibo("");
+    setModalRecibo(true);
+  };
+
+  const closeRecibo = () => setModalRecibo(false);
+
+  const buscarCliente = (texto) => {
+    setClienteQuery(texto);
+    setClienteElegido(null);
+    setObrasCliente([]);
+    if (!texto.trim() || texto.trim().length < 2) {
+      setClienteResultados([]);
+      return;
+    }
+    authFetch(`${API}/clientes/buscar-nombre?q=${encodeURIComponent(texto.trim())}`)
+      .then((r) => r.json())
+      .then((data) => setClienteResultados(Array.isArray(data) ? data : []))
+      .catch(() => setClienteResultados([]));
+  };
+
+  const elegirCliente = (c) => {
+    setClienteElegido(c);
+    setClienteQuery(c.nombre);
+    setClienteResultados([]);
+    setLoadingObrasCliente(true);
+    authFetch(`${API}/tabla-presupuestos/revisiones-confirmadas`)
+      .then((r) => r.json())
+      .then((data) => {
+        const propias = (Array.isArray(data) ? data : []).filter(
+          (o) => o.codcliente === c.codcliente,
+        );
+        setObrasCliente(propias);
+      })
+      .catch(() => setObrasCliente([]))
+      .finally(() => setLoadingObrasCliente(false));
+  };
+
+  const guardarRecibo = async () => {
+    if (!clienteElegido) return setErrorRecibo("Elegí un cliente.");
+    const montoNum = parseFloat(String(formRecibo.monto).replace(",", "."));
+    if (!montoNum || montoNum <= 0)
+      return setErrorRecibo("Ingresá un monto mayor a cero.");
+    if (!formRecibo.fecha) return setErrorRecibo("Elegí una fecha.");
+
+    const obraElegida = formRecibo.numeropres
+      ? obrasCliente.find((o) => String(o.numeropres) === String(formRecibo.numeropres))
+      : null;
+
+    setGuardandoRecibo(true);
+    setErrorRecibo("");
+    try {
+      const r = await authFetch(`${API}/recibos`, {
+        method: "POST",
+        body: JSON.stringify({
+          codcliente: clienteElegido.codcliente,
+          numeropres: obraElegida?.numeropres ?? null,
+          revision: obraElegida?.revision ?? null,
+          monto: montoNum,
+          concepto: formRecibo.concepto || "Anticipo",
+          fecha: formRecibo.fecha,
+        }),
+      });
+      const recibo = await r.json();
+      if (!r.ok) throw new Error(recibo?.error || "No se pudo guardar el recibo.");
+
+      setModalRecibo(false);
+      cargarTodo();
+
+      generarPdfRecibo({ ...recibo, fecha: formRecibo.fecha }, clienteElegido, obraElegida);
+    } catch (err) {
+      setErrorRecibo(err.message || "No se pudo guardar el recibo.");
+    } finally {
+      setGuardandoRecibo(false);
+    }
+  };
+  // ── FIN Recibo ───────────────────────────────────────────────────────
 
   const cargarTodo = () => {
     setLoading(true);
@@ -293,6 +396,9 @@ export default function FlujoFondos({ token }) {
           </div>
           <button className="btn-add" onClick={openAdd}>
             <span>＋</span> Nuevo gasto
+          </button>
+          <button className="btn-add btn-recibo" onClick={openRecibo}>
+            <span>🧾</span> Recibo
           </button>
           <span className="ff-count">
             {loading
@@ -595,6 +701,128 @@ export default function FlujoFondos({ token }) {
                 </button>
                 <button className="mo-save" onClick={guardarGasto}>
                   {editId ? "Guardar cambios" : "Agregar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modal recibo ── */}
+        {modalRecibo && (
+          <div className="mo" onClick={closeRecibo}>
+            <div className="mo-box" onClick={(e) => e.stopPropagation()}>
+              <div className="mo-hdr">
+                <span className="mo-title">Nuevo recibo</span>
+                <button className="mo-close" onClick={closeRecibo}>
+                  ✕
+                </button>
+              </div>
+
+              {errorRecibo && <div className="mo-err">{errorRecibo}</div>}
+
+              <div className="mo-grid">
+                <div className="ff-fld full" style={{ position: "relative" }}>
+                  <span className="ff-fld-lbl">Cliente</span>
+                  <input
+                    className="ff-inp"
+                    value={clienteQuery}
+                    onChange={(e) => buscarCliente(e.target.value)}
+                    placeholder="Buscar cliente por nombre…"
+                  />
+                  {clienteResultados.length > 0 && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        background: "#fff",
+                        border: "1.5px solid #dde4ef",
+                        borderRadius: 9,
+                        marginTop: 4,
+                        maxHeight: 180,
+                        overflowY: "auto",
+                        zIndex: 10,
+                        boxShadow: "0 8px 20px rgba(15,31,53,.12)",
+                      }}
+                    >
+                      {clienteResultados.map((c) => (
+                        <div
+                          key={c.codcliente}
+                          onClick={() => elegirCliente(c)}
+                          style={{ padding: "8px 12px", cursor: "pointer", fontSize: 13 }}
+                          onMouseDown={(e) => e.preventDefault()}
+                        >
+                          {c.nombre}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="ff-fld">
+                  <span className="ff-fld-lbl">Fecha</span>
+                  <input
+                    type="date"
+                    className="ff-inp"
+                    value={formRecibo.fecha}
+                    onChange={(e) =>
+                      setFormRecibo((f) => ({ ...f, fecha: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="ff-fld">
+                  <span className="ff-fld-lbl">Monto</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className="ff-inp"
+                    value={formRecibo.monto}
+                    onChange={(e) =>
+                      setFormRecibo((f) => ({ ...f, monto: e.target.value }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div className="ff-fld full">
+                  <span className="ff-fld-lbl">Obra vinculada (opcional)</span>
+                  <select
+                    className="ff-sel"
+                    value={formRecibo.numeropres}
+                    onChange={(e) =>
+                      setFormRecibo((f) => ({ ...f, numeropres: e.target.value }))
+                    }
+                    disabled={!clienteElegido || loadingObrasCliente}
+                  >
+                    <option value="">— Sin vincular a una obra puntual —</option>
+                    {obrasCliente.map((o) => (
+                      <option key={`${o.numeropres}-${o.revision}`} value={o.numeropres}>
+                        Presupuesto Nº{o.numeropres} rev.{o.revision}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="ff-fld full">
+                  <span className="ff-fld-lbl">Concepto</span>
+                  <input
+                    className="ff-inp"
+                    value={formRecibo.concepto}
+                    onChange={(e) =>
+                      setFormRecibo((f) => ({ ...f, concepto: e.target.value }))
+                    }
+                    placeholder="Ej: Anticipo, seña…"
+                  />
+                </div>
+              </div>
+
+              <div className="mo-acts">
+                <button className="mo-cancel" onClick={closeRecibo}>
+                  Cancelar
+                </button>
+                <button className="mo-save" onClick={guardarRecibo} disabled={guardandoRecibo}>
+                  {guardandoRecibo ? "Guardando…" : "Guardar y descargar PDF"}
                 </button>
               </div>
             </div>
