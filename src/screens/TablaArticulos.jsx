@@ -3,6 +3,14 @@ import Totales from "./Totales";
 
 // Secciones cuyos ítems llevan medidas de ancho/alto.
 const TIENE_MEDIDAS = ["Mampara", "Puerta", "Vanitory"];
+// item.seccion de Placard viene como "Placard / <Familia>" (Placard, Frente,
+// Auxiliares, Accesorios — ver toItems en useCocinaPlacard.js), nunca matchea
+// un string exacto de TIENE_MEDIDAS. Antes de esto, las columnas Ancho/Alto
+// quedaban siempre en "—" para ítems de Placard aunque item.ancho/item.alto
+// sí tuvieran valor.
+const tieneMedidas = (seccion) =>
+  TIENE_MEDIDAS.includes(seccion) ||
+  String(seccion ?? "").startsWith("Placard / ");
 
 // Codartint reales de los accesorios "autofreno" (puerta y cajonera/correderas).
 // Mismo criterio que useCocinaPlacard.js / TabCocina.jsx / PlacardSection.jsx —
@@ -1186,12 +1194,12 @@ export default function TablaArticulos({
                             padding: "7px 10px",
                             border: "1px solid #e8f0f7",
                             textAlign: "center",
-                            color: TIENE_MEDIDAS.includes(item.seccion)
+                            color: tieneMedidas(item.seccion)
                               ? "#0a3a5c"
                               : "#aaa",
                           }}
                         >
-                          {TIENE_MEDIDAS.includes(item.seccion)
+                          {tieneMedidas(item.seccion)
                             ? (item.ancho ?? "—")
                             : "—"}
                         </td>
@@ -1200,12 +1208,12 @@ export default function TablaArticulos({
                             padding: "7px 10px",
                             border: "1px solid #e8f0f7",
                             textAlign: "center",
-                            color: TIENE_MEDIDAS.includes(item.seccion)
+                            color: tieneMedidas(item.seccion)
                               ? "#0a3a5c"
                               : "#aaa",
                           }}
                         >
-                          {TIENE_MEDIDAS.includes(item.seccion)
+                          {tieneMedidas(item.seccion)
                             ? (item.alto ?? "—")
                             : "—"}
                         </td>
