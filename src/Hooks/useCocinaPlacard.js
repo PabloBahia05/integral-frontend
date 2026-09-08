@@ -134,6 +134,9 @@ export default function useCocinaPlacard({
     area: null,
     accesorios: [],
     grupo: "",
+    ancho: "",
+    alto: "",
+    codartint: null,
   };
   const [placardFila, setPlacardFila] = useState({ ...PLACARD_FILA_INIT });
   const [placardSearch, setPlacardSearch] = useState("");
