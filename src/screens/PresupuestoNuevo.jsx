@@ -2080,6 +2080,7 @@ export default function PresupuestoNuevo({
             // Medidas (mampara, puerta y vanitory)
             ancho: it.ancho ?? it.ANCHO ?? null,
             alto: it.alto ?? it.ALTO ?? null,
+            codartint: it.codartint ?? it.CODARTINT ?? null,
             grupo: it.grupo ?? it.GRUPO ?? null,
             color: it.color ?? it.COLOR ?? null,
             manija: it.manija ?? it.MANIJA ?? null,
@@ -2479,6 +2480,11 @@ export default function PresupuestoNuevo({
           precios: it.precios ?? [],
           ancho: it.ancho ?? null,
           alto: it.alto ?? null,
+          // Artículo vinculado a la fórmula de cálculo (ver
+          // asociaciones_form) — se guarda al elegir el producto del
+          // buscador en PlacardSection.jsx (ya trae codartint del
+          // catálogo), no se pide aparte.
+          codartint: it.codartint ?? null,
           // Área del artículo (columna AREA en tabla articulos), guardada
           // en el ítem al elegirlo del buscador. Se manda tal cual para
           // que sobreviva al recargar el presupuesto (antes se perdía:

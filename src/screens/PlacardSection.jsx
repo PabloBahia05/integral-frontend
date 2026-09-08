@@ -605,6 +605,8 @@ export default function PlacardSection({
                                           // como cantidad (cantacc) del
                                           // accesorio de freno al guardar.
                                           const area = p.area ?? p.AREA ?? null;
+                                          const codartint =
+                                            p.codartint ?? p.CODARTINT ?? null;
                                           setPlacardFila((f) => ({
                                             ...f,
                                             articulo: base,
@@ -616,6 +618,7 @@ export default function PlacardSection({
                                             precios,
                                             preciosBase,
                                             area,
+                                            codartint,
                                           }));
                                           setPlacardSearch(base);
                                         }}
@@ -1385,6 +1388,8 @@ export default function PlacardSection({
                                   // (cantacc) del accesorio de freno al
                                   // guardar.
                                   const area = p.area ?? p.AREA ?? null;
+                                  const codartint =
+                                    p.codartint ?? p.CODARTINT ?? null;
                                   setPlacardFila((f) => ({
                                     ...f,
                                     articulo: base,
@@ -1395,6 +1400,7 @@ export default function PlacardSection({
                                     precios,
                                     preciosBase,
                                     area,
+                                    codartint,
                                   }));
                                   setPlacardSearch(base);
                                 }}
