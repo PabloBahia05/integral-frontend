@@ -451,6 +451,28 @@ export default function PlacardSection({
                           textAlign: "center",
                           border: "1px solid #c8dae8",
                           fontWeight: 700,
+                          width: 80,
+                        }}
+                      >
+                        Ancho
+                      </th>
+                      <th
+                        style={{
+                          padding: "8px 12px",
+                          textAlign: "center",
+                          border: "1px solid #c8dae8",
+                          fontWeight: 700,
+                          width: 80,
+                        }}
+                      >
+                        Alto
+                      </th>
+                      <th
+                        style={{
+                          padding: "8px 12px",
+                          textAlign: "center",
+                          border: "1px solid #c8dae8",
+                          fontWeight: 700,
                           width: 90,
                         }}
                       >
@@ -607,6 +629,10 @@ export default function PlacardSection({
                                           const area = p.area ?? p.AREA ?? null;
                                           const codartint =
                                             p.codartint ?? p.CODARTINT ?? null;
+                                          const anchoCatalogo =
+                                            p.ancho ?? p.ANCHO ?? "";
+                                          const altoCatalogo =
+                                            p.alto ?? p.ALTO ?? "";
                                           setPlacardFila((f) => ({
                                             ...f,
                                             articulo: base,
@@ -619,6 +645,12 @@ export default function PlacardSection({
                                             preciosBase,
                                             area,
                                             codartint,
+                                            // Dimensiones del catálogo como
+                                            // punto de partida — el usuario
+                                            // puede seguir editándolas si
+                                            // este ítem puntual mide distinto.
+                                            ancho: anchoCatalogo,
+                                            alto: altoCatalogo,
                                           }));
                                           setPlacardSearch(base);
                                         }}
@@ -665,6 +697,60 @@ export default function PlacardSection({
                                 setPlacardFila((f) => ({
                                   ...f,
                                   cantidad: e.target.value,
+                                }))
+                              }
+                              style={{
+                                width: "100%",
+                                textAlign: "center",
+                                fontFamily: "'Space Mono',monospace",
+                                fontSize: 12,
+                                border: "1px solid #7aaac8",
+                                padding: "4px 4px",
+                                borderRadius: 2,
+                              }}
+                            />
+                          </td>
+                          <td
+                            style={{
+                              padding: "6px 8px",
+                              border: "1px solid #c8dae8",
+                            }}
+                          >
+                            <input
+                              type="number"
+                              value={placardFila.ancho ?? ""}
+                              placeholder="—"
+                              onChange={(e) =>
+                                setPlacardFila((f) => ({
+                                  ...f,
+                                  ancho: e.target.value,
+                                }))
+                              }
+                              style={{
+                                width: "100%",
+                                textAlign: "center",
+                                fontFamily: "'Space Mono',monospace",
+                                fontSize: 12,
+                                border: "1px solid #7aaac8",
+                                padding: "4px 4px",
+                                borderRadius: 2,
+                              }}
+                            />
+                          </td>
+                          <td
+                            style={{
+                              padding: "6px 8px",
+                              border: "1px solid #c8dae8",
+                            }}
+                          >
+                            <input
+                              type="number"
+                              value={placardFila.alto ?? ""}
+                              placeholder="—"
+                              onChange={(e) =>
+                                setPlacardFila((f) => ({
+                                  ...f,
+                                  alto: e.target.value,
                                 }))
                               }
                               style={{
@@ -1011,6 +1097,26 @@ export default function PlacardSection({
                           </td>
                           <td
                             style={{
+                              padding: "8px 12px",
+                              border: "1px solid #c8dae8",
+                              textAlign: "center",
+                              color: fila.ancho ? "#334155" : "#b8c8d4",
+                            }}
+                          >
+                            {fila.ancho || "—"}
+                          </td>
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              border: "1px solid #c8dae8",
+                              textAlign: "center",
+                              color: fila.alto ? "#334155" : "#b8c8d4",
+                            }}
+                          >
+                            {fila.alto || "—"}
+                          </td>
+                          <td
+                            style={{
                               padding: "6px 8px",
                               border: "1px solid #c8dae8",
                               textAlign: "center",
@@ -1216,7 +1322,7 @@ export default function PlacardSection({
                     )}
                     <tr style={{ background: "#e8f4ee" }}>
                       <td
-                        colSpan={6}
+                        colSpan={8}
                         style={{
                           padding: "8px 12px",
                           border: "1px solid #c8dae8",
@@ -1390,6 +1496,9 @@ export default function PlacardSection({
                                   const area = p.area ?? p.AREA ?? null;
                                   const codartint =
                                     p.codartint ?? p.CODARTINT ?? null;
+                                  const anchoCatalogo =
+                                    p.ancho ?? p.ANCHO ?? "";
+                                  const altoCatalogo = p.alto ?? p.ALTO ?? "";
                                   setPlacardFila((f) => ({
                                     ...f,
                                     articulo: base,
@@ -1401,6 +1510,8 @@ export default function PlacardSection({
                                     preciosBase,
                                     area,
                                     codartint,
+                                    ancho: anchoCatalogo,
+                                    alto: altoCatalogo,
                                   }));
                                   setPlacardSearch(base);
                                 }}
@@ -1480,6 +1591,72 @@ export default function PlacardSection({
                             cantidad: e.target.value,
                           }))
                         }
+                        style={{
+                          width: "100%",
+                          textAlign: "center",
+                          fontFamily: "'Space Mono',monospace",
+                          fontSize: 12,
+                          border: "1px solid #b8cfe0",
+                          padding: "6px 6px",
+                          borderRadius: 2,
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: "0 0 80px" }}>
+                      <label
+                        style={{
+                          display: "block",
+                          fontSize: 11,
+                          color: "#6699bb",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Ancho
+                      </label>
+                      <input
+                        type="number"
+                        value={placardFila.ancho ?? ""}
+                        placeholder="—"
+                        onChange={(e) =>
+                          setPlacardFila((f) => ({
+                            ...f,
+                            ancho: e.target.value,
+                          }))
+                        }
+                        title="Se precarga con la medida del artículo elegido — se puede ajustar si este ítem puntual mide distinto."
+                        style={{
+                          width: "100%",
+                          textAlign: "center",
+                          fontFamily: "'Space Mono',monospace",
+                          fontSize: 12,
+                          border: "1px solid #b8cfe0",
+                          padding: "6px 6px",
+                          borderRadius: 2,
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: "0 0 80px" }}>
+                      <label
+                        style={{
+                          display: "block",
+                          fontSize: 11,
+                          color: "#6699bb",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Alto
+                      </label>
+                      <input
+                        type="number"
+                        value={placardFila.alto ?? ""}
+                        placeholder="—"
+                        onChange={(e) =>
+                          setPlacardFila((f) => ({
+                            ...f,
+                            alto: e.target.value,
+                          }))
+                        }
+                        title="Se precarga con la medida del artículo elegido — se puede ajustar si este ítem puntual mide distinto."
                         style={{
                           width: "100%",
                           textAlign: "center",
