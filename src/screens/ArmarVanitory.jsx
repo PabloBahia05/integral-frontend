@@ -4,6 +4,10 @@ const API = "https://integral-backend-production.up.railway.app";
 
 const CAJON_EMPTY = { cantidad: "", ancho: "", alto: "", prof: "" };
 
+// Codart del artículo genérico vinculado a la fórmula de cajón (usado por
+// cajon1, cajon2 y cajon3 por igual — cada uno con sus propias medidas).
+const CAJON_GENERICO_CODART = "CAJON-GENERICO";
+
 export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
   const authFetch = (url, options = {}) =>
     fetch(url, {
@@ -58,6 +62,23 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
   const [insumosMuebles, setInsumosMuebles] = useState([]);
   const [herrajes, setHerrajes] = useState([]);
   const [cargandoInsumos, setCargandoInsumos] = useState(false);
+
+  // Cálculo independiente por cajón (misma fórmula genérica, medidas propias)
+  const [cajonSubtotal, setCajonSubtotal] = useState({
+    cajon1: 0,
+    cajon2: 0,
+    cajon3: 0,
+  });
+  const [cajonCalculando, setCajonCalculando] = useState({
+    cajon1: false,
+    cajon2: false,
+    cajon3: false,
+  });
+  const [cajonError, setCajonError] = useState({
+    cajon1: "",
+    cajon2: "",
+    cajon3: "",
+  });
 
   // Próximo número — se carga al montar y muestra el siguiente disponible
   useEffect(() => {
@@ -220,11 +241,71 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
     form.materialPrecio,
   ]);
 
+  // Calcular fórmula de un cajón (independiente de los otros y del cuerpo
+  // del vanitory). Usa siempre CAJON_GENERICO_CODART, con las medidas
+  // propias de ese cajón.
+  const calcularCajon = async (numero) => {
+    const c = form[`cajon${numero}`];
+    const key = `cajon${numero}`;
+    if (c.cantidad === "") {
+      setCajonSubtotal((prev) => ({ ...prev, [key]: 0 }));
+      setCajonError((prev) => ({ ...prev, [key]: "" }));
+      return;
+    }
+    setCajonCalculando((prev) => ({ ...prev, [key]: true }));
+    setCajonError((prev) => ({ ...prev, [key]: "" }));
+    try {
+      const res = await authFetch(`${API}/formulas/calcular`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          codart_modelo: CAJON_GENERICO_CODART,
+          variables: {
+            ancho: c.ancho === "" ? 0 : Number(c.ancho),
+            alto: c.alto === "" ? 0 : Number(c.alto),
+            profundo: c.prof === "" ? 0 : Number(c.prof),
+            profundidad: c.prof === "" ? 0 : Number(c.prof),
+            cantidad: Number(c.cantidad),
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setCajonSubtotal((prev) => ({ ...prev, [key]: Number(data.resultado) || 0 }));
+    } catch (err) {
+      setCajonError((prev) => ({ ...prev, [key]: err.message }));
+      setCajonSubtotal((prev) => ({ ...prev, [key]: 0 }));
+    } finally {
+      setCajonCalculando((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  // Un useEffect por cajón: cada uno dispara sólo con sus propios cambios,
+  // nunca con los de los otros cajones ni con los del cuerpo del vanitory.
+  useEffect(() => {
+    calcularCajon(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.cajon1.cantidad, form.cajon1.ancho, form.cajon1.alto, form.cajon1.prof]);
+
+  useEffect(() => {
+    calcularCajon(2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.cajon2.cantidad, form.cajon2.ancho, form.cajon2.alto, form.cajon2.prof]);
+
+  useEffect(() => {
+    calcularCajon(3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.cajon3.cantidad, form.cajon3.ancho, form.cajon3.alto, form.cajon3.prof]);
+
   // Totales
   const totalCorredera =
     (Number(form.correderaPrecio) || 0) * (Number(form.correderaCantidad) || 1);
   const totalMaterial = Number(form.materialPrecio) || 0;
-  const baseMargen = result.subtotal + totalCorredera;
+  const totalCajones =
+    (Number(cajonSubtotal.cajon1) || 0) +
+    (Number(cajonSubtotal.cajon2) || 0) +
+    (Number(cajonSubtotal.cajon3) || 0);
+  const baseMargen = result.subtotal + totalCorredera + totalCajones;
   const totalMargen = (baseMargen * (Number(form.margen) || 0)) / 100;
   const total = baseMargen + totalMargen + Number(form.colocacion);
 
@@ -519,6 +600,18 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
           {inp("alto", "Alto", `ALJ${numero}`, "cm")}
           {inp("prof", "Prof.", `PRJ${numero}`, "cm")}
         </div>
+        {cajonError[`cajon${numero}`] && (
+          <div
+            style={{
+              padding: "0 16px 10px",
+              fontSize: 11,
+              color: "#dc2626",
+              background: "#fff",
+            }}
+          >
+            ⚠️ {cajonError[`cajon${numero}`]}
+          </div>
+        )}
       </div>
     );
   };
@@ -1213,6 +1306,29 @@ export default function ArmarVanitory({ modelo: modeloRaw, onVolver, token }) {
                     <span>{formatPeso(totalCorredera)}</span>
                   </div>
                 )}
+                {[1, 2, 3].map((n) => {
+                  const key = `cajon${n}`;
+                  const c = form[key];
+                  const tieneAlgo = c.cantidad !== "";
+                  if (!tieneAlgo) return null;
+                  return (
+                    <div
+                      key={key}
+                      className="breakdown-row"
+                      style={{ color: "#2d7fc1" }}
+                    >
+                      <span>
+                        📦 Cajón {n}
+                        {cajonCalculando[key] ? " (calculando...)" : ""}
+                      </span>
+                      <span>
+                        {cajonError[key]
+                          ? "⚠️ error"
+                          : formatPeso(cajonSubtotal[key])}
+                      </span>
+                    </div>
+                  );
+                })}
                 {totalMargen > 0 && (
                   <div className="breakdown-row" style={{ color: "#16a34a" }}>
                     <span>📈 Margen ({form.margen}%)</span>
