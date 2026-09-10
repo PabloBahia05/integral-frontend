@@ -50,6 +50,7 @@ const SCREENS = {
   "mueble-especial": { label: "MUEBLE ESPECIAL", icon: "🪚" },
   "obras-confirmadas": { label: "OBRAS CONFIRMADAS", icon: "✅" },
   produccion: { label: "PRODUCCIÓN", icon: "🏭" },
+  "modulos-domus": { label: "MÓDULOS DOMUS", icon: "🏠" },
   facturas: { label: "FACTURAS", icon: "🧾" },
   "facturas-venta": { label: "FACTURAS EMITIDAS", icon: "🧮" },
   "factura-manual": { label: "FACTURAR (MANUAL)", icon: "🧾" },
@@ -78,6 +79,7 @@ const PANTALLAS_MENU = [
   { id: "cuenta-corriente", label: "CLIENTES ACTIVOS", icon: "💰", color: "#e67e22", ubicacionDefault: "principal" },
   { id: "obras-confirmadas", label: "OBRAS CONFIRMADAS", icon: "✅", color: "#00b4d8", ubicacionDefault: "principal" },
   { id: "produccion", label: "PRODUCCIÓN", icon: "🏭", color: "#8d6e63", ubicacionDefault: "principal" },
+  { id: "modulos-domus", label: "MÓDULOS DOMUS", icon: "🏠", color: "#5c6b73", ubicacionDefault: "principal" },
   { id: "visor-dwg", label: "VISOR 3D MÓDULOS", icon: "📐", color: "#00838f", ubicacionDefault: "lateral" },
   { id: "chat", label: "CHAT", icon: "💬", color: "#25d366", ubicacionDefault: "principal" },
   { id: "presupuesto-mamparas", label: "PRESUPUESTO MAMPARAS", icon: "🪟", color: "#4895ef", ubicacionDefault: "lateral" },
@@ -1276,9 +1278,6 @@ function App() {
             {screen === "produccion" && (
               <Produccion authFetch={authFetch} token={token} />
             )}
-            {/* Suelta a propósito: todavía sin entrada en el menú, se ubica
-                a mano (setScreen("modulos-domus") o similar) hasta definir
-                dónde va. */}
             {screen === "modulos-domus" && (
               <ModulosDomus authFetch={authFetch} token={token} />
             )}
