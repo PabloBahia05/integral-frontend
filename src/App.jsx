@@ -13,6 +13,7 @@ import PresupuestoNuevo from "./screens/PresupuestoNuevo";
 import ListaPresupuestos from "./screens/ListaPresupuestos";
 import ObrasConfirmadas from "./screens/ObrasConfirmadas";
 import Produccion from "./screens/Produccion";
+import ModulosDomus from "./screens/ModulosDomus";
 import Chat from "./screens/Chat";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
@@ -1274,6 +1275,12 @@ function App() {
             )}
             {screen === "produccion" && (
               <Produccion authFetch={authFetch} token={token} />
+            )}
+            {/* Suelta a propósito: todavía sin entrada en el menú, se ubica
+                a mano (setScreen("modulos-domus") o similar) hasta definir
+                dónde va. */}
+            {screen === "modulos-domus" && (
+              <ModulosDomus authFetch={authFetch} token={token} />
             )}
             {screen === "chat" && (
               <Chat
