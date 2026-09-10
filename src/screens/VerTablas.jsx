@@ -45,6 +45,7 @@ const MODULOS = [
   { id: "lista-presupuestos-2",      label: "Lista Presupuestos",     acciones: ["ver"] },
   { id: "obras-confirmadas",         label: "Obras Confirmadas",      acciones: ["ver", "editar"] },
   { id: "produccion",                label: "Producción",             acciones: ["ver", "crear", "editar", "eliminar"] },
+  { id: "modulos-domus",             label: "Módulos Domus",          acciones: ["ver"] },
   { id: "facturas",                  label: "Facturas",               acciones: ["ver", "subir", "eliminar"] },
   { id: "facturas-venta",            label: "Facturas Emitidas",      acciones: ["ver", "eliminar"] },
   { id: "factura-manual",            label: "Facturar (Manual)",      acciones: ["ver", "crear"] },
@@ -75,9 +76,9 @@ const MODULOS = [
 // NOTA: los módulos nuevos (actualizar-precios, presupuesto-muebles,
 // presupuestos-tabla, obras-confirmadas, produccion, facturas-venta,
 // factura-manual, afip-iva, vehiculos-mantenimiento, cuenta-corriente,
-// visor-dwg) se agregaron con acciones "razonables" a criterio, no
-// confirmadas contra cada pantalla real — ajustar si alguna no coincide
-// con los botones que esa pantalla realmente tiene.
+// visor-dwg, modulos-domus) se agregaron con acciones "razonables" a
+// criterio, no confirmadas contra cada pantalla real — ajustar si alguna
+// no coincide con los botones que esa pantalla realmente tiene.
 
 // Pantallas administrables desde el Gestor de Menú (Principal / Lateral).
 // `ubicacionDefault` es donde aparece la pantalla si el rol todavía no tiene
@@ -92,6 +93,7 @@ const PANTALLAS_MENU = [
   { id: "cuenta-corriente", label: "Clientes Activos", icon: "💰", ubicacionDefault: "principal" },
   { id: "obras-confirmadas", label: "Obras Confirmadas", icon: "✅", ubicacionDefault: "principal" },
   { id: "produccion", label: "Producción", icon: "🏭", ubicacionDefault: "principal" },
+  { id: "modulos-domus", label: "Módulos Domus", icon: "🏠", ubicacionDefault: "principal" },
   { id: "visor-dwg", label: "Visor 3D Módulos", icon: "📐", ubicacionDefault: "lateral" },
   { id: "chat", label: "Chat", icon: "💬", ubicacionDefault: "principal" },
   { id: "presupuesto-mamparas", label: "Presup. Mamparas", icon: "🪟", ubicacionDefault: "lateral" },
