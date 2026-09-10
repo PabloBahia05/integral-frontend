@@ -164,7 +164,16 @@ export default function ModulosDomus({ authFetch, token }) {
           body: JSON.stringify({ modulo: nuevoModulo.trim() || null }),
         },
       );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        let detalle = `HTTP ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body?.error) detalle = body.error;
+        } catch {
+          // el body no era JSON parseable, nos quedamos con el status
+        }
+        throw new Error(detalle);
+      }
       setNuevoAbierto(false);
       setNuevoCodartint("");
       setNuevoModulo("");
@@ -173,7 +182,7 @@ export default function ModulosDomus({ authFetch, token }) {
       fetchModulosDomus();
     } catch (e) {
       console.error("Error creando fila de modulos-domus:", e);
-      setErrorNuevo("No se pudo guardar. ¿El código ya existe?");
+      setErrorNuevo(e.message || "No se pudo guardar.");
     } finally {
       setGuardandoNuevo(false);
     }
