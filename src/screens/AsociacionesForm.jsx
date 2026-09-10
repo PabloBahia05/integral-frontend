@@ -11,33 +11,43 @@ const EMPTY = () => ({
   codf1: "",
   form1: "",
   titulo1: "",
+  cant1: 1,
   codf2: "",
   form2: "",
   titulo2: "",
+  cant2: 1,
   codf3: "",
   form3: "",
   titulo3: "",
+  cant3: 1,
   codf4: "",
   form4: "",
   titulo4: "",
+  cant4: 1,
   codf5: "",
   form5: "",
   titulo5: "",
+  cant5: 1,
   codf6: "",
   form6: "",
   titulo6: "",
+  cant6: 1,
   codf7: "",
   form7: "",
   titulo7: "",
+  cant7: 1,
   codf8: "",
   form8: "",
   titulo8: "",
+  cant8: 1,
   codf9: "",
   form9: "",
   titulo9: "",
+  cant9: 1,
   codf10: "",
   form10: "",
   titulo10: "",
+  cant10: 1,
 });
 
 const styles = `
@@ -307,6 +317,27 @@ const styles = `
   }
   .aform-slot-titulo::placeholder { color: #aab5c8; font-style: italic; }
 
+  .aform-slot-cant-row {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .aform-slot-cant-lbl {
+    font-size: 11px; font-weight: 600; color: #7a92b0; white-space: nowrap;
+  }
+  .aform-slot-cant {
+    padding: 6px 8px; border: 1.5px solid #e2e8f0; border-radius: 7px;
+    font-family: 'DM Sans', sans-serif; font-size: 12.5px; color: #1a2332;
+    background: #fff; outline: none; transition: border-color 0.18s;
+    width: 64px; box-sizing: border-box;
+  }
+  .aform-slot-cant:focus {
+    border-color: #e63946; box-shadow: 0 0 0 2px rgba(230,57,70,0.08);
+  }
+  .aform-slot-cant-badge {
+    display: inline-block; padding: 2px 6px;
+    background: #eef2ff; color: #4338ca; border-radius: 4px;
+    font-size: 11px; font-weight: 600; width: fit-content;
+  }
+
   .aform-modal-actions {
     display: flex; justify-content: flex-end; gap: 10px;
     margin-top: 24px; padding-top: 18px; border-top: 1.5px solid #f0f4f8;
@@ -516,8 +547,8 @@ export default function AsociacionesForm({
       ...f,
       [`codf${slot}`]: codform,
       [`form${slot}`]: preview,
-      // Si se borra la fórmula, limpiar también el título
-      ...(!codform ? { [`titulo${slot}`]: "" } : {}),
+      // Si se borra la fórmula, limpiar también el título y resetear cantidad
+      ...(!codform ? { [`titulo${slot}`]: "", [`cant${slot}`]: 1 } : {}),
     }));
   };
 
@@ -662,6 +693,12 @@ export default function AsociacionesForm({
                                   {row[`titulo${n}`]}
                                 </span>
                               )}
+                              {row[`cant${n}`] != null &&
+                                Number(row[`cant${n}`]) !== 1 && (
+                                  <span className="aform-slot-cant-badge">
+                                    ✕ {row[`cant${n}`]}
+                                  </span>
+                                )}
                             </div>
                           ) : (
                             <span className="aform-slot-empty">—</span>
@@ -889,6 +926,33 @@ export default function AsociacionesForm({
                             : {}
                         }
                       />
+                      {/* Cantidad */}
+                      <div className="aform-slot-cant-row">
+                        <span className="aform-slot-cant-lbl">✕ Cant.</span>
+                        <input
+                          className="aform-slot-cant"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={form[`cant${n}`] ?? 1}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              [`cant${n}`]:
+                                e.target.value === ""
+                                  ? ""
+                                  : Number(e.target.value),
+                            }))
+                          }
+                          placeholder="1"
+                          disabled={!codformSlot}
+                          style={
+                            !codformSlot
+                              ? { opacity: 0.4, cursor: "not-allowed" }
+                              : {}
+                          }
+                        />
+                      </div>
                       {/* Preview expresión */}
                       <input
                         className="aform-slot-input readonly"
