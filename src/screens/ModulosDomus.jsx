@@ -61,6 +61,34 @@ export default function ModulosDomus({ authFetch, token }) {
   const [nuevoModulo, setNuevoModulo] = useState("");
   const [guardandoNuevo, setGuardandoNuevo] = useState(false);
   const [errorNuevo, setErrorNuevo] = useState(null);
+  // Buscador de artículo del modal de alta: tipea y elige de la lista,
+  // igual que el selector de Material Placa/Guías en PresupuestoNuevo.jsx.
+  const [nuevoBusqueda, setNuevoBusqueda] = useState("");
+  const [nuevoResultados, setNuevoResultados] = useState([]);
+  const [nuevoFocus, setNuevoFocus] = useState(false);
+  const [buscandoArticulo, setBuscandoArticulo] = useState(false);
+
+  // Búsqueda server-side con debounce contra /articulos/buscar-descripcion
+  // (ya existe y busca por código de proveedor exacto o por palabras en la
+  // columna `articulo`, hasta 8 resultados).
+  useEffect(() => {
+    if (!nuevoBusqueda.trim()) {
+      setNuevoResultados([]);
+      setBuscandoArticulo(false);
+      return;
+    }
+    setBuscandoArticulo(true);
+    const timer = setTimeout(() => {
+      authFetch(
+        `${API}/articulos/buscar-descripcion?q=${encodeURIComponent(nuevoBusqueda.trim())}`,
+      )
+        .then((r) => r.json())
+        .then((data) => setNuevoResultados(Array.isArray(data) ? data : []))
+        .catch(() => setNuevoResultados([]))
+        .finally(() => setBuscandoArticulo(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [nuevoBusqueda, authFetch]);
 
   // ── Fetch ──────────────────────────────────────────────────────────────
 
@@ -140,6 +168,8 @@ export default function ModulosDomus({ authFetch, token }) {
       setNuevoAbierto(false);
       setNuevoCodartint("");
       setNuevoModulo("");
+      setNuevoBusqueda("");
+      setNuevoResultados([]);
       fetchModulosDomus();
     } catch (e) {
       console.error("Error creando fila de modulos-domus:", e);
@@ -400,24 +430,104 @@ export default function ModulosDomus({ authFetch, token }) {
             </p>
 
             <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
-              Código interno del artículo (codartint)
+              Artículo (buscar por código o nombre)
             </label>
-            <input
-              type="text"
-              value={nuevoCodartint}
-              onChange={(e) => setNuevoCodartint(e.target.value)}
-              placeholder="Ej: KITMP000"
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "6px 8px",
-                fontSize: 13,
-                fontFamily: "'Space Mono',monospace",
-                border: "1.5px solid #b8d6ef",
-                borderRadius: 4,
-                marginBottom: 12,
-              }}
-            />
+            <div style={{ position: "relative", marginBottom: 12 }}>
+              <input
+                type="text"
+                value={nuevoBusqueda}
+                onChange={(e) => {
+                  setNuevoBusqueda(e.target.value);
+                  setNuevoCodartint(e.target.value);
+                }}
+                onFocus={() => setNuevoFocus(true)}
+                onBlur={() => setTimeout(() => setNuevoFocus(false), 160)}
+                placeholder="Ej: KITMP000 o Kit Melamina..."
+                autoComplete="off"
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "6px 8px",
+                  fontSize: 13,
+                  fontFamily: "'Space Mono',monospace",
+                  border: "1.5px solid #b8d6ef",
+                  borderRadius: 4,
+                }}
+              />
+              {nuevoFocus && nuevoResultados.length > 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    background: "#fff",
+                    border: "1px solid #b8cfe0",
+                    borderTop: "none",
+                    zIndex: 1200,
+                    boxShadow: "0 6px 18px #0002",
+                    maxHeight: 220,
+                    overflowY: "auto",
+                    borderRadius: "0 0 3px 3px",
+                  }}
+                >
+                  {nuevoResultados.map((a) => (
+                    <div
+                      key={a.codartint}
+                      onMouseDown={() => {
+                        setNuevoCodartint(a.codartint);
+                        setNuevoBusqueda(`${a.articulo} — ${a.codartint}`);
+                        setNuevoResultados([]);
+                      }}
+                      style={{
+                        padding: "8px 14px",
+                        cursor: "pointer",
+                        fontSize: 12,
+                        fontFamily: "'Space Mono',monospace",
+                        borderBottom: "1px solid #eef2f6",
+                        color: "#0a3a5c",
+                      }}
+                      onMouseOver={(e) =>
+                        (e.currentTarget.style.background = "#ddeefa")
+                      }
+                      onMouseOut={(e) =>
+                        (e.currentTarget.style.background = "#fff")
+                      }
+                    >
+                      <span style={{ fontWeight: 700 }}>{a.articulo}</span>
+                      <span
+                        style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}
+                      >
+                        {a.codartint}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {nuevoFocus &&
+                !buscandoArticulo &&
+                nuevoResultados.length === 0 &&
+                nuevoBusqueda.trim().length > 0 && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      background: "#fff",
+                      border: "1px solid #b8cfe0",
+                      borderTop: "none",
+                      zIndex: 1200,
+                      padding: "10px 14px",
+                      color: "#8aabcc",
+                      fontSize: 11,
+                      borderRadius: "0 0 3px 3px",
+                    }}
+                  >
+                    Sin resultados — se usará el código tipeado tal cual
+                  </div>
+                )}
+            </div>
 
             <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
               Módulo (opcional)
@@ -447,7 +557,11 @@ export default function ModulosDomus({ authFetch, token }) {
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button
-                onClick={() => setNuevoAbierto(false)}
+                onClick={() => {
+                  setNuevoAbierto(false);
+                  setNuevoBusqueda("");
+                  setNuevoResultados([]);
+                }}
                 disabled={guardandoNuevo}
                 style={{
                   padding: "8px 14px",
