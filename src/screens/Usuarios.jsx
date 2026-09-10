@@ -37,6 +37,13 @@ const STYLE = `
   .field-hint { font-size:11px; color:#99a0aa; margin-top:4px; }
   .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
   .empty { text-align:center; color:#99bbcc; padding:40px; font-size:13px; }
+  .carnet-thumb { width:36px; height:24px; object-fit:cover; border-radius:3px; border:1px solid #a0cce8; cursor:pointer; display:block; }
+  .carnet-input { font-size:12px; }
+  .carnet-preview-wrap { margin-top:8px; display:flex; align-items:center; gap:10px; }
+  .carnet-preview { width:90px; height:60px; object-fit:cover; border-radius:4px; border:1px solid #a0cce8; cursor:pointer; }
+  .carnet-remove { font-size:11px; color:#c0392b; background:none; border:none; cursor:pointer; text-decoration:underline; padding:0; }
+  .lightbox-bg { position:fixed; inset:0; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; z-index:200; padding:24px; }
+  .lightbox-bg img { max-width:90vw; max-height:90vh; border-radius:6px; }
 `;
 
 const emptyForm = {
@@ -44,11 +51,13 @@ const emptyForm = {
   nombre: "",
   apellido: "",
   dni: "",
-  legajo: "",
   telefono: "",
   direccion: "",
   fecha_ingreso: "",
   activo: 1,
+  contacto_emergencia_nombre: "",
+  contacto_emergencia_telefono: "",
+  foto_carnet: "",
 };
 
 export default function Usuarios({ onBack }) {
@@ -62,6 +71,7 @@ export default function Usuarios({ onBack }) {
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
   const [error, setError] = useState("");
+  const [lightbox, setLightbox] = useState(null);
 
   const fetchUsuarios = () => {
     setLoading(true);
@@ -104,15 +114,29 @@ export default function Usuarios({ onBack }) {
       nombre: u.nombre || "",
       apellido: u.apellido || "",
       dni: u.dni || "",
-      legajo: u.legajo || "",
       telefono: u.telefono || "",
       direccion: u.direccion || "",
       fecha_ingreso: u.fecha_ingreso ? String(u.fecha_ingreso).slice(0, 10) : "",
       activo: u.activo,
+      contacto_emergencia_nombre: u.contacto_emergencia_nombre || "",
+      contacto_emergencia_telefono: u.contacto_emergencia_telefono || "",
+      foto_carnet: u.foto_carnet || "",
     });
     setEditId(u.id);
     setError("");
     setModal(true);
+  };
+
+  const handleFotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024) {
+      setError("La foto no puede pesar más de 4MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setForm((f) => ({ ...f, foto_carnet: reader.result }));
+    reader.readAsDataURL(file);
   };
 
   const handleSave = () => {
@@ -133,10 +157,12 @@ export default function Usuarios({ onBack }) {
         id: Number(form.id),
         activo: Number(form.activo),
         dni: form.dni.trim() || null,
-        legajo: form.legajo.trim() || null,
         telefono: form.telefono.trim() || null,
         direccion: form.direccion.trim() || null,
         fecha_ingreso: form.fecha_ingreso || null,
+        contacto_emergencia_nombre: form.contacto_emergencia_nombre.trim() || null,
+        contacto_emergencia_telefono: form.contacto_emergencia_telefono.trim() || null,
+        foto_carnet: form.foto_carnet || null,
       }),
     })
       .then((r) => r.json())
@@ -183,13 +209,14 @@ export default function Usuarios({ onBack }) {
             <thead>
               <tr>
                 <th>ID Lector</th>
-                <th>Legajo</th>
                 <th>Apellido</th>
                 <th>Nombre</th>
                 <th>DNI</th>
                 <th>Teléfono</th>
                 <th>Dirección</th>
                 <th>Fecha ingreso</th>
+                <th>Contacto emergencia</th>
+                <th>Carnet</th>
                 <th>Usuario sistema</th>
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -203,7 +230,6 @@ export default function Usuarios({ onBack }) {
                     <td>
                       <strong>{u.id}</strong>
                     </td>
-                    <td>{u.legajo || "—"}</td>
                     <td>{u.apellido}</td>
                     <td>{u.nombre}</td>
                     <td>{u.dni || "—"}</td>
@@ -211,6 +237,28 @@ export default function Usuarios({ onBack }) {
                     <td>{u.direccion || "—"}</td>
                     <td>
                       {u.fecha_ingreso ? String(u.fecha_ingreso).slice(0, 10) : "—"}
+                    </td>
+                    <td>
+                      {u.contacto_emergencia_nombre || u.contacto_emergencia_telefono ? (
+                        <>
+                          {u.contacto_emergencia_nombre || "—"}
+                          {u.contacto_emergencia_telefono ? ` · ${u.contacto_emergencia_telefono}` : ""}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      {u.foto_carnet ? (
+                        <img
+                          src={u.foto_carnet}
+                          alt="Carnet"
+                          className="carnet-thumb"
+                          onClick={() => setLightbox(u.foto_carnet)}
+                        />
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td>
                       {vinculo ? (
@@ -250,26 +298,15 @@ export default function Usuarios({ onBack }) {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>{editId ? "Editar empleado" : "Nuevo empleado"}</h3>
 
-            <div className="field-row">
-              <div className="field">
-                <label>ID del lector (número Anviz)</label>
-                <input
-                  type="number"
-                  value={form.id}
-                  onChange={(e) => setForm({ ...form, id: e.target.value })}
-                  disabled={!!editId}
-                  placeholder="ej: 7"
-                />
-              </div>
-              <div className="field">
-                <label>Legajo</label>
-                <input
-                  type="text"
-                  value={form.legajo}
-                  onChange={(e) => setForm({ ...form, legajo: e.target.value })}
-                  placeholder="ej: L-0034"
-                />
-              </div>
+            <div className="field">
+              <label>ID del lector (número Anviz)</label>
+              <input
+                type="number"
+                value={form.id}
+                onChange={(e) => setForm({ ...form, id: e.target.value })}
+                disabled={!!editId}
+                placeholder="ej: 7"
+              />
             </div>
 
             <div className="field-row">
@@ -345,6 +382,58 @@ export default function Usuarios({ onBack }) {
               </div>
             </div>
 
+            <div className="field-row">
+              <div className="field">
+                <label>Contacto de emergencia</label>
+                <input
+                  type="text"
+                  value={form.contacto_emergencia_nombre}
+                  onChange={(e) =>
+                    setForm({ ...form, contacto_emergencia_nombre: e.target.value })
+                  }
+                  placeholder="ej: María Vasquez (madre)"
+                />
+              </div>
+              <div className="field">
+                <label>Teléfono de emergencia</label>
+                <input
+                  type="text"
+                  value={form.contacto_emergencia_telefono}
+                  onChange={(e) =>
+                    setForm({ ...form, contacto_emergencia_telefono: e.target.value })
+                  }
+                  placeholder="ej: 291-4987654"
+                />
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Foto carnet de conducir</label>
+              <input
+                type="file"
+                accept="image/*"
+                className="carnet-input"
+                onChange={handleFotoChange}
+              />
+              {form.foto_carnet && (
+                <div className="carnet-preview-wrap">
+                  <img
+                    src={form.foto_carnet}
+                    alt="Vista previa carnet"
+                    className="carnet-preview"
+                    onClick={() => setLightbox(form.foto_carnet)}
+                  />
+                  <button
+                    type="button"
+                    className="carnet-remove"
+                    onClick={() => setForm({ ...form, foto_carnet: "" })}
+                  >
+                    Quitar foto
+                  </button>
+                </div>
+              )}
+            </div>
+
             {editId && (
               <p className="field-hint">
                 El vínculo con la cuenta de usuario del sistema (login) se gestiona
@@ -368,6 +457,12 @@ export default function Usuarios({ onBack }) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {lightbox && (
+        <div className="lightbox-bg" onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt="Carnet de conducir" />
         </div>
       )}
     </div>
