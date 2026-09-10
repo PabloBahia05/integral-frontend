@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 
 const API = "https://integral-backend-production.up.railway.app";
 const WALLPANEL_IMG =
@@ -78,22 +78,14 @@ export default function PresupuestoWallPanel({ onVolver, token, onAgregarAPresup
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  // Cache de precios traídos de BD (precio_XXXX)
-  const preciosBD = useRef({});
-
   useEffect(() => {
     setCargando(true);
-
-    const extraerCodarts = (expr) => {
-      if (!expr) return [];
-      return [...expr.matchAll(/precio_([A-Z0-9]+)/gi)].map((m) => m[1]);
-    };
 
     Promise.all([
       authFetch(`${API}/productos/wall-panel`)
         .then((r) => r.json())
         .catch(() => []),
-      authFetch(`${API}/asociaciones-form`)
+      authFetch(`${API}/asociaciones`)
         .then((r) => r.json())
         .catch(() => []),
     ])
@@ -105,84 +97,31 @@ export default function PresupuestoWallPanel({ onVolver, token, onAgregarAPresup
           (a) => (a.codart ?? a.CODART ?? "").toUpperCase() === "WALLPANEL",
         );
 
-        // Expandir la fila en un array de fórmulas individuales
+        // Expandir la fila de la tabla `asociaciones` (cod{i}/form{i}/
+        // margen{i}/art{i}/cant{i}) en un array de slots. `form{i}` es el
+        // CODIGO de una fórmula guardada en la tabla `formulas` (ej:
+        // SUPERFIC, VARILLAS, HHWALL) — se resuelve más abajo contra el
+        // backend (/formulas/calcular), igual que antes.
         const expandir = (f) => {
           if (!f) return [];
           const slots = [];
           for (let i = 1; i <= 10; i++) {
-            const t = f[`titulo${i}`] ?? f[`TITULO${i}`];
-            const c = f[`codf${i}`] ?? f[`CODF${i}`];
-            const fm = f[`form${i}`] ?? f[`FORM${i}`];
+            const nombreArt = f[`art${i}`] ?? f[`ART${i}`];
+            const codform = f[`form${i}`] ?? f[`FORM${i}`];
             const ca = f[`cant${i}`] ?? f[`CANT${i}`];
-            if (fm)
+            const mg = f[`margen${i}`] ?? f[`MARGEN${i}`];
+            if (codform)
               slots.push({
-                titulo: t ?? `Fórmula ${i}`,
-                codform: c,
-                formula: fm,
+                titulo: nombreArt ?? `Fórmula ${i}`,
+                codform,
                 cantidad: parseFloat(ca) || 1,
+                margen: parseFloat(mg) || 0,
               });
           }
           return slots;
         };
 
         const slots = expandir(fila);
-
-        // Extraer todos los precio_XXXX de las expresiones y buscar en BD
-        const todasExpresiones = slots.map((s) => s.formula).join(" ");
-        const codartsBD = [...new Set(extraerCodarts(todasExpresiones))];
-
-        const nuevosPrecios = {};
-        await Promise.all(
-          codartsBD.map(async (cod) => {
-            try {
-              const res = await authFetch(
-                `${API}/articulos/${encodeURIComponent(cod)}`,
-              );
-              const data = await res.json();
-              const row = Array.isArray(data) ? data[0] : data;
-              const campos = [
-                "PRECIO_UN",
-                "precio_un",
-                "PRECIO1",
-                "precio1",
-                "PRECIO",
-                "precio",
-                "PREC1",
-                "prec1",
-                "P1",
-                "p1",
-                "COSTO",
-                "costo",
-                "VALOR",
-                "valor",
-              ];
-              let precio = NaN;
-              for (const campo of campos) {
-                const v = parseFloat(row?.[campo]);
-                if (!isNaN(v) && v > 0) {
-                  precio = v;
-                  break;
-                }
-              }
-              if (isNaN(precio) && row) {
-                for (const k of Object.keys(row)) {
-                  if (/prec|price|cost|valor/i.test(k)) {
-                    const v = parseFloat(row[k]);
-                    if (!isNaN(v) && v > 0) {
-                      precio = v;
-                      break;
-                    }
-                  }
-                }
-              }
-              if (!isNaN(precio)) nuevosPrecios[`precio_${cod}`] = precio;
-            } catch {
-              /* artículo no encontrado */
-            }
-          }),
-        );
-
-        preciosBD.current = nuevosPrecios;
         setAsociados(slots);
       })
       .finally(() => setCargando(false));
@@ -364,13 +303,16 @@ export default function PresupuestoWallPanel({ onVolver, token, onAgregarAPresup
     const codform = a.codform ?? a.CODFORM ?? a.formula ?? a.FORMULA ?? null;
     const r = codform ? resultadosFormulas[codform] : null;
     const cantidad = parseFloat(a.cantidad ?? a.cant) || 1;
+    const margen = parseFloat(a.margen ?? a.MARGEN) || 0;
     const resultadoUnitario = r?.resultado ?? 0;
+    const valorSinMargen = resultadoUnitario * cantidad;
     return {
       ...a,
       codform,
       cantidad,
+      margen,
       resultadoUnitario,
-      valorCalculado: resultadoUnitario * cantidad,
+      valorCalculado: valorSinMargen * (1 + margen / 100),
       parciales: r?.parciales ?? {},
       errorFormula: r?.error ?? "",
     };
