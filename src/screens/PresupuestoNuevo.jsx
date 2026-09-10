@@ -1995,6 +1995,14 @@ export default function PresupuestoNuevo({
           grupo: it.grupo ?? it.GRUPO ?? "",
           color: it.color ?? it.COLOR ?? null,
           manija: it.manija ?? it.MANIJA ?? null,
+          // Medidas + código de fórmula interno. Faltaban acá (a diferencia
+          // de la rama de otrosItems un poco más abajo, que sí los copia) —
+          // por eso Ancho/Alto/codartint se guardaban bien en tabla_presupuestos
+          // pero al volver a abrir el presupuesto se perdían para ítems de
+          // Cocina/Placard.
+          ancho: it.ancho ?? it.ANCHO ?? null,
+          alto: it.alto ?? it.ALTO ?? null,
+          codartint: it.codartint ?? it.CODARTINT ?? null,
         };
         if (tipo.includes("cocina") && tipo.includes("bajomesada"))
           nuevaCocina.bajomesadas.push(fila);
