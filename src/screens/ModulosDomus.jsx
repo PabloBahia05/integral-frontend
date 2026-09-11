@@ -98,6 +98,18 @@ export default function ModulosDomus({ authFetch, token }) {
   const [nuevoFocus, setNuevoFocus] = useState(false);
   const [buscandoArticulo, setBuscandoArticulo] = useState(false);
 
+  // ── Modal de DUPLICAR artículo (copia todas las piezas a otro codartint) ─
+  const [duplicarAbierto, setDuplicarAbierto] = useState(false);
+  const [articuloOrigenDuplicar, setArticuloOrigenDuplicar] = useState(null); // { codartint, articulo_descripcion, totalPiezas }
+  const [duplicarCodartint, setDuplicarCodartint] = useState("");
+  const [duplicarDescripcion, setDuplicarDescripcion] = useState("");
+  const [duplicarBusqueda, setDuplicarBusqueda] = useState("");
+  const [duplicarResultados, setDuplicarResultados] = useState([]);
+  const [duplicarFocus, setDuplicarFocus] = useState(false);
+  const [buscandoArticuloDuplicar, setBuscandoArticuloDuplicar] = useState(false);
+  const [guardandoDuplicar, setGuardandoDuplicar] = useState(false);
+  const [errorDuplicar, setErrorDuplicar] = useState(null);
+
   // Búsqueda server-side con debounce contra /articulos/buscar-descripcion.
   useEffect(() => {
     if (!nuevoBusqueda.trim()) {
@@ -117,6 +129,27 @@ export default function ModulosDomus({ authFetch, token }) {
     }, 300);
     return () => clearTimeout(timer);
   }, [nuevoBusqueda, authFetch]);
+
+  // Búsqueda server-side con debounce para el destino del modal de Duplicar
+  // — mismo endpoint y patrón que la de "Nuevo artículo".
+  useEffect(() => {
+    if (!duplicarBusqueda.trim()) {
+      setDuplicarResultados([]);
+      setBuscandoArticuloDuplicar(false);
+      return;
+    }
+    setBuscandoArticuloDuplicar(true);
+    const timer = setTimeout(() => {
+      authFetch(
+        `${API}/articulos/buscar-descripcion?q=${encodeURIComponent(duplicarBusqueda.trim())}`,
+      )
+        .then((r) => r.json())
+        .then((data) => setDuplicarResultados(Array.isArray(data) ? data : []))
+        .catch(() => setDuplicarResultados([]))
+        .finally(() => setBuscandoArticuloDuplicar(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [duplicarBusqueda, authFetch]);
 
   // Búsqueda server-side con debounce contra /modulos-domus/formulas-buscar,
   // para el desplegable de fórmula de la pieza que se esté editando.
@@ -336,6 +369,55 @@ export default function ModulosDomus({ authFetch, token }) {
       setErrorNuevo(e.message || "No se pudo guardar.");
     } finally {
       setGuardandoNuevo(false);
+    }
+  };
+
+  // ── Duplicar artículo (copia todas sus piezas + datos internos a otro) ──
+
+  const abrirDuplicar = (articulo) => {
+    setArticuloOrigenDuplicar(articulo);
+    setDuplicarCodartint("");
+    setDuplicarDescripcion("");
+    setDuplicarBusqueda("");
+    setDuplicarResultados([]);
+    setErrorDuplicar(null);
+    setDuplicarAbierto(true);
+  };
+
+  const handleConfirmarDuplicar = async () => {
+    if (!articuloOrigenDuplicar || !duplicarCodartint.trim()) return;
+    setGuardandoDuplicar(true);
+    setErrorDuplicar(null);
+    try {
+      const res = await authFetch(`${API}/modulos-domus/duplicar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          origen: articuloOrigenDuplicar.codartint,
+          destino: duplicarCodartint.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+
+      const articuloDestino = {
+        codartint: duplicarCodartint.trim(),
+        articulo_descripcion: duplicarDescripcion || null,
+      };
+      setDuplicarAbierto(false);
+      setArticuloOrigenDuplicar(null);
+      setDuplicarCodartint("");
+      setDuplicarDescripcion("");
+      setDuplicarBusqueda("");
+      setDuplicarResultados([]);
+      fetchModulosDomus();
+      setSelected(articuloDestino);
+      abrirPanel(articuloDestino);
+    } catch (e) {
+      console.error("Error duplicando artículo en modulos-domus:", e);
+      setErrorDuplicar(e.message || "No se pudo duplicar.");
+    } finally {
+      setGuardandoDuplicar(false);
     }
   };
 
@@ -704,6 +786,31 @@ export default function ModulosDomus({ authFetch, token }) {
           search={search}
           onSearch={setSearch}
         />
+        <button
+          onClick={() => {
+            const articulo = articulos.find((a) => a.codartint === selected?.codartint);
+            if (articulo) abrirDuplicar(articulo);
+          }}
+          disabled={!selected}
+          title={
+            selected
+              ? "Duplicar este artículo (todas sus piezas y datos internos) a otro código"
+              : "Elegí un artículo primero"
+          }
+          style={{
+            padding: "7px 14px",
+            borderRadius: 6,
+            border: `1.5px solid ${selected ? "#0a3a5c" : "#d5e2ec"}`,
+            background: "#fff",
+            color: selected ? "#0a3a5c" : "#b8c8d4",
+            cursor: selected ? "pointer" : "default",
+            fontFamily: "'Space Mono', monospace",
+            fontSize: 12,
+            fontWeight: 700,
+          }}
+        >
+          ⧉ Duplicar
+        </button>
       </div>
 
       {loading ? (
@@ -1076,6 +1183,221 @@ export default function ModulosDomus({ authFetch, token }) {
                 }}
               >
                 {guardandoNuevo ? "Guardando…" : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {duplicarAbierto && articuloOrigenDuplicar && (
+        <div
+          onClick={() => !guardandoDuplicar && setDuplicarAbierto(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "90%",
+              maxWidth: 380,
+              background: "#fff",
+              borderRadius: 10,
+              padding: "20px 22px",
+              fontFamily: "'Space Mono', monospace",
+              color: "#0a3a5c",
+            }}
+          >
+            <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>
+              Duplicar artículo en Módulos Domus
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#4a8ab5" }}>
+              Copia las {" "}
+              {articulos.find((a) => a.codartint === articuloOrigenDuplicar.codartint)
+                ?.totalPiezas ?? "—"}{" "}
+              pieza(s) de{" "}
+              <strong>
+                {articuloOrigenDuplicar.articulo_descripcion ??
+                  articuloOrigenDuplicar.codartint}
+              </strong>{" "}
+              (fórmula, título, BPP, Cant1-4, Veta, medidas — todo) a otro artículo.
+            </p>
+
+            <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+              Artículo destino (buscar por código o nombre)
+            </label>
+            <div style={{ position: "relative", marginBottom: 12 }}>
+              <input
+                type="text"
+                value={duplicarBusqueda}
+                onChange={(e) => {
+                  setDuplicarBusqueda(e.target.value);
+                  setDuplicarCodartint(e.target.value);
+                  setDuplicarDescripcion("");
+                }}
+                onFocus={() => setDuplicarFocus(true)}
+                onBlur={() => setTimeout(() => setDuplicarFocus(false), 160)}
+                placeholder="Ej: KITMP001 o Kit Melamina..."
+                autoComplete="off"
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "6px 8px",
+                  fontSize: 13,
+                  fontFamily: "'Space Mono',monospace",
+                  border: "1.5px solid #b8d6ef",
+                  borderRadius: 4,
+                }}
+              />
+              {duplicarFocus && duplicarResultados.length > 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    background: "#fff",
+                    border: "1px solid #b8cfe0",
+                    borderTop: "none",
+                    zIndex: 1200,
+                    boxShadow: "0 6px 18px #0002",
+                    maxHeight: 220,
+                    overflowY: "auto",
+                    borderRadius: "0 0 3px 3px",
+                  }}
+                >
+                  {duplicarResultados.map((a) => (
+                    <div
+                      key={a.codartint}
+                      onMouseDown={() => {
+                        setDuplicarCodartint(a.codartint);
+                        setDuplicarDescripcion(a.articulo);
+                        setDuplicarBusqueda(`${a.articulo} — ${a.codartint}`);
+                        setDuplicarResultados([]);
+                      }}
+                      style={{
+                        padding: "8px 14px",
+                        cursor: "pointer",
+                        fontSize: 12,
+                        fontFamily: "'Space Mono',monospace",
+                        borderBottom: "1px solid #eef2f6",
+                        color: "#0a3a5c",
+                      }}
+                      onMouseOver={(e) =>
+                        (e.currentTarget.style.background = "#ddeefa")
+                      }
+                      onMouseOut={(e) =>
+                        (e.currentTarget.style.background = "#fff")
+                      }
+                    >
+                      <span style={{ fontWeight: 700 }}>{a.articulo}</span>
+                      <span
+                        style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}
+                      >
+                        {a.codartint}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {duplicarFocus &&
+                !buscandoArticuloDuplicar &&
+                duplicarResultados.length === 0 &&
+                duplicarBusqueda.trim().length > 0 && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      background: "#fff",
+                      border: "1px solid #b8cfe0",
+                      borderTop: "none",
+                      zIndex: 1200,
+                      padding: "10px 14px",
+                      color: "#8aabcc",
+                      fontSize: 11,
+                      borderRadius: "0 0 3px 3px",
+                    }}
+                  >
+                    Sin resultados — se usará el código tipeado tal cual
+                  </div>
+                )}
+            </div>
+
+            {duplicarCodartint.trim() &&
+              duplicarCodartint.trim() === articuloOrigenDuplicar.codartint && (
+                <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
+                  El destino tiene que ser distinto del artículo de origen.
+                </p>
+              )}
+            {duplicarCodartint.trim() &&
+              duplicarCodartint.trim() !== articuloOrigenDuplicar.codartint &&
+              articulos.some((a) => a.codartint === duplicarCodartint.trim()) && (
+                <p style={{ color: "#b8860b", fontSize: 12, margin: "0 0 12px" }}>
+                  ⚠ Ese artículo ya tiene{" "}
+                  {articulos.find((a) => a.codartint === duplicarCodartint.trim())
+                    ?.totalPiezas}{" "}
+                  pieza(s) cargada(s) — las copias se van a AGREGAR a esas, no las
+                  reemplazan.
+                </p>
+              )}
+
+            {errorDuplicar && (
+              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
+                {errorDuplicar}
+              </p>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                onClick={() => {
+                  setDuplicarAbierto(false);
+                  setDuplicarBusqueda("");
+                  setDuplicarResultados([]);
+                }}
+                disabled={guardandoDuplicar}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "1.5px solid #b8d6ef",
+                  background: "#fff",
+                  color: "#4a8ab5",
+                  cursor: "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarDuplicar}
+                disabled={
+                  guardandoDuplicar ||
+                  !duplicarCodartint.trim() ||
+                  duplicarCodartint.trim() === articuloOrigenDuplicar.codartint
+                }
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "none",
+                  background: "#1a7a44",
+                  color: "#fff",
+                  cursor: guardandoDuplicar ? "wait" : "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  opacity: guardandoDuplicar ? 0.6 : 1,
+                }}
+              >
+                {guardandoDuplicar ? "Duplicando…" : "Duplicar"}
               </button>
             </div>
           </div>
