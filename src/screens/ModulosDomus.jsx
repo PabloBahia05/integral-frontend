@@ -9,23 +9,24 @@ const API = "https://integral-backend-production.up.railway.app";
 
 // ── Componente ────────────────────────────────────────────────────────────
 //
-// Tabla ÚNICA de piezas (`modulos-domus`) para todos los artículos, pero la
-// pantalla opera "por artículo": la tabla de arriba agrupa las piezas por
-// codartint (una fila = un artículo, con la cuenta de piezas), y al hacer
-// clic en un artículo se abre un panel con SOLO las piezas de ese artículo
-// (filtradas de la misma tabla), donde se cargan/editan una por una.
+// CRUD de `modulos-domus`: guarda las PIEZAS que componen cada artículo
+// (codartint), cada una con su fórmula asociada (codform, de
+// formulas_produccion) y los datos que completa el CSV de fórmulas de
+// producción (bpp, cant1-4, veta, ancho/alto/formulax/formulay) — ver
+// GET /produccion/:id/formulas-csv en tabla-produccion_routes.js, que
+// arma un renglón de CSV por cada pieza con fórmula asignada.
 //
-// Cada pieza se vincula a una fórmula puntual de Producción (`codform`) —
-// eso es lo que después usa el generador del CSV de fórmulas
-// (GET /produccion/:id/formulas-csv en tabla-produccion_routes.js) para
-// saber qué BPP/CANT1-4/VETA le corresponde a cada renglón del CSV. La
-// pantalla "Asociaciones de Fórmulas" ya no cumple ese rol.
+// Un mismo codartint puede tener varias piezas, así que ya no hay upsert
+// por codartint: alta = POST /modulos-domus (siempre inserta), edición y
+// borrado = PUT/DELETE /modulos-domus/:id (id de la pieza puntual).
 //
-// Guardado: alta = POST /modulos-domus, edición = PUT /modulos-domus/:id,
-// borrado = DELETE /modulos-domus/:id (antes todo era upsert por
-// codartint; ahora cada pieza es su propia fila con `id`).
+// La grilla principal muestra TODAS las piezas de TODOS los artículos
+// mezcladas (como siempre). Al hacer clic en una fila se abre un panel
+// filtrado por ese artículo, con sus piezas y un alta guiada por
+// búsqueda de fórmula (mismo patrón de buscador+desplegable que el modal
+// "Nuevo artículo").
 
-const CAMPOS_TEXTO_PIEZA = [
+const CAMPOS_TEXTO = [
   { campo: "bpp", label: "BPP", maxLength: 30 },
   { campo: "cant1", label: "Cant1", maxLength: 100 },
   { campo: "cant2", label: "Cant2", maxLength: 100 },
@@ -36,143 +37,64 @@ const CAMPOS_TEXTO_PIEZA = [
   { campo: "formulay", label: "Fórmula Y", maxLength: 255 },
 ];
 
-const CAMPOS_NUMERICOS_PIEZA = [
+const CAMPOS_NUMERICOS = [
   { campo: "ancho", label: "Ancho" },
   { campo: "alto", label: "Alto" },
   { campo: "cantidad", label: "Cantidad" },
 ];
 
-const ESTILO_INPUT_BASE = {
-  width: "100%",
-  padding: "4px 8px",
-  fontSize: "12px",
-  fontFamily: "'Space Mono',monospace",
-  borderRadius: "4px",
-  color: "#0a3a5c",
-};
-
 export default function ModulosDomus({ authFetch, token }) {
-  // ── Tabla de arriba (todas las piezas, agrupadas por artículo) ────────
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState(null); // artículo seleccionado (para ActionBar)
   const [filtroModulo, setFiltroModulo] = useState(null);
 
-  const [aEliminarArticulo, setAEliminarArticulo] = useState(null);
-  const [eliminandoArticulo, setEliminandoArticulo] = useState(false);
+  // Pieza a eliminar — puede venir de la grilla principal o del panel de
+  // un artículo, por eso no distingue origen, solo necesita `id`.
+  const [aEliminar, setAEliminar] = useState(null);
+  const [eliminando, setEliminando] = useState(false);
 
-  // ── Panel de piezas de un artículo ──────────────────────────────────
-  const [panelAbierto, setPanelAbierto] = useState(false);
-  const [articuloPanel, setArticuloPanel] = useState(null); // { codartint, articulo_descripcion }
-  const [piezasPanel, setPiezasPanel] = useState([]);
-  const [loadingPanel, setLoadingPanel] = useState(false);
-  const [errorPanel, setErrorPanel] = useState(null);
-  const [agregandoPieza, setAgregandoPieza] = useState(false);
-  const [aEliminarPieza, setAEliminarPieza] = useState(null);
-  const [eliminandoPieza, setEliminandoPieza] = useState(false);
-
-  // Guardado inline por campo: key = `${id}-${campo}`, mismo patrón que
-  // `guardandoCampo`/`errorCampo` de Producción.jsx.
+  // Guardado inline por campo: key = `${id}-${campo}`, ahora por `id` de
+  // PIEZA (antes era por codartint — dejó de servir porque un mismo
+  // codartint puede repetirse en varias filas).
   const [guardandoCampo, setGuardandoCampo] = useState(null);
   const [errorCampo, setErrorCampo] = useState(null);
 
-  // Desplegable de fórmula ↔ pieza: solo una fila puede estar editando su
-  // fórmula a la vez.
-  const [formulaEditId, setFormulaEditId] = useState(null);
-  const [formulaQuery, setFormulaQuery] = useState("");
-  const [formulaResultados, setFormulaResultados] = useState([]);
-  const [formulaFocus, setFormulaFocus] = useState(false);
-  const [buscandoFormula, setBuscandoFormula] = useState(false);
-
-  // ── Modal de alta de artículo NUEVO (crea la primera pieza) ───────────
+  // Modal "Nuevo artículo": da de alta la primera pieza de un artículo
+  // (nuevo o ya existente), buscándolo por código o nombre.
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
   const [nuevoCodartint, setNuevoCodartint] = useState("");
-  const [nuevoDescripcion, setNuevoDescripcion] = useState("");
   const [nuevoModulo, setNuevoModulo] = useState("");
-  const [guardandoNuevo, setGuardandoNuevo] = useState(false);
-  const [errorNuevo, setErrorNuevo] = useState(null);
   const [nuevoBusqueda, setNuevoBusqueda] = useState("");
   const [nuevoResultados, setNuevoResultados] = useState([]);
   const [nuevoFocus, setNuevoFocus] = useState(false);
   const [buscandoArticulo, setBuscandoArticulo] = useState(false);
+  const [guardandoNuevo, setGuardandoNuevo] = useState(false);
+  const [errorNuevo, setErrorNuevo] = useState(null);
 
-  // ── Modal de DUPLICAR artículo (copia todas las piezas a otro codartint) ─
-  const [duplicarAbierto, setDuplicarAbierto] = useState(false);
-  const [articuloOrigenDuplicar, setArticuloOrigenDuplicar] = useState(null); // { codartint, articulo_descripcion, totalPiezas }
-  const [duplicarCodartint, setDuplicarCodartint] = useState("");
-  const [duplicarDescripcion, setDuplicarDescripcion] = useState("");
-  const [duplicarBusqueda, setDuplicarBusqueda] = useState("");
-  const [duplicarResultados, setDuplicarResultados] = useState([]);
-  const [duplicarFocus, setDuplicarFocus] = useState(false);
-  const [buscandoArticuloDuplicar, setBuscandoArticuloDuplicar] = useState(false);
-  const [guardandoDuplicar, setGuardandoDuplicar] = useState(false);
-  const [errorDuplicar, setErrorDuplicar] = useState(null);
+  // Panel de un artículo puntual: sus piezas + alta de piezas nuevas.
+  const [panelCodartint, setPanelCodartint] = useState(null);
+  const [panelArticulo, setPanelArticulo] = useState("");
+  const [piezas, setPiezas] = useState([]);
+  const [piezasLoading, setPiezasLoading] = useState(false);
+  const [piezasError, setPiezasError] = useState(null);
 
-  // Búsqueda server-side con debounce contra /articulos/buscar-descripcion.
-  useEffect(() => {
-    if (!nuevoBusqueda.trim()) {
-      setNuevoResultados([]);
-      setBuscandoArticulo(false);
-      return;
-    }
-    setBuscandoArticulo(true);
-    const timer = setTimeout(() => {
-      authFetch(
-        `${API}/articulos/buscar-descripcion?q=${encodeURIComponent(nuevoBusqueda.trim())}`,
-      )
-        .then((r) => r.json())
-        .then((data) => setNuevoResultados(Array.isArray(data) ? data : []))
-        .catch(() => setNuevoResultados([]))
-        .finally(() => setBuscandoArticulo(false));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [nuevoBusqueda, authFetch]);
+  // Alta de pieza nueva, dentro del panel: buscador de fórmula (catálogo
+  // completo de formulas_produccion, cargado una vez y filtrado acá
+  // mismo — a diferencia de la búsqueda de artículos, esta lista no suele
+  // ser gigante, así que no hace falta pegarle al backend en cada tecla).
+  const [piezaAbierta, setPiezaAbierta] = useState(false);
+  const [formulas, setFormulas] = useState([]);
+  const [formulasCargadas, setFormulasCargadas] = useState(false);
+  const [busquedaFormula, setBusquedaFormula] = useState("");
+  const [formulaFocus, setFormulaFocus] = useState(false);
+  const [piezaCodform, setPiezaCodform] = useState("");
+  const [piezaTitulo, setPiezaTitulo] = useState("");
+  const [guardandoPieza, setGuardandoPieza] = useState(false);
+  const [errorPieza, setErrorPieza] = useState(null);
 
-  // Búsqueda server-side con debounce para el destino del modal de Duplicar
-  // — mismo endpoint y patrón que la de "Nuevo artículo".
-  useEffect(() => {
-    if (!duplicarBusqueda.trim()) {
-      setDuplicarResultados([]);
-      setBuscandoArticuloDuplicar(false);
-      return;
-    }
-    setBuscandoArticuloDuplicar(true);
-    const timer = setTimeout(() => {
-      authFetch(
-        `${API}/articulos/buscar-descripcion?q=${encodeURIComponent(duplicarBusqueda.trim())}`,
-      )
-        .then((r) => r.json())
-        .then((data) => setDuplicarResultados(Array.isArray(data) ? data : []))
-        .catch(() => setDuplicarResultados([]))
-        .finally(() => setBuscandoArticuloDuplicar(false));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [duplicarBusqueda, authFetch]);
-
-  // Búsqueda server-side con debounce contra /modulos-domus/formulas-buscar,
-  // para el desplegable de fórmula de la pieza que se esté editando.
-  useEffect(() => {
-    if (formulaEditId === null || !formulaQuery.trim()) {
-      setFormulaResultados([]);
-      setBuscandoFormula(false);
-      return;
-    }
-    setBuscandoFormula(true);
-    const timer = setTimeout(() => {
-      authFetch(
-        `${API}/modulos-domus/formulas-buscar?q=${encodeURIComponent(formulaQuery.trim())}`,
-      )
-        .then((r) => r.json())
-        .then((data) => setFormulaResultados(Array.isArray(data) ? data : []))
-        .catch(() => setFormulaResultados([]))
-        .finally(() => setBuscandoFormula(false));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [formulaQuery, formulaEditId, authFetch]);
-
-  // ── Fetch tabla de arriba ─────────────────────────────────────────────
+  // ── Fetch principal (grilla mezclada) ────────────────────────────────
 
   const fetchModulosDomus = () => {
     setLoading(true);
@@ -195,57 +117,43 @@ export default function ModulosDomus({ authFetch, token }) {
     fetchModulosDomus();
   }, []);
 
-  // ── Fetch + acciones del panel de piezas ─────────────────────────────
+  // Búsqueda server-side (con debounce) de artículos para "Nuevo
+  // artículo" — mismo patrón que el buscador de Material Placa/Guías en
+  // PresupuestoNuevo.jsx, contra /articulos/buscar-descripcion.
+  useEffect(() => {
+    if (!nuevoBusqueda.trim()) {
+      setNuevoResultados([]);
+      setBuscandoArticulo(false);
+      return;
+    }
+    setBuscandoArticulo(true);
+    const timer = setTimeout(() => {
+      authFetch(
+        `${API}/articulos/buscar-descripcion?q=${encodeURIComponent(nuevoBusqueda.trim())}`,
+      )
+        .then((r) => r.json())
+        .then((data) => setNuevoResultados(Array.isArray(data) ? data : []))
+        .catch(() => setNuevoResultados([]))
+        .finally(() => setBuscandoArticulo(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [nuevoBusqueda, authFetch]);
 
-  const fetchPiezasArticulo = (codartint) => {
-    setLoadingPanel(true);
-    setErrorPanel(null);
-    authFetch(`${API}/modulos-domus/por-articulo/${encodeURIComponent(codartint)}`)
-      .then(async (r) => {
-        const data = await r.json().catch(() => null);
-        if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
-        setPiezasPanel(Array.isArray(data) ? data : []);
-      })
-      .catch((e) => {
-        console.error(e);
-        setErrorPanel(e.message);
-        setPiezasPanel([]);
-      })
-      .finally(() => setLoadingPanel(false));
-  };
-
-  const abrirPanel = (articulo) => {
-    setArticuloPanel(articulo);
-    setPanelAbierto(true);
-    setFormulaEditId(null);
-    fetchPiezasArticulo(articulo.codartint);
-  };
-
-  const cerrarPanel = () => {
-    setPanelAbierto(false);
-    setArticuloPanel(null);
-    setPiezasPanel([]);
-    setFormulaEditId(null);
-    fetchModulosDomus(); // refresca cuenta de piezas en la tabla de arriba
-  };
-
-  // ── Edición inline de una pieza (guarda al salir del campo) ──────────
+  // ── Edición inline de la grilla principal (por id de pieza) ──────────
 
   const handleCampoChange = (id, campo, valor) => {
-    setPiezasPanel((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, [campo]: valor } : p)),
-    );
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [campo]: valor } : r)));
   };
 
-  const handleCampoBlur = async (pieza, campo) => {
-    const key = `${pieza.id}-${campo}`;
+  const handleCampoBlur = async (row, campo) => {
+    const key = `${row.id}-${campo}`;
     setGuardandoCampo(key);
     setErrorCampo(null);
     try {
-      const res = await authFetch(`${API}/modulos-domus/${pieza.id}`, {
+      const res = await authFetch(`${API}/modulos-domus/${row.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [campo]: pieza[campo] === "" ? null : pieza[campo] }),
+        body: JSON.stringify({ [campo]: row[campo] === "" ? null : row[campo] }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (e) {
@@ -256,84 +164,20 @@ export default function ModulosDomus({ authFetch, token }) {
     }
   };
 
-  // `modulo` no cambia el agrupamiento de arriba en vivo (se refresca recién
-  // al cerrar el panel), así que se guarda igual que cualquier otro campo.
-
-  // ── Fórmula ↔ pieza ────────────────────────────────────────────────
-
-  const handleSeleccionarFormula = async (pieza, formula) => {
-    const tituloNuevo = pieza.titulo && pieza.titulo.trim() ? pieza.titulo : formula.descripcion || "";
-    setPiezasPanel((prev) =>
-      prev.map((p) =>
-        p.id === pieza.id
-          ? { ...p, codform: formula.codform, titulo: tituloNuevo, formula_descripcion: formula.descripcion }
-          : p,
-      ),
-    );
-    setFormulaEditId(null);
-    setFormulaQuery("");
-    setFormulaResultados([]);
-    const key = `${pieza.id}-codform`;
-    setGuardandoCampo(key);
-    setErrorCampo(null);
-    try {
-      const res = await authFetch(`${API}/modulos-domus/${pieza.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codform: formula.codform, titulo: tituloNuevo || null }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    } catch (e) {
-      console.error("Error guardando fórmula de la pieza:", e);
-      setErrorCampo(key);
-    } finally {
-      setGuardandoCampo(null);
-    }
+  // `modulo` cambia el agrupamiento, así que además de guardarlo hay que
+  // refrescar la lista de módulos (para los botones de filtro).
+  const handleModuloBlur = async (row) => {
+    await handleCampoBlur(row, "modulo");
+    fetchModulosDomus();
   };
 
-  // ── Alta de pieza nueva (dentro del panel, codartint ya fijo) ────────
+  // ── Alta de artículo nuevo (su primera pieza) ────────────────────────
 
-  const handleAgregarPieza = async () => {
-    if (!articuloPanel) return;
-    setAgregandoPieza(true);
-    try {
-      const res = await authFetch(`${API}/modulos-domus`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codartint: articuloPanel.codartint }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-      fetchPiezasArticulo(articuloPanel.codartint);
-    } catch (e) {
-      console.error("Error agregando pieza:", e);
-      alert("No se pudo agregar la pieza. Revisá la consola.");
-    } finally {
-      setAgregandoPieza(false);
-    }
+  const cerrarNuevo = () => {
+    setNuevoAbierto(false);
+    setNuevoBusqueda("");
+    setNuevoResultados([]);
   };
-
-  // ── Borrado de una pieza puntual ──────────────────────────────────
-
-  const handleDeletePieza = async () => {
-    if (!aEliminarPieza) return;
-    setEliminandoPieza(true);
-    try {
-      const res = await authFetch(`${API}/modulos-domus/${aEliminarPieza.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setPiezasPanel((prev) => prev.filter((p) => p.id !== aEliminarPieza.id));
-      setAEliminarPieza(null);
-    } catch (e) {
-      console.error("Error borrando pieza:", e);
-      alert("No se pudo borrar la pieza. Revisá la consola.");
-    } finally {
-      setEliminandoPieza(false);
-    }
-  };
-
-  // ── Alta de artículo nuevo (crea la primera pieza) ───────────────────
 
   const handleCrearNuevo = async () => {
     if (!nuevoCodartint.trim()) return;
@@ -348,367 +192,380 @@ export default function ModulosDomus({ authFetch, token }) {
           modulo: nuevoModulo.trim() || null,
         }),
       });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-
-      const articulo = {
-        codartint: nuevoCodartint.trim(),
-        articulo_descripcion: nuevoDescripcion || null,
-      };
+      if (!res.ok) {
+        let detalle = `HTTP ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body?.error) detalle = body.error;
+        } catch {
+          // el body no era JSON parseable, nos quedamos con el status
+        }
+        throw new Error(detalle);
+      }
       setNuevoAbierto(false);
       setNuevoCodartint("");
-      setNuevoDescripcion("");
       setNuevoModulo("");
       setNuevoBusqueda("");
       setNuevoResultados([]);
       fetchModulosDomus();
-      setSelected(articulo);
-      abrirPanel(articulo);
     } catch (e) {
-      console.error("Error creando artículo en modulos-domus:", e);
+      console.error("Error creando pieza en modulos-domus:", e);
       setErrorNuevo(e.message || "No se pudo guardar.");
     } finally {
       setGuardandoNuevo(false);
     }
   };
 
-  // ── Duplicar artículo (copia todas sus piezas + datos internos a otro) ──
+  // ── DELETE de una pieza puntual (id) ─────────────────────────────────
 
-  const abrirDuplicar = (articulo) => {
-    setArticuloOrigenDuplicar(articulo);
-    setDuplicarCodartint("");
-    setDuplicarDescripcion("");
-    setDuplicarBusqueda("");
-    setDuplicarResultados([]);
-    setErrorDuplicar(null);
-    setDuplicarAbierto(true);
+  const handleDelete = async () => {
+    if (!aEliminar) return;
+    setEliminando(true);
+    try {
+      const res = await authFetch(`${API}/modulos-domus/${aEliminar.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setRows((prev) => prev.filter((r) => r.id !== aEliminar.id));
+      setPiezas((prev) => prev.filter((p) => p.id !== aEliminar.id));
+      setAEliminar(null);
+    } catch (e) {
+      console.error("Error borrando pieza de modulos-domus:", e);
+      alert("No se pudo borrar la pieza. Revisá la consola.");
+    } finally {
+      setEliminando(false);
+    }
   };
 
-  const handleConfirmarDuplicar = async () => {
-    if (!articuloOrigenDuplicar || !duplicarCodartint.trim()) return;
-    setGuardandoDuplicar(true);
-    setErrorDuplicar(null);
+  // ── Panel de un artículo (sus piezas) ────────────────────────────────
+
+  const fetchPiezas = (codartint) => {
+    setPiezasLoading(true);
+    setPiezasError(null);
+    authFetch(`${API}/modulos-domus/por-articulo/${encodeURIComponent(codartint)}`)
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+        setPiezas(Array.isArray(data) ? data : []);
+      })
+      .catch((e) => {
+        console.error(e);
+        setPiezasError(e.message);
+        setPiezas([]);
+      })
+      .finally(() => setPiezasLoading(false));
+  };
+
+  const cerrarPieza = () => {
+    setPiezaAbierta(false);
+    setBusquedaFormula("");
+    setPiezaCodform("");
+    setPiezaTitulo("");
+    setErrorPieza(null);
+  };
+
+  const abrirPanel = (row) => {
+    setPanelCodartint(row.codartint);
+    setPanelArticulo(row.articulo_descripcion ?? "");
+    fetchPiezas(row.codartint);
+  };
+
+  const cerrarPanel = () => {
+    setPanelCodartint(null);
+    setPanelArticulo("");
+    setPiezas([]);
+    setPiezasError(null);
+    cerrarPieza();
+  };
+
+  const handlePiezaCampoChange = (id, campo, valor) => {
+    setPiezas((prev) => prev.map((p) => (p.id === id ? { ...p, [campo]: valor } : p)));
+  };
+
+  const handlePiezaCampoBlur = async (pieza, campo) => {
+    const key = `${pieza.id}-${campo}`;
+    setGuardandoCampo(key);
+    setErrorCampo(null);
     try {
-      const res = await authFetch(`${API}/modulos-domus/duplicar`, {
+      const res = await authFetch(`${API}/modulos-domus/${pieza.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [campo]: pieza[campo] === "" ? null : pieza[campo] }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // La grilla principal muestra todo mezclado — reflejar el cambio
+      // ahí también, sin esperar a un refetch completo.
+      setRows((prev) =>
+        prev.map((r) => (r.id === pieza.id ? { ...r, [campo]: pieza[campo] } : r)),
+      );
+    } catch (e) {
+      console.error(`Error guardando ${campo} de la pieza:`, e);
+      setErrorCampo(key);
+    } finally {
+      setGuardandoCampo(null);
+    }
+  };
+
+  // ── Alta de pieza nueva (buscador de fórmula) ────────────────────────
+
+  const fetchFormulas = () => {
+    if (formulasCargadas) return;
+    authFetch(`${API}/formulas-produccion`)
+      .then((r) => r.json())
+      .then((data) => {
+        setFormulas(Array.isArray(data) ? data : []);
+        setFormulasCargadas(true);
+      })
+      .catch((e) => console.error("Error cargando fórmulas de producción:", e));
+  };
+
+  const abrirPieza = () => {
+    fetchFormulas();
+    setPiezaAbierta(true);
+  };
+
+  const fq = busquedaFormula.trim().toLowerCase();
+  const formulasFiltradas = fq
+    ? formulas
+        .filter(
+          (f) =>
+            (f.codform ?? "").toLowerCase().includes(fq) ||
+            (f.descripcion ?? "").toLowerCase().includes(fq),
+        )
+        .slice(0, 20)
+    : [];
+
+  const handleCrearPieza = async () => {
+    if (!panelCodartint) return;
+    setGuardandoPieza(true);
+    setErrorPieza(null);
+    try {
+      const res = await authFetch(`${API}/modulos-domus`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          origen: articuloOrigenDuplicar.codartint,
-          destino: duplicarCodartint.trim(),
+          codartint: panelCodartint,
+          codform: piezaCodform.trim() || null,
+          titulo: piezaTitulo.trim() || null,
         }),
       });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-
-      const articuloDestino = {
-        codartint: duplicarCodartint.trim(),
-        articulo_descripcion: duplicarDescripcion || null,
-      };
-      setDuplicarAbierto(false);
-      setArticuloOrigenDuplicar(null);
-      setDuplicarCodartint("");
-      setDuplicarDescripcion("");
-      setDuplicarBusqueda("");
-      setDuplicarResultados([]);
-      fetchModulosDomus();
-      setSelected(articuloDestino);
-      abrirPanel(articuloDestino);
-    } catch (e) {
-      console.error("Error duplicando artículo en modulos-domus:", e);
-      setErrorDuplicar(e.message || "No se pudo duplicar.");
-    } finally {
-      setGuardandoDuplicar(false);
-    }
-  };
-
-  // ── Borrado de TODAS las piezas de un artículo (desde la tabla de arriba) ─
-
-  const handleDeleteArticulo = async () => {
-    if (!aEliminarArticulo) return;
-    setEliminandoArticulo(true);
-    try {
-      const ids = aEliminarArticulo.piezas.map((p) => p.id);
-      for (const id of ids) {
-        const res = await authFetch(`${API}/modulos-domus/${id}`, { method: "DELETE" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        let detalle = `HTTP ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body?.error) detalle = body.error;
+        } catch {
+          // el body no era JSON parseable, nos quedamos con el status
+        }
+        throw new Error(detalle);
       }
-      if (selected?.codartint === aEliminarArticulo.codartint) setSelected(null);
-      if (articuloPanel?.codartint === aEliminarArticulo.codartint) cerrarPanel();
-      setAEliminarArticulo(null);
+      cerrarPieza();
+      fetchPiezas(panelCodartint);
       fetchModulosDomus();
     } catch (e) {
-      console.error("Error borrando piezas del artículo:", e);
-      alert("No se pudo borrar el artículo. Revisá la consola.");
+      console.error("Error creando pieza:", e);
+      setErrorPieza(e.message || "No se pudo guardar.");
     } finally {
-      setEliminandoArticulo(false);
+      setGuardandoPieza(false);
     }
   };
 
-  // ── Filtro por módulo + búsqueda (sobre las piezas, luego se agrupa) ──
+  // ── Filtro por módulo + búsqueda (grilla principal) ──────────────────
 
   const modulos = [...new Set(rows.map((r) => r.modulo).filter(Boolean))].sort();
 
   const q = search.toLowerCase();
-  const piezasFiltradas = rows.filter(
+  const filtered = rows.filter(
     (r) =>
       (!filtroModulo || r.modulo === filtroModulo) &&
       ((r.codartint ?? "").toLowerCase().includes(q) ||
         (r.articulo_descripcion ?? "").toLowerCase().includes(q) ||
         (r.modulo ?? "").toLowerCase().includes(q) ||
-        (r.bpp ?? "").toLowerCase().includes(q) ||
-        (r.veta ?? "").toLowerCase().includes(q) ||
         (r.titulo ?? "").toLowerCase().includes(q) ||
-        (r.codform ?? "").toLowerCase().includes(q)),
+        (r.bpp ?? "").toLowerCase().includes(q) ||
+        (r.veta ?? "").toLowerCase().includes(q)),
   );
 
-  // Agrupado por artículo: una fila de la tabla de arriba = un codartint.
-  const articulosMap = new Map();
-  piezasFiltradas.forEach((r) => {
-    if (!articulosMap.has(r.codartint)) {
-      articulosMap.set(r.codartint, {
-        codartint: r.codartint,
-        articulo_descripcion: r.articulo_descripcion,
-        piezas: [],
-      });
-    }
-    articulosMap.get(r.codartint).piezas.push(r);
-  });
-  const articulos = [...articulosMap.values()]
-    .map((a) => ({
-      ...a,
-      totalPiezas: a.piezas.length,
-      sinFormula: a.piezas.filter((p) => !p.codform).length,
-      modulosTexto: [...new Set(a.piezas.map((p) => p.modulo).filter(Boolean))].join(", "),
-    }))
-    .sort((a, b) => (a.codartint > b.codartint ? 1 : -1));
-
+  // "Sin módulo" y "Total artículos" cuentan ARTÍCULOS distintos, no
+  // piezas — si un artículo tiene 3 piezas sin módulo, sigue siendo 1
+  // artículo sin módulo.
   const totalArticulos = new Set(rows.map((r) => r.codartint)).size;
-  const totalPiezasSinFormula = rows.filter((r) => !r.codform).length;
+  const articulosSinModulo = new Set(
+    rows.filter((r) => !r.modulo || !r.modulo.trim()).map((r) => r.codartint),
+  ).size;
 
-  // ── Estilos de los inputs editables del panel ───────────────────────
+  // ── Estilos de los inputs editables ─────────────────────────────────
 
-  const estiloInputPanel = (pieza, campo, ancho = "100px") => ({
-    ...ESTILO_INPUT_BASE,
+  const estiloInput = (id, campo, ancho = "100px") => ({
+    width: "100%",
     maxWidth: ancho,
-    border: `1.5px solid ${
-      errorCampo === `${pieza.id}-${campo}` ? "#e57373" : "#b8d6ef"
-    }`,
-    background: guardandoCampo === `${pieza.id}-${campo}` ? "#fffbe6" : "#fff",
+    padding: "4px 8px",
+    fontSize: "12px",
+    fontFamily: "'Space Mono',monospace",
+    border: `1.5px solid ${errorCampo === `${id}-${campo}` ? "#e57373" : "#b8d6ef"}`,
+    borderRadius: "4px",
+    background: guardandoCampo === `${id}-${campo}` ? "#fffbe6" : "#fff",
+    color: "#0a3a5c",
   });
 
-  // ── Columnas de la tabla de arriba (artículos) ───────────────────────
+  // ── Columnas de la grilla principal (todo mezclado) ──────────────────
 
-  const columnsArticulos = [
+  const columns = [
     { key: "codartint", label: "Código", render: (v) => v ?? "—" },
     { key: "articulo_descripcion", label: "Artículo", render: (v) => v ?? "—" },
-    { key: "modulosTexto", label: "Módulo(s)", render: (v) => v || "—" },
-    { key: "totalPiezas", label: "Piezas" },
-    {
-      key: "sinFormula",
-      label: "Sin fórmula",
-      render: (v) =>
-        v > 0 ? <span style={{ color: "#c0392b", fontWeight: 700 }}>{v}</span> : "0",
-    },
-  ];
-
-  // ── Columnas de la tabla del panel (piezas del artículo) ─────────────
-
-  const columnsPiezas = [
-    {
-      key: "codform",
-      label: "Fórmula",
-      render: (v, pieza) =>
-        formulaEditId === pieza.id ? (
-          <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
-            <input
-              type="text"
-              autoFocus
-              value={formulaQuery}
-              onChange={(e) => setFormulaQuery(e.target.value)}
-              onFocus={() => setFormulaFocus(true)}
-              onBlur={() => setTimeout(() => setFormulaFocus(false), 160)}
-              placeholder="Buscar por código o descripción..."
-              autoComplete="off"
-              style={{ ...ESTILO_INPUT_BASE, maxWidth: "180px", border: "1.5px solid #b8d6ef" }}
-            />
-            {formulaFocus && formulaResultados.length > 0 && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  right: 0,
-                  background: "#fff",
-                  border: "1px solid #b8cfe0",
-                  borderTop: "none",
-                  zIndex: 1300,
-                  boxShadow: "0 6px 18px #0002",
-                  maxHeight: 200,
-                  overflowY: "auto",
-                  borderRadius: "0 0 3px 3px",
-                }}
-              >
-                {formulaResultados.map((f) => (
-                  <div
-                    key={f.codform}
-                    onMouseDown={() => handleSeleccionarFormula(pieza, f)}
-                    style={{
-                      padding: "8px 12px",
-                      cursor: "pointer",
-                      fontSize: 12,
-                      fontFamily: "'Space Mono',monospace",
-                      borderBottom: "1px solid #eef2f6",
-                      color: "#0a3a5c",
-                    }}
-                    onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
-                    onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
-                  >
-                    <span style={{ fontWeight: 700 }}>{f.descripcion}</span>
-                    <span style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}>
-                      {f.codform}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {formulaFocus &&
-              !buscandoFormula &&
-              formulaResultados.length === 0 &&
-              formulaQuery.trim().length > 0 && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "100%",
-                    left: 0,
-                    right: 0,
-                    background: "#fff",
-                    border: "1px solid #b8cfe0",
-                    borderTop: "none",
-                    zIndex: 1300,
-                    padding: "8px 12px",
-                    color: "#8aabcc",
-                    fontSize: 11,
-                  }}
-                >
-                  Sin resultados
-                </div>
-              )}
-          </div>
-        ) : (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setFormulaEditId(pieza.id);
-              setFormulaQuery("");
-              setFormulaResultados([]);
-            }}
-            title="Elegir fórmula"
-            style={{
-              padding: "4px 8px",
-              fontSize: 11,
-              fontFamily: "'Space Mono',monospace",
-              border: `1.5px solid ${pieza.codform ? "#b8d6ef" : "#e57373"}`,
-              borderRadius: 4,
-              background: "#fff",
-              color: pieza.codform ? "#0a3a5c" : "#c0392b",
-              cursor: "pointer",
-              textAlign: "left",
-              width: "100%",
-              maxWidth: 180,
-            }}
-          >
-            {pieza.codform
-              ? `${pieza.formula_descripcion || pieza.codform}`
-              : "Sin asignar"}
-          </button>
-        ),
-    },
-    {
-      key: "titulo",
-      label: "Título",
-      render: (v, pieza) => (
-        <input
-          type="text"
-          value={pieza.titulo ?? ""}
-          placeholder="—"
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handleCampoChange(pieza.id, "titulo", e.target.value)}
-          onBlur={() => handleCampoBlur(pieza, "titulo")}
-          maxLength={255}
-          style={estiloInputPanel(pieza, "titulo", "160px")}
-        />
-      ),
-    },
     {
       key: "modulo",
       label: "Módulo",
-      render: (v, pieza) => (
+      render: (v, row) => (
         <input
           type="text"
-          value={pieza.modulo ?? ""}
+          value={row.modulo ?? ""}
           placeholder="Sin cargar"
           onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handleCampoChange(pieza.id, "modulo", e.target.value)}
-          onBlur={() => handleCampoBlur(pieza, "modulo")}
+          onChange={(e) => handleCampoChange(row.id, "modulo", e.target.value)}
+          onBlur={() => handleModuloBlur(row)}
           maxLength={50}
-          style={estiloInputPanel(pieza, "modulo", "120px")}
+          style={estiloInput(row.id, "modulo", "140px")}
         />
       ),
     },
-    ...CAMPOS_NUMERICOS_PIEZA.map(({ campo, label }) => ({
+    {
+      key: "titulo",
+      label: "Pieza / Fórmula",
+      render: (v, row) => (
+        <span style={{ fontSize: 11 }}>
+          {row.titulo || row.formula_descripcion || (
+            <em style={{ color: "#b8cfe0" }}>sin fórmula</em>
+          )}
+          {row.codform && (
+            <span style={{ color: "#8aabcc", marginLeft: 6 }}>({row.codform})</span>
+          )}
+        </span>
+      ),
+    },
+    ...CAMPOS_NUMERICOS.map(({ campo, label }) => ({
       key: campo,
       label,
-      render: (v, pieza) => (
+      render: (v, row) => (
         <input
           type="number"
           step="0.1"
-          value={pieza[campo] ?? ""}
+          value={row[campo] ?? ""}
           placeholder="—"
           onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handleCampoChange(pieza.id, campo, e.target.value)}
-          onBlur={() => handleCampoBlur(pieza, campo)}
-          style={estiloInputPanel(pieza, campo, "80px")}
+          onChange={(e) => handleCampoChange(row.id, campo, e.target.value)}
+          onBlur={() => handleCampoBlur(row, campo)}
+          style={estiloInput(row.id, campo, "90px")}
         />
       ),
     })),
-    ...CAMPOS_TEXTO_PIEZA.map(({ campo, label, maxLength }) => ({
+    ...CAMPOS_TEXTO.map(({ campo, label, maxLength }) => ({
       key: campo,
       label,
-      render: (v, pieza) => (
+      render: (v, row) => (
         <input
           type="text"
-          value={pieza[campo] ?? ""}
+          value={row[campo] ?? ""}
           placeholder="—"
           onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handleCampoChange(pieza.id, campo, e.target.value)}
-          onBlur={() => handleCampoBlur(pieza, campo)}
+          onChange={(e) => handleCampoChange(row.id, campo, e.target.value)}
+          onBlur={() => handleCampoBlur(row, campo)}
           maxLength={maxLength}
-          style={estiloInputPanel(
-            pieza,
+          style={estiloInput(
+            row.id,
             campo,
-            campo === "bpp" || campo.startsWith("cant") || campo === "veta" ? "90px" : "150px",
+            campo === "bpp" || campo.startsWith("cant") || campo === "veta" ? "100px" : "160px",
           )}
         />
       ),
     })),
+  ];
+
+  // Columnas del mini-table de piezas dentro del panel: mismos campos que
+  // la grilla grande (menos Código/Artículo, que ya están fijos por el
+  // panel), más el nombre de la pieza, la fórmula asignada y un borrar
+  // puntual.
+  const columnasPieza = [
     {
-      key: "acciones",
+      key: "titulo",
+      label: "Pieza",
+      render: (v, row) => (
+        <input
+          type="text"
+          value={row.titulo ?? ""}
+          placeholder="Sin nombre"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => handlePiezaCampoChange(row.id, "titulo", e.target.value)}
+          onBlur={() => handlePiezaCampoBlur(row, "titulo")}
+          maxLength={255}
+          style={estiloInput(row.id, "titulo", "160px")}
+        />
+      ),
+    },
+    {
+      key: "codform",
+      label: "Fórmula",
+      render: (v, row) => (
+        <input
+          type="text"
+          value={row.codform ?? ""}
+          placeholder="Sin fórmula"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => handlePiezaCampoChange(row.id, "codform", e.target.value)}
+          onBlur={() => handlePiezaCampoBlur(row, "codform")}
+          maxLength={50}
+          style={estiloInput(row.id, "codform", "110px")}
+        />
+      ),
+    },
+    ...CAMPOS_NUMERICOS.map(({ campo, label }) => ({
+      key: campo,
+      label,
+      render: (v, row) => (
+        <input
+          type="number"
+          step="0.1"
+          value={row[campo] ?? ""}
+          placeholder="—"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => handlePiezaCampoChange(row.id, campo, e.target.value)}
+          onBlur={() => handlePiezaCampoBlur(row, campo)}
+          style={estiloInput(row.id, campo, "80px")}
+        />
+      ),
+    })),
+    ...CAMPOS_TEXTO.map(({ campo, label, maxLength }) => ({
+      key: campo,
+      label,
+      render: (v, row) => (
+        <input
+          type="text"
+          value={row[campo] ?? ""}
+          placeholder="—"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => handlePiezaCampoChange(row.id, campo, e.target.value)}
+          onBlur={() => handlePiezaCampoBlur(row, campo)}
+          maxLength={maxLength}
+          style={estiloInput(row.id, campo, "90px")}
+        />
+      ),
+    })),
+    {
+      key: "_borrar",
       label: "",
-      render: (v, pieza) => (
+      render: (v, row) => (
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setAEliminarPieza(pieza);
+            setAEliminar(row);
           }}
           title="Eliminar pieza"
           style={{
-            padding: "4px 8px",
-            fontSize: 12,
-            border: "1.5px solid #e57373",
-            borderRadius: 4,
-            background: "#fff",
+            border: "none",
+            background: "none",
             color: "#c0392b",
             cursor: "pointer",
+            fontSize: 14,
           }}
         >
           🗑
@@ -730,8 +587,8 @@ export default function ModulosDomus({ authFetch, token }) {
       <StatCards
         stats={[
           { label: "Total artículos", value: totalArticulos },
-          { label: "Piezas sin fórmula", value: totalPiezasSinFormula },
-          { label: "Artículos filtrados", value: articulos.length },
+          { label: "Sin módulo", value: articulosSinModulo },
+          { label: "Filtrados", value: filtered.length },
         ]}
       />
 
@@ -772,46 +629,18 @@ export default function ModulosDomus({ authFetch, token }) {
 
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <ActionBar
-          selected={selected}
+          selected={null}
           onNew={() => setNuevoAbierto(true)}
           onEdit={null}
-          onDelete={
-            selected
-              ? () =>
-                  setAEliminarArticulo(
-                    articulos.find((a) => a.codartint === selected.codartint) ?? null,
-                  )
-              : null
-          }
+          onDelete={null}
           search={search}
           onSearch={setSearch}
         />
-        <button
-          onClick={() => {
-            const articulo = articulos.find((a) => a.codartint === selected?.codartint);
-            if (articulo) abrirDuplicar(articulo);
-          }}
-          disabled={!selected}
-          title={
-            selected
-              ? "Duplicar este artículo (todas sus piezas y datos internos) a otro código"
-              : "Elegí un artículo primero"
-          }
-          style={{
-            padding: "7px 14px",
-            borderRadius: 6,
-            border: `1.5px solid ${selected ? "#0a3a5c" : "#d5e2ec"}`,
-            background: "#fff",
-            color: selected ? "#0a3a5c" : "#b8c8d4",
-            cursor: selected ? "pointer" : "default",
-            fontFamily: "'Space Mono', monospace",
-            fontSize: 12,
-            fontWeight: 700,
-          }}
-        >
-          ⧉ Duplicar
-        </button>
       </div>
+
+      <p style={{ margin: "4px 0 12px", fontSize: 11, color: "#8aabb8", fontFamily: "'Space Mono',monospace" }}>
+        Hacé clic en una fila para ver y cargar las piezas de ese artículo.
+      </p>
 
       {loading ? (
         <p style={{ padding: "24px", color: "#4a8ab5", fontFamily: "'Space Mono',monospace" }}>
@@ -821,171 +650,41 @@ export default function ModulosDomus({ authFetch, token }) {
         <p style={{ padding: "24px", color: "#c0392b", fontFamily: "'Space Mono',monospace" }}>
           ⚠ No se pudo cargar: {errorCarga}
         </p>
-      ) : articulos.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <p style={{ padding: "24px", color: "#8aabb8", fontFamily: "'Space Mono',monospace" }}>
           No hay artículos cargados todavía. Usá "Nuevo" para agregar el primero.
         </p>
       ) : (
         <DataTable
-          columns={columnsArticulos}
-          rows={articulos}
-          selectedId={selected?.codartint}
-          onSelect={(row) => {
-            if (!row) {
-              setSelected(null);
-              return;
-            }
-            setSelected(row);
-            abrirPanel(row);
-          }}
-          storageKey={`modulos-domus-articulos-${filtroModulo ?? "todos"}`}
+          columns={columns}
+          rows={filtered}
+          selectedId={null}
+          onSelect={(row) => row && abrirPanel(row)}
+          storageKey={`modulos-domus-${filtroModulo ?? "todos"}`}
         />
       )}
 
-      {/* ── Panel de piezas del artículo seleccionado ──────────────────── */}
-      {panelAbierto && articuloPanel && (
-        <div
-          onClick={cerrarPanel}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(10,58,92,0.55)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "center",
-            padding: "40px 16px",
-            overflowY: "auto",
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: 1100,
-              background: "#fff",
-              borderRadius: 10,
-              padding: "20px 22px",
-              fontFamily: "'Space Mono', monospace",
-              color: "#0a3a5c",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                marginBottom: 10,
-              }}
-            >
-              <div>
-                <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>
-                  {articuloPanel.articulo_descripcion || articuloPanel.codartint}
-                </h3>
-                <p style={{ margin: 0, fontSize: 11, color: "#8aabcc" }}>
-                  {articuloPanel.codartint}
-                </p>
-              </div>
-              <button
-                onClick={cerrarPanel}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  fontSize: 18,
-                  cursor: "pointer",
-                  color: "#4a8ab5",
-                  lineHeight: 1,
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-              <button
-                onClick={handleAgregarPieza}
-                disabled={agregandoPieza}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 4,
-                  border: "none",
-                  background: "#1a7a44",
-                  color: "#fff",
-                  cursor: agregandoPieza ? "wait" : "pointer",
-                  fontFamily: "'Space Mono', monospace",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  opacity: agregandoPieza ? 0.6 : 1,
-                }}
-              >
-                {agregandoPieza ? "Agregando…" : "+ Nueva pieza"}
-              </button>
-            </div>
-
-            {loadingPanel ? (
-              <p style={{ padding: "16px", color: "#4a8ab5", fontSize: 13 }}>
-                ⏳ Cargando piezas...
-              </p>
-            ) : errorPanel ? (
-              <p style={{ padding: "16px", color: "#c0392b", fontSize: 13 }}>
-                ⚠ No se pudo cargar: {errorPanel}
-              </p>
-            ) : piezasPanel.length === 0 ? (
-              <p style={{ padding: "16px", color: "#8aabb8", fontSize: 13 }}>
-                Este artículo todavía no tiene piezas. Usá "+ Nueva pieza" para agregar la primera.
-              </p>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <DataTable
-                  columns={columnsPiezas}
-                  rows={piezasPanel}
-                  selectedId={null}
-                  onSelect={() => {}}
-                  storageKey={`modulos-domus-piezas-${articuloPanel.codartint}`}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {aEliminarArticulo && (
+      {aEliminar && (
         <ConfirmDelete
-          item={aEliminarArticulo}
-          title="¿Eliminar artículo de Módulos Domus?"
-          message={
-            <>
-              Vas a eliminar las <strong>{aEliminarArticulo.totalPiezas}</strong> pieza(s) de{" "}
-              <strong>
-                {aEliminarArticulo.articulo_descripcion ?? aEliminarArticulo.codartint}
-              </strong>
-              . Esto vacía los renglones de ese artículo en el próximo CSV de producción que se
-              genere. Esta acción no se puede deshacer.
-            </>
-          }
-          onConfirm={handleDeleteArticulo}
-          onClose={() => !eliminandoArticulo && setAEliminarArticulo(null)}
-        />
-      )}
-
-      {aEliminarPieza && (
-        <ConfirmDelete
-          item={aEliminarPieza}
+          item={aEliminar}
           title="¿Eliminar esta pieza?"
           message={
             <>
-              Vas a eliminar la pieza <strong>{aEliminarPieza.titulo || aEliminarPieza.codform || `#${aEliminarPieza.id}`}</strong>.
-              Esta acción no se puede deshacer.
+              Vas a eliminar la pieza{" "}
+              <strong>{aEliminar.titulo || aEliminar.codform || `#${aEliminar.id}`}</strong>{" "}
+              de <strong>{aEliminar.articulo_descripcion ?? aEliminar.codartint}</strong>.
+              Esto la saca del próximo CSV de producción que se genere para ese
+              artículo. Esta acción no se puede deshacer.
             </>
           }
-          onConfirm={handleDeletePieza}
-          onClose={() => !eliminandoPieza && setAEliminarPieza(null)}
+          onConfirm={handleDelete}
+          onClose={() => !eliminando && setAEliminar(null)}
         />
       )}
 
       {nuevoAbierto && (
         <div
-          onClick={() => !guardandoNuevo && setNuevoAbierto(false)}
+          onClick={() => !guardandoNuevo && cerrarNuevo()}
           style={{
             position: "fixed",
             inset: 0,
@@ -1012,8 +711,8 @@ export default function ModulosDomus({ authFetch, token }) {
               Nuevo artículo en Módulos Domus
             </h3>
             <p style={{ margin: "0 0 16px", fontSize: 12, color: "#4a8ab5" }}>
-              Se crea la primera pieza del artículo. El resto (fórmula, BPP, Cant1-4,
-              Veta, medidas) se carga después en el panel del artículo.
+              Esto da de alta la primera pieza del artículo. El resto de las
+              piezas se agregan después, abriendo su panel desde la tabla.
             </p>
 
             <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
@@ -1026,7 +725,6 @@ export default function ModulosDomus({ authFetch, token }) {
                 onChange={(e) => {
                   setNuevoBusqueda(e.target.value);
                   setNuevoCodartint(e.target.value);
-                  setNuevoDescripcion("");
                 }}
                 onFocus={() => setNuevoFocus(true)}
                 onBlur={() => setTimeout(() => setNuevoFocus(false), 160)}
@@ -1064,7 +762,6 @@ export default function ModulosDomus({ authFetch, token }) {
                       key={a.codartint}
                       onMouseDown={() => {
                         setNuevoCodartint(a.codartint);
-                        setNuevoDescripcion(a.articulo);
                         setNuevoBusqueda(`${a.articulo} — ${a.codartint}`);
                         setNuevoResultados([]);
                       }}
@@ -1076,17 +773,11 @@ export default function ModulosDomus({ authFetch, token }) {
                         borderBottom: "1px solid #eef2f6",
                         color: "#0a3a5c",
                       }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.background = "#ddeefa")
-                      }
-                      onMouseOut={(e) =>
-                        (e.currentTarget.style.background = "#fff")
-                      }
+                      onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
+                      onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
                     >
                       <span style={{ fontWeight: 700 }}>{a.articulo}</span>
-                      <span
-                        style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}
-                      >
+                      <span style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}>
                         {a.codartint}
                       </span>
                     </div>
@@ -1139,18 +830,12 @@ export default function ModulosDomus({ authFetch, token }) {
             />
 
             {errorNuevo && (
-              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
-                {errorNuevo}
-              </p>
+              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>{errorNuevo}</p>
             )}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button
-                onClick={() => {
-                  setNuevoAbierto(false);
-                  setNuevoBusqueda("");
-                  setNuevoResultados([]);
-                }}
+                onClick={cerrarNuevo}
                 disabled={guardandoNuevo}
                 style={{
                   padding: "8px 14px",
@@ -1189,24 +874,27 @@ export default function ModulosDomus({ authFetch, token }) {
         </div>
       )}
 
-      {duplicarAbierto && articuloOrigenDuplicar && (
+      {panelCodartint && (
         <div
-          onClick={() => !guardandoDuplicar && setDuplicarAbierto(false)}
+          onClick={cerrarPanel}
           style={{
             position: "fixed",
             inset: 0,
             background: "rgba(10,58,92,0.55)",
-            zIndex: 1100,
+            zIndex: 1150,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            padding: 16,
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: "90%",
-              maxWidth: 380,
+              width: "100%",
+              maxWidth: 920,
+              maxHeight: "85vh",
+              overflowY: "auto",
               background: "#fff",
               borderRadius: 10,
               padding: "20px 22px",
@@ -1214,192 +902,245 @@ export default function ModulosDomus({ authFetch, token }) {
               color: "#0a3a5c",
             }}
           >
-            <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>
-              Duplicar artículo en Módulos Domus
-            </h3>
-            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#4a8ab5" }}>
-              Copia las {" "}
-              {articulos.find((a) => a.codartint === articuloOrigenDuplicar.codartint)
-                ?.totalPiezas ?? "—"}{" "}
-              pieza(s) de{" "}
-              <strong>
-                {articuloOrigenDuplicar.articulo_descripcion ??
-                  articuloOrigenDuplicar.codartint}
-              </strong>{" "}
-              (fórmula, título, BPP, Cant1-4, Veta, medidas — todo) a otro artículo.
-            </p>
-
-            <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
-              Artículo destino (buscar por código o nombre)
-            </label>
-            <div style={{ position: "relative", marginBottom: 12 }}>
-              <input
-                type="text"
-                value={duplicarBusqueda}
-                onChange={(e) => {
-                  setDuplicarBusqueda(e.target.value);
-                  setDuplicarCodartint(e.target.value);
-                  setDuplicarDescripcion("");
-                }}
-                onFocus={() => setDuplicarFocus(true)}
-                onBlur={() => setTimeout(() => setDuplicarFocus(false), 160)}
-                placeholder="Ej: KITMP001 o Kit Melamina..."
-                autoComplete="off"
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                marginBottom: 4,
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16 }}>{panelArticulo || panelCodartint}</h3>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: "#8aabcc" }}>
+                  {panelCodartint}
+                </p>
+              </div>
+              <button
+                onClick={cerrarPanel}
                 style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "6px 8px",
-                  fontSize: 13,
-                  fontFamily: "'Space Mono',monospace",
-                  border: "1.5px solid #b8d6ef",
-                  borderRadius: 4,
+                  border: "none",
+                  background: "none",
+                  color: "#4a8ab5",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  lineHeight: 1,
                 }}
-              />
-              {duplicarFocus && duplicarResultados.length > 0 && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "100%",
-                    left: 0,
-                    right: 0,
-                    background: "#fff",
-                    border: "1px solid #b8cfe0",
-                    borderTop: "none",
-                    zIndex: 1200,
-                    boxShadow: "0 6px 18px #0002",
-                    maxHeight: 220,
-                    overflowY: "auto",
-                    borderRadius: "0 0 3px 3px",
-                  }}
-                >
-                  {duplicarResultados.map((a) => (
-                    <div
-                      key={a.codartint}
-                      onMouseDown={() => {
-                        setDuplicarCodartint(a.codartint);
-                        setDuplicarDescripcion(a.articulo);
-                        setDuplicarBusqueda(`${a.articulo} — ${a.codartint}`);
-                        setDuplicarResultados([]);
-                      }}
-                      style={{
-                        padding: "8px 14px",
-                        cursor: "pointer",
-                        fontSize: 12,
-                        fontFamily: "'Space Mono',monospace",
-                        borderBottom: "1px solid #eef2f6",
-                        color: "#0a3a5c",
-                      }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.background = "#ddeefa")
-                      }
-                      onMouseOut={(e) =>
-                        (e.currentTarget.style.background = "#fff")
-                      }
-                    >
-                      <span style={{ fontWeight: 700 }}>{a.articulo}</span>
-                      <span
-                        style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}
-                      >
-                        {a.codartint}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {duplicarFocus &&
-                !buscandoArticuloDuplicar &&
-                duplicarResultados.length === 0 &&
-                duplicarBusqueda.trim().length > 0 && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      background: "#fff",
-                      border: "1px solid #b8cfe0",
-                      borderTop: "none",
-                      zIndex: 1200,
-                      padding: "10px 14px",
-                      color: "#8aabcc",
-                      fontSize: 11,
-                      borderRadius: "0 0 3px 3px",
-                    }}
-                  >
-                    Sin resultados — se usará el código tipeado tal cual
-                  </div>
-                )}
+              >
+                ✕
+              </button>
             </div>
 
-            {duplicarCodartint.trim() &&
-              duplicarCodartint.trim() === articuloOrigenDuplicar.codartint && (
-                <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
-                  El destino tiene que ser distinto del artículo de origen.
-                </p>
-              )}
-            {duplicarCodartint.trim() &&
-              duplicarCodartint.trim() !== articuloOrigenDuplicar.codartint &&
-              articulos.some((a) => a.codartint === duplicarCodartint.trim()) && (
-                <p style={{ color: "#b8860b", fontSize: 12, margin: "0 0 12px" }}>
-                  ⚠ Ese artículo ya tiene{" "}
-                  {articulos.find((a) => a.codartint === duplicarCodartint.trim())
-                    ?.totalPiezas}{" "}
-                  pieza(s) cargada(s) — las copias se van a AGREGAR a esas, no las
-                  reemplazan.
-                </p>
-              )}
+            <p style={{ margin: "8px 0 16px", fontSize: 12, color: "#4a8ab5" }}>
+              Cada pieza con fórmula asignada genera un renglón en el CSV de
+              fórmulas de producción de este artículo.
+            </p>
 
-            {errorDuplicar && (
-              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
-                {errorDuplicar}
+            {piezasLoading ? (
+              <p style={{ color: "#4a8ab5", fontSize: 12 }}>⏳ Cargando piezas...</p>
+            ) : piezasError ? (
+              <p style={{ color: "#c0392b", fontSize: 12 }}>⚠ {piezasError}</p>
+            ) : piezas.length === 0 ? (
+              <p style={{ color: "#8aabb8", fontSize: 12 }}>
+                Todavía no cargaste piezas para este artículo.
               </p>
+            ) : (
+              <div style={{ overflowX: "auto", marginBottom: 16 }}>
+                <DataTable
+                  columns={columnasPieza}
+                  rows={piezas}
+                  selectedId={null}
+                  onSelect={() => {}}
+                  storageKey={`modulos-domus-piezas-${panelCodartint}`}
+                />
+              </div>
             )}
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            {!piezaAbierta ? (
               <button
-                onClick={() => {
-                  setDuplicarAbierto(false);
-                  setDuplicarBusqueda("");
-                  setDuplicarResultados([]);
-                }}
-                disabled={guardandoDuplicar}
+                onClick={abrirPieza}
                 style={{
                   padding: "8px 14px",
                   borderRadius: 4,
-                  border: "1.5px solid #b8d6ef",
-                  background: "#fff",
-                  color: "#4a8ab5",
+                  border: "none",
+                  background: "#0a3a5c",
+                  color: "#fff",
                   cursor: "pointer",
                   fontFamily: "'Space Mono', monospace",
                   fontSize: 12,
                   fontWeight: 700,
                 }}
               >
-                Cancelar
+                + Nueva pieza
               </button>
-              <button
-                onClick={handleConfirmarDuplicar}
-                disabled={
-                  guardandoDuplicar ||
-                  !duplicarCodartint.trim() ||
-                  duplicarCodartint.trim() === articuloOrigenDuplicar.codartint
-                }
+            ) : (
+              <div
                 style={{
-                  padding: "8px 14px",
-                  borderRadius: 4,
-                  border: "none",
-                  background: "#1a7a44",
-                  color: "#fff",
-                  cursor: guardandoDuplicar ? "wait" : "pointer",
-                  fontFamily: "'Space Mono', monospace",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  opacity: guardandoDuplicar ? 0.6 : 1,
+                  border: "1.5px solid #b8d6ef",
+                  borderRadius: 8,
+                  padding: 14,
+                  marginTop: 4,
                 }}
               >
-                {guardandoDuplicar ? "Duplicando…" : "Duplicar"}
-              </button>
-            </div>
+                <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+                  Fórmula (buscar por código o descripción)
+                </label>
+                <div style={{ position: "relative", marginBottom: 12 }}>
+                  <input
+                    type="text"
+                    value={busquedaFormula}
+                    onChange={(e) => setBusquedaFormula(e.target.value)}
+                    onFocus={() => setFormulaFocus(true)}
+                    onBlur={() => setTimeout(() => setFormulaFocus(false), 160)}
+                    placeholder="Ej: FORM-01 o Lateral..."
+                    autoComplete="off"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "6px 8px",
+                      fontSize: 13,
+                      fontFamily: "'Space Mono',monospace",
+                      border: "1.5px solid #b8d6ef",
+                      borderRadius: 4,
+                    }}
+                  />
+                  {formulaFocus && formulasFiltradas.length > 0 && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        background: "#fff",
+                        border: "1px solid #b8cfe0",
+                        borderTop: "none",
+                        zIndex: 1200,
+                        boxShadow: "0 6px 18px #0002",
+                        maxHeight: 200,
+                        overflowY: "auto",
+                        borderRadius: "0 0 3px 3px",
+                      }}
+                    >
+                      {formulasFiltradas.map((f) => (
+                        <div
+                          key={f.codform}
+                          onMouseDown={() => {
+                            setPiezaCodform(f.codform);
+                            setPiezaTitulo(f.descripcion || "");
+                            setBusquedaFormula(`${f.descripcion || f.codform} — ${f.codform}`);
+                            setFormulaFocus(false);
+                          }}
+                          style={{
+                            padding: "8px 14px",
+                            cursor: "pointer",
+                            fontSize: 12,
+                            fontFamily: "'Space Mono',monospace",
+                            borderBottom: "1px solid #eef2f6",
+                            color: "#0a3a5c",
+                          }}
+                          onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
+                          onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+                        >
+                          <span style={{ fontWeight: 700 }}>
+                            {f.descripcion || "(sin descripción)"}
+                          </span>
+                          <span style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}>
+                            {f.codform}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {formulaFocus &&
+                    busquedaFormula.trim().length > 0 &&
+                    formulasFiltradas.length === 0 && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          background: "#fff",
+                          border: "1px solid #b8cfe0",
+                          borderTop: "none",
+                          zIndex: 1200,
+                          padding: "10px 14px",
+                          color: "#8aabcc",
+                          fontSize: 11,
+                          borderRadius: "0 0 3px 3px",
+                        }}
+                      >
+                        Sin resultados en Fórmulas de Producción
+                      </div>
+                    )}
+                </div>
+
+                <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+                  Título de la pieza (editable)
+                </label>
+                <input
+                  type="text"
+                  value={piezaTitulo}
+                  onChange={(e) => setPiezaTitulo(e.target.value)}
+                  placeholder="Ej: Lateral izquierdo"
+                  maxLength={255}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "6px 8px",
+                    fontSize: 13,
+                    fontFamily: "'Space Mono',monospace",
+                    border: "1.5px solid #b8d6ef",
+                    borderRadius: 4,
+                    marginBottom: 12,
+                  }}
+                />
+
+                {errorPieza && (
+                  <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
+                    {errorPieza}
+                  </p>
+                )}
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <button
+                    onClick={cerrarPieza}
+                    disabled={guardandoPieza}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: 4,
+                      border: "1.5px solid #b8d6ef",
+                      background: "#fff",
+                      color: "#4a8ab5",
+                      cursor: "pointer",
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCrearPieza}
+                    disabled={guardandoPieza}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: 4,
+                      border: "none",
+                      background: "#1a7a44",
+                      color: "#fff",
+                      cursor: guardandoPieza ? "wait" : "pointer",
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      opacity: guardandoPieza ? 0.6 : 1,
+                    }}
+                  >
+                    {guardandoPieza ? "Guardando…" : "Guardar pieza"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
