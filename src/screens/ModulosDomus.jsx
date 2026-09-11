@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import DataTable from "../Component/DataTable";
 import ActionBar from "../Component/ActionBar";
 import ScreenHeader from "../Component/ScreenHeader";
@@ -51,6 +52,8 @@ const CAMPOS_NUMERICOS = [
 function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
   const [busqueda, setBusqueda] = useState("");
   const [focus, setFocus] = useState(false);
+  const [coords, setCoords] = useState(null); // {top, left, width} en viewport, para el portal
+  const inputRef = useRef(null);
 
   const valorActual = row[campo];
   const actual = formulas.find((f) => f.codform === valorActual);
@@ -71,9 +74,38 @@ function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
         .slice(0, 15)
     : [];
 
+  // Recalcula la posición del input contra el viewport. Se llama al
+  // enfocar y en cada scroll/resize mientras el desplegable está abierto,
+  // porque al usar un portal ya no hereda el posicionamiento relativo del
+  // contenedor con scroll (el mini-table de la pieza) y hay que seguirlo
+  // "a mano".
+  const actualizarCoords = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setCoords({ top: r.bottom, left: r.left, width: r.width });
+  }, []);
+
+  useEffect(() => {
+    if (!focus) return;
+    actualizarCoords();
+    // capture:true para enterarnos también del scroll de ancestros
+    // (el contenedor overflow-x:auto de la mini-tabla), no solo del window.
+    window.addEventListener("scroll", actualizarCoords, true);
+    window.addEventListener("resize", actualizarCoords);
+    return () => {
+      window.removeEventListener("scroll", actualizarCoords, true);
+      window.removeEventListener("resize", actualizarCoords);
+    };
+  }, [focus, actualizarCoords]);
+
+  const mostrarLista = focus && resultados.length > 0;
+  const mostrarSinResultados = focus && fq && resultados.length === 0;
+
   return (
     <div style={{ position: "relative", minWidth: 140 }} onClick={(e) => e.stopPropagation()}>
       <input
+        ref={inputRef}
         type="text"
         value={texto}
         placeholder="Buscar fórmula..."
@@ -81,8 +113,12 @@ function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
           cargarFormulas();
           setFocus(true);
           setBusqueda("");
+          actualizarCoords();
         }}
-        onChange={(e) => setBusqueda(e.target.value)}
+        onChange={(e) => {
+          setBusqueda(e.target.value);
+          actualizarCoords();
+        }}
         onBlur={() => setTimeout(() => setFocus(false), 160)}
         autoComplete="off"
         style={{
@@ -95,64 +131,69 @@ function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
           color: valorActual ? "#0a3a5c" : "#8aabcc",
         }}
       />
-      {focus && resultados.length > 0 && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            background: "#fff",
-            border: "1px solid #b8cfe0",
-            borderTop: "none",
-            zIndex: 1300,
-            boxShadow: "0 6px 18px #0002",
-            maxHeight: 180,
-            overflowY: "auto",
-            borderRadius: "0 0 3px 3px",
-            minWidth: 240,
-          }}
-        >
-          {resultados.map((f) => (
-            <div
-              key={f.codform}
-              onMouseDown={() => onElegir(f)}
-              style={{
-                padding: "6px 10px",
-                cursor: "pointer",
-                fontSize: 11,
-                fontFamily: "'Space Mono',monospace",
-                borderBottom: "1px solid #eef2f6",
-                color: "#0a3a5c",
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
-              onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
-            >
-              <span style={{ fontWeight: 700 }}>{f.descripcion || "(sin descripción)"}</span>
-              <span style={{ color: "#8aabcc", marginLeft: 6, fontSize: 9 }}>{f.codform}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {focus && fq && resultados.length === 0 && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            background: "#fff",
-            border: "1px solid #b8cfe0",
-            borderTop: "none",
-            zIndex: 1300,
-            padding: "6px 10px",
-            color: "#8aabcc",
-            fontSize: 10,
-            borderRadius: "0 0 3px 3px",
-            minWidth: 200,
-          }}
-        >
-          Sin resultados
-        </div>
-      )}
+      {(mostrarLista || mostrarSinResultados) &&
+        coords &&
+        createPortal(
+          <div
+            // Portal a document.body: así el desplegable flota sobre toda
+            // la pantalla (fixed, calculado desde getBoundingClientRect)
+            // en vez de quedar recortado por el overflow-x:auto del
+            // contenedor scrolleable de la mini-tabla de piezas.
+            style={{
+              position: "fixed",
+              top: coords.top,
+              left: coords.left,
+              width: mostrarLista ? "max-content" : coords.width,
+              minWidth: mostrarLista ? 240 : 200,
+              maxWidth: 360,
+              background: "#fff",
+              border: "1px solid #b8cfe0",
+              zIndex: 3000,
+              boxShadow: "0 6px 18px #0003",
+              maxHeight: 180,
+              overflowY: "auto",
+              borderRadius: "0 0 4px 4px",
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {mostrarLista
+              ? resultados.map((f) => (
+                  <div
+                    key={f.codform}
+                    onMouseDown={() => onElegir(f)}
+                    style={{
+                      padding: "6px 10px",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      fontFamily: "'Space Mono',monospace",
+                      borderBottom: "1px solid #eef2f6",
+                      color: "#0a3a5c",
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
+                    onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+                  >
+                    <span style={{ fontWeight: 700 }}>
+                      {f.descripcion || "(sin descripción)"}
+                    </span>
+                    <span style={{ color: "#8aabcc", marginLeft: 6, fontSize: 9 }}>
+                      {f.codform}
+                    </span>
+                  </div>
+                ))
+              : (
+                  <div
+                    style={{
+                      padding: "6px 10px",
+                      color: "#8aabcc",
+                      fontSize: 10,
+                    }}
+                  >
+                    Sin resultados
+                  </div>
+                )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
