@@ -10,11 +10,12 @@ const API = "https://integral-backend-production.up.railway.app";
 // ── Componente ────────────────────────────────────────────────────────────
 //
 // CRUD de `modulos-domus`: guarda las PIEZAS que componen cada artículo
-// (codartint), cada una con su fórmula asociada (codform, de
+// (codartint), cada una con dos fórmulas asociadas INDEPENDIENTES
+// (formulax → Ancho, formulay → Alto, ambas referencias a
 // formulas_produccion) y los datos que completa el CSV de fórmulas de
-// producción (bpp, cant1-4, veta, ancho/alto/formulax/formulay) — ver
-// GET /produccion/:id/formulas-csv en tabla-produccion_routes.js, que
-// arma un renglón de CSV por cada pieza con fórmula asignada.
+// producción (bpp, cant1-4, veta) — ver GET /produccion/:id/formulas-csv
+// en tabla-produccion_routes.js, que arma un renglón de CSV por cada pieza
+// con formulax y/o formulay asignada.
 //
 // Un mismo codartint puede tener varias piezas, así que ya no hay upsert
 // por codartint: alta = POST /modulos-domus (siempre inserta), edición y
@@ -33,8 +34,6 @@ const CAMPOS_TEXTO = [
   { campo: "cant3", label: "Cant3", maxLength: 100 },
   { campo: "cant4", label: "Cant4", maxLength: 100 },
   { campo: "veta", label: "Veta", maxLength: 100 },
-  { campo: "formulax", label: "Fórmula X", maxLength: 255 },
-  { campo: "formulay", label: "Fórmula Y", maxLength: 255 },
 ];
 
 const CAMPOS_NUMERICOS = [
@@ -43,18 +42,21 @@ const CAMPOS_NUMERICOS = [
   { campo: "cantidad", label: "Cantidad" },
 ];
 
-// Buscador+desplegable de fórmulas de Producción para el campo `codform`
-// de una pieza YA existente (dentro del mini-table del panel). Mismo
-// patrón que el buscador de "Nueva pieza"/"Nuevo artículo", pero con
-// estado propio por fila (busqueda/foco), porque cada fila de la tabla
-// necesita su propio desplegable independiente.
-function SelectorFormula({ row, formulas, cargarFormulas, onElegir }) {
+// Buscador+desplegable de fórmulas de Producción para uno de los dos
+// campos de fórmula de una pieza YA existente (dentro del mini-table del
+// panel) — `campo` es "formulax" (Ancho) o "formulay" (Alto), cada uno
+// independiente del otro. Mismo patrón que el buscador de "Nueva
+// pieza"/"Nuevo artículo", pero con estado propio por fila+campo
+// (busqueda/foco), porque cada desplegable de cada fila es independiente.
+function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
   const [busqueda, setBusqueda] = useState("");
   const [focus, setFocus] = useState(false);
 
-  const actual = formulas.find((f) => f.codform === row.codform);
-  const etiquetaActual = row.codform
-    ? `${actual?.descripcion || row.titulo || "(sin descripción)"} — ${row.codform}`
+  const valorActual = row[campo];
+  const actual = formulas.find((f) => f.codform === valorActual);
+  const descripcionResuelta = row[`${campo}_descripcion`];
+  const etiquetaActual = valorActual
+    ? `${actual?.descripcion || descripcionResuelta || "(sin descripción)"} — ${valorActual}`
     : "";
   const texto = focus ? busqueda : etiquetaActual;
 
@@ -90,7 +92,7 @@ function SelectorFormula({ row, formulas, cargarFormulas, onElegir }) {
           fontFamily: "'Space Mono',monospace",
           border: "1.5px solid #b8d6ef",
           borderRadius: 4,
-          color: row.codform ? "#0a3a5c" : "#8aabcc",
+          color: valorActual ? "#0a3a5c" : "#8aabcc",
         }}
       />
       {focus && resultados.length > 0 && (
@@ -155,6 +157,107 @@ function SelectorFormula({ row, formulas, cargarFormulas, onElegir }) {
   );
 }
 
+// Buscador+desplegable de fórmulas de Producción para el formulario de
+// "Nueva pieza" — reutilizado dos veces (Ancho y Alto), cada uno con su
+// propio estado de busqueda/foco/resultados manejado por el padre.
+function BuscadorFormulaCampo({
+  label,
+  placeholder,
+  busqueda,
+  onBusquedaChange,
+  focus,
+  onFocus,
+  onBlur,
+  resultados,
+  onElegir,
+}) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>{label}</label>
+      <div style={{ position: "relative" }}>
+        <input
+          type="text"
+          value={busqueda}
+          onChange={(e) => onBusquedaChange(e.target.value)}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          autoComplete="off"
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "6px 8px",
+            fontSize: 13,
+            fontFamily: "'Space Mono',monospace",
+            border: "1.5px solid #b8d6ef",
+            borderRadius: 4,
+          }}
+        />
+        {focus && resultados.length > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              background: "#fff",
+              border: "1px solid #b8cfe0",
+              borderTop: "none",
+              zIndex: 1200,
+              boxShadow: "0 6px 18px #0002",
+              maxHeight: 200,
+              overflowY: "auto",
+              borderRadius: "0 0 3px 3px",
+            }}
+          >
+            {resultados.map((f) => (
+              <div
+                key={f.codform}
+                onMouseDown={() => onElegir(f)}
+                style={{
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontFamily: "'Space Mono',monospace",
+                  borderBottom: "1px solid #eef2f6",
+                  color: "#0a3a5c",
+                }}
+                onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
+                onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+              >
+                <span style={{ fontWeight: 700 }}>{f.descripcion || "(sin descripción)"}</span>
+                <span style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}>
+                  {f.codform}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {focus && busqueda.trim().length > 0 && resultados.length === 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              background: "#fff",
+              border: "1px solid #b8cfe0",
+              borderTop: "none",
+              zIndex: 1200,
+              padding: "10px 14px",
+              color: "#8aabcc",
+              fontSize: 11,
+              borderRadius: "0 0 3px 3px",
+            }}
+          >
+            Sin resultados en Fórmulas de Producción
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ModulosDomus({ authFetch, token }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -199,9 +302,14 @@ export default function ModulosDomus({ authFetch, token }) {
   const [piezaAbierta, setPiezaAbierta] = useState(false);
   const [formulas, setFormulas] = useState([]);
   const [formulasCargadas, setFormulasCargadas] = useState(false);
-  const [busquedaFormula, setBusquedaFormula] = useState("");
-  const [formulaFocus, setFormulaFocus] = useState(false);
-  const [piezaCodform, setPiezaCodform] = useState("");
+  // Dos buscadores independientes: uno resuelve formulax (Ancho), el otro
+  // formulay (Alto) — ya no hay un único codform por pieza.
+  const [busquedaFormulaX, setBusquedaFormulaX] = useState("");
+  const [formulaXFocus, setFormulaXFocus] = useState(false);
+  const [piezaFormulaX, setPiezaFormulaX] = useState("");
+  const [busquedaFormulaY, setBusquedaFormulaY] = useState("");
+  const [formulaYFocus, setFormulaYFocus] = useState(false);
+  const [piezaFormulaY, setPiezaFormulaY] = useState("");
   const [piezaTitulo, setPiezaTitulo] = useState("");
   const [guardandoPieza, setGuardandoPieza] = useState(false);
   const [errorPieza, setErrorPieza] = useState(null);
@@ -370,8 +478,10 @@ export default function ModulosDomus({ authFetch, token }) {
 
   const cerrarPieza = () => {
     setPiezaAbierta(false);
-    setBusquedaFormula("");
-    setPiezaCodform("");
+    setBusquedaFormulaX("");
+    setPiezaFormulaX("");
+    setBusquedaFormulaY("");
+    setPiezaFormulaY("");
     setPiezaTitulo("");
     setErrorPieza(null);
   };
@@ -423,16 +533,19 @@ export default function ModulosDomus({ authFetch, token }) {
   const handlePiezaCampoBlur = (pieza, campo) =>
     guardarPiezaCampo(pieza.id, campo, pieza[campo]);
 
-  // Elegir una fórmula del catálogo para una pieza existente: guarda el
-  // codform siempre, y además el título SOLO si la pieza todavía no tenía
-  // uno propio cargado (no pisa un título que el usuario ya haya editado).
-  const elegirFormulaPieza = (row, f) => {
+  // Elegir una fórmula del catálogo para una pieza existente, en el campo
+  // indicado ("formulax" para Ancho, "formulay" para Alto — independientes
+  // entre sí): guarda ese campo siempre, y además el título SOLO si la
+  // pieza todavía no tenía uno propio cargado (no pisa un título que el
+  // usuario ya haya editado, ni el que haya puesto la elección del otro
+  // campo un instante antes).
+  const elegirFormulaPieza = (row, campo, f) => {
     const yaTeniaTitulo = (row.titulo ?? "").trim().length > 0;
     const nuevoTitulo = yaTeniaTitulo ? row.titulo : f.descripcion || "";
     setPiezas((prev) =>
-      prev.map((p) => (p.id === row.id ? { ...p, codform: f.codform, titulo: nuevoTitulo } : p)),
+      prev.map((p) => (p.id === row.id ? { ...p, [campo]: f.codform, titulo: nuevoTitulo } : p)),
     );
-    guardarPiezaCampo(row.id, "codform", f.codform);
+    guardarPiezaCampo(row.id, campo, f.codform);
     if (!yaTeniaTitulo) {
       guardarPiezaCampo(row.id, "titulo", nuevoTitulo);
     }
@@ -456,16 +569,19 @@ export default function ModulosDomus({ authFetch, token }) {
     setPiezaAbierta(true);
   };
 
-  const fq = busquedaFormula.trim().toLowerCase();
-  const formulasFiltradas = fq
-    ? formulas
-        .filter(
-          (f) =>
-            (f.codform ?? "").toLowerCase().includes(fq) ||
-            (f.descripcion ?? "").toLowerCase().includes(fq),
-        )
-        .slice(0, 20)
-    : [];
+  const filtrarFormulas = (busqueda) => {
+    const fq = busqueda.trim().toLowerCase();
+    if (!fq) return [];
+    return formulas
+      .filter(
+        (f) =>
+          (f.codform ?? "").toLowerCase().includes(fq) ||
+          (f.descripcion ?? "").toLowerCase().includes(fq),
+      )
+      .slice(0, 20);
+  };
+  const formulasFiltradasX = filtrarFormulas(busquedaFormulaX);
+  const formulasFiltradasY = filtrarFormulas(busquedaFormulaY);
 
   const handleCrearPieza = async () => {
     if (!panelCodartint) return;
@@ -477,7 +593,8 @@ export default function ModulosDomus({ authFetch, token }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           codartint: panelCodartint,
-          codform: piezaCodform.trim() || null,
+          formulax: piezaFormulaX.trim() || null,
+          formulay: piezaFormulaY.trim() || null,
           titulo: piezaTitulo.trim() || null,
         }),
       });
@@ -563,14 +680,41 @@ export default function ModulosDomus({ authFetch, token }) {
     },
     {
       key: "titulo",
-      label: "Pieza / Fórmula",
+      label: "Pieza",
       render: (v, row) => (
         <span style={{ fontSize: 11 }}>
-          {row.titulo || row.formula_descripcion || (
+          {row.titulo || <em style={{ color: "#b8cfe0" }}>sin nombre</em>}
+        </span>
+      ),
+    },
+    {
+      key: "formulax",
+      label: "Fórmula Ancho",
+      render: (v, row) => (
+        <span style={{ fontSize: 11 }}>
+          {row.formulax ? (
+            <>
+              {row.formulax_descripcion || "(sin descripción)"}
+              <span style={{ color: "#8aabcc", marginLeft: 6 }}>({row.formulax})</span>
+            </>
+          ) : (
             <em style={{ color: "#b8cfe0" }}>sin fórmula</em>
           )}
-          {row.codform && (
-            <span style={{ color: "#8aabcc", marginLeft: 6 }}>({row.codform})</span>
+        </span>
+      ),
+    },
+    {
+      key: "formulay",
+      label: "Fórmula Alto",
+      render: (v, row) => (
+        <span style={{ fontSize: 11 }}>
+          {row.formulay ? (
+            <>
+              {row.formulay_descripcion || "(sin descripción)"}
+              <span style={{ color: "#8aabcc", marginLeft: 6 }}>({row.formulay})</span>
+            </>
+          ) : (
+            <em style={{ color: "#b8cfe0" }}>sin fórmula</em>
           )}
         </span>
       ),
@@ -635,14 +779,28 @@ export default function ModulosDomus({ authFetch, token }) {
       ),
     },
     {
-      key: "codform",
-      label: "Fórmula",
+      key: "formulax",
+      label: "Fórmula Ancho",
       render: (v, row) => (
         <SelectorFormula
           row={row}
+          campo="formulax"
           formulas={formulas}
           cargarFormulas={fetchFormulas}
-          onElegir={(f) => elegirFormulaPieza(row, f)}
+          onElegir={(f) => elegirFormulaPieza(row, "formulax", f)}
+        />
+      ),
+    },
+    {
+      key: "formulay",
+      label: "Fórmula Alto",
+      render: (v, row) => (
+        <SelectorFormula
+          row={row}
+          campo="formulay"
+          formulas={formulas}
+          cargarFormulas={fetchFormulas}
+          onElegir={(f) => elegirFormulaPieza(row, "formulay", f)}
         />
       ),
     },
@@ -799,7 +957,9 @@ export default function ModulosDomus({ authFetch, token }) {
           message={
             <>
               Vas a eliminar la pieza{" "}
-              <strong>{aEliminar.titulo || aEliminar.codform || `#${aEliminar.id}`}</strong>{" "}
+              <strong>
+                {aEliminar.titulo || aEliminar.formulax || aEliminar.formulay || `#${aEliminar.id}`}
+              </strong>{" "}
               de <strong>{aEliminar.articulo_descripcion ?? aEliminar.codartint}</strong>.
               Esto la saca del próximo CSV de producción que se genere para ese
               artículo. Esta acción no se puede deshacer.
@@ -1110,98 +1270,39 @@ export default function ModulosDomus({ authFetch, token }) {
                   marginTop: 4,
                 }}
               >
-                <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
-                  Fórmula (buscar por código o descripción)
-                </label>
-                <div style={{ position: "relative", marginBottom: 12 }}>
-                  <input
-                    type="text"
-                    value={busquedaFormula}
-                    onChange={(e) => setBusquedaFormula(e.target.value)}
-                    onFocus={() => setFormulaFocus(true)}
-                    onBlur={() => setTimeout(() => setFormulaFocus(false), 160)}
-                    placeholder="Ej: FORM-01 o Lateral..."
-                    autoComplete="off"
-                    style={{
-                      width: "100%",
-                      boxSizing: "border-box",
-                      padding: "6px 8px",
-                      fontSize: 13,
-                      fontFamily: "'Space Mono',monospace",
-                      border: "1.5px solid #b8d6ef",
-                      borderRadius: 4,
-                    }}
-                  />
-                  {formulaFocus && formulasFiltradas.length > 0 && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "100%",
-                        left: 0,
-                        right: 0,
-                        background: "#fff",
-                        border: "1px solid #b8cfe0",
-                        borderTop: "none",
-                        zIndex: 1200,
-                        boxShadow: "0 6px 18px #0002",
-                        maxHeight: 200,
-                        overflowY: "auto",
-                        borderRadius: "0 0 3px 3px",
-                      }}
-                    >
-                      {formulasFiltradas.map((f) => (
-                        <div
-                          key={f.codform}
-                          onMouseDown={() => {
-                            setPiezaCodform(f.codform);
-                            setPiezaTitulo(f.descripcion || "");
-                            setBusquedaFormula(`${f.descripcion || f.codform} — ${f.codform}`);
-                            setFormulaFocus(false);
-                          }}
-                          style={{
-                            padding: "8px 14px",
-                            cursor: "pointer",
-                            fontSize: 12,
-                            fontFamily: "'Space Mono',monospace",
-                            borderBottom: "1px solid #eef2f6",
-                            color: "#0a3a5c",
-                          }}
-                          onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
-                          onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
-                        >
-                          <span style={{ fontWeight: 700 }}>
-                            {f.descripcion || "(sin descripción)"}
-                          </span>
-                          <span style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}>
-                            {f.codform}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {formulaFocus &&
-                    busquedaFormula.trim().length > 0 &&
-                    formulasFiltradas.length === 0 && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "100%",
-                          left: 0,
-                          right: 0,
-                          background: "#fff",
-                          border: "1px solid #b8cfe0",
-                          borderTop: "none",
-                          zIndex: 1200,
-                          padding: "10px 14px",
-                          color: "#8aabcc",
-                          fontSize: 11,
-                          borderRadius: "0 0 3px 3px",
-                        }}
-                      >
-                        Sin resultados en Fórmulas de Producción
-                      </div>
-                    )}
-                </div>
+                <BuscadorFormulaCampo
+                  label="Fórmula para Ancho (buscar por código o descripción)"
+                  placeholder="Ej: FORM-01 o Lateral..."
+                  busqueda={busquedaFormulaX}
+                  onBusquedaChange={setBusquedaFormulaX}
+                  focus={formulaXFocus}
+                  onFocus={() => setFormulaXFocus(true)}
+                  onBlur={() => setTimeout(() => setFormulaXFocus(false), 160)}
+                  resultados={formulasFiltradasX}
+                  onElegir={(f) => {
+                    setPiezaFormulaX(f.codform);
+                    if (!piezaTitulo.trim()) setPiezaTitulo(f.descripcion || "");
+                    setBusquedaFormulaX(`${f.descripcion || f.codform} — ${f.codform}`);
+                    setFormulaXFocus(false);
+                  }}
+                />
+
+                <BuscadorFormulaCampo
+                  label="Fórmula para Alto (buscar por código o descripción)"
+                  placeholder="Ej: FORM-02 o Zócalo..."
+                  busqueda={busquedaFormulaY}
+                  onBusquedaChange={setBusquedaFormulaY}
+                  focus={formulaYFocus}
+                  onFocus={() => setFormulaYFocus(true)}
+                  onBlur={() => setTimeout(() => setFormulaYFocus(false), 160)}
+                  resultados={formulasFiltradasY}
+                  onElegir={(f) => {
+                    setPiezaFormulaY(f.codform);
+                    if (!piezaTitulo.trim()) setPiezaTitulo(f.descripcion || "");
+                    setBusquedaFormulaY(`${f.descripcion || f.codform} — ${f.codform}`);
+                    setFormulaYFocus(false);
+                  }}
+                />
 
                 <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
                   Título de la pieza (editable)
