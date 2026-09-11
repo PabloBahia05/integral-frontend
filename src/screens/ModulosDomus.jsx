@@ -43,6 +43,118 @@ const CAMPOS_NUMERICOS = [
   { campo: "cantidad", label: "Cantidad" },
 ];
 
+// Buscador+desplegable de fórmulas de Producción para el campo `codform`
+// de una pieza YA existente (dentro del mini-table del panel). Mismo
+// patrón que el buscador de "Nueva pieza"/"Nuevo artículo", pero con
+// estado propio por fila (busqueda/foco), porque cada fila de la tabla
+// necesita su propio desplegable independiente.
+function SelectorFormula({ row, formulas, cargarFormulas, onElegir }) {
+  const [busqueda, setBusqueda] = useState("");
+  const [focus, setFocus] = useState(false);
+
+  const actual = formulas.find((f) => f.codform === row.codform);
+  const etiquetaActual = row.codform
+    ? `${actual?.descripcion || row.titulo || "(sin descripción)"} — ${row.codform}`
+    : "";
+  const texto = focus ? busqueda : etiquetaActual;
+
+  const fq = busqueda.trim().toLowerCase();
+  const resultados = fq
+    ? formulas
+        .filter(
+          (f) =>
+            (f.codform ?? "").toLowerCase().includes(fq) ||
+            (f.descripcion ?? "").toLowerCase().includes(fq),
+        )
+        .slice(0, 15)
+    : [];
+
+  return (
+    <div style={{ position: "relative", minWidth: 140 }} onClick={(e) => e.stopPropagation()}>
+      <input
+        type="text"
+        value={texto}
+        placeholder="Buscar fórmula..."
+        onFocus={() => {
+          cargarFormulas();
+          setFocus(true);
+          setBusqueda("");
+        }}
+        onChange={(e) => setBusqueda(e.target.value)}
+        onBlur={() => setTimeout(() => setFocus(false), 160)}
+        autoComplete="off"
+        style={{
+          width: "100%",
+          padding: "4px 8px",
+          fontSize: 11,
+          fontFamily: "'Space Mono',monospace",
+          border: "1.5px solid #b8d6ef",
+          borderRadius: 4,
+          color: row.codform ? "#0a3a5c" : "#8aabcc",
+        }}
+      />
+      {focus && resultados.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            background: "#fff",
+            border: "1px solid #b8cfe0",
+            borderTop: "none",
+            zIndex: 1300,
+            boxShadow: "0 6px 18px #0002",
+            maxHeight: 180,
+            overflowY: "auto",
+            borderRadius: "0 0 3px 3px",
+            minWidth: 240,
+          }}
+        >
+          {resultados.map((f) => (
+            <div
+              key={f.codform}
+              onMouseDown={() => onElegir(f)}
+              style={{
+                padding: "6px 10px",
+                cursor: "pointer",
+                fontSize: 11,
+                fontFamily: "'Space Mono',monospace",
+                borderBottom: "1px solid #eef2f6",
+                color: "#0a3a5c",
+              }}
+              onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
+              onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+            >
+              <span style={{ fontWeight: 700 }}>{f.descripcion || "(sin descripción)"}</span>
+              <span style={{ color: "#8aabcc", marginLeft: 6, fontSize: 9 }}>{f.codform}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {focus && fq && resultados.length === 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            background: "#fff",
+            border: "1px solid #b8cfe0",
+            borderTop: "none",
+            zIndex: 1300,
+            padding: "6px 10px",
+            color: "#8aabcc",
+            fontSize: 10,
+            borderRadius: "0 0 3px 3px",
+            minWidth: 200,
+          }}
+        >
+          Sin resultados
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ModulosDomus({ authFetch, token }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -268,6 +380,7 @@ export default function ModulosDomus({ authFetch, token }) {
     setPanelCodartint(row.codartint);
     setPanelArticulo(row.articulo_descripcion ?? "");
     fetchPiezas(row.codartint);
+    fetchFormulas();
   };
 
   const cerrarPanel = () => {
@@ -282,27 +395,46 @@ export default function ModulosDomus({ authFetch, token }) {
     setPiezas((prev) => prev.map((p) => (p.id === id ? { ...p, [campo]: valor } : p)));
   };
 
-  const handlePiezaCampoBlur = async (pieza, campo) => {
-    const key = `${pieza.id}-${campo}`;
+  // Guarda un campo de una pieza por `id` directo (sin depender de leer el
+  // valor de un objeto `row` completo) — lo usa tanto el blur de los
+  // inputs de texto/número como el selector de fórmula.
+  const guardarPiezaCampo = async (id, campo, valor) => {
+    const key = `${id}-${campo}`;
     setGuardandoCampo(key);
     setErrorCampo(null);
     try {
-      const res = await authFetch(`${API}/modulos-domus/${pieza.id}`, {
+      const res = await authFetch(`${API}/modulos-domus/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [campo]: pieza[campo] === "" ? null : pieza[campo] }),
+        body: JSON.stringify({ [campo]: valor === "" ? null : valor }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       // La grilla principal muestra todo mezclado — reflejar el cambio
       // ahí también, sin esperar a un refetch completo.
-      setRows((prev) =>
-        prev.map((r) => (r.id === pieza.id ? { ...r, [campo]: pieza[campo] } : r)),
-      );
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [campo]: valor } : r)));
     } catch (e) {
       console.error(`Error guardando ${campo} de la pieza:`, e);
       setErrorCampo(key);
     } finally {
       setGuardandoCampo(null);
+    }
+  };
+
+  const handlePiezaCampoBlur = (pieza, campo) =>
+    guardarPiezaCampo(pieza.id, campo, pieza[campo]);
+
+  // Elegir una fórmula del catálogo para una pieza existente: guarda el
+  // codform siempre, y además el título SOLO si la pieza todavía no tenía
+  // uno propio cargado (no pisa un título que el usuario ya haya editado).
+  const elegirFormulaPieza = (row, f) => {
+    const yaTeniaTitulo = (row.titulo ?? "").trim().length > 0;
+    const nuevoTitulo = yaTeniaTitulo ? row.titulo : f.descripcion || "";
+    setPiezas((prev) =>
+      prev.map((p) => (p.id === row.id ? { ...p, codform: f.codform, titulo: nuevoTitulo } : p)),
+    );
+    guardarPiezaCampo(row.id, "codform", f.codform);
+    if (!yaTeniaTitulo) {
+      guardarPiezaCampo(row.id, "titulo", nuevoTitulo);
     }
   };
 
@@ -506,15 +638,11 @@ export default function ModulosDomus({ authFetch, token }) {
       key: "codform",
       label: "Fórmula",
       render: (v, row) => (
-        <input
-          type="text"
-          value={row.codform ?? ""}
-          placeholder="Sin fórmula"
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handlePiezaCampoChange(row.id, "codform", e.target.value)}
-          onBlur={() => handlePiezaCampoBlur(row, "codform")}
-          maxLength={50}
-          style={estiloInput(row.id, "codform", "110px")}
+        <SelectorFormula
+          row={row}
+          formulas={formulas}
+          cargarFormulas={fetchFormulas}
+          onElegir={(f) => elegirFormulaPieza(row, f)}
         />
       ),
     },
