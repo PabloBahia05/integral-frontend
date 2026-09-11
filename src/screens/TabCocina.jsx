@@ -672,6 +672,20 @@ export default function TabCocina({
                                     p.ancho ?? p.ANCHO ?? null;
                                   const altoCatalogo =
                                     p.alto ?? p.ALTO ?? null;
+                                  // *PorLinea: cada línea (Nº 0..22) tiene su
+                                  // propio codartint/ancho/alto real en la
+                                  // tabla articulos. Viajan junto con precios/
+                                  // preciosBase para poder resolver el valor
+                                  // correcto según la línea que finalmente se
+                                  // use para este ítem (ver lineaPorGrupo en
+                                  // PresupuestoNuevo.jsx / TablaArticulos.jsx).
+                                  // Los campos planos codartint/ancho/alto de
+                                  // arriba quedan como fallback, pero no
+                                  // representan ninguna línea en particular.
+                                  const codartintPorLinea =
+                                    p.codartintPorLinea ?? {};
+                                  const anchoPorLinea = p.anchoPorLinea ?? {};
+                                  const altoPorLinea = p.altoPorLinea ?? {};
                                   setCocinaFila((f) => ({
                                     ...f,
                                     articulo: base,
@@ -684,6 +698,9 @@ export default function TabCocina({
                                     codartint,
                                     ancho: anchoCatalogo,
                                     alto: altoCatalogo,
+                                    codartintPorLinea,
+                                    anchoPorLinea,
+                                    altoPorLinea,
                                   }));
                                   setCocinaSearch(base);
                                 }}
@@ -1560,6 +1577,11 @@ export default function TabCocina({
                             p.codartint ?? p.CODARTINT ?? null;
                           const anchoCatalogo = p.ancho ?? p.ANCHO ?? null;
                           const altoCatalogo = p.alto ?? p.ALTO ?? null;
+                          // *PorLinea: ver comentario en el otro buscador de
+                          // artículo de Cocina (más arriba en este archivo).
+                          const codartintPorLinea = p.codartintPorLinea ?? {};
+                          const anchoPorLinea = p.anchoPorLinea ?? {};
+                          const altoPorLinea = p.altoPorLinea ?? {};
                           setCocinaFila((f) => ({
                             ...f,
                             articulo: base,
@@ -1572,6 +1594,9 @@ export default function TabCocina({
                             codartint,
                             ancho: anchoCatalogo,
                             alto: altoCatalogo,
+                            codartintPorLinea,
+                            anchoPorLinea,
+                            altoPorLinea,
                           }));
                           setCocinaSearch(base);
                         }}
