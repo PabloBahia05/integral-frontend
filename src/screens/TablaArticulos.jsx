@@ -8,9 +8,14 @@ const TIENE_MEDIDAS = ["Mampara", "Puerta", "Vanitory"];
 // un string exacto de TIENE_MEDIDAS. Antes de esto, las columnas Ancho/Alto
 // quedaban siempre en "—" para ítems de Placard aunque item.ancho/item.alto
 // sí tuvieran valor.
+// Mismo caso para Cocina: item.seccion viene como "Cocina / <Familia>"
+// (Bajomesadas/Alacenas — ver mismo toItems). Faltaba acá, así que las
+// columnas Ancho/Alto quedaban en "—" para Cocina aunque TabCocina.jsx ya
+// completara item.ancho/item.alto desde el catálogo al elegir el artículo.
 const tieneMedidas = (seccion) =>
   TIENE_MEDIDAS.includes(seccion) ||
-  String(seccion ?? "").startsWith("Placard / ");
+  String(seccion ?? "").startsWith("Placard / ") ||
+  String(seccion ?? "").startsWith("Cocina / ");
 
 // Codartint reales de los accesorios "autofreno" (puerta y cajonera/correderas).
 // Mismo criterio que useCocinaPlacard.js / TabCocina.jsx / PlacardSection.jsx —
