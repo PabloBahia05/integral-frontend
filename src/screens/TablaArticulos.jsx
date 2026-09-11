@@ -76,6 +76,7 @@ export default function TablaArticulos({
   prespv,
   abrirPresItemPopover,
   quitarDePresupuesto,
+  editarItemCocinaDesdePresupuesto,
   authFetch,
   API,
   setMamparaAEditar,
@@ -1552,6 +1553,24 @@ export default function TablaArticulos({
                             textAlign: "center",
                           }}
                         >
+                          {item.id?.startsWith("cocina-") && (
+                            <button
+                              onClick={() =>
+                                editarItemCocinaDesdePresupuesto(item.id)
+                              }
+                              title="Editar"
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: 14,
+                                color: "#2277bb",
+                                marginRight: 4,
+                              }}
+                            >
+                              ✏️
+                            </button>
+                          )}
                           {item.seccion === "Mampara" && item.presmv != null && (
                             <button
                               onClick={async () => {

@@ -73,6 +73,9 @@ export default function TabCocina({
   // familia activa (elevada al padre para que el sync con presupuesto funcione)
   cocinaFamilia,
   setCocinaFamilia,
+  // pedido de edición de un ítem puntual desde la pestaña Presupuesto
+  cocinaItemAEditar,
+  setCocinaItemAEditar,
   // líneas activas y precio (del encabezado)
   lineasActivas,
   listaPorcentaje,
@@ -217,6 +220,23 @@ export default function TabCocina({
     setCocinaSearch(fila.articulo);
     setCocinaEditIdx(idx);
   };
+
+  // Pedido de edición llegado desde la pestaña Presupuesto (ver
+  // editarItemCocinaDesdePresupuesto en PresupuestoNuevo.jsx). El padre ya
+  // hizo setCocinaFamilia(familia) en el mismo click, así que para cuando
+  // este efecto corre cocinaFamilia ya está actualizada.
+  useEffect(() => {
+    if (!cocinaItemAEditar) return;
+    const { familia, idx } = cocinaItemAEditar;
+    if (familia !== cocinaFamilia) return;
+    const fila = cocinaItems[familia]?.[idx];
+    if (fila) {
+      setCocinaFila({ ...fila });
+      setCocinaSearch(fila.articulo);
+      setCocinaEditIdx(idx);
+    }
+    setCocinaItemAEditar(null);
+  }, [cocinaItemAEditar, cocinaFamilia, cocinaItems]);
 
   const cocina_total = (familia) =>
     cocinaItems[familia]?.reduce(

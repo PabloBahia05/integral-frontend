@@ -627,6 +627,7 @@ export default function PresupuestoNuevo({
   const [confirmando, setConfirmando] = useState(false);
   const [presmv, setPresmv] = useState(null); // id de presupuesto_mampara vinculado
   const [mamparaAEditar, setMamparaAEditar] = useState(null); // datos para editar mampara existente
+  const [cocinaItemAEditar, setCocinaItemAEditar] = useState(null); // { familia, idx } — pedido de edición desde la pestaña Presupuesto
   const [prespv, setPrespv] = useState(null); // id de presupuesto_puerta vinculado
   const [puertaAEditar, setPuertaAEditar] = useState(null); // datos para editar puerta existente
   const [revision, setRevision] = useState(1);
@@ -1662,6 +1663,22 @@ export default function PresupuestoNuevo({
 
   const quitarDePresupuesto = (id) =>
     setPresupuestoItems((prev) => prev.filter((p) => p.id !== id));
+
+  // Recupera el "editar" de un ítem de Cocina (Bajomesada/Alacena) desde la
+  // pestaña Presupuesto: los ids de estos ítems tienen el patrón
+  // "cocina-{familia}-{idx}" (ver sync cocinaItems -> presupuestoItems más
+  // abajo), así que de ahí sacamos a qué familia e índice apuntar, cambiamos
+  // a esa familia y avisamos a TabCocina (vía cocinaItemAEditar) que abra el
+  // formulario de edición para ese ítem puntual.
+  const editarItemCocinaDesdePresupuesto = (id) => {
+    const m = /^cocina-(.+)-(\d+)$/.exec(id ?? "");
+    if (!m) return;
+    const familia = m[1];
+    const idx = Number(m[2]);
+    setCocinaFamilia(familia);
+    setCocinaItemAEditar({ familia, idx });
+    setTab("cocina");
+  };
 
   useEffect(() => {
     // Próximo número (solo aplica a un presupuesto nuevo; si viene
@@ -4073,6 +4090,8 @@ export default function PresupuestoNuevo({
               setCocinaItems={setCocinaItems}
               cocinaFamilia={cocinaFamilia}
               setCocinaFamilia={setCocinaFamilia}
+              cocinaItemAEditar={cocinaItemAEditar}
+              setCocinaItemAEditar={setCocinaItemAEditar}
               lineasActivas={lineasActivas}
               listaPorcentaje={listaPorcentaje}
               aplicarPorcentaje={aplicarPorcentaje}
@@ -4205,6 +4224,7 @@ export default function PresupuestoNuevo({
               prespv={prespv}
               abrirPresItemPopover={abrirPresItemPopover}
               quitarDePresupuesto={quitarDePresupuesto}
+              editarItemCocinaDesdePresupuesto={editarItemCocinaDesdePresupuesto}
               authFetch={authFetch}
               API={API}
               setMamparaAEditar={setMamparaAEditar}
