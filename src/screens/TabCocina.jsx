@@ -56,6 +56,14 @@ const FILA_VACIA = {
   area: null,
   accesorios: [],
   grupo: "",
+  // Medidas + código de fórmula interno del artículo elegido — mismo
+  // patrón que placardFila en PlacardSection.jsx. Antes no existían acá,
+  // así que ítems de Cocina (Bajomesada/Alacena) se guardaban siempre sin
+  // ancho/alto/codartint (se veían vacíos en la pestaña Presupuesto y
+  // faltaban para el CSV de fórmulas de producción).
+  ancho: null,
+  alto: null,
+  codartint: null,
 };
 
 export default function TabCocina({
@@ -652,6 +660,18 @@ export default function TabCocina({
                                   // guardar y para calcular el cargo por
                                   // accesorios en recalcFila.
                                   const area = p.area ?? p.AREA ?? null;
+                                  // Medidas + código de fórmula interno del
+                                  // catálogo, mismo patrón que
+                                  // PlacardSection.jsx — punto de partida;
+                                  // no hay input para editarlos a mano en
+                                  // Cocina (a diferencia de Placard), así
+                                  // que quedan tal cual vienen del artículo.
+                                  const codartint =
+                                    p.codartint ?? p.CODARTINT ?? null;
+                                  const anchoCatalogo =
+                                    p.ancho ?? p.ANCHO ?? null;
+                                  const altoCatalogo =
+                                    p.alto ?? p.ALTO ?? null;
                                   setCocinaFila((f) => ({
                                     ...f,
                                     articulo: base,
@@ -661,6 +681,9 @@ export default function TabCocina({
                                     precios,
                                     preciosBase,
                                     area,
+                                    codartint,
+                                    ancho: anchoCatalogo,
+                                    alto: altoCatalogo,
                                   }));
                                   setCocinaSearch(base);
                                 }}
@@ -1533,6 +1556,10 @@ export default function TabCocina({
                           // articulos): se usa como cantidad (cantacc) del
                           // accesorio de freno al guardar.
                           const area = p.area ?? p.AREA ?? null;
+                          const codartint =
+                            p.codartint ?? p.CODARTINT ?? null;
+                          const anchoCatalogo = p.ancho ?? p.ANCHO ?? null;
+                          const altoCatalogo = p.alto ?? p.ALTO ?? null;
                           setCocinaFila((f) => ({
                             ...f,
                             articulo: base,
@@ -1542,6 +1569,9 @@ export default function TabCocina({
                             precios,
                             preciosBase,
                             area,
+                            codartint,
+                            ancho: anchoCatalogo,
+                            alto: altoCatalogo,
                           }));
                           setCocinaSearch(base);
                         }}
