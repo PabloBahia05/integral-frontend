@@ -2019,6 +2019,7 @@ export default function PresupuestoNuevo({
           // Cocina/Placard.
           ancho: it.ancho ?? it.ANCHO ?? null,
           alto: it.alto ?? it.ALTO ?? null,
+          profundidad: it.profundidad ?? it.PROFUNDIDAD ?? null,
           codartint: it.codartint ?? it.CODARTINT ?? null,
         };
         if (tipo.includes("cocina") && tipo.includes("bajomesada"))
@@ -2105,6 +2106,7 @@ export default function PresupuestoNuevo({
             // Medidas (mampara, puerta y vanitory)
             ancho: it.ancho ?? it.ANCHO ?? null,
             alto: it.alto ?? it.ALTO ?? null,
+            profundidad: it.profundidad ?? it.PROFUNDIDAD ?? null,
             codartint: it.codartint ?? it.CODARTINT ?? null,
             grupo: it.grupo ?? it.GRUPO ?? null,
             color: it.color ?? it.COLOR ?? null,
@@ -2505,6 +2507,7 @@ export default function PresupuestoNuevo({
           precios: it.precios ?? [],
           ancho: it.ancho ?? null,
           alto: it.alto ?? null,
+          profundidad: it.profundidad ?? null,
           // Artículo vinculado a la fórmula de cálculo (ver
           // asociaciones_form) — se guarda al elegir el producto del
           // buscador en PlacardSection.jsx (ya trae codartint del

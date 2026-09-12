@@ -63,6 +63,7 @@ const FILA_VACIA = {
   // faltaban para el CSV de fórmulas de producción).
   ancho: null,
   alto: null,
+  profundidad: null,
   codartint: null,
 };
 
@@ -692,6 +693,12 @@ export default function TabCocina({
                                     p.ancho ?? p.ANCHO ?? null;
                                   const altoCatalogo =
                                     p.alto ?? p.ALTO ?? null;
+                                  // Profundidad: mismo patrón que ancho/alto
+                                  // — viene del catálogo, en caso de tener
+                                  // valor cargado (si no, queda null y el
+                                  // backend usa su propio respaldo).
+                                  const profundidadCatalogo =
+                                    p.profundidad ?? p.PROFUNDIDAD ?? null;
                                   // codartint/ancho/alto reales por línea
                                   // (backend agrupa varias líneas —Nº 0..22—
                                   // bajo un mismo artículo; cada una tiene su
@@ -713,6 +720,9 @@ export default function TabCocina({
                                   const altoResuelto =
                                     p.altoPorLinea?.[String(lineaActiva)] ??
                                     altoCatalogo;
+                                  const profundidadResuelta =
+                                    p.profundidadPorLinea?.[String(lineaActiva)] ??
+                                    profundidadCatalogo;
                                   setCocinaFila((f) => ({
                                     ...f,
                                     articulo: base,
@@ -725,6 +735,7 @@ export default function TabCocina({
                                     codartint: codartintResuelto,
                                     ancho: anchoResuelto,
                                     alto: altoResuelto,
+                                    profundidad: profundidadResuelta,
                                   }));
                                   setCocinaSearch(base);
                                 }}
@@ -1601,6 +1612,8 @@ export default function TabCocina({
                             p.codartint ?? p.CODARTINT ?? null;
                           const anchoCatalogo = p.ancho ?? p.ANCHO ?? null;
                           const altoCatalogo = p.alto ?? p.ALTO ?? null;
+                          const profundidadCatalogo =
+                            p.profundidad ?? p.PROFUNDIDAD ?? null;
                           // codartint/ancho/alto por línea real: ver
                           // comentario en el otro buscador de artículo de
                           // Cocina (más arriba en este archivo).
@@ -1614,6 +1627,9 @@ export default function TabCocina({
                           const altoResuelto =
                             p.altoPorLinea?.[String(lineaActiva)] ??
                             altoCatalogo;
+                          const profundidadResuelta =
+                            p.profundidadPorLinea?.[String(lineaActiva)] ??
+                            profundidadCatalogo;
                           setCocinaFila((f) => ({
                             ...f,
                             articulo: base,
@@ -1626,6 +1642,7 @@ export default function TabCocina({
                             codartint: codartintResuelto,
                             ancho: anchoResuelto,
                             alto: altoResuelto,
+                            profundidad: profundidadResuelta,
                           }));
                           setCocinaSearch(base);
                         }}
