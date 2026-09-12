@@ -972,6 +972,14 @@ export default function ModulosDomus({ authFetch, token }) {
       render: (v, row) => <CodigoFormulaResuelto codigo={row.formulax} formulas={formulas} />,
     },
     {
+      // Ídem siguiente bloque, pero Valor 2 (`formula2`) — lo que el
+      // backend evalúa como Alto. Va primero en la tabla (antes que
+      // Ancho) por pedido explícito de orden de columnas.
+      key: "formula1",
+      label: "Fórmula (Alto)",
+      render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula2" />,
+    },
+    {
       // Solo lectura, solo informativo: el texto de la expresión (Valor 1
       // de formulas_produccion) que el backend va a evaluar como Ancho al
       // generar el CSV. No se calcula acá — se recarga solo al elegir de
@@ -979,13 +987,6 @@ export default function ModulosDomus({ authFetch, token }) {
       key: "formula",
       label: "Fórmula (Ancho)",
       render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula" />,
-    },
-    {
-      // Ídem anterior, pero Valor 2 (`formula2`) — lo que el backend evalúa
-      // como Alto.
-      key: "formula1",
-      label: "Fórmula (Alto)",
-      render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula2" />,
     },
     ...CAMPOS_NUMERICOS.map(({ campo, label }) => ({
       key: campo,
