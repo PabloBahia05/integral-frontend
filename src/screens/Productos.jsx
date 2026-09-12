@@ -446,6 +446,9 @@ function DetalleArticulo({ producto }) {
           MCA: <strong>{producto.mca}</strong>
         </p>
       )}
+      <p className="detalle-codigo">
+        Veta: <strong>{producto.veta == 1 || producto.veta === true ? "Sí" : "No"}</strong>
+      </p>
       <div className="detalle-precios">
         <div className="detalle-precio-row">
           <span>Val. lista proveedor</span>
