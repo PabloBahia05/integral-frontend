@@ -36,6 +36,11 @@ const CAMPOS_TEXTO = [
   { campo: "cant4", label: "Cant4", maxLength: 100 },
 ];
 
+// Cant1 a Cant4 dejan de ser texto libre: son un desplegable fijo con
+// estas opciones (más "—" vacío), usado tanto en la grilla principal
+// como en el mini-table de piezas del panel.
+const OPCIONES_CANT = ["1", "2", "3", "4", "BLANCO-045"];
+
 const CAMPOS_NUMERICOS = [
   { campo: "ancho", label: "Ancho" },
   { campo: "alto", label: "Alto" },
@@ -915,26 +920,49 @@ export default function ModulosDomus({ authFetch, token }) {
         />
       ),
     })),
-    ...CAMPOS_TEXTO.map(({ campo, label, maxLength }) => ({
-      key: campo,
-      label,
-      render: (v, row) => (
-        <input
-          type="text"
-          value={row[campo] ?? ""}
-          placeholder="—"
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handleCampoChange(row.id, campo, e.target.value)}
-          onBlur={() => handleCampoBlur(row, campo)}
-          maxLength={maxLength}
-          style={estiloInput(
-            row.id,
-            campo,
-            campo === "bpp" || campo.startsWith("cant") ? "100px" : "160px",
-          )}
-        />
-      ),
-    })),
+    ...CAMPOS_TEXTO.map(({ campo, label, maxLength }) => {
+      if (campo.startsWith("cant")) {
+        return {
+          key: campo,
+          label,
+          render: (v, row) => (
+            <select
+              value={row[campo] ?? ""}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const valor = e.target.value;
+                handleCampoChange(row.id, campo, valor);
+                handleCampoBlur({ ...row, [campo]: valor }, campo);
+              }}
+              style={estiloInput(row.id, campo, "100px")}
+            >
+              <option value="">—</option>
+              {OPCIONES_CANT.map((op) => (
+                <option key={op} value={op}>
+                  {op}
+                </option>
+              ))}
+            </select>
+          ),
+        };
+      }
+      return {
+        key: campo,
+        label,
+        render: (v, row) => (
+          <input
+            type="text"
+            value={row[campo] ?? ""}
+            placeholder="—"
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => handleCampoChange(row.id, campo, e.target.value)}
+            onBlur={() => handleCampoBlur(row, campo)}
+            maxLength={maxLength}
+            style={estiloInput(row.id, campo, "100px")}
+          />
+        ),
+      };
+    }),
     {
       key: "color",
       label: "Color",
@@ -1066,22 +1094,49 @@ export default function ModulosDomus({ authFetch, token }) {
         />
       ),
     })),
-    ...CAMPOS_TEXTO.map(({ campo, label, maxLength }) => ({
-      key: campo,
-      label,
-      render: (v, row) => (
-        <input
-          type="text"
-          value={row[campo] ?? ""}
-          placeholder="—"
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handlePiezaCampoChange(row.id, campo, e.target.value)}
-          onBlur={() => handlePiezaCampoBlur(row, campo)}
-          maxLength={maxLength}
-          style={estiloInput(row.id, campo, "90px")}
-        />
-      ),
-    })),
+    ...CAMPOS_TEXTO.map(({ campo, label, maxLength }) => {
+      if (campo.startsWith("cant")) {
+        return {
+          key: campo,
+          label,
+          render: (v, row) => (
+            <select
+              value={row[campo] ?? ""}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const valor = e.target.value;
+                handlePiezaCampoChange(row.id, campo, valor);
+                guardarPiezaCampo(row.id, campo, valor);
+              }}
+              style={estiloInput(row.id, campo, "90px")}
+            >
+              <option value="">—</option>
+              {OPCIONES_CANT.map((op) => (
+                <option key={op} value={op}>
+                  {op}
+                </option>
+              ))}
+            </select>
+          ),
+        };
+      }
+      return {
+        key: campo,
+        label,
+        render: (v, row) => (
+          <input
+            type="text"
+            value={row[campo] ?? ""}
+            placeholder="—"
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => handlePiezaCampoChange(row.id, campo, e.target.value)}
+            onBlur={() => handlePiezaCampoBlur(row, campo)}
+            maxLength={maxLength}
+            style={estiloInput(row.id, campo, "90px")}
+          />
+        ),
+      };
+    }),
     {
       key: "color",
       label: "Color",
