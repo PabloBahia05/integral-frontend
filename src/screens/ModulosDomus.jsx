@@ -12,7 +12,7 @@ const API = "https://integral-backend-production.up.railway.app";
 //
 // CRUD de `modulos-domus`: guarda las PIEZAS que componen cada artículo
 // (codartint), cada una con dos fórmulas asociadas INDEPENDIENTES
-// (formulax → Ancho, formulay → Alto, ambas referencias a
+// (formulax → Alto, formulay → Ancho, ambas referencias a
 // formulas_produccion) y los datos que completa el CSV de fórmulas de
 // producción (bpp, cant1-4, veta) — ver GET /produccion/:id/formulas-csv
 // en tabla-produccion_routes.js, que arma un renglón de CSV por cada pieza
@@ -48,8 +48,9 @@ const CAMPOS_NUMERICOS = [
 // próxima búsqueda — es un buscador tipo comando, no queda mostrando el
 // valor persistido (eso lo muestra la columna de solo lectura de al
 // lado). El mismo codform elegido acá se guarda en formulax Y formulay;
-// Ancho/Alto se resuelven después en el backend contra el Valor 1
-// (`formula`) y Valor 2 (`formula2`) de ese registro. El desplegable usa
+// Alto/Ancho/Profundidad se resuelven después en el backend contra el
+// Valor 1 (`formula`), Valor 2 (`formula2`) y Valor 3 (`formula3`) de ese
+// registro. El desplegable usa
 // un portal a document.body, posicionado con getBoundingClientRect(),
 // para que no quede recortado por el overflow-x del mini-table.
 function SelectorFormulaMadre({ formulas, cargarFormulas, onElegir }) {
@@ -183,7 +184,7 @@ function SelectorFormulaMadre({ formulas, cargarFormulas, onElegir }) {
 // (formulax o formulay de la pieza), resuelve su descripción contra el
 // catálogo cargado y lo muestra como "descripción — código". No es
 // editable acá — para cambiarlo hay que volver a elegir en "Buscar
-// fórmula", que recalcula ambos (Ancho y Alto) juntos.
+// fórmula", que recalcula los tres (Alto, Ancho y Profundidad) juntos.
 function CodigoFormulaResuelto({ codigo, formulas }) {
   if (!codigo) {
     return (
@@ -218,12 +219,13 @@ function CodigoFormulaResuelto({ codigo, formulas }) {
   );
 }
 
-// Muestra en texto plano el Valor 1 (`formula`) o Valor 2 (`formula2`) de
-// la fórmula asignada a la pieza (según `campo`), buscándola en el
-// catálogo ya cargado por `codform`. Es puramente informativo — no
-// evalúa la expresión (eso solo pasa en el backend al generar el CSV) —
-// sirve para que el usuario vea de un vistazo qué expresión va a aplicar
-// como Ancho (Valor 1) y cuál como Alto (Valor 2) al elegir una fórmula.
+// Muestra en texto plano el Valor 1 (`formula`), Valor 2 (`formula2`) o
+// Valor 3 (`formula3`) de la fórmula asignada a la pieza (según `campo`),
+// buscándola en el catálogo ya cargado por `codform`. Es puramente
+// informativo — no evalúa la expresión (eso solo pasa en el backend al
+// generar el CSV) — sirve para que el usuario vea de un vistazo qué
+// expresión va a aplicar como Alto (Valor 1), cuál como Ancho (Valor 2) y
+// cuál como Profundidad (Valor 3) al elegir una fórmula.
 function TextoFormulaCampo({ codigo, formulas, campo }) {
   if (!codigo) {
     return (
@@ -407,10 +409,10 @@ export default function ModulosDomus({ authFetch, token }) {
   const [formulas, setFormulas] = useState([]);
   const [formulasCargadas, setFormulasCargadas] = useState(false);
   // Un solo buscador: se guarda el MISMO codform en formulax y formulay
-  // de la pieza nueva. Ancho/Alto se resuelven después en el backend
-  // contra el Valor 1 (`formula`) y Valor 2 (`formula2`) de ese registro
-  // — formulas_produccion no tiene columnas separadas "formula_ancho"/
-  // "formula_alto".
+  // de la pieza nueva. Alto/Ancho/Profundidad se resuelven después en el
+  // backend contra el Valor 1 (`formula`), Valor 2 (`formula2`) y Valor 3
+  // (`formula3`) de ese registro — formulas_produccion no tiene columnas
+  // separadas "formula_ancho"/"formula_alto"/"formula_profundidad".
   const [busquedaFormula, setBusquedaFormula] = useState("");
   const [formulaFocus, setFormulaFocus] = useState(false);
   const [piezaFormula, setPiezaFormula] = useState("");
@@ -637,10 +639,11 @@ export default function ModulosDomus({ authFetch, token }) {
 
   // Elegir una fórmula del catálogo para una pieza existente: se guarda el
   // MISMO codform en formulax Y formulay. El backend (/produccion/:id/
-  // formulas-csv) es el que resuelve Ancho con el Valor 1 (`formula`) y
-  // Alto con el Valor 2 (`formula2`) de ese mismo registro — acá no hace
-  // falta pedirle dos columnas distintas a formulas_produccion, que no
-  // existen (esa tabla no tiene "formula_ancho"/"formula_alto").
+  // formulas-csv) es el que resuelve Alto con el Valor 1 (`formula`),
+  // Ancho con el Valor 2 (`formula2`) y Profundidad con el Valor 3
+  // (`formula3`) de ese mismo registro — acá no hace falta pedirle
+  // columnas distintas a formulas_produccion, que no existen (esa tabla no
+  // tiene "formula_ancho"/"formula_alto"/"formula_profundidad").
   // Además el título se completa SOLO si la pieza todavía no tenía uno
   // propio cargado (no pisa un título que el usuario ya haya editado).
   const elegirFormulaPieza = (row, f) => {
@@ -838,7 +841,7 @@ export default function ModulosDomus({ authFetch, token }) {
     },
     {
       key: "formulax",
-      label: "Fórmula Ancho",
+      label: "Fórmula Alto",
       render: (v, row) => (
         <span style={{ fontSize: 11 }}>
           {row.formulax ? (
@@ -854,7 +857,7 @@ export default function ModulosDomus({ authFetch, token }) {
     },
     {
       key: "formulay",
-      label: "Fórmula Alto",
+      label: "Fórmula Ancho",
       render: (v, row) => (
         <span style={{ fontSize: 11 }}>
           {row.formulay ? (
@@ -964,29 +967,37 @@ export default function ModulosDomus({ authFetch, token }) {
     },
     {
       // Solo lectura: la fórmula guardada en la pieza (formulax y formulay
-      // son siempre el mismo código desde acá — Ancho sale de su Valor 1 y
-      // Alto de su Valor 2 en el backend). No se edita acá directo — se
-      // recarga eligiendo de nuevo en "Buscar fórmula".
+      // son siempre el mismo código desde acá — Alto sale de su Valor 1,
+      // Ancho de su Valor 2 y Profundidad de su Valor 3 en el backend). No
+      // se edita acá directo — se recarga eligiendo de nuevo en "Buscar
+      // fórmula".
       key: "formula_resuelta",
       label: "Fórmula asignada",
       render: (v, row) => <CodigoFormulaResuelto codigo={row.formulax} formulas={formulas} />,
     },
     {
-      // Ídem siguiente bloque, pero Valor 2 (`formula2`) — lo que el
-      // backend evalúa como Alto. Va primero en la tabla (antes que
-      // Ancho) por pedido explícito de orden de columnas.
-      key: "formula1",
+      // Solo lectura, solo informativo: el texto de la expresión (Valor 1
+      // de formulas_produccion) que el backend va a evaluar como Alto al
+      // generar el CSV. No se calcula acá — se recarga solo al elegir de
+      // nuevo en "Buscar fórmula". Va primero en la tabla por ser la
+      // primera columna del CSV.
+      key: "formula",
       label: "Fórmula (Alto)",
+      render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula" />,
+    },
+    {
+      // Ídem anterior, pero Valor 2 (`formula2`) — lo que el backend
+      // evalúa como Ancho. Segunda columna, igual que en el CSV.
+      key: "formula2",
+      label: "Fórmula (Ancho)",
       render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula2" />,
     },
     {
-      // Solo lectura, solo informativo: el texto de la expresión (Valor 1
-      // de formulas_produccion) que el backend va a evaluar como Ancho al
-      // generar el CSV. No se calcula acá — se recarga solo al elegir de
-      // nuevo en "Buscar fórmula".
-      key: "formula",
-      label: "Fórmula (Ancho)",
-      render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula" />,
+      // Ídem anterior, pero Valor 3 (`formula3`) — lo que el backend
+      // evalúa como Profundidad. Tercera columna, igual que en el CSV.
+      key: "formula3",
+      label: "Fórmula (Profundidad)",
+      render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula3" />,
     },
     ...CAMPOS_NUMERICOS.map(({ campo, label }) => ({
       key: campo,
@@ -1461,7 +1472,7 @@ export default function ModulosDomus({ authFetch, token }) {
                 }}
               >
                 <BuscadorFormulaCampo
-                  label="Fórmula (Ancho y Alto) — buscar por código o descripción"
+                  label="Fórmula (Alto, Ancho y Profundidad) — buscar por código o descripción"
                   placeholder="Ej: FORM-01 o Lateral..."
                   busqueda={busquedaFormula}
                   onBusquedaChange={setBusquedaFormula}
