@@ -550,6 +550,8 @@ export default function Productos({
   const [filtroFamilia, setFiltroFamilia] = useState("");
   const [filtroRubro, setFiltroRubro] = useState("");
   const [filtroProveedor, setFiltroProveedor] = useState("");
+  const [filtroArea, setFiltroArea] = useState("");
+  const [areas, setAreas] = useState([]);
   const [rubrosDelFiltro, setRubrosDelFiltro] = useState([]);
   const [familiaEsNueva, setFamiliaEsNueva] = useState(false);
   const [rubroEsNuevo, setRubroEsNuevo] = useState(false);
@@ -599,6 +601,14 @@ export default function Productos({
   };
   useEffect(() => {
     cargarRubros();
+  }, []);
+
+  // Cargar áreas únicas (para el filtro)
+  useEffect(() => {
+    authFetch(`${API}/articulos/areas`)
+      .then((r) => r.json())
+      .then((data) => setAreas(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, []);
 
   // Cargar aplicaciones únicas (CAJ/PTA + lo que se haya agregado con
@@ -658,11 +668,13 @@ export default function Productos({
       if (filtroFamilia) params.set("familia", filtroFamilia);
       if (filtroRubro) params.set("rubro", filtroRubro);
       if (filtroProveedor) params.set("proveedor", filtroProveedor);
+      if (filtroArea) params.set("area", filtroArea);
       const countParams = new URLSearchParams();
       if (debouncedSearch) countParams.set("search", debouncedSearch);
       if (filtroFamilia) countParams.set("familia", filtroFamilia);
       if (filtroRubro) countParams.set("rubro", filtroRubro);
       if (filtroProveedor) countParams.set("proveedor", filtroProveedor);
+      if (filtroArea) countParams.set("area", filtroArea);
       const countQ = countParams.toString() ? `?${countParams}` : "";
       const [dataRes, countRes] = await Promise.all([
         authFetch(`${API}/productos?${params}`),
@@ -677,7 +689,7 @@ export default function Productos({
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, filtroFamilia, filtroRubro, filtroProveedor]);
+  }, [page, debouncedSearch, filtroFamilia, filtroRubro, filtroProveedor, filtroArea]);
 
   useEffect(() => {
     fetchRows();
@@ -699,6 +711,11 @@ export default function Productos({
     if (
       filtroProveedor &&
       (r.proveedor ?? "").toLowerCase() !== filtroProveedor.toLowerCase()
+    )
+      return false;
+    if (
+      filtroArea &&
+      (r.area ?? "").toLowerCase() !== filtroArea.toLowerCase()
     )
       return false;
     return true;
@@ -968,7 +985,23 @@ export default function Productos({
             );
           })}
         </select>
-        {(filtroRubro || filtroFamilia || filtroProveedor) && (
+        <select
+          className="form-input"
+          style={{ maxWidth: 160, marginBottom: 0, cursor: "pointer" }}
+          value={filtroArea}
+          onChange={(e) => {
+            setFiltroArea(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">— Todas las áreas —</option>
+          {areas.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+        {(filtroRubro || filtroFamilia || filtroProveedor || filtroArea) && (
           <button
             className="btn-cancel"
             style={{ padding: "6px 14px", fontSize: 12, whiteSpace: "nowrap" }}
@@ -976,6 +1009,7 @@ export default function Productos({
               setFiltroRubro("");
               setFiltroFamilia("");
               setFiltroProveedor("");
+              setFiltroArea("");
               setPage(1);
             }}
           >
