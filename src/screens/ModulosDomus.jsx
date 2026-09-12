@@ -43,13 +43,15 @@ const CAMPOS_NUMERICOS = [
   { campo: "cantidad", label: "Cantidad" },
 ];
 
-// Buscador "madre": al elegir un resultado dispara onElegir(f) y se vacía
-// solo, listo para la próxima búsqueda (no queda atado a un campo
-// persistido puntual, porque formulax/formulay ya no van a ser el mismo
-// código elegido acá, sino lo que traiga formula_ancho/formula_alto de la
-// fórmula elegida). El desplegable usa un portal a document.body,
-// posicionado con getBoundingClientRect(), para que no quede recortado
-// por el overflow-x del mini-table.
+// Buscador de fórmula para una pieza existente (mini-table del panel): al
+// elegir un resultado dispara onElegir(f) y se vacía solo, listo para la
+// próxima búsqueda — es un buscador tipo comando, no queda mostrando el
+// valor persistido (eso lo muestra la columna de solo lectura de al
+// lado). El mismo codform elegido acá se guarda en formulax Y formulay;
+// Ancho/Alto se resuelven después en el backend contra el Valor 1
+// (`formula`) y Valor 2 (`formula2`) de ese registro. El desplegable usa
+// un portal a document.body, posicionado con getBoundingClientRect(),
+// para que no quede recortado por el overflow-x del mini-table.
 function SelectorFormulaMadre({ formulas, cargarFormulas, onElegir }) {
   const [busqueda, setBusqueda] = useState("");
   const [focus, setFocus] = useState(false);
@@ -359,14 +361,14 @@ export default function ModulosDomus({ authFetch, token }) {
   const [piezaAbierta, setPiezaAbierta] = useState(false);
   const [formulas, setFormulas] = useState([]);
   const [formulasCargadas, setFormulasCargadas] = useState(false);
-  // Un solo buscador de la fórmula "madre": la tabla formula_produccion
-  // trae, en la misma fila, las columnas formula_ancho y formula_alto —
-  // son esas dos las que efectivamente se guardan en formulax/formulay
-  // de la pieza nueva, no el codform de la fórmula buscada.
+  // Un solo buscador: se guarda el MISMO codform en formulax y formulay
+  // de la pieza nueva. Ancho/Alto se resuelven después en el backend
+  // contra el Valor 1 (`formula`) y Valor 2 (`formula2`) de ese registro
+  // — formulas_produccion no tiene columnas separadas "formula_ancho"/
+  // "formula_alto".
   const [busquedaFormula, setBusquedaFormula] = useState("");
   const [formulaFocus, setFormulaFocus] = useState(false);
-  const [piezaFormulaAncho, setPiezaFormulaAncho] = useState("");
-  const [piezaFormulaAlto, setPiezaFormulaAlto] = useState("");
+  const [piezaFormula, setPiezaFormula] = useState("");
   const [piezaTitulo, setPiezaTitulo] = useState("");
   const [guardandoPieza, setGuardandoPieza] = useState(false);
   const [errorPieza, setErrorPieza] = useState(null);
@@ -536,8 +538,7 @@ export default function ModulosDomus({ authFetch, token }) {
   const cerrarPieza = () => {
     setPiezaAbierta(false);
     setBusquedaFormula("");
-    setPiezaFormulaAncho("");
-    setPiezaFormulaAlto("");
+    setPiezaFormula("");
     setPiezaTitulo("");
     setErrorPieza(null);
   };
@@ -589,26 +590,24 @@ export default function ModulosDomus({ authFetch, token }) {
   const handlePiezaCampoBlur = (pieza, campo) =>
     guardarPiezaCampo(pieza.id, campo, pieza[campo]);
 
-  // Elegir una fórmula "madre" del catálogo para una pieza existente: la
-  // tabla formula_produccion tiene, en la misma fila, las columnas
-  // formula_ancho y formula_alto — son las que efectivamente van a
-  // formulax/formulay de la pieza (no el codform de la fórmula elegida).
+  // Elegir una fórmula del catálogo para una pieza existente: se guarda el
+  // MISMO codform en formulax Y formulay. El backend (/produccion/:id/
+  // formulas-csv) es el que resuelve Ancho con el Valor 1 (`formula`) y
+  // Alto con el Valor 2 (`formula2`) de ese mismo registro — acá no hace
+  // falta pedirle dos columnas distintas a formulas_produccion, que no
+  // existen (esa tabla no tiene "formula_ancho"/"formula_alto").
   // Además el título se completa SOLO si la pieza todavía no tenía uno
   // propio cargado (no pisa un título que el usuario ya haya editado).
   const elegirFormulaPieza = (row, f) => {
     const yaTeniaTitulo = (row.titulo ?? "").trim().length > 0;
     const nuevoTitulo = yaTeniaTitulo ? row.titulo : f.descripcion || "";
-    const nuevoAncho = f.formula_ancho ?? null;
-    const nuevoAlto = f.formula_alto ?? null;
     setPiezas((prev) =>
       prev.map((p) =>
-        p.id === row.id
-          ? { ...p, formulax: nuevoAncho, formulay: nuevoAlto, titulo: nuevoTitulo }
-          : p,
+        p.id === row.id ? { ...p, formulax: f.codform, formulay: f.codform, titulo: nuevoTitulo } : p,
       ),
     );
-    guardarPiezaCampo(row.id, "formulax", nuevoAncho);
-    guardarPiezaCampo(row.id, "formulay", nuevoAlto);
+    guardarPiezaCampo(row.id, "formulax", f.codform);
+    guardarPiezaCampo(row.id, "formulay", f.codform);
     if (!yaTeniaTitulo) {
       guardarPiezaCampo(row.id, "titulo", nuevoTitulo);
     }
@@ -655,8 +654,8 @@ export default function ModulosDomus({ authFetch, token }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           codartint: panelCodartint,
-          formulax: String(piezaFormulaAncho ?? "").trim() || null,
-          formulay: String(piezaFormulaAlto ?? "").trim() || null,
+          formulax: String(piezaFormula ?? "").trim() || null,
+          formulay: String(piezaFormula ?? "").trim() || null,
           titulo: piezaTitulo.trim() || null,
         }),
       });
@@ -852,19 +851,13 @@ export default function ModulosDomus({ authFetch, token }) {
       ),
     },
     {
-      // Solo lectura: lo que trajo formula_ancho de la fórmula madre
-      // elegida (columna formula_ancho de la tabla formula_produccion),
-      // ya guardado en formulax de la pieza. No se edita acá directo —
-      // se recarga eligiendo de nuevo en "Buscar fórmula".
-      key: "formulax_resuelta",
-      label: "Fórmula Ancho",
+      // Solo lectura: la fórmula guardada en la pieza (formulax y formulay
+      // son siempre el mismo código desde acá — Ancho sale de su Valor 1 y
+      // Alto de su Valor 2 en el backend). No se edita acá directo — se
+      // recarga eligiendo de nuevo en "Buscar fórmula".
+      key: "formula_resuelta",
+      label: "Fórmula asignada",
       render: (v, row) => <CodigoFormulaResuelto codigo={row.formulax} formulas={formulas} />,
-    },
-    {
-      // Ídem, con formula_alto → formulay.
-      key: "formulay_resuelta",
-      label: "Fórmula Alto",
-      render: (v, row) => <CodigoFormulaResuelto codigo={row.formulay} formulas={formulas} />,
     },
     ...CAMPOS_NUMERICOS.map(({ campo, label }) => ({
       key: campo,
@@ -1333,7 +1326,7 @@ export default function ModulosDomus({ authFetch, token }) {
                 }}
               >
                 <BuscadorFormulaCampo
-                  label="Buscar fórmula (trae Ancho y Alto desde formula_producción)"
+                  label="Fórmula (Ancho y Alto) — buscar por código o descripción"
                   placeholder="Ej: FORM-01 o Lateral..."
                   busqueda={busquedaFormula}
                   onBusquedaChange={setBusquedaFormula}
@@ -1342,27 +1335,18 @@ export default function ModulosDomus({ authFetch, token }) {
                   onBlur={() => setTimeout(() => setFormulaFocus(false), 160)}
                   resultados={formulasFiltradas}
                   onElegir={(f) => {
-                    setPiezaFormulaAncho(f.formula_ancho ?? "");
-                    setPiezaFormulaAlto(f.formula_alto ?? "");
+                    setPiezaFormula(f.codform);
                     if (!piezaTitulo.trim()) setPiezaTitulo(f.descripcion || "");
                     setBusquedaFormula(`${f.descripcion || f.codform} — ${f.codform}`);
                     setFormulaFocus(false);
                   }}
                 />
 
-                <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 10, color: "#5a86ab", marginBottom: 2 }}>
-                      Fórmula Ancho
-                    </div>
-                    <CodigoFormulaResuelto codigo={piezaFormulaAncho} formulas={formulas} />
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: "#5a86ab", marginBottom: 2 }}>
+                    Fórmula asignada
                   </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: "#5a86ab", marginBottom: 2 }}>
-                      Fórmula Alto
-                    </div>
-                    <CodigoFormulaResuelto codigo={piezaFormulaAlto} formulas={formulas} />
-                  </div>
+                  <CodigoFormulaResuelto codigo={piezaFormula} formulas={formulas} />
                 </div>
 
                 <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
