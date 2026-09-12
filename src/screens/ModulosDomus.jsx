@@ -34,7 +34,6 @@ const CAMPOS_TEXTO = [
   { campo: "cant2", label: "Cant2", maxLength: 100 },
   { campo: "cant3", label: "Cant3", maxLength: 100 },
   { campo: "cant4", label: "Cant4", maxLength: 100 },
-  { campo: "color", label: "Color", maxLength: 100 },
 ];
 
 const CAMPOS_NUMERICOS = [
@@ -443,6 +442,17 @@ export default function ModulosDomus({ authFetch, token }) {
     fetchModulosDomus();
   }, []);
 
+  // Colores de melamina: artículos con area=MELAMINA, para el desplegable
+  // de la columna Color (reemplaza el texto libre — el color de cada
+  // pieza tiene que ser uno de los artículos de melamina existentes).
+  const [coloresMelamina, setColoresMelamina] = useState([]);
+  useEffect(() => {
+    authFetch(`${API}/articulos/colores-melamina`)
+      .then((r) => r.json())
+      .then((data) => setColoresMelamina(Array.isArray(data) ? data : []))
+      .catch(() => setColoresMelamina([]));
+  }, []);
+
   // Búsqueda server-side (con debounce) de artículos para "Nuevo
   // artículo" — mismo patrón que el buscador de Material Placa/Guías en
   // PresupuestoNuevo.jsx, contra /articulos/buscar-descripcion.
@@ -787,6 +797,18 @@ export default function ModulosDomus({ authFetch, token }) {
         (r.color ?? "").toLowerCase().includes(q)),
   );
 
+  // La grilla principal muestra UN renglón por artículo (no una fila por
+  // pieza) — se queda con la primera pieza de cada codartint, en el mismo
+  // orden en que vino de `filtered`. Al hacer clic en el renglón igual se
+  // abre el panel con TODAS las piezas de ese artículo (fetchPiezas más
+  // abajo no depende de esto, sigue trayendo todo por codartint).
+  const vistos = new Set();
+  const filteredPorArticulo = filtered.filter((r) => {
+    if (vistos.has(r.codartint)) return false;
+    vistos.add(r.codartint);
+    return true;
+  });
+
   // "Sin módulo" y "Total artículos" cuentan ARTÍCULOS distintos, no
   // piezas — si un artículo tiene 3 piezas sin módulo, sigue siendo 1
   // artículo sin módulo.
@@ -908,11 +930,34 @@ export default function ModulosDomus({ authFetch, token }) {
           style={estiloInput(
             row.id,
             campo,
-            campo === "bpp" || campo.startsWith("cant") || campo === "color" ? "100px" : "160px",
+            campo === "bpp" || campo.startsWith("cant") ? "100px" : "160px",
           )}
         />
       ),
     })),
+    {
+      key: "color",
+      label: "Color",
+      render: (v, row) => (
+        <select
+          value={row.color ?? ""}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            const valor = e.target.value;
+            handleCampoChange(row.id, "color", valor);
+            handleCampoBlur({ ...row, color: valor }, "color");
+          }}
+          style={estiloInput(row.id, "color", "140px")}
+        >
+          <option value="">—</option>
+          {coloresMelamina.map((c) => (
+            <option key={c.codartint} value={c.articulo}>
+              {c.articulo}
+            </option>
+          ))}
+        </select>
+      ),
+    },
   ];
 
   // Columnas del mini-table de piezas dentro del panel: mismos campos que
@@ -1038,6 +1083,29 @@ export default function ModulosDomus({ authFetch, token }) {
       ),
     })),
     {
+      key: "color",
+      label: "Color",
+      render: (v, row) => (
+        <select
+          value={row.color ?? ""}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            const valor = e.target.value;
+            handlePiezaCampoChange(row.id, "color", valor);
+            guardarPiezaCampo(row.id, "color", valor);
+          }}
+          style={estiloInput(row.id, "color", "120px")}
+        >
+          <option value="">—</option>
+          {coloresMelamina.map((c) => (
+            <option key={c.codartint} value={c.articulo}>
+              {c.articulo}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
       key: "_borrar",
       label: "",
       render: (v, row) => (
@@ -1075,7 +1143,7 @@ export default function ModulosDomus({ authFetch, token }) {
         stats={[
           { label: "Total artículos", value: totalArticulos },
           { label: "Sin módulo", value: articulosSinModulo },
-          { label: "Filtrados", value: filtered.length },
+          { label: "Filtrados", value: filteredPorArticulo.length },
         ]}
       />
 
@@ -1137,14 +1205,14 @@ export default function ModulosDomus({ authFetch, token }) {
         <p style={{ padding: "24px", color: "#c0392b", fontFamily: "'Space Mono',monospace" }}>
           ⚠ No se pudo cargar: {errorCarga}
         </p>
-      ) : filtered.length === 0 ? (
+      ) : filteredPorArticulo.length === 0 ? (
         <p style={{ padding: "24px", color: "#8aabb8", fontFamily: "'Space Mono',monospace" }}>
           No hay artículos cargados todavía. Usá "Nuevo" para agregar el primero.
         </p>
       ) : (
         <DataTable
           columns={columns}
-          rows={filtered}
+          rows={filteredPorArticulo}
           selectedId={null}
           onSelect={(row) => row && abrirPanel(row)}
           storageKey={`modulos-domus-${filtroModulo ?? "todos"}`}
