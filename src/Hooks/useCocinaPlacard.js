@@ -136,6 +136,7 @@ export default function useCocinaPlacard({
     grupo: "",
     ancho: "",
     alto: "",
+    profundidad: "",
     codartint: null,
   };
   const [placardFila, setPlacardFila] = useState({ ...PLACARD_FILA_INIT });
@@ -947,15 +948,17 @@ export default function useCocinaPlacard({
           accesorios: f.accesorios ?? [],
           grupo: f.grupo && f.grupo.trim() ? f.grupo.trim() : null,
           color: f.color ?? null,
-          // ancho/alto/codartint: se completan en placardFila al elegir el
-          // artículo en el buscador (PlacardSection.jsx) y viajan en la fila
-          // (f), pero acá nunca se copiaban a presupuestoItems — el objeto
-          // que realmente se manda al backend en handleGuardar. Por eso
-          // tabla_presupuestos se guardaba siempre sin dimensiones ni
-          // codartint para ítems de cocina/placard, aunque el backend
-          // (POST /tabla-presupuestos) ya sabía leer y persistir ambos.
+          // ancho/alto/profundidad/codartint: se completan en placardFila
+          // al elegir el artículo en el buscador (PlacardSection.jsx) y
+          // viajan en la fila (f), pero acá nunca se copiaban a
+          // presupuestoItems — el objeto que realmente se manda al backend
+          // en handleGuardar. Por eso tabla_presupuestos se guardaba
+          // siempre sin dimensiones ni codartint para ítems de
+          // cocina/placard, aunque el backend (POST /tabla-presupuestos)
+          // ya sabía leer y persistir ambos.
           ancho: f.ancho ?? null,
           alto: f.alto ?? null,
+          profundidad: f.profundidad ?? null,
           codartint: f.codartint ?? null,
         })),
       );
