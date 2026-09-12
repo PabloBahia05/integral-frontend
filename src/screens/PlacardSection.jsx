@@ -473,6 +473,17 @@ export default function PlacardSection({
                           textAlign: "center",
                           border: "1px solid #c8dae8",
                           fontWeight: 700,
+                          width: 80,
+                        }}
+                      >
+                        Prof.
+                      </th>
+                      <th
+                        style={{
+                          padding: "8px 12px",
+                          textAlign: "center",
+                          border: "1px solid #c8dae8",
+                          fontWeight: 700,
                           width: 90,
                         }}
                       >
@@ -633,6 +644,10 @@ export default function PlacardSection({
                                             p.ancho ?? p.ANCHO ?? "";
                                           const altoCatalogo =
                                             p.alto ?? p.ALTO ?? "";
+                                          const profundidadCatalogo =
+                                            p.profundidad ??
+                                            p.PROFUNDIDAD ??
+                                            "";
                                           setPlacardFila((f) => ({
                                             ...f,
                                             articulo: base,
@@ -651,6 +666,7 @@ export default function PlacardSection({
                                             // este ítem puntual mide distinto.
                                             ancho: anchoCatalogo,
                                             alto: altoCatalogo,
+                                            profundidad: profundidadCatalogo,
                                           }));
                                           setPlacardSearch(base);
                                         }}
@@ -751,6 +767,33 @@ export default function PlacardSection({
                                 setPlacardFila((f) => ({
                                   ...f,
                                   alto: e.target.value,
+                                }))
+                              }
+                              style={{
+                                width: "100%",
+                                textAlign: "center",
+                                fontFamily: "'Space Mono',monospace",
+                                fontSize: 12,
+                                border: "1px solid #7aaac8",
+                                padding: "4px 4px",
+                                borderRadius: 2,
+                              }}
+                            />
+                          </td>
+                          <td
+                            style={{
+                              padding: "6px 8px",
+                              border: "1px solid #c8dae8",
+                            }}
+                          >
+                            <input
+                              type="number"
+                              value={placardFila.profundidad ?? ""}
+                              placeholder="—"
+                              onChange={(e) =>
+                                setPlacardFila((f) => ({
+                                  ...f,
+                                  profundidad: e.target.value,
                                 }))
                               }
                               style={{
@@ -1117,6 +1160,16 @@ export default function PlacardSection({
                           </td>
                           <td
                             style={{
+                              padding: "8px 12px",
+                              border: "1px solid #c8dae8",
+                              textAlign: "center",
+                              color: fila.profundidad ? "#334155" : "#b8c8d4",
+                            }}
+                          >
+                            {fila.profundidad || "—"}
+                          </td>
+                          <td
+                            style={{
                               padding: "6px 8px",
                               border: "1px solid #c8dae8",
                               textAlign: "center",
@@ -1322,7 +1375,7 @@ export default function PlacardSection({
                     )}
                     <tr style={{ background: "#e8f4ee" }}>
                       <td
-                        colSpan={8}
+                        colSpan={9}
                         style={{
                           padding: "8px 12px",
                           border: "1px solid #c8dae8",
@@ -1499,6 +1552,8 @@ export default function PlacardSection({
                                   const anchoCatalogo =
                                     p.ancho ?? p.ANCHO ?? "";
                                   const altoCatalogo = p.alto ?? p.ALTO ?? "";
+                                  const profundidadCatalogo =
+                                    p.profundidad ?? p.PROFUNDIDAD ?? "";
                                   setPlacardFila((f) => ({
                                     ...f,
                                     articulo: base,
@@ -1512,6 +1567,7 @@ export default function PlacardSection({
                                     codartint,
                                     ancho: anchoCatalogo,
                                     alto: altoCatalogo,
+                                    profundidad: profundidadCatalogo,
                                   }));
                                   setPlacardSearch(base);
                                 }}
@@ -1657,6 +1713,39 @@ export default function PlacardSection({
                           }))
                         }
                         title="Se precarga con la medida del artículo elegido — se puede ajustar si este ítem puntual mide distinto."
+                        style={{
+                          width: "100%",
+                          textAlign: "center",
+                          fontFamily: "'Space Mono',monospace",
+                          fontSize: 12,
+                          border: "1px solid #b8cfe0",
+                          padding: "6px 6px",
+                          borderRadius: 2,
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: "0 0 80px" }}>
+                      <label
+                        style={{
+                          display: "block",
+                          fontSize: 11,
+                          color: "#6699bb",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Prof.
+                      </label>
+                      <input
+                        type="number"
+                        value={placardFila.profundidad ?? ""}
+                        placeholder="—"
+                        onChange={(e) =>
+                          setPlacardFila((f) => ({
+                            ...f,
+                            profundidad: e.target.value,
+                          }))
+                        }
+                        title="Se precarga con la profundidad del artículo elegido — se puede ajustar si este ítem puntual mide distinto."
                         style={{
                           width: "100%",
                           textAlign: "center",
