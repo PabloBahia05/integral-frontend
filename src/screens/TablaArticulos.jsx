@@ -196,10 +196,10 @@ export default function TablaArticulos({
   }, [numero, revision, confirmado]);
 
   // Cantidad de columnas fijas antes de las columnas de línea de precio:
-  // Grupo, Producto, Descripción, Cant., Ancho, Alto (+ Color / Manija si
-  // están activadas). Se usa para los colSpan de las filas de sección y
+  // Grupo, Producto, Descripción, Cant., Ancho, Alto, Prof. (+ Color / Manija
+  // si están activadas). Se usa para los colSpan de las filas de sección y
   // subtotal.
-  const colSpanBase = 6 + (mostrarColor ? 1 : 0) + (mostrarManija ? 1 : 0);
+  const colSpanBase = 7 + (mostrarColor ? 1 : 0) + (mostrarManija ? 1 : 0);
 
   return (
     <div>
@@ -795,6 +795,16 @@ export default function TablaArticulos({
               >
                 Alto
               </th>
+              <th
+                style={{
+                  padding: "9px 10px",
+                  textAlign: "center",
+                  fontWeight: 700,
+                  width: 70,
+                }}
+              >
+                Prof.
+              </th>
               {mostrarColor && (
                 <th
                   style={{
@@ -1221,6 +1231,20 @@ export default function TablaArticulos({
                         >
                           {tieneMedidas(item.seccion)
                             ? (item.alto ?? "—")
+                            : "—"}
+                        </td>
+                        <td
+                          style={{
+                            padding: "7px 10px",
+                            border: "1px solid #e8f0f7",
+                            textAlign: "center",
+                            color: tieneMedidas(item.seccion)
+                              ? "#0a3a5c"
+                              : "#aaa",
+                          }}
+                        >
+                          {tieneMedidas(item.seccion)
+                            ? (item.profundidad ?? "—")
                             : "—"}
                         </td>
                         {mostrarColor && (
