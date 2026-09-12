@@ -82,7 +82,7 @@ const PANTALLAS_MENU = [
   { id: "obras-confirmadas", label: "OBRAS CONFIRMADAS", icon: "✅", color: "#00b4d8", ubicacionDefault: "principal" },
   { id: "produccion", label: "PRODUCCIÓN", icon: "🏭", color: "#8d6e63", ubicacionDefault: "principal" },
   { id: "modulos-domus", label: "MÓDULOS DOMUS", icon: "🏠", color: "#5c6b73", ubicacionDefault: "principal" },
-  { id: "materiales-melamina", label: "MATERIALES MELAMINA", icon: "🎨", color: "#c2185b", ubicacionDefault: "lateral" },
+  { id: "materiales-melamina", label: "MATERIALES MELAMINA", icon: "🎨", color: "#c2185b", ubicacionDefault: "principal" },
   { id: "visor-dwg", label: "VISOR 3D MÓDULOS", icon: "📐", color: "#00838f", ubicacionDefault: "lateral" },
   { id: "chat", label: "CHAT", icon: "💬", color: "#25d366", ubicacionDefault: "principal" },
   { id: "presupuesto-mamparas", label: "PRESUPUESTO MAMPARAS", icon: "🪟", color: "#4895ef", ubicacionDefault: "lateral" },
@@ -103,6 +103,11 @@ const PANTALLAS_MENU = [
   { id: "fichadas", label: "CONTROL DE FICHADAS", icon: "🕒", color: "#4f46e5", ubicacionDefault: "lateral" },
   { id: "flujo-fondos", label: "FLUJO DE FONDOS", icon: "💵", color: "#2e8b57", ubicacionDefault: "lateral" },
 ];
+
+// Pantallas que solo debe ver el rol admin, sin importar lo que diga
+// `permisos` (ni lo que se configure desde el Gestor de Menú en
+// VerTablas.jsx). Se chequea aparte de puedo() en pantallasPor().
+const SOLO_ADMIN = new Set(["materiales-melamina"]);
 
 export default function Root() {
   return (
@@ -335,7 +340,7 @@ function App() {
       .filter((item) => item.ubicacion === ubicacion)
       .map((item) => PANTALLAS_MENU.find((p) => p.id === item.modulo))
       .filter(Boolean)
-      .filter((p) => puedo(p.id, "ver"));
+      .filter((p) => (SOLO_ADMIN.has(p.id) ? rol === "admin" : puedo(p.id, "ver")));
   };
 
   const panelPrincipal = pantallasPor("principal");
