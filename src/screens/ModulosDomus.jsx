@@ -14,7 +14,7 @@ const API = "https://integral-backend-production.up.railway.app";
 // (codartint), cada una con dos fórmulas asociadas INDEPENDIENTES
 // (formulax → Alto, formulay → Ancho, ambas referencias a
 // formulas_produccion) y los datos que completa el CSV de fórmulas de
-// producción (bpp, cant1-4, veta) — ver GET /produccion/:id/formulas-csv
+// producción (bpp, cant1-4, color) — ver GET /produccion/:id/formulas-csv
 // en tabla-produccion_routes.js, que arma un renglón de CSV por cada pieza
 // con formulax y/o formulay asignada.
 //
@@ -34,7 +34,7 @@ const CAMPOS_TEXTO = [
   { campo: "cant2", label: "Cant2", maxLength: 100 },
   { campo: "cant3", label: "Cant3", maxLength: 100 },
   { campo: "cant4", label: "Cant4", maxLength: 100 },
-  { campo: "veta", label: "Veta", maxLength: 100 },
+  { campo: "color", label: "Color", maxLength: 100 },
 ];
 
 const CAMPOS_NUMERICOS = [
@@ -784,7 +784,7 @@ export default function ModulosDomus({ authFetch, token }) {
         (r.modulo ?? "").toLowerCase().includes(q) ||
         (r.titulo ?? "").toLowerCase().includes(q) ||
         (r.bpp ?? "").toLowerCase().includes(q) ||
-        (r.veta ?? "").toLowerCase().includes(q)),
+        (r.color ?? "").toLowerCase().includes(q)),
   );
 
   // "Sin módulo" y "Total artículos" cuentan ARTÍCULOS distintos, no
@@ -908,7 +908,7 @@ export default function ModulosDomus({ authFetch, token }) {
           style={estiloInput(
             row.id,
             campo,
-            campo === "bpp" || campo.startsWith("cant") || campo === "veta" ? "100px" : "160px",
+            campo === "bpp" || campo.startsWith("cant") || campo === "color" ? "100px" : "160px",
           )}
         />
       ),
