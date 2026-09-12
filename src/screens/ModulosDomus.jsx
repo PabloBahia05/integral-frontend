@@ -343,14 +343,13 @@ export default function ModulosDomus({ authFetch, token }) {
   const [piezaAbierta, setPiezaAbierta] = useState(false);
   const [formulas, setFormulas] = useState([]);
   const [formulasCargadas, setFormulasCargadas] = useState(false);
-  // Dos buscadores independientes: uno resuelve formulax (Ancho), el otro
-  // formulay (Alto) — ya no hay un único codform por pieza.
-  const [busquedaFormulaX, setBusquedaFormulaX] = useState("");
-  const [formulaXFocus, setFormulaXFocus] = useState(false);
-  const [piezaFormulaX, setPiezaFormulaX] = useState("");
-  const [busquedaFormulaY, setBusquedaFormulaY] = useState("");
-  const [formulaYFocus, setFormulaYFocus] = useState(false);
-  const [piezaFormulaY, setPiezaFormulaY] = useState("");
+  // Un solo buscador: la fórmula elegida se carga a la vez en formulax
+  // (Ancho) y formulay (Alto) de la pieza nueva — dejó de tener sentido
+  // buscarla dos veces cuando en la práctica es la misma fórmula para
+  // ambos lados.
+  const [busquedaFormula, setBusquedaFormula] = useState("");
+  const [formulaFocus, setFormulaFocus] = useState(false);
+  const [piezaFormula, setPiezaFormula] = useState("");
   const [piezaTitulo, setPiezaTitulo] = useState("");
   const [guardandoPieza, setGuardandoPieza] = useState(false);
   const [errorPieza, setErrorPieza] = useState(null);
@@ -519,10 +518,8 @@ export default function ModulosDomus({ authFetch, token }) {
 
   const cerrarPieza = () => {
     setPiezaAbierta(false);
-    setBusquedaFormulaX("");
-    setPiezaFormulaX("");
-    setBusquedaFormulaY("");
-    setPiezaFormulaY("");
+    setBusquedaFormula("");
+    setPiezaFormula("");
     setPiezaTitulo("");
     setErrorPieza(null);
   };
@@ -574,19 +571,22 @@ export default function ModulosDomus({ authFetch, token }) {
   const handlePiezaCampoBlur = (pieza, campo) =>
     guardarPiezaCampo(pieza.id, campo, pieza[campo]);
 
-  // Elegir una fórmula del catálogo para una pieza existente, en el campo
-  // indicado ("formulax" para Ancho, "formulay" para Alto — independientes
-  // entre sí): guarda ese campo siempre, y además el título SOLO si la
-  // pieza todavía no tenía uno propio cargado (no pisa un título que el
-  // usuario ya haya editado, ni el que haya puesto la elección del otro
-  // campo un instante antes).
-  const elegirFormulaPieza = (row, campo, f) => {
+  // Elegir una fórmula del catálogo para una pieza existente: se carga a
+  // la vez en formulax (Ancho) Y formulay (Alto) — ya no son dos búsquedas
+  // independientes — y además el título SOLO si la pieza todavía no tenía
+  // uno propio cargado (no pisa un título que el usuario ya haya editado).
+  const elegirFormulaPieza = (row, f) => {
     const yaTeniaTitulo = (row.titulo ?? "").trim().length > 0;
     const nuevoTitulo = yaTeniaTitulo ? row.titulo : f.descripcion || "";
     setPiezas((prev) =>
-      prev.map((p) => (p.id === row.id ? { ...p, [campo]: f.codform, titulo: nuevoTitulo } : p)),
+      prev.map((p) =>
+        p.id === row.id
+          ? { ...p, formulax: f.codform, formulay: f.codform, titulo: nuevoTitulo }
+          : p,
+      ),
     );
-    guardarPiezaCampo(row.id, campo, f.codform);
+    guardarPiezaCampo(row.id, "formulax", f.codform);
+    guardarPiezaCampo(row.id, "formulay", f.codform);
     if (!yaTeniaTitulo) {
       guardarPiezaCampo(row.id, "titulo", nuevoTitulo);
     }
@@ -621,8 +621,7 @@ export default function ModulosDomus({ authFetch, token }) {
       )
       .slice(0, 20);
   };
-  const formulasFiltradasX = filtrarFormulas(busquedaFormulaX);
-  const formulasFiltradasY = filtrarFormulas(busquedaFormulaY);
+  const formulasFiltradas = filtrarFormulas(busquedaFormula);
 
   const handleCrearPieza = async () => {
     if (!panelCodartint) return;
@@ -634,8 +633,8 @@ export default function ModulosDomus({ authFetch, token }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           codartint: panelCodartint,
-          formulax: piezaFormulaX.trim() || null,
-          formulay: piezaFormulaY.trim() || null,
+          formulax: piezaFormula.trim() || null,
+          formulay: piezaFormula.trim() || null,
           titulo: piezaTitulo.trim() || null,
         }),
       });
@@ -821,28 +820,47 @@ export default function ModulosDomus({ authFetch, token }) {
     },
     {
       key: "formulax",
-      label: "Fórmula Ancho",
+      label: "Fórmula (Ancho y Alto)",
       render: (v, row) => (
         <SelectorFormula
           row={row}
           campo="formulax"
           formulas={formulas}
           cargarFormulas={fetchFormulas}
-          onElegir={(f) => elegirFormulaPieza(row, "formulax", f)}
+          onElegir={(f) => elegirFormulaPieza(row, f)}
         />
       ),
     },
     {
-      key: "formulay",
-      label: "Fórmula Alto",
+      // Solo lectura: el código de fórmula tal cual, sin depender del
+      // combo de búsqueda de al lado (que muestra "descripción — código"
+      // y en columnas angostas puede truncar el código). El valor real
+      // sigue cargándose desde el buscador; esto es nada más una vidriera
+      // clara del codform guardado, para pegar/copiar o confirmar de un
+      // vistazo.
+      key: "formulax_codigo",
+      label: "Código fórmula",
       render: (v, row) => (
-        <SelectorFormula
-          row={row}
-          campo="formulay"
-          formulas={formulas}
-          cargarFormulas={fetchFormulas}
-          onElegir={(f) => elegirFormulaPieza(row, "formulay", f)}
-        />
+        <span
+          style={{
+            display: "inline-block",
+            width: "100%",
+            maxWidth: "120px",
+            padding: "4px 8px",
+            fontSize: "12px",
+            fontFamily: "'Space Mono',monospace",
+            border: "1.5px solid #dbe9f5",
+            borderRadius: "4px",
+            background: "#f4f9fd",
+            color: row.formulax ? "#0a3a5c" : "#a9c1d6",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+          title={row.formulax || ""}
+        >
+          {row.formulax || "—"}
+        </span>
       ),
     },
     ...CAMPOS_NUMERICOS.map(({ campo, label }) => ({
@@ -1312,36 +1330,19 @@ export default function ModulosDomus({ authFetch, token }) {
                 }}
               >
                 <BuscadorFormulaCampo
-                  label="Fórmula para Ancho (buscar por código o descripción)"
+                  label="Fórmula (Ancho y Alto) — buscar por código o descripción"
                   placeholder="Ej: FORM-01 o Lateral..."
-                  busqueda={busquedaFormulaX}
-                  onBusquedaChange={setBusquedaFormulaX}
-                  focus={formulaXFocus}
-                  onFocus={() => setFormulaXFocus(true)}
-                  onBlur={() => setTimeout(() => setFormulaXFocus(false), 160)}
-                  resultados={formulasFiltradasX}
+                  busqueda={busquedaFormula}
+                  onBusquedaChange={setBusquedaFormula}
+                  focus={formulaFocus}
+                  onFocus={() => setFormulaFocus(true)}
+                  onBlur={() => setTimeout(() => setFormulaFocus(false), 160)}
+                  resultados={formulasFiltradas}
                   onElegir={(f) => {
-                    setPiezaFormulaX(f.codform);
+                    setPiezaFormula(f.codform);
                     if (!piezaTitulo.trim()) setPiezaTitulo(f.descripcion || "");
-                    setBusquedaFormulaX(`${f.descripcion || f.codform} — ${f.codform}`);
-                    setFormulaXFocus(false);
-                  }}
-                />
-
-                <BuscadorFormulaCampo
-                  label="Fórmula para Alto (buscar por código o descripción)"
-                  placeholder="Ej: FORM-02 o Zócalo..."
-                  busqueda={busquedaFormulaY}
-                  onBusquedaChange={setBusquedaFormulaY}
-                  focus={formulaYFocus}
-                  onFocus={() => setFormulaYFocus(true)}
-                  onBlur={() => setTimeout(() => setFormulaYFocus(false), 160)}
-                  resultados={formulasFiltradasY}
-                  onElegir={(f) => {
-                    setPiezaFormulaY(f.codform);
-                    if (!piezaTitulo.trim()) setPiezaTitulo(f.descripcion || "");
-                    setBusquedaFormulaY(`${f.descripcion || f.codform} — ${f.codform}`);
-                    setFormulaYFocus(false);
+                    setBusquedaFormula(`${f.descripcion || f.codform} — ${f.codform}`);
+                    setFormulaFocus(false);
                   }}
                 />
 
