@@ -840,15 +840,15 @@ export default function ModulosDomus({ authFetch, token }) {
       ),
     },
     {
+      // Muestra la EXPRESIÓN (Valor 1 de formulax), no la descripción —
+      // es lo que el backend evalúa como Alto en el CSV, en los dos modos
+      // (una sola fórmula o independientes): siempre Valor 1 de formulax.
       key: "formulax",
       label: "Fórmula Alto",
       render: (v, row) => (
-        <span style={{ fontSize: 11 }}>
+        <span style={{ fontSize: 11 }} title={row.formulax_descripcion || ""}>
           {row.formulax ? (
-            <>
-              {row.formulax_descripcion || "(sin descripción)"}
-              <span style={{ color: "#8aabcc", marginLeft: 6 }}>({row.formulax})</span>
-            </>
+            row.formulax_formula || <em style={{ color: "#b8cfe0" }}>(sin cargar)</em>
           ) : (
             <em style={{ color: "#b8cfe0" }}>sin fórmula</em>
           )}
@@ -856,20 +856,26 @@ export default function ModulosDomus({ authFetch, token }) {
       ),
     },
     {
+      // Idem, pero lo que el backend evalúa como Ancho: Valor 2 de
+      // formulax si formulax===formulay (una sola fórmula, el flujo
+      // actual del panel), o Valor 1 de formulay si son distintas
+      // (piezas viejas, modo independiente).
       key: "formulay",
       label: "Fórmula Ancho",
-      render: (v, row) => (
-        <span style={{ fontSize: 11 }}>
-          {row.formulay ? (
-            <>
-              {row.formulay_descripcion || "(sin descripción)"}
-              <span style={{ color: "#8aabcc", marginLeft: 6 }}>({row.formulay})</span>
-            </>
-          ) : (
-            <em style={{ color: "#b8cfe0" }}>sin fórmula</em>
-          )}
-        </span>
-      ),
+      render: (v, row) => {
+        const unaSolaFormula = !!row.formulax && row.formulax === row.formulay;
+        const expresion = unaSolaFormula ? row.formulax_formula2 : row.formulay_formula;
+        const descripcion = unaSolaFormula ? row.formulax_descripcion : row.formulay_descripcion;
+        return (
+          <span style={{ fontSize: 11 }} title={descripcion || ""}>
+            {row.formulay ? (
+              expresion || <em style={{ color: "#b8cfe0" }}>(sin cargar)</em>
+            ) : (
+              <em style={{ color: "#b8cfe0" }}>sin fórmula</em>
+            )}
+          </span>
+        );
+      },
     },
     ...CAMPOS_NUMERICOS.map(({ campo, label }) => ({
       key: campo,
