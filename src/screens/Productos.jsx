@@ -134,6 +134,12 @@ const makeColumns = (onVer) => [
   { key: "color", label: "Color", width: 90 },
   { key: "area", label: "Área", width: 80 },
   { key: "mca", label: "MCA", width: 80 },
+  {
+    key: "veta",
+    label: "Veta",
+    width: 70,
+    render: (v) => (v == 1 || v === true ? "Sí" : "No"),
+  },
 ];
 
 const EMPTY = {
@@ -167,6 +173,7 @@ const EMPTY = {
   mca: "",
   codartprov: "",
   prod_prov: "",
+  veta: false,
 };
 
 const FIELDS_LEFT_TOP = [
@@ -781,6 +788,7 @@ export default function Productos({
       prod_prov: s(art.prod_prov),
       mca: s(art.mca),
       precio_un: recalculado.precio_un || s(art.precio_un),
+      veta: art.veta == 1 || art.veta === true,
     });
     setError("");
     setFamiliaEsNueva(false);
@@ -851,6 +859,7 @@ export default function Productos({
         form.mca !== "" && form.mca != null
           ? parseInt(form.mca, 10) || 0
           : 0,
+      veta: form.veta ? 1 : 0,
     };
     const payload = modal === "nuevo" ? data : { ...data, id: selected.id };
     onSave(payload);
@@ -1612,6 +1621,31 @@ export default function Productos({
               {FIELDS_RIGHT.map((f) => (
                 <FormField key={f.field} {...f} form={form} setForm={setForm} />
               ))}
+              <div
+                className="form-field"
+                style={{
+                  marginBottom: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  id="veta-checkbox"
+                  checked={!!form.veta}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, veta: e.target.checked }))
+                  }
+                  style={{ width: 16, height: 16, cursor: "pointer" }}
+                />
+                <label
+                  htmlFor="veta-checkbox"
+                  style={{ fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                >
+                  Veta
+                </label>
+              </div>
             </div>
           </div>
           <div className="form-actions">
