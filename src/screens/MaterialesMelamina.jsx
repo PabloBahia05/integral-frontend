@@ -64,6 +64,17 @@ export default function MaterialesMelamina({ authFetch }) {
     fetchMateriales();
   }, []);
 
+  // Colores de melamina: artículos con area=MELAMINA, mismo endpoint que
+  // usa ModulosDomus.jsx para su desplegable de Color — acá reemplaza el
+  // texto libre de la columna Melamina por un <select> con esas opciones.
+  const [coloresMelamina, setColoresMelamina] = useState([]);
+  useEffect(() => {
+    authFetch(`${API}/articulos/colores-melamina`)
+      .then((r) => r.json())
+      .then((data) => setColoresMelamina(Array.isArray(data) ? data : []))
+      .catch(() => setColoresMelamina([]));
+  }, []);
+
   // ── Edición inline por fila ───────────────────────────────────────────
 
   const handleCampoChange = (id, campo, valor) => {
@@ -154,22 +165,51 @@ export default function MaterialesMelamina({ authFetch }) {
   // ── Columnas de la grilla ─────────────────────────────────────────────
 
   const columns = [
-    ...CAMPOS.map(({ campo, label, maxLength }) => ({
-      key: campo,
-      label,
-      render: (v, row) => (
-        <input
-          type="text"
-          value={row[campo] ?? ""}
-          placeholder="—"
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handleCampoChange(row.id, campo, e.target.value)}
-          onBlur={() => handleCampoBlur(row, campo)}
-          maxLength={maxLength}
-          style={estiloInput(row.id, campo)}
-        />
-      ),
-    })),
+    ...CAMPOS.map(({ campo, label, maxLength }) => {
+      // Melamina: desplegable de artículos con area=MELAMINA en vez de
+      // texto libre, para que el valor sea siempre un color existente.
+      if (campo === "melamina") {
+        return {
+          key: campo,
+          label,
+          render: (v, row) => (
+            <select
+              value={row.melamina ?? ""}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const valor = e.target.value;
+                handleCampoChange(row.id, "melamina", valor);
+                handleCampoBlur({ ...row, melamina: valor }, "melamina");
+              }}
+              style={estiloInput(row.id, campo)}
+            >
+              <option value="">—</option>
+              {coloresMelamina.map((c) => (
+                <option key={c.codartint} value={c.articulo}>
+                  {c.articulo}
+                </option>
+              ))}
+            </select>
+          ),
+        };
+      }
+      return {
+        key: campo,
+        label,
+        render: (v, row) => (
+          <input
+            type="text"
+            value={row[campo] ?? ""}
+            placeholder="—"
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => handleCampoChange(row.id, campo, e.target.value)}
+            onBlur={() => handleCampoBlur(row, campo)}
+            maxLength={maxLength}
+            style={estiloInput(row.id, campo)}
+          />
+        ),
+      };
+    }),
     {
       key: "_borrar",
       label: "",
