@@ -218,6 +218,46 @@ function CodigoFormulaResuelto({ codigo, formulas }) {
   );
 }
 
+// Muestra en texto plano el Valor 1 (`formula`) o Valor 2 (`formula2`) de
+// la fórmula asignada a la pieza (según `campo`), buscándola en el
+// catálogo ya cargado por `codform`. Es puramente informativo — no
+// evalúa la expresión (eso solo pasa en el backend al generar el CSV) —
+// sirve para que el usuario vea de un vistazo qué expresión va a aplicar
+// como Ancho (Valor 1) y cuál como Alto (Valor 2) al elegir una fórmula.
+function TextoFormulaCampo({ codigo, formulas, campo }) {
+  if (!codigo) {
+    return (
+      <span style={{ fontSize: 11, fontFamily: "'Space Mono',monospace", color: "#a9c1d6" }}>
+        —
+      </span>
+    );
+  }
+  const encontrada = formulas.find((f) => f.codform === codigo);
+  const texto = encontrada ? encontrada[campo] || "(sin cargar)" : "(fórmula no encontrada)";
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        width: "100%",
+        maxWidth: "160px",
+        padding: "4px 8px",
+        fontSize: 11,
+        fontFamily: "'Space Mono',monospace",
+        border: "1.5px solid #dbe9f5",
+        borderRadius: 4,
+        background: "#f4f9fd",
+        color: "#0a3a5c",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}
+      title={texto}
+    >
+      {texto}
+    </span>
+  );
+}
+
 // propio estado de busqueda/foco/resultados manejado por el padre.
 function BuscadorFormulaCampo({
   label,
@@ -858,6 +898,22 @@ export default function ModulosDomus({ authFetch, token }) {
       key: "formula_resuelta",
       label: "Fórmula asignada",
       render: (v, row) => <CodigoFormulaResuelto codigo={row.formulax} formulas={formulas} />,
+    },
+    {
+      // Solo lectura, solo informativo: el texto de la expresión (Valor 1
+      // de formulas_produccion) que el backend va a evaluar como Ancho al
+      // generar el CSV. No se calcula acá — se recarga solo al elegir de
+      // nuevo en "Buscar fórmula".
+      key: "formula",
+      label: "Fórmula (Ancho)",
+      render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula" />,
+    },
+    {
+      // Ídem anterior, pero Valor 2 (`formula2`) — lo que el backend evalúa
+      // como Alto.
+      key: "formula1",
+      label: "Fórmula (Alto)",
+      render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula2" />,
     },
     ...CAMPOS_NUMERICOS.map(({ campo, label }) => ({
       key: campo,
