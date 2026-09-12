@@ -43,25 +43,18 @@ const CAMPOS_NUMERICOS = [
   { campo: "cantidad", label: "Cantidad" },
 ];
 
-// Buscador+desplegable de fórmulas de Producción para uno de los dos
-// campos de fórmula de una pieza YA existente (dentro del mini-table del
-// panel) — `campo` es "formulax" (Ancho) o "formulay" (Alto), cada uno
-// independiente del otro. Mismo patrón que el buscador de "Nueva
-// pieza"/"Nuevo artículo", pero con estado propio por fila+campo
-// (busqueda/foco), porque cada desplegable de cada fila es independiente.
-function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
+// Buscador "madre": al elegir un resultado dispara onElegir(f) y se vacía
+// solo, listo para la próxima búsqueda (no queda atado a un campo
+// persistido puntual, porque formulax/formulay ya no van a ser el mismo
+// código elegido acá, sino lo que traiga formula_ancho/formula_alto de la
+// fórmula elegida). El desplegable usa un portal a document.body,
+// posicionado con getBoundingClientRect(), para que no quede recortado
+// por el overflow-x del mini-table.
+function SelectorFormulaMadre({ formulas, cargarFormulas, onElegir }) {
   const [busqueda, setBusqueda] = useState("");
   const [focus, setFocus] = useState(false);
-  const [coords, setCoords] = useState(null); // {top, left, width} en viewport, para el portal
+  const [coords, setCoords] = useState(null);
   const inputRef = useRef(null);
-
-  const valorActual = row[campo];
-  const actual = formulas.find((f) => f.codform === valorActual);
-  const descripcionResuelta = row[`${campo}_descripcion`];
-  const etiquetaActual = valorActual
-    ? `${actual?.descripcion || descripcionResuelta || "(sin descripción)"} — ${valorActual}`
-    : "";
-  const texto = focus ? busqueda : etiquetaActual;
 
   const fq = busqueda.trim().toLowerCase();
   const resultados = fq
@@ -74,11 +67,6 @@ function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
         .slice(0, 15)
     : [];
 
-  // Recalcula la posición del input contra el viewport. Se llama al
-  // enfocar y en cada scroll/resize mientras el desplegable está abierto,
-  // porque al usar un portal ya no hereda el posicionamiento relativo del
-  // contenedor con scroll (el mini-table de la pieza) y hay que seguirlo
-  // "a mano".
   const actualizarCoords = useCallback(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -89,8 +77,6 @@ function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
   useEffect(() => {
     if (!focus) return;
     actualizarCoords();
-    // capture:true para enterarnos también del scroll de ancestros
-    // (el contenedor overflow-x:auto de la mini-tabla), no solo del window.
     window.addEventListener("scroll", actualizarCoords, true);
     window.addEventListener("resize", actualizarCoords);
     return () => {
@@ -107,12 +93,11 @@ function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
       <input
         ref={inputRef}
         type="text"
-        value={texto}
+        value={busqueda}
         placeholder="Buscar fórmula..."
         onFocus={() => {
           cargarFormulas();
           setFocus(true);
-          setBusqueda("");
           actualizarCoords();
         }}
         onChange={(e) => {
@@ -128,17 +113,13 @@ function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
           fontFamily: "'Space Mono',monospace",
           border: "1.5px solid #b8d6ef",
           borderRadius: 4,
-          color: valorActual ? "#0a3a5c" : "#8aabcc",
+          color: "#0a3a5c",
         }}
       />
       {(mostrarLista || mostrarSinResultados) &&
         coords &&
         createPortal(
           <div
-            // Portal a document.body: así el desplegable flota sobre toda
-            // la pantalla (fixed, calculado desde getBoundingClientRect)
-            // en vez de quedar recortado por el overflow-x:auto del
-            // contenedor scrolleable de la mini-tabla de piezas.
             style={{
               position: "fixed",
               top: coords.top,
@@ -160,7 +141,11 @@ function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
               ? resultados.map((f) => (
                   <div
                     key={f.codform}
-                    onMouseDown={() => onElegir(f)}
+                    onMouseDown={() => {
+                      onElegir(f);
+                      setBusqueda("");
+                      setFocus(false);
+                    }}
                     style={{
                       padding: "6px 10px",
                       cursor: "pointer",
@@ -181,13 +166,7 @@ function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
                   </div>
                 ))
               : (
-                  <div
-                    style={{
-                      padding: "6px 10px",
-                      color: "#8aabcc",
-                      fontSize: 10,
-                    }}
-                  >
+                  <div style={{ padding: "6px 10px", color: "#8aabcc", fontSize: 10 }}>
                     Sin resultados
                   </div>
                 )}
@@ -198,8 +177,45 @@ function SelectorFormula({ row, campo, formulas, cargarFormulas, onElegir }) {
   );
 }
 
-// Buscador+desplegable de fórmulas de Producción para el formulario de
-// "Nueva pieza" — reutilizado dos veces (Ancho y Alto), cada uno con su
+// Vidriera de solo lectura: dado un código de fórmula ya guardado
+// (formulax o formulay de la pieza), resuelve su descripción contra el
+// catálogo cargado y lo muestra como "descripción — código". No es
+// editable acá — para cambiarlo hay que volver a elegir en "Buscar
+// fórmula", que recalcula ambos (Ancho y Alto) juntos.
+function CodigoFormulaResuelto({ codigo, formulas }) {
+  if (!codigo) {
+    return (
+      <span style={{ fontSize: 11, fontFamily: "'Space Mono',monospace", color: "#a9c1d6" }}>
+        —
+      </span>
+    );
+  }
+  const encontrada = formulas.find((f) => f.codform === codigo);
+  const etiqueta = encontrada ? `${encontrada.descripcion || "(sin descripción)"} — ${codigo}` : codigo;
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        width: "100%",
+        maxWidth: "160px",
+        padding: "4px 8px",
+        fontSize: 11,
+        fontFamily: "'Space Mono',monospace",
+        border: "1.5px solid #dbe9f5",
+        borderRadius: 4,
+        background: "#f4f9fd",
+        color: "#0a3a5c",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}
+      title={etiqueta}
+    >
+      {etiqueta}
+    </span>
+  );
+}
+
 // propio estado de busqueda/foco/resultados manejado por el padre.
 function BuscadorFormulaCampo({
   label,
@@ -343,13 +359,14 @@ export default function ModulosDomus({ authFetch, token }) {
   const [piezaAbierta, setPiezaAbierta] = useState(false);
   const [formulas, setFormulas] = useState([]);
   const [formulasCargadas, setFormulasCargadas] = useState(false);
-  // Un solo buscador: la fórmula elegida se carga a la vez en formulax
-  // (Ancho) y formulay (Alto) de la pieza nueva — dejó de tener sentido
-  // buscarla dos veces cuando en la práctica es la misma fórmula para
-  // ambos lados.
+  // Un solo buscador de la fórmula "madre": la tabla formula_produccion
+  // trae, en la misma fila, las columnas formula_ancho y formula_alto —
+  // son esas dos las que efectivamente se guardan en formulax/formulay
+  // de la pieza nueva, no el codform de la fórmula buscada.
   const [busquedaFormula, setBusquedaFormula] = useState("");
   const [formulaFocus, setFormulaFocus] = useState(false);
-  const [piezaFormula, setPiezaFormula] = useState("");
+  const [piezaFormulaAncho, setPiezaFormulaAncho] = useState("");
+  const [piezaFormulaAlto, setPiezaFormulaAlto] = useState("");
   const [piezaTitulo, setPiezaTitulo] = useState("");
   const [guardandoPieza, setGuardandoPieza] = useState(false);
   const [errorPieza, setErrorPieza] = useState(null);
@@ -519,7 +536,8 @@ export default function ModulosDomus({ authFetch, token }) {
   const cerrarPieza = () => {
     setPiezaAbierta(false);
     setBusquedaFormula("");
-    setPiezaFormula("");
+    setPiezaFormulaAncho("");
+    setPiezaFormulaAlto("");
     setPiezaTitulo("");
     setErrorPieza(null);
   };
@@ -571,22 +589,26 @@ export default function ModulosDomus({ authFetch, token }) {
   const handlePiezaCampoBlur = (pieza, campo) =>
     guardarPiezaCampo(pieza.id, campo, pieza[campo]);
 
-  // Elegir una fórmula del catálogo para una pieza existente: se carga a
-  // la vez en formulax (Ancho) Y formulay (Alto) — ya no son dos búsquedas
-  // independientes — y además el título SOLO si la pieza todavía no tenía
-  // uno propio cargado (no pisa un título que el usuario ya haya editado).
+  // Elegir una fórmula "madre" del catálogo para una pieza existente: la
+  // tabla formula_produccion tiene, en la misma fila, las columnas
+  // formula_ancho y formula_alto — son las que efectivamente van a
+  // formulax/formulay de la pieza (no el codform de la fórmula elegida).
+  // Además el título se completa SOLO si la pieza todavía no tenía uno
+  // propio cargado (no pisa un título que el usuario ya haya editado).
   const elegirFormulaPieza = (row, f) => {
     const yaTeniaTitulo = (row.titulo ?? "").trim().length > 0;
     const nuevoTitulo = yaTeniaTitulo ? row.titulo : f.descripcion || "";
+    const nuevoAncho = f.formula_ancho ?? null;
+    const nuevoAlto = f.formula_alto ?? null;
     setPiezas((prev) =>
       prev.map((p) =>
         p.id === row.id
-          ? { ...p, formulax: f.codform, formulay: f.codform, titulo: nuevoTitulo }
+          ? { ...p, formulax: nuevoAncho, formulay: nuevoAlto, titulo: nuevoTitulo }
           : p,
       ),
     );
-    guardarPiezaCampo(row.id, "formulax", f.codform);
-    guardarPiezaCampo(row.id, "formulay", f.codform);
+    guardarPiezaCampo(row.id, "formulax", nuevoAncho);
+    guardarPiezaCampo(row.id, "formulay", nuevoAlto);
     if (!yaTeniaTitulo) {
       guardarPiezaCampo(row.id, "titulo", nuevoTitulo);
     }
@@ -633,8 +655,8 @@ export default function ModulosDomus({ authFetch, token }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           codartint: panelCodartint,
-          formulax: piezaFormula.trim() || null,
-          formulay: piezaFormula.trim() || null,
+          formulax: String(piezaFormulaAncho ?? "").trim() || null,
+          formulay: String(piezaFormulaAlto ?? "").trim() || null,
           titulo: piezaTitulo.trim() || null,
         }),
       });
@@ -819,12 +841,10 @@ export default function ModulosDomus({ authFetch, token }) {
       ),
     },
     {
-      key: "formulax",
-      label: "Fórmula (Ancho y Alto)",
+      key: "formula_madre",
+      label: "Buscar fórmula",
       render: (v, row) => (
-        <SelectorFormula
-          row={row}
-          campo="formulax"
+        <SelectorFormulaMadre
           formulas={formulas}
           cargarFormulas={fetchFormulas}
           onElegir={(f) => elegirFormulaPieza(row, f)}
@@ -832,36 +852,19 @@ export default function ModulosDomus({ authFetch, token }) {
       ),
     },
     {
-      // Solo lectura: el código de fórmula tal cual, sin depender del
-      // combo de búsqueda de al lado (que muestra "descripción — código"
-      // y en columnas angostas puede truncar el código). El valor real
-      // sigue cargándose desde el buscador; esto es nada más una vidriera
-      // clara del codform guardado, para pegar/copiar o confirmar de un
-      // vistazo.
-      key: "formulax_codigo",
-      label: "Código fórmula",
-      render: (v, row) => (
-        <span
-          style={{
-            display: "inline-block",
-            width: "100%",
-            maxWidth: "120px",
-            padding: "4px 8px",
-            fontSize: "12px",
-            fontFamily: "'Space Mono',monospace",
-            border: "1.5px solid #dbe9f5",
-            borderRadius: "4px",
-            background: "#f4f9fd",
-            color: row.formulax ? "#0a3a5c" : "#a9c1d6",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-          title={row.formulax || ""}
-        >
-          {row.formulax || "—"}
-        </span>
-      ),
+      // Solo lectura: lo que trajo formula_ancho de la fórmula madre
+      // elegida (columna formula_ancho de la tabla formula_produccion),
+      // ya guardado en formulax de la pieza. No se edita acá directo —
+      // se recarga eligiendo de nuevo en "Buscar fórmula".
+      key: "formulax_resuelta",
+      label: "Fórmula Ancho",
+      render: (v, row) => <CodigoFormulaResuelto codigo={row.formulax} formulas={formulas} />,
+    },
+    {
+      // Ídem, con formula_alto → formulay.
+      key: "formulay_resuelta",
+      label: "Fórmula Alto",
+      render: (v, row) => <CodigoFormulaResuelto codigo={row.formulay} formulas={formulas} />,
     },
     ...CAMPOS_NUMERICOS.map(({ campo, label }) => ({
       key: campo,
@@ -1330,7 +1333,7 @@ export default function ModulosDomus({ authFetch, token }) {
                 }}
               >
                 <BuscadorFormulaCampo
-                  label="Fórmula (Ancho y Alto) — buscar por código o descripción"
+                  label="Buscar fórmula (trae Ancho y Alto desde formula_producción)"
                   placeholder="Ej: FORM-01 o Lateral..."
                   busqueda={busquedaFormula}
                   onBusquedaChange={setBusquedaFormula}
@@ -1339,12 +1342,28 @@ export default function ModulosDomus({ authFetch, token }) {
                   onBlur={() => setTimeout(() => setFormulaFocus(false), 160)}
                   resultados={formulasFiltradas}
                   onElegir={(f) => {
-                    setPiezaFormula(f.codform);
+                    setPiezaFormulaAncho(f.formula_ancho ?? "");
+                    setPiezaFormulaAlto(f.formula_alto ?? "");
                     if (!piezaTitulo.trim()) setPiezaTitulo(f.descripcion || "");
                     setBusquedaFormula(`${f.descripcion || f.codform} — ${f.codform}`);
                     setFormulaFocus(false);
                   }}
                 />
+
+                <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#5a86ab", marginBottom: 2 }}>
+                      Fórmula Ancho
+                    </div>
+                    <CodigoFormulaResuelto codigo={piezaFormulaAncho} formulas={formulas} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#5a86ab", marginBottom: 2 }}>
+                      Fórmula Alto
+                    </div>
+                    <CodigoFormulaResuelto codigo={piezaFormulaAlto} formulas={formulas} />
+                  </div>
+                </div>
 
                 <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
                   Título de la pieza (editable)
