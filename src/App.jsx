@@ -14,6 +14,7 @@ import ListaPresupuestos from "./screens/ListaPresupuestos";
 import ObrasConfirmadas from "./screens/ObrasConfirmadas";
 import Produccion from "./screens/Produccion";
 import ModulosDomus from "./screens/ModulosDomus";
+import MaterialesMelamina from "./screens/MaterialesMelamina";
 import Chat from "./screens/Chat";
 import MuebleEspecial from "./screens/MuebleEspecial";
 import Facturas from "./screens/Facturas";
@@ -51,6 +52,7 @@ const SCREENS = {
   "obras-confirmadas": { label: "OBRAS CONFIRMADAS", icon: "✅" },
   produccion: { label: "PRODUCCIÓN", icon: "🏭" },
   "modulos-domus": { label: "MÓDULOS DOMUS", icon: "🏠" },
+  "materiales-melamina": { label: "MATERIALES MELAMINA", icon: "🎨" },
   facturas: { label: "FACTURAS", icon: "🧾" },
   "facturas-venta": { label: "FACTURAS EMITIDAS", icon: "🧮" },
   "factura-manual": { label: "FACTURAR (MANUAL)", icon: "🧾" },
@@ -80,6 +82,7 @@ const PANTALLAS_MENU = [
   { id: "obras-confirmadas", label: "OBRAS CONFIRMADAS", icon: "✅", color: "#00b4d8", ubicacionDefault: "principal" },
   { id: "produccion", label: "PRODUCCIÓN", icon: "🏭", color: "#8d6e63", ubicacionDefault: "principal" },
   { id: "modulos-domus", label: "MÓDULOS DOMUS", icon: "🏠", color: "#5c6b73", ubicacionDefault: "principal" },
+  { id: "materiales-melamina", label: "MATERIALES MELAMINA", icon: "🎨", color: "#c2185b", ubicacionDefault: "lateral" },
   { id: "visor-dwg", label: "VISOR 3D MÓDULOS", icon: "📐", color: "#00838f", ubicacionDefault: "lateral" },
   { id: "chat", label: "CHAT", icon: "💬", color: "#25d366", ubicacionDefault: "principal" },
   { id: "presupuesto-mamparas", label: "PRESUPUESTO MAMPARAS", icon: "🪟", color: "#4895ef", ubicacionDefault: "lateral" },
@@ -1280,6 +1283,9 @@ function App() {
             )}
             {screen === "modulos-domus" && (
               <ModulosDomus authFetch={authFetch} token={token} />
+            )}
+            {screen === "materiales-melamina" && (
+              <MaterialesMelamina authFetch={authFetch} token={token} />
             )}
             {screen === "chat" && (
               <Chat
