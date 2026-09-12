@@ -393,6 +393,11 @@ export default function ModulosDomus({ authFetch, token }) {
   const [piezas, setPiezas] = useState([]);
   const [piezasLoading, setPiezasLoading] = useState(false);
   const [piezasError, setPiezasError] = useState(null);
+  // Duplicar una pieza existente: id de la pieza que se está copiando
+  // (para deshabilitar/mostrar spinner solo en ese renglón) y un error
+  // puntual si el POST falla, sin tapar la tabla como hace piezasError.
+  const [duplicandoId, setDuplicandoId] = useState(null);
+  const [errorDuplicar, setErrorDuplicar] = useState(null);
 
   // Alta de pieza nueva, dentro del panel: buscador de fórmula (catálogo
   // completo de formulas_produccion, cargado una vez y filtrado acá
@@ -671,6 +676,49 @@ export default function ModulosDomus({ authFetch, token }) {
     setPiezaAbierta(true);
   };
 
+  // Duplica una pieza tal cual está: manda todo su contenido (menos id y
+  // los campos resueltos por JOIN, que el backend igual descarta en el
+  // POST) como alta nueva. Queda en el mismo artículo, con el mismo
+  // título — el usuario la distingue y ajusta a mano después (es más
+  // rápido partir de una copia que cargar todo de cero).
+  const handleDuplicarPieza = async (row) => {
+    if (!panelCodartint) return;
+    setDuplicandoId(row.id);
+    setErrorDuplicar(null);
+    try {
+      const {
+        id: _id,
+        codform: _cf,
+        articulo_descripcion: _ad,
+        formulax_descripcion: _fxd,
+        formulay_descripcion: _fyd,
+        ...resto
+      } = row;
+      const res = await authFetch(`${API}/modulos-domus`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(resto),
+      });
+      if (!res.ok) {
+        let detalle = `HTTP ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body?.error) detalle = body.error;
+        } catch {
+          // el body no era JSON parseable, nos quedamos con el status
+        }
+        throw new Error(detalle);
+      }
+      fetchPiezas(panelCodartint);
+      fetchModulosDomus();
+    } catch (e) {
+      console.error("Error duplicando pieza:", e);
+      setErrorDuplicar(e.message || "No se pudo duplicar la pieza.");
+    } finally {
+      setDuplicandoId(null);
+    }
+  };
+
   const filtrarFormulas = (busqueda) => {
     const fq = busqueda.trim().toLowerCase();
     if (!fq) return [];
@@ -863,6 +911,30 @@ export default function ModulosDomus({ authFetch, token }) {
   // panel), más el nombre de la pieza, la fórmula asignada y un borrar
   // puntual.
   const columnasPieza = [
+    {
+      key: "_duplicar",
+      label: "",
+      render: (v, row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDuplicarPieza(row);
+          }}
+          disabled={duplicandoId === row.id}
+          title="Duplicar pieza"
+          style={{
+            border: "none",
+            background: "none",
+            color: "#0a3a5c",
+            cursor: duplicandoId === row.id ? "default" : "pointer",
+            fontSize: 14,
+            opacity: duplicandoId === row.id ? 0.4 : 1,
+          }}
+        >
+          {duplicandoId === row.id ? "⏳" : "⧉"}
+        </button>
+      ),
+    },
     {
       key: "titulo",
       label: "Pieza",
@@ -1334,6 +1406,12 @@ export default function ModulosDomus({ authFetch, token }) {
               Cada pieza con fórmula asignada genera un renglón en el CSV de
               fórmulas de producción de este artículo.
             </p>
+
+            {errorDuplicar && (
+              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 8px" }}>
+                ⚠ {errorDuplicar}
+              </p>
+            )}
 
             {piezasLoading ? (
               <p style={{ color: "#4a8ab5", fontSize: 12 }}>⏳ Cargando piezas...</p>
