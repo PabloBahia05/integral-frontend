@@ -211,6 +211,24 @@ export default function MaterialesMelamina({ authFetch }) {
       };
     }),
     {
+      // Veta: de solo lectura acá — el valor real vive en `articulos.veta`
+      // (0/1, campo "¿tiene veta?"), no en esta tabla. Se resuelve por
+      // texto contra la misma lista `coloresMelamina` que ya alimenta el
+      // desplegable de Melamina, matcheando `articulo` con `row.melamina`.
+      // Mismo criterio que usa el CSV de Producción para esta columna.
+      key: "veta",
+      label: "Veta",
+      render: (v, row) => {
+        const art = coloresMelamina.find((c) => c.articulo === row.melamina);
+        const valor = art ? String(art.veta ?? "0") : "—";
+        return (
+          <span style={{ fontFamily: "'Space Mono',monospace", fontSize: "12px", color: "#4a8ab5" }}>
+            {valor}
+          </span>
+        );
+      },
+    },
+    {
       key: "_borrar",
       label: "",
       render: (v, row) => (
