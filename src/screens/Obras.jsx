@@ -15,11 +15,12 @@ import {
 import BotonFacturar from "../Component/BotonFacturar";
 
 // Columnas de la lista principal en "Obras": COLS_ENCABEZADO sin Teléfono,
-// Referencia, Estado ni Por — filtrado acá (no en presupuestosShared.jsx)
-// para no afectar a ListaPresupuestos.jsx ni a ObrasConfirmadas.jsx, que
-// siguen usando el set completo.
+// Referencia, Estado, Por ni Lista (ya se ve al abrir el panel de ítems de
+// la obra picada) — filtrado acá (no en presupuestosShared.jsx) para no
+// afectar a ListaPresupuestos.jsx ni a ObrasConfirmadas.jsx, que siguen
+// usando el set completo.
 const COLS_OBRAS = COLS_ENCABEZADO.filter(
-  (c) => !["telefono1", "referencia", "confirmado", "actualizado_por"].includes(c.key),
+  (c) => !["telefono1", "referencia", "confirmado", "actualizado_por", "lista"].includes(c.key),
 );
 
 // "Obras": clon de ObrasConfirmadas.jsx (mismos endpoints, mismo filtro de
