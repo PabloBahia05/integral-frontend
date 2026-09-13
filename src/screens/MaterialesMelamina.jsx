@@ -24,6 +24,7 @@ const CAMPOS = [
   { campo: "canto2", label: "Canto2", maxLength: 150 },
   { campo: "canto3", label: "Canto3", maxLength: 150 },
   { campo: "canto4", label: "Canto4", maxLength: 150 },
+  { campo: "veta", label: "Veta", maxLength: 20 },
 ];
 
 export default function MaterialesMelamina({ authFetch }) {
