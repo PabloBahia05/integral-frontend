@@ -8,6 +8,7 @@ import Modal from "../Component/Modal";
 import {
   API,
   COLS_ENCABEZADO,
+  COLS_ITEMS,
   cruzarConProduccion,
   PRESUPUESTOS_CSS,
   ItemsPanel,
@@ -43,7 +44,35 @@ const BTN_ACCION_ARCHIVO_STYLE = {
   whiteSpace: "nowrap",
 };
 
-const buildColsObras = (onImagenes, onPlanos) => [
+// Botón desplegable (▶/▼) para el resumen rápido de artículos — independiente
+// de la selección de fila (que sigue disparando ItemsPanel al pie). onToggle
+// recibe la fila entera porque el fetch de items necesita numeropres/revision.
+const buildColsObras = (onImagenes, onPlanos, expandedId, onToggleExpand) => [
+  {
+    key: "__expand__",
+    label: "",
+    width: 36,
+    render: (_, row) => (
+      <button
+        title="Ver artículos de la obra"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleExpand(row);
+        }}
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          fontSize: 12,
+          color: "#3a7abf",
+          padding: 0,
+          lineHeight: 1,
+        }}
+      >
+        {expandedId === row.id ? "▼" : "▶"}
+      </button>
+    ),
+  },
   ...COLS_OBRAS_BASE,
   {
     key: "__imagenes__",
@@ -149,6 +178,18 @@ export default function Obras({
 
   const [presupuestoAEliminar, setPresupuestoAEliminar] = useState(null);
   const [eliminandoPresupuesto, setEliminandoPresupuesto] = useState(false);
+
+  // Fila expandida (resumen rápido de artículos) — a propósito un estado
+  // separado de `selected`: expandir NO selecciona la fila ni dispara el
+  // ItemsPanel de abajo (que sigue funcionando igual, con color/manija/
+  // línea de precio editables). Acá solo mostramos tipo/artículo/medidas.
+  const [expandedId, setExpandedId] = useState(null);
+  const [itemsExpandido, setItemsExpandido] = useState([]);
+  const [loadingExpandido, setLoadingExpandido] = useState(false);
+
+  const toggleExpand = (row) => {
+    setExpandedId((prev) => (prev === row.id ? null : row.id));
+  };
 
   // { numeropres, tipo: "imagen" | "plano", nombre } | null
   const [archivosModal, setArchivosModal] = useState(null);
@@ -265,6 +306,28 @@ export default function Obras({
       .values(),
   );
 
+  // Fetch liviano de ítems para el resumen rápido del desplegable — a
+  // diferencia del efecto de `selected` de más arriba, acá NO se piden
+  // producción ni línea-por-grupo (no hace falta color/manija/precio para
+  // un resumen), así el desplegable abre más rápido que seleccionar la fila.
+  useEffect(() => {
+    if (!expandedId) {
+      setItemsExpandido([]);
+      return;
+    }
+    const fila = filtered.find((f) => f.id === expandedId);
+    if (!fila) return;
+    setLoadingExpandido(true);
+    authFetch(
+      `${API}/tabla-presupuestos?numeropres=${fila.numeropres}&revision=${fila.revision}`,
+    )
+      .then((r) => r.json())
+      .then((data) => setItemsExpandido(Array.isArray(data) ? data : []))
+      .catch(console.error)
+      .finally(() => setLoadingExpandido(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedId, filtered.length]);
+
   const itemsConColor = cruzarConProduccion(
     itemsDetalle,
     produccionSeleccionada,
@@ -371,6 +434,75 @@ export default function Obras({
     }
   };
 
+  // Resumen rápido del desplegable: mismas columnas que el detalle de
+  // ítems (COLS_ITEMS, de presupuestosShared.jsx) pero sin Precio u. ni
+  // Subtotal — eso ya lo muestra el ItemsPanel de abajo al seleccionar la
+  // fila. No usa DataTable (resize/localStorage de anchos sería overkill
+  // acá) sino una tabla simple embebida en la fila expandida.
+  const COLS_RESUMEN_ARTICULOS = COLS_ITEMS.filter(
+    (c) => !["valor1", "_subtotal"].includes(c.key),
+  );
+
+  const renderResumenArticulos = () => {
+    if (loadingExpandido) {
+      return (
+        <p
+          style={{
+            margin: 0,
+            padding: "8px 12px",
+            color: "#4a8ab5",
+            fontFamily: "'Space Mono', monospace",
+            fontSize: 12,
+          }}
+        >
+          ⏳ Cargando artículos...
+        </p>
+      );
+    }
+    if (itemsExpandido.length === 0) {
+      return (
+        <p style={{ margin: 0, padding: "8px 12px", color: "#888", fontSize: 12 }}>
+          — Sin artículos —
+        </p>
+      );
+    }
+    return (
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr>
+            {COLS_RESUMEN_ARTICULOS.map((c) => (
+              <th
+                key={c.key}
+                style={{
+                  textAlign: "left",
+                  padding: "4px 12px",
+                  borderBottom: "1px solid #d8e6f0",
+                  color: "#3a7abf",
+                }}
+              >
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {itemsExpandido.map((it, i) => (
+            <tr key={it.id ?? i}>
+              {COLS_RESUMEN_ARTICULOS.map((c) => (
+                <td
+                  key={c.key}
+                  style={{ padding: "4px 12px", borderBottom: "1px solid #eef4f9" }}
+                >
+                  {c.render ? c.render(it[c.key], it) : it[c.key]}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
@@ -423,11 +555,13 @@ export default function Obras({
         </p>
       ) : (
         <DataTable
-          columns={buildColsObras(abrirImagenes, abrirPlanos)}
+          columns={buildColsObras(abrirImagenes, abrirPlanos, expandedId, toggleExpand)}
           rows={filtered}
           selectedId={selected?.id}
           onSelect={handleSelect}
           storageKey="lista-obras"
+          expandedRowId={expandedId}
+          renderExpandedRow={renderResumenArticulos}
         />
       )}
 
