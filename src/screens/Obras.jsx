@@ -14,6 +14,14 @@ import {
 } from "./presupuestosShared";
 import BotonFacturar from "../Component/BotonFacturar";
 
+// Columnas de la lista principal en "Obras": COLS_ENCABEZADO sin Teléfono,
+// Referencia, Estado ni Por — filtrado acá (no en presupuestosShared.jsx)
+// para no afectar a ListaPresupuestos.jsx ni a ObrasConfirmadas.jsx, que
+// siguen usando el set completo.
+const COLS_OBRAS = COLS_ENCABEZADO.filter(
+  (c) => !["telefono1", "referencia", "confirmado", "actualizado_por"].includes(c.key),
+);
+
 // "Obras": clon de ObrasConfirmadas.jsx (mismos endpoints, mismo filtro de
 // 1 fila por numeropres con al menos una revisión confirmada) pero sin
 // precio en la lista principal — usa COLS_ENCABEZADO (sin la columna
@@ -389,7 +397,7 @@ export default function Obras({
         </p>
       ) : (
         <DataTable
-          columns={COLS_ENCABEZADO}
+          columns={COLS_OBRAS}
           rows={filtered}
           selectedId={selected?.id}
           onSelect={handleSelect}
