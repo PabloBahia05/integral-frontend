@@ -435,12 +435,12 @@ export default function Obras({
   };
 
   // Resumen rápido del desplegable: mismas columnas que el detalle de
-  // ítems (COLS_ITEMS, de presupuestosShared.jsx) pero sin Precio u. ni
-  // Subtotal — eso ya lo muestra el ItemsPanel de abajo al seleccionar la
-  // fila. No usa DataTable (resize/localStorage de anchos sería overkill
-  // acá) sino una tabla simple embebida en la fila expandida.
+  // ítems (COLS_ITEMS, de presupuestosShared.jsx) pero sin Sección, Precio
+  // u. ni Subtotal — eso ya lo muestra el ItemsPanel de abajo al
+  // seleccionar la fila. No usa DataTable (resize/localStorage de anchos
+  // sería overkill acá) sino una tabla simple embebida en la fila expandida.
   const COLS_RESUMEN_ARTICULOS = COLS_ITEMS.filter(
-    (c) => !["valor1", "_subtotal"].includes(c.key),
+    (c) => !["tipo", "valor1", "_subtotal"].includes(c.key),
   );
 
   const renderResumenArticulos = () => {
