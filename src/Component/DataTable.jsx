@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from "react";
+import { Fragment, useRef, useState, useCallback, useEffect } from "react";
 
 const MIN_COL_WIDTH = 40;
 const DEFAULT_COL_WIDTH = 120;
@@ -36,6 +36,12 @@ export default function DataTable({
   selectedId,
   onSelect,
   storageKey,
+  // Fila expandible (opcional, hoy solo la usa Obras.jsx para el resumen
+  // rápido de artículos). Si expandedRowId es null/undefined no se agrega
+  // ninguna fila extra, así que el resto de las pantallas que usan
+  // DataTable sin pasar estos dos props quedan exactamente igual.
+  expandedRowId = null,
+  renderExpandedRow,
 }) {
   // Anchos por columna (key -> px). Arranca con el ancho guardado en
   // localStorage (si hay storageKey y hay algo guardado para esa columna),
@@ -177,24 +183,38 @@ export default function DataTable({
             </tr>
           ) : (
             rows.map((row) => (
-              <tr
-                key={row.id}
-                className={selectedId === row.id ? "selected" : ""}
-                onClick={() => onSelect(row)}
-              >
-                {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    style={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {col.render ? col.render(row[col.key], row) : row[col.key]}
-                  </td>
-                ))}
-              </tr>
+              <Fragment key={row.id}>
+                <tr
+                  className={selectedId === row.id ? "selected" : ""}
+                  onClick={() => onSelect(row)}
+                >
+                  {columns.map((col) => (
+                    <td
+                      key={col.key}
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {col.render ? col.render(row[col.key], row) : row[col.key]}
+                    </td>
+                  ))}
+                </tr>
+                {expandedRowId != null &&
+                  row.id === expandedRowId &&
+                  renderExpandedRow && (
+                    <tr className="expanded-row">
+                      <td
+                        colSpan={columns.length}
+                        style={{ whiteSpace: "normal", cursor: "default" }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {renderExpandedRow(row)}
+                      </td>
+                    </tr>
+                  )}
+              </Fragment>
             ))
           )}
         </tbody>
