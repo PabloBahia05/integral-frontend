@@ -14,15 +14,22 @@ import {
 } from "./presupuestosShared";
 
 // Columnas de la lista principal en "Obras": COLS_ENCABEZADO sin Teléfono,
-// Referencia, Estado, Por ni Lista (ya se ve al abrir el panel de ítems de
-// la obra picada) — filtrado acá (no en presupuestosShared.jsx) para no
-// afectar a ListaPresupuestos.jsx ni a ObrasConfirmadas.jsx, que siguen
-// usando el set completo. Se antepone una columna de acciones con los
-// botones "Imágenes" y "Planos" por renglón (mismo patrón que la columna
-// "__ver__" de Productos.jsx).
-const COLS_OBRAS_BASE = COLS_ENCABEZADO.filter(
-  (c) => !["telefono1", "referencia", "confirmado", "actualizado_por", "lista"].includes(c.key),
-);
+// Referencia, Estado, Por, Lista ni Última modificación (ya se ve al abrir
+// el panel de ítems de la obra picada) — filtrado acá (no en
+// presupuestosShared.jsx) para no afectar a ListaPresupuestos.jsx ni a
+// ObrasConfirmadas.jsx, que siguen usando el set completo. Reconstruimos
+// cada columna que necesitamos reordenar/renombrar en un objeto nuevo (no
+// mutamos las entradas de COLS_ENCABEZADO) para no pisarle el label o el
+// orden a las otras dos pantallas, que comparten el mismo array en memoria.
+// Orden final pedido: Cliente, N° obra, Rev, Línea, Imágenes, Planos.
+const colEncabezadoPorKey = (key) => COLS_ENCABEZADO.find((c) => c.key === key);
+
+const COLS_OBRAS_BASE = [
+  colEncabezadoPorKey("nombre"), // Cliente
+  { ...colEncabezadoPorKey("numeropres"), label: "N° obra" },
+  colEncabezadoPorKey("revision"), // Rev.
+  colEncabezadoPorKey("linea1"), // Línea (usa formatLineas vía su propio render)
+];
 
 const BTN_ACCION_ARCHIVO_STYLE = {
   background: "none",
@@ -37,36 +44,39 @@ const BTN_ACCION_ARCHIVO_STYLE = {
 };
 
 const buildColsObras = (onImagenes, onPlanos) => [
+  ...COLS_OBRAS_BASE,
   {
-    key: "__archivos__",
-    label: "",
-    width: 165,
+    key: "__imagenes__",
+    label: "Imágenes",
     render: (_, row) => (
-      <div style={{ display: "flex", gap: 6 }}>
-        <button
-          title="Imágenes de la obra"
-          onClick={(e) => {
-            e.stopPropagation();
-            onImagenes(row);
-          }}
-          style={BTN_ACCION_ARCHIVO_STYLE}
-        >
-          🖼️ Imágenes
-        </button>
-        <button
-          title="Planos de la obra"
-          onClick={(e) => {
-            e.stopPropagation();
-            onPlanos(row);
-          }}
-          style={BTN_ACCION_ARCHIVO_STYLE}
-        >
-          📐 Planos
-        </button>
-      </div>
+      <button
+        title="Imágenes de la obra"
+        onClick={(e) => {
+          e.stopPropagation();
+          onImagenes(row);
+        }}
+        style={BTN_ACCION_ARCHIVO_STYLE}
+      >
+        🖼️ Imágenes
+      </button>
     ),
   },
-  ...COLS_OBRAS_BASE,
+  {
+    key: "__planos__",
+    label: "Planos",
+    render: (_, row) => (
+      <button
+        title="Planos de la obra"
+        onClick={(e) => {
+          e.stopPropagation();
+          onPlanos(row);
+        }}
+        style={BTN_ACCION_ARCHIVO_STYLE}
+      >
+        📐 Planos
+      </button>
+    ),
+  },
 ];
 
 // ── Galería de archivos por obra (Imágenes / Planos) ────────────────────
