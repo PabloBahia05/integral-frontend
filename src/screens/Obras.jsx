@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import DataTable from "../Component/DataTable";
 import ActionBar from "../Component/ActionBar";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
+import Modal from "../Component/Modal";
 import {
   API,
   COLS_ENCABEZADO,
@@ -16,10 +17,85 @@ import {
 // Referencia, Estado, Por ni Lista (ya se ve al abrir el panel de ítems de
 // la obra picada) — filtrado acá (no en presupuestosShared.jsx) para no
 // afectar a ListaPresupuestos.jsx ni a ObrasConfirmadas.jsx, que siguen
-// usando el set completo.
-const COLS_OBRAS = COLS_ENCABEZADO.filter(
+// usando el set completo. Se antepone una columna de acciones con los
+// botones "Imágenes" y "Planos" por renglón (mismo patrón que la columna
+// "__ver__" de Productos.jsx).
+const COLS_OBRAS_BASE = COLS_ENCABEZADO.filter(
   (c) => !["telefono1", "referencia", "confirmado", "actualizado_por", "lista"].includes(c.key),
 );
+
+const BTN_ACCION_ARCHIVO_STYLE = {
+  background: "none",
+  border: "1px solid #b8cfe0",
+  borderRadius: 4,
+  cursor: "pointer",
+  fontSize: 12,
+  padding: "3px 7px",
+  color: "#3a7abf",
+  lineHeight: 1,
+  whiteSpace: "nowrap",
+};
+
+const buildColsObras = (onImagenes, onPlanos) => [
+  {
+    key: "__archivos__",
+    label: "",
+    width: 165,
+    render: (_, row) => (
+      <div style={{ display: "flex", gap: 6 }}>
+        <button
+          title="Imágenes de la obra"
+          onClick={(e) => {
+            e.stopPropagation();
+            onImagenes(row);
+          }}
+          style={BTN_ACCION_ARCHIVO_STYLE}
+        >
+          🖼️ Imágenes
+        </button>
+        <button
+          title="Planos de la obra"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlanos(row);
+          }}
+          style={BTN_ACCION_ARCHIVO_STYLE}
+        >
+          📐 Planos
+        </button>
+      </div>
+    ),
+  },
+  ...COLS_OBRAS_BASE,
+];
+
+// ── Galería de archivos por obra (Imágenes / Planos) ────────────────────
+// Sube contra /obras/:numeropres/archivos (ver
+// obras/obras-archivos.controller.js en el backend). Igual que
+// uploadImageToCloud en Productos.jsx, la subida NO usa authFetch (que
+// fuerza Content-Type: application/json y rompe el multipart/form-data) —
+// pega directo con fetch + el token crudo. Listar y borrar sí usan
+// authFetch porque no llevan body multipart.
+async function subirArchivoObra(numeropres, tipo, file, token) {
+  const formData = new FormData();
+  formData.append("archivo", file);
+  formData.append("tipo", tipo);
+  const res = await fetch(`${API}/obras/${numeropres}/archivos`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!res.ok) throw new Error("Error al subir archivo");
+  return res.json();
+}
+
+const getIconoArchivo = (archivo) => {
+  if (archivo.resource_type === "image") return "🖼️";
+  const ext = (archivo.nombre_original || "").split(".").pop()?.toLowerCase();
+  if (ext === "pdf") return "📄";
+  if (ext === "dwg" || ext === "dxf") return "📐";
+  return "📎";
+};
 
 // "Obras": clon de ObrasConfirmadas.jsx (mismos endpoints, mismo filtro de
 // 1 fila por numeropres con al menos una revisión confirmada) pero sin
@@ -33,6 +109,7 @@ export default function Obras({
   onAbrirPresupuesto,
   onNuevoPresupuesto,
   authFetch,
+  token,
 }) {
   // "Obras Confirmadas" necesita 1 fila POR REVISIÓN confirmada (una obra
   // puede tener varias revisiones ya cerradas), así que usa un endpoint
@@ -62,6 +139,13 @@ export default function Obras({
 
   const [presupuestoAEliminar, setPresupuestoAEliminar] = useState(null);
   const [eliminandoPresupuesto, setEliminandoPresupuesto] = useState(false);
+
+  // { numeropres, tipo: "imagen" | "plano", nombre } | null
+  const [archivosModal, setArchivosModal] = useState(null);
+  const abrirImagenes = (row) =>
+    setArchivosModal({ numeropres: row.numeropres, tipo: "imagen", nombre: row.nombre });
+  const abrirPlanos = (row) =>
+    setArchivosModal({ numeropres: row.numeropres, tipo: "plano", nombre: row.nombre });
 
   // ── Fetch encabezados ──────────────────────────────────────────────────
 
@@ -329,7 +413,7 @@ export default function Obras({
         </p>
       ) : (
         <DataTable
-          columns={COLS_OBRAS}
+          columns={buildColsObras(abrirImagenes, abrirPlanos)}
           rows={filtered}
           selectedId={selected?.id}
           onSelect={handleSelect}
@@ -375,6 +459,263 @@ export default function Obras({
           }
         />
       )}
+
+      {archivosModal && (
+        <ArchivosObraModal
+          numeropres={archivosModal.numeropres}
+          tipo={archivosModal.tipo}
+          nombreObra={archivosModal.nombre}
+          token={token}
+          authFetch={authFetch}
+          onClose={() => setArchivosModal(null)}
+        />
+      )}
     </>
+  );
+}
+
+// ── Modal de galería (Imágenes / Planos) ──────────────────────────────────
+
+function ArchivosObraModal({ numeropres, tipo, nombreObra, token, authFetch, onClose }) {
+  const [archivos, setArchivos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState("");
+  const [archivoAEliminar, setArchivoAEliminar] = useState(null);
+  const [eliminando, setEliminando] = useState(false);
+  const inputRef = useRef(null);
+
+  const esImagen = tipo === "imagen";
+  const titulo = esImagen ? "Imágenes de la obra" : "Planos de la obra";
+  const accept = esImagen ? "image/*" : "image/*,.pdf,application/pdf,.dwg,.dxf";
+
+  useEffect(() => {
+    setLoading(true);
+    authFetch(`${API}/obras/${numeropres}/archivos?tipo=${tipo}`)
+      .then((r) => r.json())
+      .then((data) => setArchivos(Array.isArray(data) ? data : []))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numeropres, tipo]);
+
+  const handleFiles = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setUploading(true);
+    setError("");
+    try {
+      // Secuencial (no Promise.all) para no saturar Cloudinary con varios
+      // archivos pesados (planos/DWG) al mismo tiempo.
+      for (const file of files) {
+        const nuevo = await subirArchivoObra(numeropres, tipo, file, token);
+        setArchivos((prev) => [nuevo, ...prev]);
+      }
+    } catch (e) {
+      console.error("Error subiendo archivo:", e);
+      setError("No se pudo subir uno o más archivos.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!archivoAEliminar) return;
+    setEliminando(true);
+    try {
+      const res = await authFetch(
+        `${API}/obras/archivos/${archivoAEliminar.id}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setArchivos((prev) => prev.filter((a) => a.id !== archivoAEliminar.id));
+      setArchivoAEliminar(null);
+    } catch (e) {
+      console.error("Error borrando archivo:", e);
+      alert("No se pudo borrar el archivo. Revisá la consola.");
+    } finally {
+      setEliminando(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={`${titulo}${nombreObra ? " — " + nombreObra : ""}`}
+      onClose={onClose}
+    >
+      <div
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          handleFiles(e.dataTransfer.files);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onClick={() => !uploading && inputRef.current?.click()}
+        style={{
+          border: `2px dashed ${dragging ? "#3a7abf" : "#b8cfe0"}`,
+          borderRadius: 8,
+          padding: "20px",
+          textAlign: "center",
+          cursor: uploading ? "default" : "pointer",
+          background: dragging ? "#eef6fc" : "#fafcfe",
+          color: "#4a8ab5",
+          fontFamily: "'Space Mono',monospace",
+          fontSize: 13,
+          marginBottom: 16,
+        }}
+      >
+        {uploading
+          ? "⏳ Subiendo..."
+          : dragging
+            ? "Soltá los archivos acá"
+            : `Arrastrá o hacé clic para subir ${esImagen ? "imágenes" : "planos (PDF, imagen o DWG)"}`}
+        <input
+          ref={inputRef}
+          type="file"
+          accept={accept}
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
+      {error && (
+        <p style={{ color: "red", fontSize: "0.85rem", marginTop: -8 }}>
+          {error}
+        </p>
+      )}
+
+      {loading ? (
+        <p style={{ color: "#4a8ab5" }}>⏳ Cargando...</p>
+      ) : archivos.length === 0 ? (
+        <p style={{ color: "#888" }}>
+          Todavía no hay {esImagen ? "imágenes" : "planos"} para esta obra.
+        </p>
+      ) : esImagen ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+            gap: 10,
+          }}
+        >
+          {archivos.map((a) => (
+            <div
+              key={a.id}
+              style={{
+                position: "relative",
+                border: "1px solid #e0e8f0",
+                borderRadius: 6,
+                overflow: "hidden",
+              }}
+            >
+              <a href={a.url} target="_blank" rel="noreferrer">
+                <img
+                  src={a.url}
+                  alt={a.nombre_original || "imagen"}
+                  style={{
+                    width: "100%",
+                    height: 100,
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              </a>
+              <button
+                title="Borrar"
+                onClick={() => setArchivoAEliminar(a)}
+                style={{
+                  position: "absolute",
+                  top: 4,
+                  right: 4,
+                  background: "rgba(255,255,255,0.9)",
+                  border: "1px solid #e0a0a0",
+                  borderRadius: 4,
+                  color: "#c0392b",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  lineHeight: 1,
+                  padding: "3px 6px",
+                }}
+              >
+                🗑️
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {archivos.map((a) => (
+            <div
+              key={a.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                border: "1px solid #e0e8f0",
+                borderRadius: 6,
+                padding: "8px 10px",
+              }}
+            >
+              <span style={{ fontSize: 20 }}>{getIconoArchivo(a)}</span>
+              <a
+                href={a.url}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  flex: 1,
+                  color: "#3a7abf",
+                  textDecoration: "none",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {a.nombre_original || "Ver archivo"}
+              </a>
+              <button
+                title="Borrar"
+                onClick={() => setArchivoAEliminar(a)}
+                style={{
+                  background: "none",
+                  border: "1px solid #e0a0a0",
+                  borderRadius: 4,
+                  color: "#c0392b",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  padding: "3px 8px",
+                }}
+              >
+                🗑️
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {archivoAEliminar && (
+        <ConfirmDelete
+          item={archivoAEliminar}
+          title="¿Eliminar archivo?"
+          message={
+            <>
+              Vas a eliminar{" "}
+              <strong>{archivoAEliminar.nombre_original || "este archivo"}</strong>.
+              Esta acción no se puede deshacer.
+            </>
+          }
+          onConfirm={handleDelete}
+          onClose={() => !eliminando && setArchivoAEliminar(null)}
+        />
+      )}
+    </Modal>
   );
 }
