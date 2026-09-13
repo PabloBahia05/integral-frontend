@@ -10,9 +10,7 @@ import {
   cruzarConProduccion,
   PRESUPUESTOS_CSS,
   ItemsPanel,
-  HistorialModal,
 } from "./presupuestosShared";
-import BotonFacturar from "../Component/BotonFacturar";
 
 // Columnas de la lista principal en "Obras": COLS_ENCABEZADO sin Teléfono,
 // Referencia, Estado, Por ni Lista (ya se ve al abrir el panel de ítems de
@@ -35,7 +33,6 @@ export default function Obras({
   onAbrirPresupuesto,
   onNuevoPresupuesto,
   authFetch,
-  onFaltanDatosCliente,
 }) {
   // "Obras Confirmadas" necesita 1 fila POR REVISIÓN confirmada (una obra
   // puede tener varias revisiones ya cerradas), así que usa un endpoint
@@ -60,15 +57,8 @@ export default function Obras({
   // Formato { "ALACENAS": 0, "BAJO MESADA": 1 } — 0/1/2 → valor1/valor2/valor3.
   const [lineaPorGrupo, setLineaPorGrupo] = useState({});
 
-  const [revisiones, setRevisiones] = useState([]);
-  const [loadingRev, setLoadingRev] = useState(false);
-  const [modalHistorial, setModalHistorial] = useState(false);
-
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
-
-  const [revisionAEliminar, setRevisionAEliminar] = useState(null);
-  const [eliminandoRevision, setEliminandoRevision] = useState(false);
 
   const [presupuestoAEliminar, setPresupuestoAEliminar] = useState(null);
   const [eliminandoPresupuesto, setEliminandoPresupuesto] = useState(false);
@@ -136,25 +126,6 @@ export default function Obras({
       .finally(() => setLoadingItems(false));
   }, [selected]);
 
-  // ── Fetch revisiones al abrir historial ───────────────────────────────
-
-  const abrirHistorial = () => {
-    if (!selected) return;
-    setLoadingRev(true);
-    setModalHistorial(true);
-    authFetch(`${API}/tabla-presupuestos/revisiones/${selected.numeropres}`)
-      .then((r) => r.json())
-      .then((data) =>
-        setRevisiones(
-          Array.isArray(data)
-            ? data.map((r) => ({ ...r, id: `${r.numeropres}-${r.revision}` }))
-            : [],
-        ),
-      )
-      .catch(console.error)
-      .finally(() => setLoadingRev(false));
-  };
-
   // ── Selección ──────────────────────────────────────────────────────────
 
   const handleSelect = (row) => {
@@ -187,8 +158,8 @@ export default function Obras({
   // confirmada, no 1 por presupuesto — así, si un presupuesto tiene varias
   // revisiones ya confirmadas, aparecía repetido en la tabla. Acá lo
   // colapsamos a la última revisión de cada numeropres, igual que en "Lista
-  // Presupuestos"; el historial completo sigue disponible con el botón
-  // "Revisiones". El SELECT del backend ya viene ordenado numeropres DESC,
+  // Presupuestos" (acá no hay botón de historial de revisiones). El SELECT
+  // del backend ya viene ordenado numeropres DESC,
   // revision DESC, así que la primera ocurrencia de cada numeropres en el
   // array ya es la más nueva.
   const filtered = Array.from(
@@ -279,30 +250,6 @@ export default function Obras({
     }
   };
 
-  // ── DELETE revisión individual ────────────────────────────────────────
-
-  const handleDeleteRevision = async () => {
-    if (!revisionAEliminar) return;
-    setEliminandoRevision(true);
-    try {
-      const res = await authFetch(
-        `${API}/tabla-presupuestos/revision/${revisionAEliminar.numeropres}/${revisionAEliminar.revision}`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setRevisiones((prev) =>
-        prev.filter((r) => r.id !== revisionAEliminar.id),
-      );
-      fetchEncabezados();
-      setRevisionAEliminar(null);
-    } catch (e) {
-      console.error("Error borrando revisión:", e);
-      alert("No se pudo borrar la revisión. Revisá la consola.");
-    } finally {
-      setEliminandoRevision(false);
-    }
-  };
-
   // ── DELETE presupuesto completo ───────────────────────────────────────
 
   const handleDeletePresupuesto = async () => {
@@ -358,14 +305,6 @@ export default function Obras({
           search={search}
           onSearch={setSearch}
         />
-        <button
-          className="btn-historial"
-          disabled={!selected}
-          onClick={abrirHistorial}
-          title="Ver historial de revisiones"
-        >
-          🕓 Revisiones
-        </button>
         {onAbrirPresupuesto && (
           <button
             className="btn-abrir"
@@ -375,14 +314,6 @@ export default function Obras({
           >
             📝 Abrir
           </button>
-        )}
-        {selected && (
-          <BotonFacturar
-            numeropres={selected.numeropres}
-            authFetch={authFetch}
-            onFacturaGenerada={fetchEncabezados}
-            onFaltanDatosCliente={onFaltanDatosCliente}
-          />
         )}
       </div>
 
@@ -422,25 +353,6 @@ export default function Obras({
         lineaPorGrupo={lineaPorGrupo}
         onChangeLineaGrupo={handleLineaGrupoChange}
       />
-
-      {modalHistorial && selected && (
-        <HistorialModal
-          selected={selected}
-          loadingRev={loadingRev}
-          revisiones={revisiones}
-          onClose={() => setModalHistorial(false)}
-          onAbrirPresupuesto={onAbrirPresupuesto}
-          onEliminarRevision={(row) => setRevisionAEliminar(row)}
-        />
-      )}
-
-      {revisionAEliminar && (
-        <ConfirmDelete
-          item={revisionAEliminar}
-          onConfirm={handleDeleteRevision}
-          onClose={() => !eliminandoRevision && setRevisionAEliminar(null)}
-        />
-      )}
 
       {presupuestoAEliminar && (
         <ConfirmDelete
