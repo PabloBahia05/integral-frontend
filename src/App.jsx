@@ -12,6 +12,7 @@ import PresupuestoAmoblamiento from "./screens/PresupuestoAmoblamiento";
 import PresupuestoNuevo from "./screens/PresupuestoNuevo";
 import ListaPresupuestos from "./screens/ListaPresupuestos";
 import ObrasConfirmadas from "./screens/ObrasConfirmadas";
+import Obras from "./screens/Obras";
 import Produccion from "./screens/Produccion";
 import ModulosDomus from "./screens/ModulosDomus";
 import MaterialesMelamina from "./screens/MaterialesMelamina";
@@ -50,6 +51,7 @@ const SCREENS = {
   "lista-presupuestos-2": { label: "LISTA PRESUPUESTOS", icon: "⚡" },
   "mueble-especial": { label: "MUEBLE ESPECIAL", icon: "🪚" },
   "obras-confirmadas": { label: "OBRAS CONFIRMADAS", icon: "✅" },
+  obras: { label: "OBRAS", icon: "🏗️" },
   produccion: { label: "PRODUCCIÓN", icon: "🏭" },
   "modulos-domus": { label: "MÓDULOS DOMUS", icon: "🏠" },
   "materiales-melamina": { label: "MATERIALES MELAMINA", icon: "🎨" },
@@ -80,6 +82,7 @@ const PANTALLAS_MENU = [
   { id: "lista-presupuestos-2", label: "LISTA PRESUPUESTOS", icon: "⚡", color: "#7b61ff", ubicacionDefault: "principal" },
   { id: "cuenta-corriente", label: "CLIENTES ACTIVOS", icon: "💰", color: "#e67e22", ubicacionDefault: "principal" },
   { id: "obras-confirmadas", label: "OBRAS CONFIRMADAS", icon: "✅", color: "#00b4d8", ubicacionDefault: "principal" },
+  { id: "obras", label: "OBRAS", icon: "🏗️", color: "#0077b6", ubicacionDefault: "principal" },
   { id: "produccion", label: "PRODUCCIÓN", icon: "🏭", color: "#8d6e63", ubicacionDefault: "principal" },
   { id: "modulos-domus", label: "MÓDULOS DOMUS", icon: "🏠", color: "#5c6b73", ubicacionDefault: "principal" },
   { id: "materiales-melamina", label: "MATERIALES MELAMINA", icon: "🎨", color: "#c2185b", ubicacionDefault: "principal" },
@@ -1242,6 +1245,27 @@ function App() {
             )}
             {screen === "obras-confirmadas" && (
               <ObrasConfirmadas
+                onAbrirPresupuesto={(row) => {
+                  setPresupuestoAbierto(row);
+                  setScreen("presupuesto-nuevo");
+                }}
+                onNuevoPresupuesto={() => {
+                  setPresupuestoAbierto(null);
+                  setScreen("presupuesto-nuevo");
+                }}
+                authFetch={authFetch}
+                onFaltanDatosCliente={(info) =>
+                  irACliente(
+                    info.codcliente,
+                    info.nombreCliente,
+                    null,
+                    info.faltantes?.map((f) => f.field),
+                  )
+                }
+              />
+            )}
+            {screen === "obras" && (
+              <Obras
                 onAbrirPresupuesto={(row) => {
                   setPresupuestoAbierto(row);
                   setScreen("presupuesto-nuevo");
