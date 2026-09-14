@@ -98,7 +98,7 @@ const PANTALLAS_MENU = [
   { id: "produccion", label: "Producción", icon: "🏭", ubicacionDefault: "principal" },
   { id: "modulos-domus", label: "Módulos Domus", icon: "🏠", ubicacionDefault: "principal" },
   { id: "visor-dwg", label: "Visor 3D Módulos", icon: "📐", ubicacionDefault: "lateral" },
-  { id: "sketchup", label: "SketchUp", icon: "🧊", ubicacionDefault: "lateral" },
+  { id: "sketchup", label: "SketchUp", icon: "🧊", ubicacionDefault: "principal" },
   { id: "chat", label: "Chat", icon: "💬", ubicacionDefault: "principal" },
   { id: "presupuesto-mamparas", label: "Presup. Mamparas", icon: "🪟", ubicacionDefault: "lateral" },
   { id: "presupuesto-muebles", label: "Presup. Muebles", icon: "🪵", ubicacionDefault: "lateral" },
