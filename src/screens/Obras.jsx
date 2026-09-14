@@ -10,6 +10,8 @@ import {
   COLS_ENCABEZADO,
   COLS_ITEMS,
   cruzarConProduccion,
+  grupoEfectivo,
+  lineasActivasDe,
   PRESUPUESTOS_CSS,
   ItemsPanel,
 } from "./presupuestosShared";
@@ -186,6 +188,10 @@ export default function Obras({
   const [expandedId, setExpandedId] = useState(null);
   const [itemsExpandido, setItemsExpandido] = useState([]);
   const [loadingExpandido, setLoadingExpandido] = useState(false);
+  // Línea por grupo de la fila EXPANDIDA (resumen rápido) — estado propio,
+  // separado de lineaPorGrupo (que es de la fila SELECCIONADA/ItemsPanel),
+  // porque ambas pueden estar activas a la vez sobre obras distintas.
+  const [lineaPorGrupoExpandido, setLineaPorGrupoExpandido] = useState({});
 
   const toggleExpand = (row) => {
     setExpandedId((prev) => (prev === row.id ? null : row.id));
@@ -306,13 +312,15 @@ export default function Obras({
       .values(),
   );
 
-  // Fetch liviano de ítems + producción para el resumen rápido del
-  // desplegable — sí necesitamos producción ahora para el código
-  // (_produccionCodpro, via cruzarConProduccion), pero seguimos sin pedir
-  // línea-por-grupo: no hace falta para este resumen.
+  // Fetch liviano de ítems + producción + línea-por-grupo para el resumen
+  // rápido del desplegable — producción da el código (_produccionCodpro y
+  // _produccionColor, vía cruzarConProduccion) y linea-grupo permite
+  // resolver qué línea de precio quedó confirmada para el grupo de cada
+  // ítem (columnas "Color" y "Línea" del resumen).
   useEffect(() => {
     if (!expandedId) {
       setItemsExpandido([]);
+      setLineaPorGrupoExpandido({});
       return;
     }
     const fila = filtered.find((f) => f.id === expandedId);
@@ -325,13 +333,17 @@ export default function Obras({
       authFetch(
         `${API}/produccion?numeropres=${fila.numeropres}&revision=${fila.revision}`,
       ).then((r) => r.json()),
+      authFetch(
+        `${API}/tabla-presupuestos/linea-grupo/${fila.numeropres}/${fila.revision}`,
+      ).then((r) => r.json()),
     ])
-      .then(([items, produccion]) => {
+      .then(([items, produccion, lineaGrupo]) => {
         const cruzados = cruzarConProduccion(
           Array.isArray(items) ? items : [],
           Array.isArray(produccion) ? produccion : [],
         );
         setItemsExpandido(cruzados);
+        setLineaPorGrupoExpandido(lineaGrupo?.lineaPorGrupo ?? {});
       })
       .catch(console.error)
       .finally(() => setLoadingExpandido(false));
@@ -445,21 +457,53 @@ export default function Obras({
   };
 
   // Resumen rápido del desplegable: variante de COLS_ITEMS (de
-  // presupuestosShared.jsx) sin Sección, Precio u. ni Subtotal — eso ya lo
-  // muestra el ItemsPanel de abajo al seleccionar la fila — y con
-  // "Artículo" reemplazado por "Código" (codpro, de la tabla producción,
-  // cruzado en el fetch de arriba vía cruzarConProduccion). No usa
-  // DataTable (resize/localStorage de anchos sería overkill acá) sino una
-  // tabla simple embebida en la fila expandida.
+  // presupuestosShared.jsx) sin Sección ni Precio u./Subtotal — eso ya lo
+  // muestra el ItemsPanel de abajo al seleccionar la fila — con "Artículo"
+  // reemplazado por "Código" (codpro, de la tabla producción, cruzado en
+  // el fetch de arriba vía cruzarConProduccion) y con Color/Línea sumadas
+  // al final. No usa DataTable (resize/localStorage de anchos sería
+  // overkill acá) sino una tabla simple embebida en la fila expandida, con
+  // `width` fijo por columna (salvo Descripción, que se lleva el resto del
+  // ancho) para que las columnas angostas no se estiren de más.
+  const filaExpandida = filtered.find((f) => f.id === expandedId);
+  const lineasActivasExpandido = lineasActivasDe(filaExpandida ?? {});
+
+  const nombreColorDe = (codartint) => {
+    if (!codartint) return "—";
+    const m = melaminas.find((m) => m.codartint === codartint);
+    return m?.articulo ?? codartint;
+  };
+
+  const nombreLineaDe = (it) => {
+    const idx = lineaPorGrupoExpandido?.[grupoEfectivo(it)];
+    if (idx == null) return "—";
+    const linea = lineasActivasExpandido.find((l) => l.idx === idx);
+    return linea?.nombre ?? "—";
+  };
+
   const COLS_RESUMEN_ARTICULOS = [
     {
       key: "_produccionCodpro",
       label: "Código",
+      width: 90,
       render: (v) => v ?? "—",
     },
-    ...COLS_ITEMS.filter((c) =>
-      ["nombreart", "cantidad", "ancho", "alto"].includes(c.key),
-    ),
+    ...COLS_ITEMS.filter((c) => c.key === "nombreart"), // Descripción — sin width, se lleva el resto
+    ...COLS_ITEMS.filter((c) => c.key === "cantidad").map((c) => ({ ...c, width: 60 })),
+    ...COLS_ITEMS.filter((c) => c.key === "ancho").map((c) => ({ ...c, width: 70 })),
+    ...COLS_ITEMS.filter((c) => c.key === "alto").map((c) => ({ ...c, width: 70 })),
+    {
+      key: "_color",
+      label: "Color",
+      width: 150,
+      render: (_, it) => nombreColorDe(it._produccionColor),
+    },
+    {
+      key: "_linea",
+      label: "Línea",
+      width: 130,
+      render: (_, it) => nombreLineaDe(it),
+    },
   ];
 
   const renderResumenArticulos = () => {
@@ -486,7 +530,14 @@ export default function Obras({
       );
     }
     return (
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+      <table
+        style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse", fontSize: 12 }}
+      >
+        <colgroup>
+          {COLS_RESUMEN_ARTICULOS.map((c) => (
+            <col key={c.key} style={c.width ? { width: c.width } : undefined} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             {COLS_RESUMEN_ARTICULOS.map((c) => (
@@ -497,6 +548,9 @@ export default function Obras({
                   padding: "4px 12px",
                   borderBottom: "1px solid #d8e6f0",
                   color: "#3a7abf",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {c.label}
@@ -510,7 +564,13 @@ export default function Obras({
               {COLS_RESUMEN_ARTICULOS.map((c) => (
                 <td
                   key={c.key}
-                  style={{ padding: "4px 12px", borderBottom: "1px solid #eef4f9" }}
+                  style={{
+                    padding: "4px 12px",
+                    borderBottom: "1px solid #eef4f9",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
                 >
                   {c.render ? c.render(it[c.key], it) : it[c.key]}
                 </td>

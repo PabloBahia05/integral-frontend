@@ -298,13 +298,13 @@ export const PRESUPUESTOS_CSS = `
 // Grupo efectivo de un ítem del panel de detalle: el `grupo` guardado en
 // tabla_presupuestos si existe, si no la sección (`tipo`) — mismo criterio
 // de fallback que `grupoDe()` en TablaArticulos.jsx.
-const grupoEfectivo = (it) =>
+export const grupoEfectivo = (it) =>
   it.grupo && String(it.grupo).trim() ? it.grupo : (it.tipo ?? "");
 
 // Líneas de precio ofrecidas para este presupuesto (nombres linea1/2/3 del
 // encabezado, sin las que estén vacías), cada una con la key de columna
 // (valor1/valor2/valor3) donde vive su precio en cada ítem.
-const lineasActivasDe = (selected) =>
+export const lineasActivasDe = (selected) =>
   [1, 2, 3]
     .map((n) => ({ idx: n - 1, nombre: selected?.[`linea${n}`], valorKey: `valor${n}` }))
     .filter((l) => l.nombre);
