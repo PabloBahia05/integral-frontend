@@ -27,6 +27,7 @@ import ActualizarPreciosExcel from "./screens/ActualizarPreciosExcel";
 import VehiculosMantenimiento from "./screens/VehiculosMantenimiento";
 import CuentaCorriente from "./screens/CuentaCorriente";
 import VisorDWGPage from "./screens/VisorDWGPage";
+import SketchUp from "./screens/SketchUp";
 import Anviz from "./screens/Anviz";
 import FichadasAnviz from "./screens/FichadasAnviz";
 import FlujoFondos from "./screens/FlujoFondos";
@@ -65,6 +66,7 @@ const SCREENS = {
   "vehiculos-mantenimiento": { label: "VEHÍCULOS - MANTENIMIENTO", icon: "🚚" },
   "cuenta-corriente": { label: "CLIENTES ACTIVOS", icon: "💰" },
   "visor-dwg": { label: "VISOR 3D MÓDULOS", icon: "📐" },
+  sketchup: { label: "SKETCHUP", icon: "🧊" },
   "flujo-fondos": { label: "FLUJO DE FONDOS", icon: "💵" },
   chat: { label: "CHAT", icon: "💬" },
 };
@@ -87,6 +89,7 @@ const PANTALLAS_MENU = [
   { id: "modulos-domus", label: "MÓDULOS DOMUS", icon: "🏠", color: "#5c6b73", ubicacionDefault: "principal" },
   { id: "materiales-melamina", label: "MATERIALES MELAMINA", icon: "🎨", color: "#c2185b", ubicacionDefault: "principal" },
   { id: "visor-dwg", label: "VISOR 3D MÓDULOS", icon: "📐", color: "#00838f", ubicacionDefault: "lateral" },
+  { id: "sketchup", label: "SKETCHUP", icon: "🧊", color: "#ff8c42", ubicacionDefault: "lateral" },
   { id: "chat", label: "CHAT", icon: "💬", color: "#25d366", ubicacionDefault: "principal" },
   { id: "presupuesto-mamparas", label: "PRESUPUESTO MAMPARAS", icon: "🪟", color: "#4895ef", ubicacionDefault: "lateral" },
   { id: "presupuesto-muebles", label: "PRESUPUESTO MUEBLES", icon: "🪵", color: "#a0785a", ubicacionDefault: "lateral" },
@@ -1456,6 +1459,11 @@ function App() {
 
             {/* ── Visor 3D DWG/DXF ── */}
             {screen === "visor-dwg" && <VisorDWGPage token={token} />}
+
+            {/* ── Visor 3D SketchUp ── */}
+            {screen === "sketchup" && (
+              <SketchUp authFetch={authFetch} token={token} />
+            )}
 
             {/* ── Flujo de Fondos ── */}
             {screen === "flujo-fondos" && (
