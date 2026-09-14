@@ -1505,17 +1505,44 @@ export default function PresupuestoNuevo({
     const val = parseFloat(ajusteValor);
     if (!val || isNaN(val)) return;
 
-    // Guardar originales antes del primer ajuste (precio + precios[] por línea)
+    // Guardar originales antes del primer ajuste (precio + precios[] por
+    // línea + porcentaje1/2/3). Antes solo se guardaba precio/precios
+    // porque el ajuste con scope != "todos" mutaba el precio directo; ahora
+    // ese scope también recompone porcentaje1/2/3 (ver ajustarFila más
+    // abajo) para que sobreviva a guardar/reabrir, así que "Revertir"
+    // necesita poder restaurar esos campos también, no solo el precio.
     if (!ajusteAplicado) {
       const orig = {};
       presupuestoItems.forEach((it) => {
         orig[it.id] = {
           precio: it.precio,
           precios: (it.precios ?? []).map((p) => ({ ...p })),
+          porcentaje1: it.porcentaje1 ?? null,
+          porcentaje2: it.porcentaje2 ?? null,
+          porcentaje3: it.porcentaje3 ?? null,
         };
       });
       setPreciosOriginales(orig);
     }
+
+    // Convierte un precio final ya ajustado en el % equivalente sobre su
+    // base (precioBase), para que el ajuste quede persistido con el mismo
+    // principio que el % individual por ítem (valor = base × (1+%/100))
+    // en vez de guardarse como un número sin origen. El %lista se
+    // descuenta acá porque nunca se persiste — se sigue aplicando en vivo
+    // al mostrar/guardar, igual que hoy (ver aplicarPorcentaje). Si no
+    // conocemos la base de esa línea (ítems sin precioBase, ej. algunos
+    // "otros"), devuelve null y esa línea sigue sin %-reconstruible, como
+    // pasaba antes de este cambio.
+    const pctEquivalente = (precioBaseLinea, precioFinalNuevo) => {
+      const b = parseFloat(precioBaseLinea) || 0;
+      if (!b) return null;
+      const baseConLista = b * (1 + (listaPorcentaje || 0) / 100);
+      if (!baseConLista) return null;
+      return (
+        Math.round((precioFinalNuevo / baseConLista - 1) * 100 * 100) / 100
+      );
+    };
 
     const ajustarFila = (id, f, origenPreciosOriginales) => {
       if (!perteneceAScope(id, f)) return f;
@@ -1524,12 +1551,34 @@ export default function PresupuestoNuevo({
         : { precio: f.precio, precios: f.precios };
       const precioBase = parseFloat(origItem?.precio ?? f.precio) || 0;
       const nuevoPrecio = calcularAjuste(precioBase, val);
-      const nuevosPrecios = (origItem?.precios ?? f.precios ?? []).map((p) => ({
+      const preciosOrig = origItem?.precios ?? f.precios ?? [];
+      const nuevosPrecios = preciosOrig.map((p) => ({
         ...p,
         precio: String(calcularAjuste(p.precio, val)),
       }));
+
+      // Scope "todos" ya es reproducible vía ajusteValor/ajusteModo
+      // guardados a nivel de presupuesto (conAjusteGeneral en
+      // useCocinaPlacard) — ahí no hace falta tocar porcentaje1/2/3.
+      // Para scope "grupo:X" o un ítem puntual, no hay dónde persistir el
+      // scope en tabla_presupuestos, así que en vez de eso componemos el
+      // ajuste directo en porcentaje1/2/3 de cada ítem afectado: mismo
+      // resultado visual, pero ahora sí sobrevive a guardar/reabrir.
+      const extraPct = {};
+      if (ajusteScope !== "todos") {
+        nuevosPrecios.forEach((p, li) => {
+          const pct = pctEquivalente(p.precioBase, parseFloat(p.precio));
+          if (pct != null) extraPct[`porcentaje${li + 1}`] = pct;
+        });
+        if (!nuevosPrecios.length && f.precioBase != null && f.precioBase !== "") {
+          const pct = pctEquivalente(f.precioBase, nuevoPrecio);
+          if (pct != null) extraPct.porcentaje1 = pct;
+        }
+      }
+
       return {
         ...f,
+        ...extraPct,
         precio: nuevoPrecio,
         precios: nuevosPrecios.length ? nuevosPrecios : f.precios,
       };
@@ -1603,6 +1652,13 @@ export default function PresupuestoNuevo({
         ...f,
         precio: p,
         precios: orig.precios?.length ? orig.precios : f.precios,
+        // Con scope != "todos" el ajuste se compuso en porcentaje1/2/3
+        // (ver ajustarFila en aplicarAjuste) — hay que restaurarlos acá
+        // también, si no el % compuesto queda pegado en el ítem aunque el
+        // precio vuelva a su valor original.
+        porcentaje1: orig.porcentaje1 ?? f.porcentaje1,
+        porcentaje2: orig.porcentaje2 ?? f.porcentaje2,
+        porcentaje3: orig.porcentaje3 ?? f.porcentaje3,
       };
     };
 
@@ -1643,6 +1699,9 @@ export default function PresupuestoNuevo({
           precio: p,
           precios: orig.precios?.length ? orig.precios : it.precios,
           subtotal: p * (parseFloat(it.cantidad) || 1),
+          porcentaje1: orig.porcentaje1 ?? it.porcentaje1,
+          porcentaje2: orig.porcentaje2 ?? it.porcentaje2,
+          porcentaje3: orig.porcentaje3 ?? it.porcentaje3,
         };
       }),
     );
