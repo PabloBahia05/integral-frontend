@@ -209,6 +209,7 @@ export const cruzarConProduccion = (items, produccionRows) => {
       ...it,
       _produccionId: prod?.id ?? null,
       _produccionColor: prod?.color ?? null,
+      _produccionCodpro: prod?.codpro ?? null,
     };
   });
 };

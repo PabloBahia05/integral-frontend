@@ -306,10 +306,10 @@ export default function Obras({
       .values(),
   );
 
-  // Fetch liviano de ítems para el resumen rápido del desplegable — a
-  // diferencia del efecto de `selected` de más arriba, acá NO se piden
-  // producción ni línea-por-grupo (no hace falta color/manija/precio para
-  // un resumen), así el desplegable abre más rápido que seleccionar la fila.
+  // Fetch liviano de ítems + producción para el resumen rápido del
+  // desplegable — sí necesitamos producción ahora para el código
+  // (_produccionCodpro, via cruzarConProduccion), pero seguimos sin pedir
+  // línea-por-grupo: no hace falta para este resumen.
   useEffect(() => {
     if (!expandedId) {
       setItemsExpandido([]);
@@ -318,11 +318,21 @@ export default function Obras({
     const fila = filtered.find((f) => f.id === expandedId);
     if (!fila) return;
     setLoadingExpandido(true);
-    authFetch(
-      `${API}/tabla-presupuestos?numeropres=${fila.numeropres}&revision=${fila.revision}`,
-    )
-      .then((r) => r.json())
-      .then((data) => setItemsExpandido(Array.isArray(data) ? data : []))
+    Promise.all([
+      authFetch(
+        `${API}/tabla-presupuestos?numeropres=${fila.numeropres}&revision=${fila.revision}`,
+      ).then((r) => r.json()),
+      authFetch(
+        `${API}/produccion?numeropres=${fila.numeropres}&revision=${fila.revision}`,
+      ).then((r) => r.json()),
+    ])
+      .then(([items, produccion]) => {
+        const cruzados = cruzarConProduccion(
+          Array.isArray(items) ? items : [],
+          Array.isArray(produccion) ? produccion : [],
+        );
+        setItemsExpandido(cruzados);
+      })
       .catch(console.error)
       .finally(() => setLoadingExpandido(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -434,14 +444,23 @@ export default function Obras({
     }
   };
 
-  // Resumen rápido del desplegable: mismas columnas que el detalle de
-  // ítems (COLS_ITEMS, de presupuestosShared.jsx) pero sin Sección, Precio
-  // u. ni Subtotal — eso ya lo muestra el ItemsPanel de abajo al
-  // seleccionar la fila. No usa DataTable (resize/localStorage de anchos
-  // sería overkill acá) sino una tabla simple embebida en la fila expandida.
-  const COLS_RESUMEN_ARTICULOS = COLS_ITEMS.filter(
-    (c) => !["tipo", "valor1", "_subtotal"].includes(c.key),
-  );
+  // Resumen rápido del desplegable: variante de COLS_ITEMS (de
+  // presupuestosShared.jsx) sin Sección, Precio u. ni Subtotal — eso ya lo
+  // muestra el ItemsPanel de abajo al seleccionar la fila — y con
+  // "Artículo" reemplazado por "Código" (codpro, de la tabla producción,
+  // cruzado en el fetch de arriba vía cruzarConProduccion). No usa
+  // DataTable (resize/localStorage de anchos sería overkill acá) sino una
+  // tabla simple embebida en la fila expandida.
+  const COLS_RESUMEN_ARTICULOS = [
+    {
+      key: "_produccionCodpro",
+      label: "Código",
+      render: (v) => v ?? "—",
+    },
+    ...COLS_ITEMS.filter((c) =>
+      ["nombreart", "cantidad", "ancho", "alto"].includes(c.key),
+    ),
+  ];
 
   const renderResumenArticulos = () => {
     if (loadingExpandido) {
