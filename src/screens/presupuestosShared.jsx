@@ -202,7 +202,13 @@ export const cruzarConProduccion = (items, produccionRows) => {
     colas.get(key).push(p);
   });
   return items.map((it) => {
-    const key = `${it.grupo ?? ""}|${it.nombreart ?? ""}`;
+    // OJO: "producto" en producción se corresponde con it.articulo (el
+    // nombre corto del artículo), NO con it.nombreart (la descripción
+    // larga, ej. con "Lat. Izq. Vista" agregado) — comparado contra datos
+    // reales de /produccion, no contra el comentario de arriba del INSERT,
+    // que describía mal el campo. Antes de este fix el cruce nunca
+    // encontraba coincidencia y todo quedaba con _produccionId null.
+    const key = `${it.grupo ?? ""}|${it.articulo ?? ""}`;
     const cola = colas.get(key);
     const prod = cola && cola.length ? cola.shift() : null;
     return {
