@@ -89,7 +89,7 @@ const PANTALLAS_MENU = [
   { id: "modulos-domus", label: "MÓDULOS DOMUS", icon: "🏠", color: "#5c6b73", ubicacionDefault: "principal" },
   { id: "materiales-melamina", label: "MATERIALES MELAMINA", icon: "🎨", color: "#c2185b", ubicacionDefault: "principal" },
   { id: "visor-dwg", label: "VISOR 3D MÓDULOS", icon: "📐", color: "#00838f", ubicacionDefault: "lateral" },
-  { id: "sketchup", label: "SKETCHUP", icon: "🧊", color: "#ff8c42", ubicacionDefault: "lateral" },
+  { id: "sketchup", label: "SKETCHUP", icon: "🧊", color: "#ff8c42", ubicacionDefault: "principal" },
   { id: "chat", label: "CHAT", icon: "💬", color: "#25d366", ubicacionDefault: "principal" },
   { id: "presupuesto-mamparas", label: "PRESUPUESTO MAMPARAS", icon: "🪟", color: "#4895ef", ubicacionDefault: "lateral" },
   { id: "presupuesto-muebles", label: "PRESUPUESTO MUEBLES", icon: "🪵", color: "#a0785a", ubicacionDefault: "lateral" },
