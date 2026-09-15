@@ -1278,6 +1278,7 @@ function App() {
                   setScreen("presupuesto-nuevo");
                 }}
                 authFetch={authFetch}
+                token={token}
                 onFaltanDatosCliente={(info) =>
                   irACliente(
                     info.codcliente,
