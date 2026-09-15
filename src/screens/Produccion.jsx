@@ -575,7 +575,7 @@ export default function Produccion({ authFetch, token }) {
   // Campos numéricos (medidas): a diferencia de OP/USPER/etc, acá "0" es un
   // valor válido y hay que mandar Number, no string, para que coincida con
   // el tipo DECIMAL de la columna en MySQL.
-  const CAMPOS_NUMERICOS = ["ancho", "profundidad", "alto"];
+  const CAMPOS_NUMERICOS = ["ancho", "profundidad", "alto", "cantidad"];
 
   const handleTextoCampoBlur = async (row, campo) => {
     const key = `${row.id}-${campo}`;
@@ -850,6 +850,27 @@ export default function Produccion({ authFetch, token }) {
     },
     { key: "grupo", label: "Grupo", render: (v) => v ?? "—" },
     { key: "producto", label: "Producto", render: (v) => v ?? "—" },
+    {
+      key: "cantidad",
+      label: "Cant.",
+      render: (v, row) => (
+        <input
+          type="number"
+          step="0.1"
+          value={row.cantidad ?? ""}
+          placeholder="—"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) =>
+            handleTextoCampoChange(row.id, "cantidad", e.target.value)
+          }
+          onBlur={() => handleTextoCampoBlur(row, "cantidad")}
+          style={{
+            ...estiloInput(row, "cantidad", guardandoCampo, errorCampo),
+            maxWidth: "70px",
+          }}
+        />
+      ),
+    },
     {
       key: "modulo",
       label: "Módulo",
