@@ -20,6 +20,9 @@ import EncabezadoSection from "./EncabezadoSection";
 import useCocinaPlacard from "../Hooks/useCocinaPlacard";
 import { generarPresupuestoPDF } from "../pdf/pdfPresupuesto";
 import { generarConfirmadoPDF } from "../pdf/pdfConfirmado";
+// Ajustá esta ruta a donde termines poniendo wordPresupuesto.js / wordMotorComun.js
+// (acá asumo un directorio "word" hermano de "pdf", mismo criterio de carpetas).
+import { generarPresupuestoWord } from "../word/wordPresupuesto";
 import { TEXTO_SENA_DEFAULT, useTextoSena } from "./textoSenaStore";
 
 const WALLPANEL_IMG =
@@ -691,6 +694,7 @@ export default function PresupuestoNuevo({
   const [incluirPrecio, setIncluirPrecio] = useState(false);
   const [incluirSubtotalItem, setIncluirSubtotalItem] = useState(false);
   const [generandoPDF, setGenerandoPDF] = useState(false);
+  const [generandoWord, setGenerandoWord] = useState(false);
   const [incluirTotal, setIncluirTotal] = useState(true);
   const [color, setColor] = useState("");
   const [incluirTextoColoc, setIncluirTextoColoc] = useState(false);
@@ -2736,32 +2740,43 @@ export default function PresupuestoNuevo({
     }
   };
 
-  // ── Generar PDF del presupuesto ─────────────────────────────────────────────
-  // Punto de entrada del botón "Generar PDF". Antes preguntaba con un
-  // window.confirm() (OK/Cancelar); ahora se pregunta con un modal propio
-  // con botones "Sí" / "No". Para Luciana Roque nunca se pregunta: se
-  // genera directo con querDescripcion = false.
-  const iniciarGeneracionPDF = () => {
+  // ── Generar PDF/Word del presupuesto ────────────────────────────────────────
+  // Punto de entrada de los botones "Generar PDF" / "Generar Word". Antes
+  // preguntaba con un window.confirm() (OK/Cancelar); ahora se pregunta con
+  // un modal propio con botones "Sí" / "No", compartido entre los dos
+  // formatos. Para Luciana Roque nunca se pregunta: se genera directo con
+  // querDescripcion = false. `formatoDocumento` recuerda qué botón se
+  // apretó, para que el modal sepa a cuál de los dos llamar al responder.
+  const [formatoDocumento, setFormatoDocumento] = useState("pdf");
+
+  const iniciarGeneracionDocumento = (formato) => {
+    setFormatoDocumento(formato);
     if (esLucianaRoque) {
-      generarPDFConDescripcion(false);
+      generarDocumentoConDescripcion(false, formato);
     } else {
       setMostrarModalDescripcionPDF(true);
     }
   };
+  const iniciarGeneracionPDF = () => iniciarGeneracionDocumento("pdf");
+  const iniciarGeneracionWord = () => iniciarGeneracionDocumento("word");
 
-  const generarPDFConDescripcion = (querDescripcion) => {
+  const generarDocumentoConDescripcion = (
+    querDescripcion,
+    formato = formatoDocumento,
+  ) => {
     setMostrarModalDescripcionPDF(false);
-    // Uso la respuesta local (querDescripcion) para el HTML de este PDF
-    // puntual, y además la guardo en el state por si el resto de la UI la
-    // necesita después.
+    // Uso la respuesta local (querDescripcion) para el armado de este
+    // documento puntual, y además la guardo en el state por si el resto de
+    // la UI la necesita después.
     setIncluirDescripcion(querDescripcion);
 
-    // El armado del HTML/CSS y la generación + descarga del PDF viven en
-    // pdfPresupuesto.js / pdfConfirmado.js (separados de este archivo para
+    // El armado y la generación + descarga viven en pdfPresupuesto.js /
+    // pdfConfirmado.js / wordPresupuesto.js (separados de este archivo para
     // no mezclar la lógica de UI con la de armado del documento, y entre sí
     // para no mezclar el caso "etapa de presupuesto" con el de "obra
-    // confirmada" — ver pdfMotorComun.js para lo que comparten los dos).
-    const datosComunesPDF = {
+    // confirmada" ni el formato PDF del Word — ver pdfMotorComun.js /
+    // wordMotorComun.js para lo que comparten entre sí).
+    const datosComunesDocumento = {
       querDescripcion,
       fecha,
       numeroPres,
@@ -2790,13 +2805,20 @@ export default function PresupuestoNuevo({
       manijas: manijasDB,
       imagenesFinal,
       setGenerandoPDF,
+      setGenerandoWord,
       authFetch,
     };
 
-    if (confirmado) {
-      generarConfirmadoPDF({ ...datosComunesPDF, lineaPorGrupo });
+    if (formato === "word") {
+      // Generar Word para obra confirmada todavía no está armado
+      // (wordConfirmado.js pendiente, mismo criterio que pdfConfirmado.js) —
+      // el botón "Generar Word" se deshabilita más abajo si confirmado es
+      // true, así que acá siempre es el caso "etapa de presupuesto".
+      generarPresupuestoWord(datosComunesDocumento);
+    } else if (confirmado) {
+      generarConfirmadoPDF({ ...datosComunesDocumento, lineaPorGrupo });
     } else {
-      generarPresupuestoPDF(datosComunesPDF);
+      generarPresupuestoPDF(datosComunesDocumento);
     }
   };
 
@@ -2826,7 +2848,8 @@ export default function PresupuestoNuevo({
               }}
             >
               <strong style={{ fontSize: 15 }}>
-                ¿Incluir la descripción de cada ítem en el PDF?
+                ¿Incluir la descripción de cada ítem en el{" "}
+                {formatoDocumento === "word" ? "Word" : "PDF"}?
               </strong>
               <div
                 style={{
@@ -2838,7 +2861,7 @@ export default function PresupuestoNuevo({
               >
                 <button
                   className="pn-tool-btn"
-                  onClick={() => generarPDFConDescripcion(true)}
+                  onClick={() => generarDocumentoConDescripcion(true)}
                   style={{
                     fontWeight: 700,
                     background: "#e6f7ff",
@@ -2850,7 +2873,7 @@ export default function PresupuestoNuevo({
                 </button>
                 <button
                   className="pn-tool-btn"
-                  onClick={() => generarPDFConDescripcion(false)}
+                  onClick={() => generarDocumentoConDescripcion(false)}
                   style={{ minWidth: 90 }}
                 >
                   No
@@ -3915,6 +3938,30 @@ export default function PresupuestoNuevo({
             }}
           >
             🖨️ {generandoPDF ? "Generando..." : "Generar PDF"}
+          </button>
+          <button
+            className="pn-tool-btn"
+            onClick={iniciarGeneracionWord}
+            disabled={presupuestoItems.length === 0 || generandoWord || confirmado}
+            title={
+              presupuestoItems.length === 0
+                ? "Agregá al menos un ítem al presupuesto para generar el Word"
+                : confirmado
+                  ? "Generar Word todavía no está disponible para obras confirmadas — usá el PDF"
+                  : "Genera y descarga el Word (editable) del presupuesto"
+            }
+            style={{
+              background: "#e8f4ee",
+              borderColor: "#1e7a4d",
+              color: "#0d3d26",
+              fontWeight: 700,
+              opacity:
+                presupuestoItems.length === 0 || generandoWord || confirmado
+                  ? 0.5
+                  : 1,
+            }}
+          >
+            📝 {generandoWord ? "Generando..." : "Generar Word"}
           </button>
           <button
             className="pn-tool-btn"
