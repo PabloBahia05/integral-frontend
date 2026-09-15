@@ -126,7 +126,21 @@ async function subirArchivoObra(numeropres, tipo, file, token) {
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
-  if (!res.ok) throw new Error("Error al subir archivo");
+  if (!res.ok) {
+    // Mensaje con status + texto del backend: sin esto, un 401 (token que no
+    // llegó como prop), un 404 (router no montado en server.js) y un 500
+    // (Cloudinary/tabla obra_archivos) se ven todos igual en pantalla.
+    let detalle = "";
+    try {
+      const body = await res.json();
+      detalle = body?.error || "";
+    } catch {
+      detalle = "";
+    }
+    throw new Error(
+      `HTTP ${res.status}${detalle ? ` — ${detalle}` : ""}`,
+    );
+  }
   return res.json();
 }
 
@@ -737,7 +751,7 @@ function ArchivosObraModal({ numeropres, tipo, nombreObra, token, authFetch, onC
       }
     } catch (e) {
       console.error("Error subiendo archivo:", e);
-      setError("No se pudo subir uno o más archivos.");
+      setError(`No se pudo subir uno o más archivos. ${e.message || ""}`.trim());
     } finally {
       setUploading(false);
     }
