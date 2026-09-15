@@ -42,7 +42,7 @@ import {
   manijaGrupo,
   colorParaMelamina,
   obtenerFotosMamparaPorModelo,
-} from "./pdfMotorComun.js";
+} from "../pdf/pdfMotorComun.js";
 
 // Re-exportadas tal cual para que wordPresupuesto.js no tenga que importar
 // de dos archivos distintos la lógica que comparte con el PDF.
