@@ -46,10 +46,20 @@ const BTN_ACCION_ARCHIVO_STYLE = {
   whiteSpace: "nowrap",
 };
 
+// Mismo botón pero relleno, para cuando la obra ya tiene archivos cargados
+// (conteos[numeropres].imagen/.plano > 0) — así se distingue de un vistazo
+// sin tener que abrir el modal.
+const BTN_ACCION_ARCHIVO_STYLE_CON_ARCHIVOS = {
+  ...BTN_ACCION_ARCHIVO_STYLE,
+  background: "#eaf2fa",
+  border: "1px solid #3a7abf",
+  fontWeight: 600,
+};
+
 // Botón desplegable (▶/▼) para el resumen rápido de artículos — independiente
 // de la selección de fila (que sigue disparando ItemsPanel al pie). onToggle
 // recibe la fila entera porque el fetch de items necesita numeropres/revision.
-const buildColsObras = (onImagenes, onPlanos, expandedId, onToggleExpand) => [
+const buildColsObras = (onImagenes, onPlanos, expandedId, onToggleExpand, conteos) => [
   {
     key: "__expand__",
     label: "",
@@ -79,34 +89,40 @@ const buildColsObras = (onImagenes, onPlanos, expandedId, onToggleExpand) => [
   {
     key: "__imagenes__",
     label: "Imágenes",
-    render: (_, row) => (
-      <button
-        title="Imágenes de la obra"
-        onClick={(e) => {
-          e.stopPropagation();
-          onImagenes(row);
-        }}
-        style={BTN_ACCION_ARCHIVO_STYLE}
-      >
-        🖼️ Imágenes
-      </button>
-    ),
+    render: (_, row) => {
+      const n = conteos?.[row.numeropres]?.imagen || 0;
+      return (
+        <button
+          title="Imágenes de la obra"
+          onClick={(e) => {
+            e.stopPropagation();
+            onImagenes(row);
+          }}
+          style={n > 0 ? BTN_ACCION_ARCHIVO_STYLE_CON_ARCHIVOS : BTN_ACCION_ARCHIVO_STYLE}
+        >
+          🖼️ Imágenes{n > 0 ? ` (${n})` : ""}
+        </button>
+      );
+    },
   },
   {
     key: "__planos__",
     label: "Planos",
-    render: (_, row) => (
-      <button
-        title="Planos de la obra"
-        onClick={(e) => {
-          e.stopPropagation();
-          onPlanos(row);
-        }}
-        style={BTN_ACCION_ARCHIVO_STYLE}
-      >
-        📐 Planos
-      </button>
-    ),
+    render: (_, row) => {
+      const n = conteos?.[row.numeropres]?.plano || 0;
+      return (
+        <button
+          title="Planos de la obra"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlanos(row);
+          }}
+          style={n > 0 ? BTN_ACCION_ARCHIVO_STYLE_CON_ARCHIVOS : BTN_ACCION_ARCHIVO_STYLE}
+        >
+          📐 Planos{n > 0 ? ` (${n})` : ""}
+        </button>
+      );
+    },
   },
 ];
 
@@ -217,6 +233,21 @@ export default function Obras({
     setArchivosModal({ numeropres: row.numeropres, tipo: "imagen", nombre: row.nombre });
   const abrirPlanos = (row) =>
     setArchivosModal({ numeropres: row.numeropres, tipo: "plano", nombre: row.nombre });
+
+  // { [numeropres]: { imagen: n, plano: n } } — para mostrar la cantidad de
+  // archivos cargados en los botones de la lista principal, sin traer los
+  // archivos en sí (ver /obras/archivos/conteos en el backend).
+  const [conteosArchivos, setConteosArchivos] = useState({});
+  const fetchConteosArchivos = () => {
+    authFetch(`${API}/obras/archivos/conteos`)
+      .then((r) => r.json())
+      .then((data) => setConteosArchivos(data && typeof data === "object" ? data : {}))
+      .catch(console.error);
+  };
+  useEffect(() => {
+    fetchConteosArchivos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Fetch encabezados ──────────────────────────────────────────────────
 
@@ -648,7 +679,7 @@ export default function Obras({
         </p>
       ) : (
         <DataTable
-          columns={buildColsObras(abrirImagenes, abrirPlanos, expandedId, toggleExpand)}
+          columns={buildColsObras(abrirImagenes, abrirPlanos, expandedId, toggleExpand, conteosArchivos)}
           rows={filtered}
           selectedId={selected?.id}
           onSelect={handleSelect}
@@ -704,7 +735,10 @@ export default function Obras({
           nombreObra={archivosModal.nombre}
           token={token}
           authFetch={authFetch}
-          onClose={() => setArchivosModal(null)}
+          onClose={() => {
+            setArchivosModal(null);
+            fetchConteosArchivos();
+          }}
         />
       )}
     </>
