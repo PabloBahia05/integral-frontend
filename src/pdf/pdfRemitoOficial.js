@@ -4,11 +4,12 @@ import { jsPDF } from "jspdf";
 // Remito oficial — SOLO texto para imprimir sobre el talonario
 // pre-impreso (sin líneas, bordes ni membrete: eso ya lo trae el papel).
 //
-// Las coordenadas de CONFIG son una PRIMERA APROXIMACIÓN sacada a ojo
-// de una captura de pantalla, no de una medición real del papel. Hay
-// que imprimir una hoja de prueba (sobre el talonario real, o mejor
-// primero sobre una hoja blanca superpuesta a trasluz) y corregir los
-// valores de CONFIG en mm hasta que el texto caiga en cada casillero.
+// Coordenadas recalibradas a partir de prueba_1.jpeg (impresión de
+// prueba superpuesta al talonario), midiendo en píxeles contra un
+// grid de referencia y convirtiendo a mm asumiendo hoja A4
+// (210x297mm). Igual conviene una prueba final impresa/trasluz para
+// confirmar el calce milimétrico exacto, porque una foto siempre
+// tiene algo de distorsión de perspectiva.
 //
 // Unidad: milímetros. Origen (0,0) arriba a la izquierda de la hoja.
 // ──────────────────────────────────────────────────────────────────────
@@ -18,21 +19,33 @@ const CONFIG = {
   fontSize: 10,
   fontSizeItems: 9,
 
-  fecha: {
-    dia: { x: 126, y: 59 },
-    mes: { x: 148, y: 59 },
-    anio: { x: 156, y: 59 },
-  },
+  // OJO: en el talonario en blanco, "N° 0001 — 00011843" ya viene
+  // PREIMPRESO de fábrica. No hay espacio en blanco para escribir un
+  // número nuestro ahí — por eso este bloque queda comentado más abajo
+  // en generarPdfRemitoOficial(). Si en algún momento cambian a un
+  // talonario sin numeración preimpresa, reactivarlo y calibrar x/y.
   numero: { x: 126, y: 85 },
 
-  cliente: { x: 32, y: 111 },
-  domicilio: { x: 32, y: 129 },
-  ciudad: { x: 124, y: 129 },
-  obra: { x: 130, y: 148 },
+  fecha: {
+    dia: { x: 143, y: 45 },
+    mes: { x: 157, y: 45 },
+    anio: { x: 172, y: 45 },
+  },
+
+  cliente: { x: 26, y: 79 },
+  domicilio: { x: 23, y: 88 }, // "Calle:" — sin confirmar con datos reales todavía
+  ciudad: { x: 145, y: 88 }, // "Localidad:" — sin confirmar con datos reales todavía
+
+  // TODO: confirmar en qué casillero del talonario va "obra" (este
+  // formulario no tiene un campo impreso que diga "Obra"). Candidatos
+  // visibles en el papel: "N° Orden de Compra N°" o "Fact. Nro".
+  // Valor actual sin calibrar — hace que el dato caiga dentro de la
+  // tabla de ítems, por eso el doc.text de obra queda comentado abajo.
+  obra: { x: 130, y: 105 },
 
   items: {
-    startY: 197, // Y de la primera línea de ítems
-    rowHeight: 8, // separación vertical entre líneas
+    startY: 197, // Y de la primera línea de ítems — calzó bien en la prueba
+    rowHeight: 8, // separación vertical entre líneas — confirmado, calza justo
     colCantidad: 3.4,
     colGrupo: 11,
     colCodigo: 18,
@@ -53,11 +66,11 @@ function fmtMedidas(it) {
 /**
  * datos = {
  *   fecha: "2026-09-15" | Date,
- *   numeroRemito: 3967 | null,
+ *   numeroRemito: 3967 | null,   // ver nota en CONFIG.numero: no se imprime
  *   cliente: "UDUT RUBEN",
  *   domicilio: "WHITCOMB 2337",
  *   ciudad: "BAHIA BLANCA",
- *   obra: 41,
+ *   obra: 41,                    // ver TODO en CONFIG.obra: no se imprime aún
  *   items: [{ cantidad, grupo, codart, nombreart, ancho, alto, profundidad }],
  * }
  *
@@ -76,9 +89,12 @@ export function generarPdfRemitoOficial(datos) {
   doc.text(String(f.getMonth() + 1), CONFIG.fecha.mes.x, CONFIG.fecha.mes.y);
   doc.text(String(f.getFullYear()), CONFIG.fecha.anio.x, CONFIG.fecha.anio.y);
 
-  if (datos.numeroRemito != null) {
-    doc.text(String(datos.numeroRemito), CONFIG.numero.x, CONFIG.numero.y);
-  }
+  // Desactivado: el número ya viene preimpreso en el talonario (ver nota
+  // en CONFIG.numero). Reactivar solo si cambian de talonario.
+  // if (datos.numeroRemito != null) {
+  //   doc.text(String(datos.numeroRemito), CONFIG.numero.x, CONFIG.numero.y);
+  // }
+
   if (datos.cliente) {
     doc.text(String(datos.cliente), CONFIG.cliente.x, CONFIG.cliente.y);
   }
@@ -88,9 +104,12 @@ export function generarPdfRemitoOficial(datos) {
   if (datos.ciudad) {
     doc.text(String(datos.ciudad), CONFIG.ciudad.x, CONFIG.ciudad.y);
   }
-  if (datos.obra != null) {
-    doc.text(String(datos.obra), CONFIG.obra.x, CONFIG.obra.y);
-  }
+
+  // Desactivado hasta confirmar en qué casillero va "obra" (ver TODO en
+  // CONFIG.obra) — con la posición vieja caía dentro de la tabla de ítems.
+  // if (datos.obra != null) {
+  //   doc.text(String(datos.obra), CONFIG.obra.x, CONFIG.obra.y);
+  // }
 
   doc.setFontSize(CONFIG.fontSizeItems);
   const {
