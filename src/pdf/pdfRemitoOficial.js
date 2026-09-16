@@ -44,7 +44,7 @@ const CONFIG = {
   obra: { x: 130, y: 105 },
 
   items: {
-    startY: 197, // Y de la primera línea de ítems — calzó bien en la prueba
+    startY: 100, // bajado de 197 a pedido — pendiente confirmar con impresión real que calce con la tabla del talonario
     rowHeight: 8, // separación vertical entre líneas — confirmado, calza justo
     colCantidad: 3.4,
     colGrupo: 11,
