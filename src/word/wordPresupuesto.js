@@ -19,10 +19,6 @@ import {
   Document,
   Paragraph,
   TextRun,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
   AlignmentType,
   BorderStyle,
   ShadingType,
@@ -49,51 +45,60 @@ import {
   descargarWord,
 } from "./wordMotorComun.js";
 
-// Ancho útil de la tabla (twips) = ancho de página A4 - márgenes izq/der
-// definidos en PAGE_A4 (11906 - 850 - 850 = 10206, redondeado).
+// Ancho útil de la página (twips) = ancho A4 - márgenes izq/der definidos
+// en PAGE_A4 (11906 - 850 - 850 = 10206, redondeado). Ya NO arma un Table
+// de docx (eso seguía generando un objeto "tabla" de Word aunque no tuviera
+// bordes visibles: se podía seleccionar como bloque, tenía el ícono de
+// arrastre, etc.). En su lugar, cada fila es un Paragraph con `tabStops`
+// —igual mecanismo que ya se usaba en el encabezado del documento
+// (Cliente: ... \tFecha: ...)— así el texto queda alineado en columnas
+// pero es texto plano, sin ningún objeto tabla debajo.
 const ANCHO_TABLA = 10200;
 const ANCHO_CANT = 700;
 const ANCHO_PRECIO = 1500;
 
-// Calcula el ancho de cada columna según cuántas columnas de precio/línea
-// tenga la tabla de este grupo — mismo criterio que las columnas
-// dinámicas del <table> en pdfPresupuesto.js.
+// Calcula el ancho "virtual" de cada columna según cuántas columnas de
+// precio/línea tenga este grupo — mismo criterio que las columnas
+// dinámicas del <table> en pdfPresupuesto.js, pero acá los anchos se usan
+// para calcular POSICIONES de tabulador, no anchos de celda.
 const anchosColumnas = ({ mostrarCosto, cantColumnasPrecio }) => {
   const fijos = ANCHO_CANT + (mostrarCosto ? ANCHO_PRECIO : 0) + cantColumnasPrecio * ANCHO_PRECIO;
   return { cant: ANCHO_CANT, costo: ANCHO_PRECIO, precio: ANCHO_PRECIO, detalle: ANCHO_TABLA - fijos };
 };
 
-const bordeSuperior = { top: { style: BorderStyle.SINGLE, size: 4, color: "111111" } };
+// Único separador que se conserva a propósito (línea sobre "Total:"),
+// mismo criterio visual que la línea del footer o la de "colocación no
+// incluida" más abajo en este archivo — es un borde de párrafo, no de
+// tabla, así que no reintroduce el problema.
+const bordeSuperiorTotal = { top: { style: BorderStyle.SINGLE, size: 4, color: "111111" } };
 
-// Sin esto, docx dibuja por defecto una grilla completa (arriba, abajo,
-// izquierda, derecha e internas) en cada Table que no declara `borders`
-// — es lo que generaba el recuadro cerrando cada celda. Al ponerlo en
-// NONE en las cuatro tablas de abajo, el layout por columnas se mantiene
-// (sigue siendo un Table, por eso el texto queda alineado), pero ya no
-// se ve ninguna línea salvo la que agrega a propósito celdaSimple con
-// `borde: true` (el único separador que se conserva: el que marca el
-// total de cada grupo, mismo criterio visual que la línea del footer o
-// la de "colocación no incluida" más abajo en este archivo).
-const SIN_BORDES_TABLA = {
-  top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-  bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-  left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-  right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-  insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-};
-
-const celdaSimple = (texto, { width, bold = false, align = AlignmentType.LEFT, borde }) =>
-  new TableCell({
-    width: { size: width, type: WidthType.DXA },
-    borders: borde ? bordeSuperior : undefined,
-    children: [
-      new Paragraph({
-        alignment: align,
-        children: [new TextRun({ text: String(texto ?? ""), bold, size: 18 })],
-      }),
+// A partir de los anchos de columna de un grupo, calcula las posiciones
+// (en twips) de los tabuladores de sus filas: dónde empieza "Detalle"
+// (tab izquierdo) y dónde termina cada columna de Costo/Precio (tab
+// derecho, para que el monto quede alineado a la derecha de esa columna).
+const tabsDeFila = ({ anchos, mostrarCosto, cantColumnasPrecio }) => {
+  const posDetalle = anchos.cant;
+  let acc = posDetalle + anchos.detalle;
+  let posCostoFin = null;
+  if (mostrarCosto) {
+    acc += anchos.costo;
+    posCostoFin = acc;
+  }
+  const preciosRightEdges = [];
+  for (let i = 0; i < cantColumnasPrecio; i++) {
+    acc += anchos.precio;
+    preciosRightEdges.push(acc);
+  }
+  return {
+    posDetalle,
+    preciosRightEdges,
+    filaTabStops: [
+      { type: "left", position: posDetalle },
+      ...(posCostoFin != null ? [{ type: "right", position: posCostoFin }] : []),
+      ...preciosRightEdges.map((p) => ({ type: "right", position: p })),
     ],
-  });
+  };
+};
 
 // generarPresupuestoWord: arma el .docx del presupuesto (etapa de
 // presupuesto, TODAS las líneas de precio activas) y dispara la descarga.
@@ -226,119 +231,107 @@ export async function generarPresupuestoWord({
         ? 1
         : 0;
     const anchos = anchosColumnas({ mostrarCosto, cantColumnasPrecio });
+    const { posDetalle, preciosRightEdges, filaTabStops } = tabsDeFila({
+      anchos,
+      mostrarCosto,
+      cantColumnasPrecio,
+    });
 
-    // Encabezado de la tabla.
-    const headerCells = [
-      celdaSimple("Cant", { width: anchos.cant, bold: true }),
-      celdaSimple("Detalle", { width: anchos.detalle, bold: true }),
-    ];
-    if (mostrarCosto) headerCells.push(celdaSimple("Costo", { width: anchos.costo, bold: true, align: AlignmentType.RIGHT }));
+    // Encabezado de columnas: una sola línea de texto en negrita con
+    // tabuladores, no una fila de tabla.
+    let encabezadoTxt = "Cant\tDetalle";
+    if (mostrarCosto) encabezadoTxt += "\tCosto";
     if (mostrarLineasSec) {
-      columnasLineaSec.forEach((col) =>
-        headerCells.push(celdaSimple(`Línea ${col.linea.linea}`, { width: anchos.precio, bold: true, align: AlignmentType.RIGHT })),
-      );
+      columnasLineaSec.forEach((col) => {
+        encabezadoTxt += `\tLínea ${col.linea.linea}`;
+      });
     } else if (usarColumnaUnicaPlacard) {
-      headerCells.push(celdaSimple("Precio", { width: anchos.precio, bold: true, align: AlignmentType.RIGHT }));
+      encabezadoTxt += "\tPrecio";
     } else if (incluirPrecio) {
-      headerCells.push(celdaSimple("Precio unit.", { width: anchos.precio, bold: true, align: AlignmentType.RIGHT }));
+      encabezadoTxt += "\tPrecio unit.";
     }
+    cuerpo.push(
+      new Paragraph({
+        tabStops: filaTabStops,
+        spacing: { after: 40 },
+        children: [new TextRun({ text: encabezadoTxt, bold: true, size: 18 })],
+      }),
+    );
 
-    // Filas de ítems.
-    const filas = [new TableRow({ children: headerCells, tableHeader: true })];
+    // Filas de ítems: una línea principal (Cant, Detalle, Costo/Precio,
+    // alineados con tabulaciones) + líneas adicionales indentadas para
+    // descripción, accesorios y foto de mampara.
     for (const item of items) {
-      const detalleRuns = [
-        new TextRun({ text: item.nombreart ?? "" }),
+      const primeraLinea = [
+        new TextRun({ text: `${item.cantidad ?? 1}\t`, size: 18 }),
+        new TextRun({ text: item.nombreart ?? "", size: 18 }),
       ];
       if ((item.seccion === "Mampara" || item.seccion === "Puerta") && item.ancho && item.alto) {
-        detalleRuns.push(new TextRun({ text: ` (${item.ancho} × ${item.alto} cm)`, size: 16, color: "444444" }));
+        primeraLinea.push(new TextRun({ text: ` (${item.ancho} × ${item.alto} cm)`, size: 16, color: "444444" }));
       }
-      const parrafosDetalle = [new Paragraph({ children: detalleRuns })];
-
-      if (querDescripcion && item.descripcion && item.descripcion !== item.nombreart) {
-        parrafosDetalle.push(
-          new Paragraph({ children: [new TextRun({ text: item.descripcion, italics: true, size: 16, color: "444444" })] }),
-        );
-      }
-      if (Array.isArray(item.accesorios) && item.accesorios.length > 0) {
-        parrafosDetalle.push(
-          new Paragraph({
-            children: [new TextRun({ text: `Accesorios: ${item.accesorios.join(", ")}`, size: 15, color: "555555" })],
-          }),
-        );
-      }
-      if (item.seccion === "Mampara" && fotosMamparaPorModelo[item.descripcion]) {
-        parrafosDetalle.push(
-          new Paragraph({
-            children: [await imageRunEscalado(fotosMamparaPorModelo[item.descripcion], 100, 220)],
-          }),
-        );
-      }
-
-      const celdasFila = [
-        celdaSimple(item.cantidad ?? 1, { width: anchos.cant, align: AlignmentType.CENTER }),
-        new TableCell({ width: { size: anchos.detalle, type: WidthType.DXA }, children: parrafosDetalle }),
-      ];
       if (mostrarCosto) {
-        celdasFila.push(
-          celdaSimple(item.costo != null ? formatPeso(item.costo) : "—", { width: anchos.costo, align: AlignmentType.RIGHT }),
+        primeraLinea.push(
+          new TextRun({ text: `\t${item.costo != null ? formatPeso(item.costo) : "—"}`, size: 18 }),
         );
       }
       if (mostrarLineasSec) {
         columnasLineaSec.forEach((col) => {
           const pr = incluirPrecio ? (item.precios?.[col.idx]?.precio ?? item.precio ?? 0) : "";
-          celdasFila.push(celdaSimple(incluirPrecio ? formatPeso(pr) : "", { width: anchos.precio, align: AlignmentType.RIGHT }));
+          primeraLinea.push(new TextRun({ text: `\t${incluirPrecio ? formatPeso(pr) : ""}`, size: 18 }));
         });
       } else if (usarColumnaUnicaPlacard) {
-        celdasFila.push(celdaSimple(incluirPrecio ? formatPeso(item.precio) : "", { width: anchos.precio, align: AlignmentType.RIGHT }));
+        primeraLinea.push(new TextRun({ text: `\t${incluirPrecio ? formatPeso(item.precio) : ""}`, size: 18 }));
       } else if (incluirPrecio) {
-        celdasFila.push(celdaSimple(formatPeso(item.precio), { width: anchos.precio, align: AlignmentType.RIGHT }));
+        primeraLinea.push(new TextRun({ text: `\t${formatPeso(item.precio)}`, size: 18 }));
       }
-      filas.push(new TableRow({ children: celdasFila }));
+      cuerpo.push(new Paragraph({ tabStops: filaTabStops, children: primeraLinea }));
+
+      if (querDescripcion && item.descripcion && item.descripcion !== item.nombreart) {
+        cuerpo.push(
+          new Paragraph({
+            indent: { left: posDetalle },
+            children: [new TextRun({ text: item.descripcion, italics: true, size: 16, color: "444444" })],
+          }),
+        );
+      }
+      if (Array.isArray(item.accesorios) && item.accesorios.length > 0) {
+        cuerpo.push(
+          new Paragraph({
+            indent: { left: posDetalle },
+            children: [new TextRun({ text: `Accesorios: ${item.accesorios.join(", ")}`, size: 15, color: "555555" })],
+          }),
+        );
+      }
+      if (item.seccion === "Mampara" && fotosMamparaPorModelo[item.descripcion]) {
+        cuerpo.push(
+          new Paragraph({
+            indent: { left: posDetalle },
+            children: [await imageRunEscalado(fotosMamparaPorModelo[item.descripcion], 100, 220)],
+          }),
+        );
+      }
     }
 
-    // Fila de total del grupo.
-    const labelColspan = 2 + (mostrarCosto ? 1 : 0);
-    const totalLabelCell = new TableCell({
-      columnSpan: labelColspan,
-      width: { size: anchos.cant + anchos.detalle + (mostrarCosto ? anchos.costo : 0), type: WidthType.DXA },
-      borders: bordeSuperior,
-      children: [new Paragraph({ children: [new TextRun({ text: "Total:", bold: true })] })],
-    });
-    const celdasMonto = [];
+    // Línea de total del grupo — único separador real: una línea fina
+    // arriba (borde de párrafo, no de tabla).
+    const totalTabStops =
+      cantColumnasPrecio > 0
+        ? preciosRightEdges.map((p) => ({ type: "right", position: p }))
+        : [{ type: "right", position: ANCHO_TABLA }];
+    const totalChildren = [new TextRun({ text: "Total:", bold: true, size: 18 })];
     if (mostrarLineasSec) {
       subtotalesPorColumnaSec.forEach((col) =>
-        celdasMonto.push(celdaSimple(formatPeso(col.subtotal), { width: anchos.precio, bold: true, align: AlignmentType.RIGHT, borde: true })),
-      );
-    } else if (usarColumnaUnicaPlacard || incluirPrecio) {
-      celdasMonto.push(celdaSimple(formatPeso(subtotalSec), { width: anchos.precio, bold: true, align: AlignmentType.RIGHT, borde: true }));
-    }
-    // Si no queda ninguna columna de precio/línea visible, el monto del
-    // grupo se agrega igual, dentro de la misma celda del label "Total:"
-    // (mismo criterio que sinColumnaMonto en pdfPresupuesto.js).
-    if (celdasMonto.length === 0) {
-      filas.push(
-        new TableRow({
-          children: [
-            new TableCell({
-              columnSpan: labelColspan,
-              width: { size: anchos.cant + anchos.detalle + (mostrarCosto ? anchos.costo : 0), type: WidthType.DXA },
-              borders: bordeSuperior,
-              children: [new Paragraph({ children: [new TextRun({ text: "Total:", bold: true })] })],
-            }),
-            celdaSimple(formatPeso(subtotalSec), { width: anchos.precio, bold: true, align: AlignmentType.RIGHT, borde: true }),
-          ],
-        }),
+        totalChildren.push(new TextRun({ text: `\t${formatPeso(col.subtotal)}`, bold: true, size: 18 })),
       );
     } else {
-      filas.push(new TableRow({ children: [totalLabelCell, ...celdasMonto] }));
+      totalChildren.push(new TextRun({ text: `\t${formatPeso(subtotalSec)}`, bold: true, size: 18 }));
     }
-
     cuerpo.push(
-      new Table({
-        width: { size: ANCHO_TABLA, type: WidthType.DXA },
-        columnWidths: [anchos.cant, anchos.detalle, ...(mostrarCosto ? [anchos.costo] : []), ...Array(cantColumnasPrecio).fill(anchos.precio)],
-        borders: SIN_BORDES_TABLA,
-        rows: filas,
+      new Paragraph({
+        tabStops: totalTabStops,
+        spacing: { before: 80, after: 80 },
+        border: bordeSuperiorTotal,
+        children: totalChildren,
       }),
     );
 
