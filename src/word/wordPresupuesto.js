@@ -65,6 +65,24 @@ const anchosColumnas = ({ mostrarCosto, cantColumnasPrecio }) => {
 
 const bordeSuperior = { top: { style: BorderStyle.SINGLE, size: 4, color: "111111" } };
 
+// Sin esto, docx dibuja por defecto una grilla completa (arriba, abajo,
+// izquierda, derecha e internas) en cada Table que no declara `borders`
+// — es lo que generaba el recuadro cerrando cada celda. Al ponerlo en
+// NONE en las cuatro tablas de abajo, el layout por columnas se mantiene
+// (sigue siendo un Table, por eso el texto queda alineado), pero ya no
+// se ve ninguna línea salvo la que agrega a propósito celdaSimple con
+// `borde: true` (el único separador que se conserva: el que marca el
+// total de cada grupo, mismo criterio visual que la línea del footer o
+// la de "colocación no incluida" más abajo en este archivo).
+const SIN_BORDES_TABLA = {
+  top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+};
+
 const celdaSimple = (texto, { width, bold = false, align = AlignmentType.LEFT, borde }) =>
   new TableCell({
     width: { size: width, type: WidthType.DXA },
@@ -319,6 +337,7 @@ export async function generarPresupuestoWord({
       new Table({
         width: { size: ANCHO_TABLA, type: WidthType.DXA },
         columnWidths: [anchos.cant, anchos.detalle, ...(mostrarCosto ? [anchos.costo] : []), ...Array(cantColumnasPrecio).fill(anchos.precio)],
+        borders: SIN_BORDES_TABLA,
         rows: filas,
       }),
     );
