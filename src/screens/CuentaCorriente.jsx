@@ -169,8 +169,18 @@ export default function CuentaCorriente({
   const [guardandoRecibo, setGuardandoRecibo] = useState(false);
 
   // ── Remitos ───────────────────────────────────────────────────────────
+  // El botón "📦 Remito" de la tabla ahora abre primero un selector
+  // (modalTipoRemito) con 2 caminos distintos:
+  //   - "Traslado": es el flujo que ya estaba (modal con ítems pendientes +
+  //     .docx sin membrete oficial, pensado para acompañar la mercadería,
+  //     no tiene valor fiscal).
+  //   - "Oficial": imprime SOBRE un talonario oficial pre-impreso (sin
+  //     membrete propio, solo estampa los datos en las posiciones fijas
+  //     del papel) — en construcción, falta confirmar coordenadas exactas
+  //     antes de generar el PDF real.
+  //
   // obraRemito: la fila de movimiento (tipo="presupuesto") sobre la que se
-  // abrió el modal — trae numeropres/revision.
+  // abrió el selector — trae numeropres/revision, común a los dos caminos.
   // datosClienteRemito: nombre/dirección/teléfono de la obra, sacados de
   // /tabla-presupuestos/revisiones-confirmadas (mismo endpoint que ya usa
   // openRecibo) porque `selectedCliente` (fila de "resumen") no trae
@@ -178,6 +188,7 @@ export default function CuentaCorriente({
   // pendientesRemito: ítems de esa revisión con cantidad_total/remitida/
   // pendiente (GET /remitos/pendientes/:numeropres/:revision).
   // cantidadesRemito: { [tabla_presupuesto_id]: "texto tipeado por el usuario" }.
+  const [modalTipoRemito, setModalTipoRemito] = useState(false);
   const [modalRemito, setModalRemito] = useState(false);
   const [obraRemito, setObraRemito] = useState(null);
   const [datosClienteRemito, setDatosClienteRemito] = useState(null);
@@ -189,8 +200,28 @@ export default function CuentaCorriente({
   const [errorRemito, setErrorRemito] = useState("");
   const [guardandoRemito, setGuardandoRemito] = useState(false);
 
+  // Clic en "📦 Remito": abre el selector, no dispara ningún fetch
+  // todavía (eso queda para cuando el usuario elige un camino puntual).
   const abrirRemito = (row) => {
     setObraRemito(row);
+    setModalTipoRemito(true);
+  };
+
+  const elegirRemitoOficial = () => {
+    setModalTipoRemito(false);
+    // TODO: falta confirmar coordenadas exactas del talonario pre-impreso
+    // antes de generar el PDF real (ver conversación con el desarrollador).
+    alert(
+      "El remito oficial todavía está en construcción — falta calibrar las posiciones exactas del talonario pre-impreso.",
+    );
+  };
+
+  const elegirRemitoTraslado = () => {
+    setModalTipoRemito(false);
+    abrirRemitoTraslado(obraRemito);
+  };
+
+  const abrirRemitoTraslado = (row) => {
     setDatosClienteRemito(null);
     setPendientesRemito([]);
     setCantidadesRemito({});
@@ -1174,6 +1205,46 @@ export default function CuentaCorriente({
               disabled={guardandoRecibo}
             >
               {guardandoRecibo ? "Guardando..." : "Guardar y descargar PDF"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {modalTipoRemito && obraRemito && (
+        <Modal
+          title={`Remito — Obra Nº${obraRemito.numeropres} rev.${obraRemito.revision}`}
+          onClose={() => setModalTipoRemito(false)}
+        >
+          <p style={{ marginBottom: 16, color: "#555" }}>
+            ¿Qué tipo de remito querés generar?
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button
+              type="button"
+              className="btn-save"
+              onClick={elegirRemitoOficial}
+              style={{ padding: "12px 16px", textAlign: "left" }}
+            >
+              📋 Remito oficial
+              <div style={{ fontWeight: 400, fontSize: 12, opacity: 0.85 }}>
+                Se imprime sobre el talonario pre-impreso. Valor fiscal.
+              </div>
+            </button>
+            <button
+              type="button"
+              className="btn-cancel"
+              onClick={elegirRemitoTraslado}
+              style={{ padding: "12px 16px", textAlign: "left" }}
+            >
+              🚚 Remito de traslado
+              <div style={{ fontWeight: 400, fontSize: 12, opacity: 0.75 }}>
+                Documento propio (.docx) para acompañar la mercadería.
+              </div>
+            </button>
+          </div>
+          <div className="form-actions">
+            <button className="btn-cancel" onClick={() => setModalTipoRemito(false)}>
+              Cancelar
             </button>
           </div>
         </Modal>
