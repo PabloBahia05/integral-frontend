@@ -6,6 +6,7 @@ import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
 import { generarPdfRecibo } from "../pdf/pdfRecibo";
 import { generarPdfResumenCuenta } from "../pdf/pdfResumenCuenta";
+import { generarRemitoWord } from "../word/wordRemito";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -166,6 +167,155 @@ export default function CuentaCorriente({
   });
   const [errorRecibo, setErrorRecibo] = useState("");
   const [guardandoRecibo, setGuardandoRecibo] = useState(false);
+
+  // ── Remitos ───────────────────────────────────────────────────────────
+  // obraRemito: la fila de movimiento (tipo="presupuesto") sobre la que se
+  // abrió el modal — trae numeropres/revision.
+  // datosClienteRemito: nombre/dirección/teléfono de la obra, sacados de
+  // /tabla-presupuestos/revisiones-confirmadas (mismo endpoint que ya usa
+  // openRecibo) porque `selectedCliente` (fila de "resumen") no trae
+  // dirección.
+  // pendientesRemito: ítems de esa revisión con cantidad_total/remitida/
+  // pendiente (GET /remitos/pendientes/:numeropres/:revision).
+  // cantidadesRemito: { [tabla_presupuesto_id]: "texto tipeado por el usuario" }.
+  const [modalRemito, setModalRemito] = useState(false);
+  const [obraRemito, setObraRemito] = useState(null);
+  const [datosClienteRemito, setDatosClienteRemito] = useState(null);
+  const [pendientesRemito, setPendientesRemito] = useState([]);
+  const [loadingPendientesRemito, setLoadingPendientesRemito] = useState(false);
+  const [cantidadesRemito, setCantidadesRemito] = useState({});
+  const [fechaRemito, setFechaRemito] = useState(hoyISO());
+  const [observacionesRemito, setObservacionesRemito] = useState("");
+  const [errorRemito, setErrorRemito] = useState("");
+  const [guardandoRemito, setGuardandoRemito] = useState(false);
+
+  const abrirRemito = (row) => {
+    setObraRemito(row);
+    setDatosClienteRemito(null);
+    setPendientesRemito([]);
+    setCantidadesRemito({});
+    setFechaRemito(hoyISO());
+    setObservacionesRemito("");
+    setErrorRemito("");
+    setModalRemito(true);
+    setLoadingPendientesRemito(true);
+
+    Promise.all([
+      authFetch(
+        `${API}/remitos/pendientes/${row.numeropres}/${row.revision}`,
+      ).then((r) => r.json()),
+      authFetch(`${API}/tabla-presupuestos/revisiones-confirmadas`).then((r) =>
+        r.json(),
+      ),
+    ])
+      .then(([pendientes, confirmadas]) => {
+        setPendientesRemito(Array.isArray(pendientes) ? pendientes : []);
+        const obraInfo = (Array.isArray(confirmadas) ? confirmadas : []).find(
+          (o) =>
+            String(o.numeropres) === String(row.numeropres) &&
+            String(o.revision) === String(row.revision),
+        );
+        setDatosClienteRemito(obraInfo || null);
+      })
+      .catch((err) => {
+        console.error("Error cargando pendientes de remito:", err);
+        setErrorRemito("No se pudieron cargar los ítems pendientes de esta obra.");
+      })
+      .finally(() => setLoadingPendientesRemito(false));
+  };
+
+  const handleCantidadRemito = (tablaPresupuestoId, valor) => {
+    setCantidadesRemito((prev) => ({ ...prev, [tablaPresupuestoId]: valor }));
+  };
+
+  // Completa cada pendiente en su input — atajo para el caso más común
+  // (remito de entrega total, no parcial).
+  const completarTodoPendienteRemito = () => {
+    const nuevo = {};
+    pendientesRemito.forEach((it) => {
+      const pend = Number(it.cantidad_pendiente);
+      nuevo[it.tabla_presupuesto_id] = pend > 0 ? String(pend) : "0";
+    });
+    setCantidadesRemito(nuevo);
+  };
+
+  const handleGuardarRemito = async () => {
+    const itemsParaEnviar = pendientesRemito
+      .map((it) => {
+        const cantidad =
+          parseFloat(
+            String(cantidadesRemito[it.tabla_presupuesto_id] ?? "").replace(
+              ",",
+              ".",
+            ),
+          ) || 0;
+        return { ...it, cantidad };
+      })
+      .filter((it) => it.cantidad > 0);
+
+    if (!itemsParaEnviar.length) {
+      setErrorRemito("Ingresá una cantidad mayor a cero en al menos un ítem.");
+      return;
+    }
+    if (!fechaRemito) {
+      setErrorRemito("Elegí una fecha para el remito.");
+      return;
+    }
+
+    setGuardandoRemito(true);
+    try {
+      const res = await authFetch(`${API}/remitos`, {
+        method: "POST",
+        body: JSON.stringify({
+          numeropres: obraRemito.numeropres,
+          revision: obraRemito.revision,
+          codcliente: selectedCliente.codcliente,
+          fecha: fechaRemito,
+          observaciones: observacionesRemito,
+          items: itemsParaEnviar.map((it) => ({
+            tabla_presupuesto_id: it.tabla_presupuesto_id,
+            nombreart: it.nombreart,
+            cantidad: it.cantidad,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data?.error || "No se pudo guardar el remito.");
+
+      setModalRemito(false);
+
+      // Igual criterio que handleGuardarRecibo: se dispara la descarga
+      // después de cerrar el modal, sin esperar la promesa (descargarWord
+      // ya maneja sus propios errores con alert() adentro).
+      generarRemitoWord({
+        numeroRemito: data.numero,
+        numeropres: obraRemito.numeropres,
+        revision: obraRemito.revision,
+        fecha: fechaRemito,
+        cliente: datosClienteRemito?.nombre ?? selectedCliente?.nombre,
+        domicilio: datosClienteRemito?.direccion,
+        telefono1: datosClienteRemito?.telefono1 ?? selectedCliente?.telefono1,
+        telefono2: datosClienteRemito?.telefono2 ?? selectedCliente?.telefono2,
+        observaciones: observacionesRemito,
+        items: itemsParaEnviar.map((it) => ({
+          nombreart: it.nombreart,
+          tipo: it.tipo,
+          grupo: it.grupo,
+          color: it.color,
+          ancho: it.ancho,
+          alto: it.alto,
+          cantidad: it.cantidad,
+          cantidad_pendiente_restante: Number(it.cantidad_pendiente) - it.cantidad,
+        })),
+      });
+    } catch (err) {
+      console.error("Error guardando remito:", err);
+      setErrorRemito(err.message || "No se pudo guardar el remito.");
+    } finally {
+      setGuardandoRemito(false);
+    }
+  };
 
   const openRecibo = () => {
     setFormRecibo({
@@ -531,6 +681,26 @@ export default function CuentaCorriente({
       key: "saldo_acumulado",
       label: "Saldo",
       render: (value) => fmtMoneda(value),
+    },
+    {
+      key: "id",
+      label: "Remito",
+      render: (value, row) =>
+        row.tipo === "presupuesto" && row.numeropres != null ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              abrirRemito(row);
+            }}
+            className="btn-cancel"
+            style={{ padding: "4px 10px", fontSize: 12 }}
+          >
+            📦 Remito
+          </button>
+        ) : (
+          "—"
+        ),
     },
     {
       key: "facturado",
@@ -1004,6 +1174,124 @@ export default function CuentaCorriente({
               disabled={guardandoRecibo}
             >
               {guardandoRecibo ? "Guardando..." : "Guardar y descargar PDF"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {modalRemito && obraRemito && (
+        <Modal
+          title={`Nuevo remito — Obra Nº${obraRemito.numeropres} rev.${obraRemito.revision}`}
+          onClose={() => setModalRemito(false)}
+        >
+          {errorRemito && <p className="form-error">{errorRemito}</p>}
+
+          <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <label
+                className="pn-field-label"
+                style={{ display: "block", marginBottom: 4 }}
+              >
+                Fecha
+              </label>
+              <input
+                className="pn-field-input"
+                type="date"
+                value={fechaRemito}
+                onChange={(e) => setFechaRemito(e.target.value)}
+                style={{ width: "100%" }}
+              />
+            </div>
+            <div style={{ alignSelf: "flex-end" }}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={completarTodoPendienteRemito}
+                disabled={loadingPendientesRemito || !pendientesRemito.length}
+                style={{ padding: "8px 12px", fontSize: 13 }}
+              >
+                Completar todo lo pendiente
+              </button>
+            </div>
+          </div>
+
+          {loadingPendientesRemito ? (
+            <p>Cargando ítems pendientes...</p>
+          ) : !pendientesRemito.length ? (
+            <p>Esta obra no tiene ítems cargados.</p>
+          ) : (
+            <div style={{ maxHeight: 360, overflowY: "auto", marginBottom: 12 }}>
+              {pendientesRemito.map((it) => {
+                const pendiente = Number(it.cantidad_pendiente);
+                return (
+                  <div
+                    key={it.tabla_presupuesto_id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "8px 0",
+                      borderBottom: "1px solid #eee",
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600 }}>{it.nombreart}</div>
+                      <div style={{ fontSize: 12, color: "#777" }}>
+                        {it.tipo}
+                        {it.color ? ` · ${it.color}` : ""}
+                        {it.ancho && it.alto ? ` · ${it.ancho}×${it.alto} cm` : ""}
+                        {" · "}
+                        <span
+                          style={{ color: pendiente > 0 ? "#b45309" : "#1a7a3a" }}
+                        >
+                          {pendiente > 0
+                            ? `Pendiente: ${pendiente} de ${it.cantidad_total}`
+                            : `Entregado completo (${it.cantidad_total})`}
+                        </span>
+                      </div>
+                    </div>
+                    <input
+                      className="pn-field-input"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={cantidadesRemito[it.tabla_presupuesto_id] ?? ""}
+                      onChange={(e) =>
+                        handleCantidadRemito(it.tabla_presupuesto_id, e.target.value)
+                      }
+                      style={{ width: 80, textAlign: "right" }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <label
+            className="pn-field-label"
+            style={{ display: "block", marginBottom: 4 }}
+          >
+            Observaciones (opcional)
+          </label>
+          <textarea
+            className="pn-field-input"
+            value={observacionesRemito}
+            onChange={(e) => setObservacionesRemito(e.target.value)}
+            placeholder="Notas sobre esta entrega..."
+            rows={2}
+            style={{ width: "100%", resize: "vertical", marginBottom: 4 }}
+          />
+
+          <div className="form-actions">
+            <button className="btn-cancel" onClick={() => setModalRemito(false)}>
+              Cancelar
+            </button>
+            <button
+              className="btn-save"
+              onClick={handleGuardarRemito}
+              disabled={guardandoRemito || loadingPendientesRemito}
+            >
+              {guardandoRemito ? "Generando..." : "Generar remito y descargar Word"}
             </button>
           </div>
         </Modal>
