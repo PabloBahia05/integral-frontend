@@ -1507,19 +1507,13 @@ export default function PresupuestoNuevo({
 
   const aplicarAjuste = () => {
     const val = parseFloat(ajusteValor);
-    // OJO: antes era "if (!val || isNaN(val)) return;" — con val === 0
-    // (número válido) "!val" da true en JS, entonces aplicar 0% cortaba
-    // acá sin hacer nada y dejaba pegado el ajuste anterior. El resto de
-    // la función ya recalcula siempre desde preciosOriginales (no es
-    // acumulativa), así que alcanza con permitir que 0 pase.
+    // val === 0 es un número válido ("resetear a precio base"): no cortar
+    // acá por eso, solo si el campo está vacío o no es un número.
     if (ajusteValor === "" || isNaN(val)) return;
 
-    // Guardar originales antes del primer ajuste (precio + precios[] por
-    // línea + porcentaje1/2/3). Antes solo se guardaba precio/precios
-    // porque el ajuste con scope != "todos" mutaba el precio directo; ahora
-    // ese scope también recompone porcentaje1/2/3 (ver ajustarFila más
-    // abajo) para que sobreviva a guardar/reabrir, así que "Revertir"
-    // necesita poder restaurar esos campos también, no solo el precio.
+    // Foto de cómo estaba todo antes del primer "Aplicar" de esta tanda,
+    // solo para que "Revertir" pueda deshacer. NO se usa para calcular el
+    // nuevo precio (eso ahora sale siempre de precioBase, ver ajustarFila).
     if (!ajusteAplicado) {
       const orig = {};
       presupuestoItems.forEach((it) => {
@@ -1553,18 +1547,28 @@ export default function PresupuestoNuevo({
       );
     };
 
-    const ajustarFila = (id, f, origenPreciosOriginales) => {
+    // Simplemente lee el valor ingresado y lo aplica sobre precioBase: cada
+    // ítem/línea guarda su precioBase "limpio" (sin ningún % de este ajuste
+    // general aplicado), se fija la primera vez que se toca la fila, y de
+    // ahí en más SIEMPRE se recalcula desde ese valor guardado — nunca
+    // desde el último precio mostrado. Así, aplicar un % nuevo (incluido 0)
+    // reemplaza al anterior en vez de acumularse, sin depender de cuándo
+    // se haya tocado "Aplicar" antes ni de ajusteAplicado/preciosOriginales.
+    const ajustarFila = (id, f) => {
       if (!perteneceAScope(id, f)) return f;
-      const origItem = ajusteAplicado
-        ? origenPreciosOriginales[id]
-        : { precio: f.precio, precios: f.precios };
-      const precioBase = parseFloat(origItem?.precio ?? f.precio) || 0;
-      const nuevoPrecio = calcularAjuste(precioBase, val);
-      const preciosOrig = origItem?.precios ?? f.precios ?? [];
-      const nuevosPrecios = preciosOrig.map((p) => ({
-        ...p,
-        precio: String(calcularAjuste(p.precio, val)),
-      }));
+
+      const baseOriginal = parseFloat(f.precioBase ?? f.precio) || 0;
+      const nuevoPrecio = calcularAjuste(baseOriginal, val);
+
+      const preciosOrig = f.precios ?? [];
+      const nuevosPrecios = preciosOrig.map((p) => {
+        const baseOriginalLinea = parseFloat(p.precioBase ?? p.precio) || 0;
+        return {
+          ...p,
+          precioBase: p.precioBase ?? String(baseOriginalLinea),
+          precio: String(calcularAjuste(baseOriginalLinea, val)),
+        };
+      });
 
       // Scope "todos" ya es reproducible vía ajusteValor/ajusteModo
       // guardados a nivel de presupuesto (conAjusteGeneral en
@@ -1579,8 +1583,8 @@ export default function PresupuestoNuevo({
           const pct = pctEquivalente(p.precioBase, parseFloat(p.precio));
           if (pct != null) extraPct[`porcentaje${li + 1}`] = pct;
         });
-        if (!nuevosPrecios.length && f.precioBase != null && f.precioBase !== "") {
-          const pct = pctEquivalente(f.precioBase, nuevoPrecio);
+        if (!nuevosPrecios.length && baseOriginal) {
+          const pct = pctEquivalente(baseOriginal, nuevoPrecio);
           if (pct != null) extraPct.porcentaje1 = pct;
         }
       }
@@ -1588,37 +1592,18 @@ export default function PresupuestoNuevo({
       return {
         ...f,
         ...extraPct,
+        precioBase: f.precioBase ?? String(baseOriginal),
         precio: nuevoPrecio,
         precios: nuevosPrecios.length ? nuevosPrecios : f.precios,
       };
     };
 
-    // preciosOriginales puede no estar actualizado en este mismo tick si es
-    // el primer ajuste (setPreciosOriginales es async): armamos el mapa a
-    // usar de forma síncrona para no depender del timing de React.
-    const origenActual = ajusteAplicado
-      ? preciosOriginales
-      : Object.fromEntries(
-          presupuestoItems.map((it) => [
-            it.id,
-            {
-              precio: it.precio,
-              precios: (it.precios ?? []).map((p) => ({ ...p })),
-            },
-          ]),
-        );
-
-    // Cocina/Placard con scope "todos": el efecto de recálculo (deps
-    // [listaPrecio, ajusteAplicado, ajusteValor, ajusteModo, ajusteScope])
-    // ya se encarga de recalcular esas filas de forma reproducible en
-    // cuanto seteamos ajusteAplicado(true) más abajo. Si mutáramos acá
-    // también, el ajuste se aplicaría dos veces.
     if (ajusteScope !== "todos") {
       setCocinaItems((prev) => {
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
           next[familia] = filas.map((f, i) =>
-            ajustarFila(`cocina-${familia}-${i}`, f, origenActual),
+            ajustarFila(`cocina-${familia}-${i}`, f),
           );
         }
         return next;
@@ -1627,7 +1612,7 @@ export default function PresupuestoNuevo({
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
           next[familia] = filas.map((f, i) =>
-            ajustarFila(`placard-${familia}-${i}`, f, origenActual),
+            ajustarFila(`placard-${familia}-${i}`, f),
           );
         }
         return next;
@@ -1640,7 +1625,7 @@ export default function PresupuestoNuevo({
           // cuando cocinaItems/placardItems cambien arriba.
           return it;
         }
-        const ajustado = ajustarFila(it.id, it, origenActual);
+        const ajustado = ajustarFila(it.id, it);
         if (ajustado === it) return it;
         const nuevaCantidad = parseFloat(it.cantidad) || 1;
         return { ...ajustado, subtotal: ajustado.precio * nuevaCantidad };
