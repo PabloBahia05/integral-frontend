@@ -1507,7 +1507,12 @@ export default function PresupuestoNuevo({
 
   const aplicarAjuste = () => {
     const val = parseFloat(ajusteValor);
-    if (!val || isNaN(val)) return;
+    // OJO: antes era "if (!val || isNaN(val)) return;" — con val === 0
+    // (número válido) "!val" da true en JS, entonces aplicar 0% cortaba
+    // acá sin hacer nada y dejaba pegado el ajuste anterior. El resto de
+    // la función ya recalcula siempre desde preciosOriginales (no es
+    // acumulativa), así que alcanza con permitir que 0 pase.
+    if (ajusteValor === "" || isNaN(val)) return;
 
     // Guardar originales antes del primer ajuste (precio + precios[] por
     // línea + porcentaje1/2/3). Antes solo se guardaba precio/precios
