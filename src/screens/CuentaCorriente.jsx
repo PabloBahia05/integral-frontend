@@ -7,6 +7,7 @@ import ConfirmDelete from "../Component/ConfirmDelete";
 import { generarPdfRecibo } from "../pdf/pdfRecibo";
 import { generarPdfResumenCuenta } from "../pdf/pdfResumenCuenta";
 import { generarRemitoWord } from "../word/wordRemito";
+import { generarPdfRemitoOficial } from "../pdf/pdfRemitoOficial";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -209,11 +210,48 @@ export default function CuentaCorriente({
 
   const elegirRemitoOficial = () => {
     setModalTipoRemito(false);
-    // TODO: falta confirmar coordenadas exactas del talonario pre-impreso
-    // antes de generar el PDF real (ver conversación con el desarrollador).
-    alert(
-      "El remito oficial todavía está en construcción — falta calibrar las posiciones exactas del talonario pre-impreso.",
-    );
+    const row = obraRemito;
+    if (!row) return;
+
+    // BORRADOR: mismo fetch que abrirRemitoTraslado (pendientes de la
+    // obra + datos del cliente confirmado). Todavía no filtra por
+    // cantidad a entregar ni guarda nada en /remitos — es solo para
+    // generar un PDF de prueba y ajustar las coordenadas de
+    // pdf/pdfRemitoOficial.js contra el talonario real.
+    Promise.all([
+      authFetch(
+        `${API}/remitos/pendientes/${row.numeropres}/${row.revision}`,
+      ).then((r) => r.json()),
+      authFetch(`${API}/tabla-presupuestos/revisiones-confirmadas`).then(
+        (r) => r.json(),
+      ),
+    ])
+      .then(([pendientes, confirmadas]) => {
+        const items = Array.isArray(pendientes) ? pendientes : [];
+        const obraInfo = (Array.isArray(confirmadas) ? confirmadas : []).find(
+          (o) =>
+            String(o.numeropres) === String(row.numeropres) &&
+            String(o.revision) === String(row.revision),
+        );
+
+        // OJO: "ciudad" y "codart"/"grupo" por ítem son nombres de campo
+        // supuestos a partir del ejemplo del talonario — revisar contra
+        // lo que realmente devuelven estos dos endpoints y ajustar acá
+        // si hace falta.
+        generarPdfRemitoOficial({
+          fecha: hoyISO(),
+          numeroRemito: null, // TODO: falta definir numeración del talonario oficial
+          cliente: obraInfo?.nombre ?? selectedCliente?.nombre,
+          domicilio: obraInfo?.direccion,
+          ciudad: obraInfo?.ciudad ?? "",
+          obra: row.numeropres,
+          items,
+        });
+      })
+      .catch((err) => {
+        console.error("Error generando remito oficial:", err);
+        alert("No se pudieron cargar los datos para el remito oficial.");
+      });
   };
 
   const elegirRemitoTraslado = () => {
