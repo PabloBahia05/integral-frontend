@@ -223,7 +223,13 @@ export const estilosDocumento = {
 // footer de todas las páginas en vez de en una esquina fija del cuerpo,
 // porque en Word (a diferencia del PDF paginado a mano con jsPDF) el
 // footer se repite solo.
-export const construirEncabezadoPie = async ({ nro, revision }) => {
+// `etiqueta` permite reusar el mismo header/footer para otros documentos
+// que no son el presupuesto (ej. wordRemito.js pasa etiqueta="Remito") sin
+// tener que duplicar esta función — el logo, el ImageRun de la firma y el
+// mecanismo de descarga son 100% iguales, lo único que cambia es el texto
+// del footer. `revision` es opcional acá: un remito tiene numeración
+// propia y no siempre necesita mostrar la revisión de la obra al lado.
+export const construirEncabezadoPie = async ({ nro, revision, etiqueta = "Presupuesto" }) => {
   const logoBytes = Uint8Array.from(
     atob(MEMBRETE_DANIEL_ROQUE_B64.split(",")[1]),
     (c) => c.charCodeAt(0),
@@ -249,7 +255,10 @@ export const construirEncabezadoPie = async ({ nro, revision }) => {
         border: { top: { style: BorderStyle.SINGLE, size: 4, color: "111111" } },
         children: [
           new TextRun({ text: "Daniel Roque S.R.L. — Bahía Blanca", size: 16 }),
-          new TextRun({ text: `\tPresupuesto N° ${nro} — Rev. ${revision}`, size: 16 }),
+          new TextRun({
+            text: `\t${etiqueta} N° ${nro}${revision != null ? ` — Rev. ${revision}` : ""}`,
+            size: 16,
+          }),
         ],
       }),
     ],
