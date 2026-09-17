@@ -1528,25 +1528,6 @@ export default function PresupuestoNuevo({
       setPreciosOriginales(orig);
     }
 
-    // Convierte un precio final ya ajustado en el % equivalente sobre su
-    // base (precioBase), para que el ajuste quede persistido con el mismo
-    // principio que el % individual por ítem (valor = base × (1+%/100))
-    // en vez de guardarse como un número sin origen. El %lista se
-    // descuenta acá porque nunca se persiste — se sigue aplicando en vivo
-    // al mostrar/guardar, igual que hoy (ver aplicarPorcentaje). Si no
-    // conocemos la base de esa línea (ítems sin precioBase, ej. algunos
-    // "otros"), devuelve null y esa línea sigue sin %-reconstruible, como
-    // pasaba antes de este cambio.
-    const pctEquivalente = (precioBaseLinea, precioFinalNuevo) => {
-      const b = parseFloat(precioBaseLinea) || 0;
-      if (!b) return null;
-      const baseConLista = b * (1 + (listaPorcentaje || 0) / 100);
-      if (!baseConLista) return null;
-      return (
-        Math.round((precioFinalNuevo / baseConLista - 1) * 100 * 100) / 100
-      );
-    };
-
     // Simplemente lee el valor ingresado y lo aplica sobre precioBase: cada
     // ítem/línea guarda su precioBase "limpio" (sin ningún % de este ajuste
     // general aplicado), se fija la primera vez que se toca la fila, y de
@@ -1558,15 +1539,23 @@ export default function PresupuestoNuevo({
       if (!perteneceAScope(id, f)) return f;
 
       const baseOriginal = parseFloat(f.precioBase ?? f.precio) || 0;
-      const nuevoPrecio = calcularAjuste(baseOriginal, val);
+      // recalcFila (useCocinaPlacard) aplica porcentaje1/2/3 como factor
+      // MULTIPLICATIVO sobre el precio que ya incluye %lista (ver
+      // conExtra(conLista, pctExtra)) — así que acá hay que calcular sobre
+      // esa misma base "con lista", no sobre la base cruda, para que
+      // guardar porcentaje=val reproduzca el mismo precio.
+      const baseConLista = parseFloat(aplicarPorcentaje(String(baseOriginal))) || 0;
+      const nuevoPrecio = calcularAjuste(baseConLista, val);
 
       const preciosOrig = f.precios ?? [];
       const nuevosPrecios = preciosOrig.map((p) => {
         const baseOriginalLinea = parseFloat(p.precioBase ?? p.precio) || 0;
+        const baseConListaLinea =
+          parseFloat(aplicarPorcentaje(String(baseOriginalLinea))) || 0;
         return {
           ...p,
           precioBase: p.precioBase ?? String(baseOriginalLinea),
-          precio: String(calcularAjuste(baseOriginalLinea, val)),
+          precio: String(calcularAjuste(baseConListaLinea, val)),
         };
       });
 
@@ -1577,15 +1566,19 @@ export default function PresupuestoNuevo({
       // scope en tabla_presupuestos, así que en vez de eso componemos el
       // ajuste directo en porcentaje1/2/3 de cada ítem afectado: mismo
       // resultado visual, pero ahora sí sobrevive a guardar/reabrir.
+      // El valor a guardar es directamente `val` (ya sea 0, positivo o
+      // negativo): como recalcFila multiplica porcentaje1/2/3 sobre el
+      // precio CON %lista, no hace falta "compensar" el %lista acá — eso
+      // era lo que producía un % negativo espurio al aplicar 0% con una
+      // lista con recargo/descuento activo.
       const extraPct = {};
       if (ajusteScope !== "todos") {
-        nuevosPrecios.forEach((p, li) => {
-          const pct = pctEquivalente(p.precioBase, parseFloat(p.precio));
-          if (pct != null) extraPct[`porcentaje${li + 1}`] = pct;
-        });
-        if (!nuevosPrecios.length && baseOriginal) {
-          const pct = pctEquivalente(baseOriginal, nuevoPrecio);
-          if (pct != null) extraPct.porcentaje1 = pct;
+        if (nuevosPrecios.length) {
+          nuevosPrecios.forEach((_, li) => {
+            extraPct[`porcentaje${li + 1}`] = val;
+          });
+        } else if (baseOriginal) {
+          extraPct.porcentaje1 = val;
         }
       }
 
