@@ -527,6 +527,39 @@ export default function TabCocina({
                   textAlign: "center",
                   border: "1px solid #c8dae8",
                   fontWeight: 700,
+                  width: 70,
+                }}
+              >
+                Ancho
+              </th>
+              <th
+                style={{
+                  padding: "8px 12px",
+                  textAlign: "center",
+                  border: "1px solid #c8dae8",
+                  fontWeight: 700,
+                  width: 70,
+                }}
+              >
+                Alto
+              </th>
+              <th
+                style={{
+                  padding: "8px 12px",
+                  textAlign: "center",
+                  border: "1px solid #c8dae8",
+                  fontWeight: 700,
+                  width: 70,
+                }}
+              >
+                Prof.
+              </th>
+              <th
+                style={{
+                  padding: "8px 12px",
+                  textAlign: "center",
+                  border: "1px solid #c8dae8",
+                  fontWeight: 700,
                   width: 90,
                 }}
               >
@@ -774,6 +807,78 @@ export default function TabCocina({
                         setCocinaFila((f) => ({
                           ...f,
                           cantidad: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "100%",
+                        textAlign: "center",
+                        fontFamily: "'Space Mono',monospace",
+                        fontSize: 12,
+                        border: "1px solid #7aaac8",
+                        padding: "4px 4px",
+                        borderRadius: 2,
+                      }}
+                    />
+                  </td>
+                  <td
+                    style={{ padding: "6px 8px", border: "1px solid #c8dae8" }}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      value={cocinaFila.ancho ?? ""}
+                      onChange={(e) =>
+                        setCocinaFila((f) => ({
+                          ...f,
+                          ancho: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "100%",
+                        textAlign: "center",
+                        fontFamily: "'Space Mono',monospace",
+                        fontSize: 12,
+                        border: "1px solid #7aaac8",
+                        padding: "4px 4px",
+                        borderRadius: 2,
+                      }}
+                    />
+                  </td>
+                  <td
+                    style={{ padding: "6px 8px", border: "1px solid #c8dae8" }}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      value={cocinaFila.alto ?? ""}
+                      onChange={(e) =>
+                        setCocinaFila((f) => ({
+                          ...f,
+                          alto: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "100%",
+                        textAlign: "center",
+                        fontFamily: "'Space Mono',monospace",
+                        fontSize: 12,
+                        border: "1px solid #7aaac8",
+                        padding: "4px 4px",
+                        borderRadius: 2,
+                      }}
+                    />
+                  </td>
+                  <td
+                    style={{ padding: "6px 8px", border: "1px solid #c8dae8" }}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      value={cocinaFila.profundidad ?? ""}
+                      onChange={(e) =>
+                        setCocinaFila((f) => ({
+                          ...f,
+                          profundidad: e.target.value,
                         }))
                       }
                       style={{
@@ -1120,6 +1225,36 @@ export default function TabCocina({
                   </td>
                   <td
                     style={{
+                      padding: "8px 12px",
+                      border: "1px solid #c8dae8",
+                      textAlign: "center",
+                      color: "#334155",
+                    }}
+                  >
+                    {fila.ancho || "—"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "8px 12px",
+                      border: "1px solid #c8dae8",
+                      textAlign: "center",
+                      color: "#334155",
+                    }}
+                  >
+                    {fila.alto || "—"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "8px 12px",
+                      border: "1px solid #c8dae8",
+                      textAlign: "center",
+                      color: "#334155",
+                    }}
+                  >
+                    {fila.profundidad || "—"}
+                  </td>
+                  <td
+                    style={{
                       padding: "6px 8px",
                       border: "1px solid #c8dae8",
                       textAlign: "center",
@@ -1391,7 +1526,7 @@ export default function TabCocina({
             {/* Fila de total */}
             <tr style={{ background: "#e8f4ee" }}>
               <td
-                colSpan={4}
+                colSpan={7}
                 style={{
                   padding: "8px 12px",
                   border: "1px solid #c8dae8",
@@ -1717,6 +1852,105 @@ export default function TabCocina({
                 onChange={(e) =>
                   setCocinaFila((f) => ({ ...f, cantidad: e.target.value }))
                 }
+                style={{
+                  width: "100%",
+                  textAlign: "center",
+                  fontFamily: "'Space Mono',monospace",
+                  fontSize: 12,
+                  border: "1px solid #b8cfe0",
+                  padding: "6px 6px",
+                  borderRadius: 2,
+                }}
+              />
+            </div>
+
+            {/* Ancho */}
+            <div style={{ flex: "0 0 80px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "#6699bb",
+                  marginBottom: 4,
+                }}
+              >
+                Ancho
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={cocinaFila.ancho ?? ""}
+                onChange={(e) =>
+                  setCocinaFila((f) => ({ ...f, ancho: e.target.value }))
+                }
+                placeholder="—"
+                style={{
+                  width: "100%",
+                  textAlign: "center",
+                  fontFamily: "'Space Mono',monospace",
+                  fontSize: 12,
+                  border: "1px solid #b8cfe0",
+                  padding: "6px 6px",
+                  borderRadius: 2,
+                }}
+              />
+            </div>
+
+            {/* Alto */}
+            <div style={{ flex: "0 0 80px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "#6699bb",
+                  marginBottom: 4,
+                }}
+              >
+                Alto
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={cocinaFila.alto ?? ""}
+                onChange={(e) =>
+                  setCocinaFila((f) => ({ ...f, alto: e.target.value }))
+                }
+                placeholder="—"
+                style={{
+                  width: "100%",
+                  textAlign: "center",
+                  fontFamily: "'Space Mono',monospace",
+                  fontSize: 12,
+                  border: "1px solid #b8cfe0",
+                  padding: "6px 6px",
+                  borderRadius: 2,
+                }}
+              />
+            </div>
+
+            {/* Prof. */}
+            <div style={{ flex: "0 0 80px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "#6699bb",
+                  marginBottom: 4,
+                }}
+              >
+                Prof.
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={cocinaFila.profundidad ?? ""}
+                onChange={(e) =>
+                  setCocinaFila((f) => ({
+                    ...f,
+                    profundidad: e.target.value,
+                  }))
+                }
+                placeholder="—"
                 style={{
                   width: "100%",
                   textAlign: "center",
