@@ -9,11 +9,18 @@ import VisorDWG from "./VisorDWG";
 
 const API = "https://integral-backend-production.up.railway.app";
 
-// Tabla modulos-domus: se usa para saber si el código de `modulo` de una fila
-// tiene fórmula de producción (botón CSV verde/azul vs rojo). AJUSTAR acá los
-// nombres de columna si en la tabla se llaman distinto.
-const MODULOS_DOMUS_CAMPO_CODIGO = "codigo"; // columna con el código de módulo
-const MODULOS_DOMUS_CAMPO_FORMULA = "formula"; // columna con la fórmula (vacía = sin fórmula)
+// Tabla modulos-domus (una fila por pieza de cada artículo): se usa para saber
+// si el código de `modulo` de una fila tiene fórmula de producción (botón CSV
+// verde/azul vs rojo). Un código cuenta como "con fórmula" si alguna de sus
+// filas tiene cargada una columna cuyo nombre empiece con "formula"
+// (formula_alto, formula_ancho...). AJUSTAR el nombre de la columna del código
+// si en la tabla se llama distinto.
+const MODULOS_DOMUS_CAMPO_CODIGO = "codigo";
+const tieneAlgunaFormula = (fila) =>
+  Object.entries(fila).some(
+    ([k, v]) =>
+      k.toLowerCase().startsWith("formula") && String(v ?? "").trim() !== "",
+  );
 const normalizarCodigo = (c) => String(c ?? "").trim().toUpperCase();
 
 // ── Componente ────────────────────────────────────────────────────────────
@@ -577,10 +584,7 @@ export default function Produccion({ authFetch, token }) {
         setModulosConFormula(
           new Set(
             lista
-              .filter(
-                (m) =>
-                  String(m[MODULOS_DOMUS_CAMPO_FORMULA] ?? "").trim() !== "",
-              )
+              .filter(tieneAlgunaFormula)
               .map((m) => normalizarCodigo(m[MODULOS_DOMUS_CAMPO_CODIGO])),
           ),
         );
