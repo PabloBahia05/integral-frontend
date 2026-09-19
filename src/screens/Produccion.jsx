@@ -11,16 +11,12 @@ const API = "https://integral-backend-production.up.railway.app";
 
 // Tabla modulos-domus (una fila por pieza de cada artículo): se usa para saber
 // si el código de `modulo` de una fila tiene fórmula de producción (botón CSV
-// verde/azul vs rojo). Un código cuenta como "con fórmula" si alguna de sus
-// filas tiene cargada una columna cuyo nombre empiece con "formula"
-// (formula_alto, formula_ancho...). AJUSTAR el nombre de la columna del código
-// si en la tabla se llama distinto.
-const MODULOS_DOMUS_CAMPO_CODIGO = "codigo";
+// verde/azul vs rojo). El código se compara contra `codartint`; el código
+// cuenta como "con fórmula" si alguna de sus piezas tiene `formulax` o
+// `formulay` cargada.
+const MODULOS_DOMUS_CAMPO_CODIGO = "codartint";
 const tieneAlgunaFormula = (fila) =>
-  Object.entries(fila).some(
-    ([k, v]) =>
-      k.toLowerCase().startsWith("formula") && String(v ?? "").trim() !== "",
-  );
+  ["formulax", "formulay"].some((k) => String(fila[k] ?? "").trim() !== "");
 const normalizarCodigo = (c) => String(c ?? "").trim().toUpperCase();
 
 // ── Componente ────────────────────────────────────────────────────────────
@@ -589,13 +585,6 @@ export default function Produccion({ authFetch, token }) {
             .filter(tieneAlgunaFormula)
             .map((m) => normalizarCodigo(m[MODULOS_DOMUS_CAMPO_CODIGO])),
         );
-        // Diagnóstico: ver en la consola (F12) qué llegó y qué códigos se armaron
-        console.info("[modulos-domus]", {
-          filas: lista.length,
-          columnas: lista[0] ? Object.keys(lista[0]) : [],
-          ejemplo: lista[0],
-          codigosConFormula: [...codigos],
-        });
         setModulosConFormula(codigos);
       })
       .catch((e) => console.error("Error cargando modulos-domus:", e));
