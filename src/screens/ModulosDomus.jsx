@@ -8,6 +8,11 @@ import ConfirmDelete from "../Component/ConfirmDelete";
 
 const API = "https://integral-backend-production.up.railway.app";
 
+// Familia de una fórmula de producción (columna `familia` de
+// formulas_produccion). Si el backend la manda con otro nombre, cambiarlo acá.
+const CAMPO_FAMILIA_FORMULA = "familia";
+const familiaDe = (f) => String(f?.[CAMPO_FAMILIA_FORMULA] ?? "").trim();
+
 // ── Componente ────────────────────────────────────────────────────────────
 //
 // CRUD de `modulos-domus`: guarda las PIEZAS que componen cada artículo
@@ -57,22 +62,27 @@ const CAMPOS_NUMERICOS = [
 // registro. El desplegable usa
 // un portal a document.body, posicionado con getBoundingClientRect(),
 // para que no quede recortado por el overflow-x del mini-table.
-function SelectorFormulaMadre({ formulas, cargarFormulas, onElegir }) {
+function SelectorFormulaMadre({ formulas, cargarFormulas, onElegir, familia = "" }) {
   const [busqueda, setBusqueda] = useState("");
   const [focus, setFocus] = useState(false);
   const [coords, setCoords] = useState(null);
   const inputRef = useRef(null);
 
   const fq = busqueda.trim().toLowerCase();
-  const resultados = fq
-    ? formulas
-        .filter(
-          (f) =>
-            (f.codform ?? "").toLowerCase().includes(fq) ||
-            (f.descripcion ?? "").toLowerCase().includes(fq),
-        )
-        .slice(0, 15)
-    : [];
+  // Con una familia elegida se listan sus fórmulas aunque todavía no se haya
+  // escrito nada; sin familia ni texto no se muestra nada (como antes).
+  const resultados =
+    fq || familia
+      ? formulas
+          .filter(
+            (f) =>
+              (!familia || familiaDe(f) === familia) &&
+              (!fq ||
+                (f.codform ?? "").toLowerCase().includes(fq) ||
+                (f.descripcion ?? "").toLowerCase().includes(fq)),
+          )
+          .slice(0, 15)
+      : [];
 
   const actualizarCoords = useCallback(() => {
     const el = inputRef.current;
@@ -418,6 +428,9 @@ export default function ModulosDomus({ authFetch, token }) {
   // (`formula3`) de ese registro — formulas_produccion no tiene columnas
   // separadas "formula_ancho"/"formula_alto"/"formula_profundidad".
   const [busquedaFormula, setBusquedaFormula] = useState("");
+  // Filtro por familia de fórmula: aplica a todos los buscadores de fórmula
+  // del panel (el de cada pieza y el de "Nueva pieza"). "" = todas.
+  const [filtroFamiliaFormula, setFiltroFamiliaFormula] = useState("");
   const [formulaFocus, setFormulaFocus] = useState(false);
   const [piezaFormula, setPiezaFormula] = useState("");
   const [piezaTitulo, setPiezaTitulo] = useState("");
@@ -737,14 +750,20 @@ export default function ModulosDomus({ authFetch, token }) {
     }
   };
 
+  const familiasFormulas = [
+    ...new Set(formulas.map(familiaDe).filter(Boolean)),
+  ].sort((a, b) => a.localeCompare(b, "es"));
+
   const filtrarFormulas = (busqueda) => {
     const fq = busqueda.trim().toLowerCase();
-    if (!fq) return [];
+    if (!fq && !filtroFamiliaFormula) return [];
     return formulas
       .filter(
         (f) =>
-          (f.codform ?? "").toLowerCase().includes(fq) ||
-          (f.descripcion ?? "").toLowerCase().includes(fq),
+          (!filtroFamiliaFormula || familiaDe(f) === filtroFamiliaFormula) &&
+          (!fq ||
+            (f.codform ?? "").toLowerCase().includes(fq) ||
+            (f.descripcion ?? "").toLowerCase().includes(fq)),
       )
       .slice(0, 20);
   };
@@ -1040,6 +1059,7 @@ export default function ModulosDomus({ authFetch, token }) {
         <SelectorFormulaMadre
           formulas={formulas}
           cargarFormulas={fetchFormulas}
+          familia={filtroFamiliaFormula}
           onElegir={(f) => elegirFormulaPieza(row, f)}
         />
       ),
@@ -1547,6 +1567,61 @@ export default function ModulosDomus({ authFetch, token }) {
               Cada pieza con fórmula asignada genera un renglón en el CSV de
               fórmulas de producción de este artículo.
             </p>
+
+            {familiasFormulas.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  margin: "0 0 12px",
+                }}
+              >
+                <label
+                  htmlFor="filtro-familia-formula"
+                  style={{ fontSize: 11, color: "#5a86ab" }}
+                >
+                  Familia de fórmula
+                </label>
+                <select
+                  id="filtro-familia-formula"
+                  value={filtroFamiliaFormula}
+                  onChange={(e) => setFiltroFamiliaFormula(e.target.value)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: 12,
+                    fontFamily: "'Space Mono',monospace",
+                    border: "1.5px solid #b8d6ef",
+                    borderRadius: 4,
+                    color: "#0a3a5c",
+                    background: "#fff",
+                    maxWidth: 260,
+                  }}
+                >
+                  <option value="">Todas</option>
+                  {familiasFormulas.map((fam) => (
+                    <option key={fam} value={fam}>
+                      {fam}
+                    </option>
+                  ))}
+                </select>
+                {filtroFamiliaFormula && (
+                  <button
+                    onClick={() => setFiltroFamiliaFormula("")}
+                    style={{
+                      border: "none",
+                      background: "none",
+                      color: "#4a8ab5",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Quitar filtro
+                  </button>
+                )}
+              </div>
+            )}
 
             {errorDuplicar && (
               <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 8px" }}>
