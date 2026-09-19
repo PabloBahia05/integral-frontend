@@ -673,6 +673,11 @@ export default function PresupuestoNuevo({
   const guardandoRef = useRef(false);
   const [guardadoOk, setGuardadoOk] = useState(false);
   const [error, setError] = useState("");
+  // Aviso puntual cuando "Guardar" pidió pisar una revisión que ya estaba
+  // confirmada: el backend no la pisa, crea una revisión nueva sin
+  // confirmar (ver POST /tabla-presupuestos) y acá se lo mostramos al
+  // usuario para que no piense que guardó sobre la Rev. que tenía abierta.
+  const [avisoRevisionNueva, setAvisoRevisionNueva] = useState("");
 
   // Lista de precios
   const [listasDB, setListasDB] = useState([]); // listas traídas de BD
@@ -2661,6 +2666,20 @@ export default function PresupuestoNuevo({
       // El servidor devuelve numero (= numeropres de tabla_indice) y revision
       const numAsignado = data.numero ?? data.NUMERO ?? data.id;
       const revAsignada = data.revision ?? data.REVISION ?? revision;
+
+      // La revisión que se pedía pisar ya estaba confirmada: el backend la
+      // redirigió a una revisión nueva sin confirmar (ver
+      // POST /tabla-presupuestos). Avisamos con el número real que quedó
+      // guardado.
+      if (data.redirigidoPorConfirmada) {
+        setAvisoRevisionNueva(
+          `La Rev. ${data.revisionSolicitada} estaba confirmada, se guardó como Rev. ${revAsignada}.`,
+        );
+        setTimeout(() => setAvisoRevisionNueva(""), 8000);
+      } else {
+        setAvisoRevisionNueva("");
+      }
+
       if (numAsignado != null) {
         setNumeroPres(numAsignado);
         setNumero(String(numAsignado).padStart(4, "0"));
@@ -4016,6 +4035,9 @@ export default function PresupuestoNuevo({
         {/* Cuerpo */}
         <div className="pn-body">
           {error && <div className="pn-error">⚠️ {error}</div>}
+          {avisoRevisionNueva && (
+            <div className="pn-ok">ℹ️ {avisoRevisionNueva}</div>
+          )}
           {guardadoOk && (
             <div className="pn-ok">✅ Presupuesto guardado correctamente</div>
           )}
