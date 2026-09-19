@@ -580,14 +580,23 @@ export default function Produccion({ authFetch, token }) {
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
-        const lista = Array.isArray(data) ? data : [];
-        setModulosConFormula(
-          new Set(
-            lista
-              .filter(tieneAlgunaFormula)
-              .map((m) => normalizarCodigo(m[MODULOS_DOMUS_CAMPO_CODIGO])),
-          ),
+        // Acepta un array directo o un objeto que envuelva el array
+        const lista = Array.isArray(data)
+          ? data
+          : Object.values(data ?? {}).find(Array.isArray) ?? [];
+        const codigos = new Set(
+          lista
+            .filter(tieneAlgunaFormula)
+            .map((m) => normalizarCodigo(m[MODULOS_DOMUS_CAMPO_CODIGO])),
         );
+        // Diagnóstico: ver en la consola (F12) qué llegó y qué códigos se armaron
+        console.info("[modulos-domus]", {
+          filas: lista.length,
+          columnas: lista[0] ? Object.keys(lista[0]) : [],
+          ejemplo: lista[0],
+          codigosConFormula: [...codigos],
+        });
+        setModulosConFormula(codigos);
       })
       .catch((e) => console.error("Error cargando modulos-domus:", e));
   }, []);
@@ -1096,7 +1105,11 @@ export default function Produccion({ authFetch, token }) {
               handleDescargarCSV(row);
             }}
             disabled={sinFormula || generando}
-            title={est.title}
+            title={
+              sinFormula
+                ? `${est.title} (módulo: "${row.modulo || ""}")`
+                : est.title
+            }
             style={{
               background: est.background,
               color: est.color,
