@@ -424,7 +424,71 @@ export default function Produccion({ authFetch, token }) {
   // esa fila (vía Asociación de Fórmulas) y devuelve un CSV con los
   // resultados (Valor 1 / Valor 2 de cada fórmula).
   const [generandoCSV, setGenerandoCSV] = useState(null);
-  const [errorCSV, setErrorCSV] = useState(null);
+
+  // Ids de las filas cuyo CSV ya se descargó (el botón pasa a azul). Se
+  // guarda en localStorage para que sobreviva a recargar la pantalla; es
+  // por navegador. Si el backend manda `csv_descargado` en la fila, también
+  // se respeta (ver estadoBotonCSV).
+  const [csvDescargados, setCsvDescargados] = useState(() => {
+    try {
+      const guardado = JSON.parse(
+        localStorage.getItem("produccion_csv_descargados") || "[]",
+      );
+      return new Set(Array.isArray(guardado) ? guardado : []);
+    } catch {
+      return new Set();
+    }
+  });
+
+  const marcarCSVDescargado = (id) => {
+    setCsvDescargados((prev) => {
+      const next = new Set(prev).add(id);
+      try {
+        localStorage.setItem(
+          "produccion_csv_descargados",
+          JSON.stringify([...next]),
+        );
+      } catch {
+        /* sin storage: el azul dura hasta recargar */
+      }
+      return next;
+    });
+  };
+
+  // Estado del botón CSV de una fila:
+  //  - "sinFormula": el código de módulo está vacío o no tiene fórmula de
+  //    producción asociada → rojo, deshabilitado. El backend informa esto
+  //    en `tiene_formula` (GET /produccion). Si el campo no viene, se
+  //    asume que sí tiene (comportamiento anterior).
+  //  - "descargado": ya se descargó el CSV de esa fila → azul.
+  //  - "conFormula": tiene fórmula y todavía no se descargó → verde.
+  const estadoBotonCSV = (row) => {
+    const tieneModulo = !!(row.modulo && row.modulo.trim());
+    if (!tieneModulo || row.tiene_formula === false) return "sinFormula";
+    if (row.csv_descargado || csvDescargados.has(row.id)) return "descargado";
+    return "conFormula";
+  };
+
+  const ESTILO_BOTON_CSV = {
+    conFormula: {
+      background: "#eafbf0",
+      color: "#1a7a44",
+      border: "#a5d6a7",
+      title: "Descargar CSV con resultados de fórmulas",
+    },
+    descargado: {
+      background: "#e3f0ff",
+      color: "#1565c0",
+      border: "#90caf9",
+      title: "CSV ya descargado — click para volver a descargarlo",
+    },
+    sinFormula: {
+      background: "#fdf0f0",
+      color: "#c0392b",
+      border: "#f0a0a0",
+      title: "Este módulo no tiene fórmula de producción asociada",
+    },
+  };
 
   // Panel provisorio: se abre cuando el backend responde 422 (a la fila le
   // falta codartint/ancho/alto para poder calcular las fórmulas asociadas).
@@ -610,7 +674,6 @@ export default function Produccion({ authFetch, token }) {
 
   const handleDescargarCSV = async (row) => {
     setGenerandoCSV(row.id);
-    setErrorCSV(null);
     try {
       const res = await authFetch(`${API}/produccion/${row.id}/formulas-csv`);
       if (res.status === 422) {
@@ -636,9 +699,9 @@ export default function Produccion({ authFetch, token }) {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      marcarCSVDescargado(row.id);
     } catch (e) {
       console.error("Error generando CSV:", e);
-      setErrorCSV(row.id);
       alert(e.message || "No se pudo generar el CSV.");
     } finally {
       setGenerandoCSV(null);
@@ -984,30 +1047,36 @@ export default function Produccion({ authFetch, token }) {
     {
       key: "csv",
       label: "CSV",
-      render: (v, row) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDescargarCSV(row);
-          }}
-          disabled={generandoCSV === row.id}
-          title="Descargar CSV con resultados de fórmulas"
-          style={{
-            background: errorCSV === row.id ? "#fdf0f0" : "#eafbf0",
-            color: errorCSV === row.id ? "#c0392b" : "#1a7a44",
-            border: `1px solid ${errorCSV === row.id ? "#f0a0a0" : "#a5d6a7"}`,
-            borderRadius: "4px",
-            padding: "3px 10px",
-            fontSize: "12px",
-            fontWeight: 700,
-            cursor: generandoCSV === row.id ? "wait" : "pointer",
-            fontFamily: "'Space Mono', monospace",
-            opacity: generandoCSV === row.id ? 0.6 : 1,
-          }}
-        >
-          {generandoCSV === row.id ? "…" : "📄 CSV"}
-        </button>
-      ),
+      render: (v, row) => {
+        const estado = estadoBotonCSV(row);
+        const est = ESTILO_BOTON_CSV[estado];
+        const sinFormula = estado === "sinFormula";
+        const generando = generandoCSV === row.id;
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDescargarCSV(row);
+            }}
+            disabled={sinFormula || generando}
+            title={est.title}
+            style={{
+              background: est.background,
+              color: est.color,
+              border: `1px solid ${est.border}`,
+              borderRadius: "4px",
+              padding: "3px 10px",
+              fontSize: "12px",
+              fontWeight: 700,
+              cursor: generando ? "wait" : sinFormula ? "not-allowed" : "pointer",
+              fontFamily: "'Space Mono', monospace",
+              opacity: generando ? 0.6 : 1,
+            }}
+          >
+            {generando ? "…" : "📄 CSV"}
+          </button>
+        );
+      },
     },
   ];
 
