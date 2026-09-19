@@ -9,6 +9,13 @@ import VisorDWG from "./VisorDWG";
 
 const API = "https://integral-backend-production.up.railway.app";
 
+// Tabla modulos-domus: se usa para saber si el código de `modulo` de una fila
+// tiene fórmula de producción (botón CSV verde/azul vs rojo). AJUSTAR acá los
+// nombres de columna si en la tabla se llaman distinto.
+const MODULOS_DOMUS_CAMPO_CODIGO = "codigo"; // columna con el código de módulo
+const MODULOS_DOMUS_CAMPO_FORMULA = "formula"; // columna con la fórmula (vacía = sin fórmula)
+const normalizarCodigo = (c) => String(c ?? "").trim().toUpperCase();
+
 // ── Componente ────────────────────────────────────────────────────────────
 //
 // Lista los ítems que caen en `produccion` al confirmar un presupuesto
@@ -456,15 +463,19 @@ export default function Produccion({ authFetch, token }) {
   };
 
   // Estado del botón CSV de una fila:
-  //  - "sinFormula": el código de módulo está vacío o no tiene fórmula de
-  //    producción asociada → rojo, deshabilitado. El backend informa esto
-  //    en `tiene_formula` (GET /produccion). Si el campo no viene, se
-  //    asume que sí tiene (comportamiento anterior).
+  //  - "sinFormula": el código de módulo está vacío o no figura con fórmula
+  //    en la tabla modulos-domus → rojo, deshabilitado.
   //  - "descargado": ya se descargó el CSV de esa fila → azul.
   //  - "conFormula": tiene fórmula y todavía no se descargó → verde.
+  // Si modulos-domus no pudo cargarse, se usa `row.tiene_formula` (si el
+  // backend lo manda) o se asume que sí tiene fórmula.
   const estadoBotonCSV = (row) => {
     const tieneModulo = !!(row.modulo && row.modulo.trim());
-    if (!tieneModulo || row.tiene_formula === false) return "sinFormula";
+    if (!tieneModulo) return "sinFormula";
+    const tieneFormula = modulosConFormula
+      ? modulosConFormula.has(normalizarCodigo(row.modulo))
+      : row.tiene_formula !== false;
+    if (!tieneFormula) return "sinFormula";
     if (row.csv_descargado || csvDescargados.has(row.id)) return "descargado";
     return "conFormula";
   };
@@ -503,6 +514,11 @@ export default function Produccion({ authFetch, token }) {
   // en produccion.color, pero en pantalla siempre se muestra `articulo`
   // (el nombre), vía este mapa.
   const [melaminas, setMelaminas] = useState([]);
+
+  // Códigos de módulo (normalizados) que tienen fórmula de producción en la
+  // tabla modulos-domus. `null` = todavía no cargó o falló la carga; en ese
+  // caso el botón CSV usa `row.tiene_formula` como respaldo.
+  const [modulosConFormula, setModulosConFormula] = useState(null);
   const nombreMelamina = (codartint) =>
     melaminas.find((m) => m.codartint === codartint)?.articulo ?? codartint;
 
@@ -553,6 +569,23 @@ export default function Produccion({ authFetch, token }) {
       .then((r) => r.json())
       .then((data) => setMelaminas(Array.isArray(data) ? data : []))
       .catch(console.error);
+    authFetch(`${API}/modulos-domus`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        const lista = Array.isArray(data) ? data : [];
+        setModulosConFormula(
+          new Set(
+            lista
+              .filter(
+                (m) =>
+                  String(m[MODULOS_DOMUS_CAMPO_FORMULA] ?? "").trim() !== "",
+              )
+              .map((m) => normalizarCodigo(m[MODULOS_DOMUS_CAMPO_CODIGO])),
+          ),
+        );
+      })
+      .catch((e) => console.error("Error cargando modulos-domus:", e));
   }, []);
 
   // ── Edición de `modulo` (inline, se guarda al salir del campo) ─────────
