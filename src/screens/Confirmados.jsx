@@ -1,0 +1,578 @@
+import { useState, useEffect, useRef } from "react";
+import DataTable from "../Component/DataTable";
+import ScreenHeader from "../Component/ScreenHeader";
+import StatCards from "../Component/StatCards";
+import ConfirmDelete from "../Component/ConfirmDelete";
+
+const API = "https://integral-backend-production.up.railway.app";
+
+// ── Pantalla de la tabla `confirmados` ────────────────────────────────────
+//
+// `confirmados` es la copia congelada de los ítems de cada revisión en el
+// momento de confirmarla (ver tabla-presupuestos_routes.js). Es la única
+// fuente de la que se sincroniza `produccion`.
+//
+// Esta pantalla:
+//  1. Lista las revisiones confirmadas   → GET /tabla-presupuestos/revisiones-confirmadas
+//  2. Al hacer clic en una, abre sus ítems → GET /confirmados/:numeropres/:revision
+//  3. Edita un campo al salir del input   → PUT /confirmados/:id
+//     (producto, grupo, color, código de artículo, medidas y cantidad se
+//     propagan solos a la fila de producción vinculada; módulo, codpro y
+//     las etapas de producción no se tocan)
+//  4. Elimina un ítem                     → DELETE /confirmados/:id
+//     (NO borra la fila de producción: solo la desvincula)
+//
+// `onInicio` (opcional): función que lleva a la pantalla de inicio. Si el
+// padre no la pasa, el botón "Inicio" navega a la raíz del sitio ("/").
+
+const FUENTE = "'Space Mono', monospace";
+const CAMPOS_NUMERICOS = ["ancho", "alto", "profundidad", "cantidad"];
+
+const fmtNumPres = (n) =>
+  n != null && n !== "" ? String(n).padStart(4, "0") : "—";
+
+// Fechas tipo "2026-03-01..." → "01/03/2026" sin pasar por Date (evita el
+// corrimiento de un día por zona horaria).
+const fmtFecha = (v) => {
+  if (!v) return "—";
+  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(v);
+};
+
+const fmtFechaHora = (v) => {
+  if (!v) return "—";
+  const d = new Date(v);
+  return Number.isNaN(d.getTime())
+    ? String(v)
+    : d.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+};
+
+const fmtMonto = (v) =>
+  v == null || v === ""
+    ? "—"
+    : "$ " +
+      Number(v).toLocaleString("es-AR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+export default function Confirmados({ authFetch, token, onInicio }) {
+  // ── Lista de revisiones confirmadas ────────────────────────────────
+  const [revisiones, setRevisiones] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(null);
+  const [search, setSearch] = useState("");
+
+  // ── Panel con los ítems de una revisión ────────────────────────────
+  const [abierta, setAbierta] = useState(null); // fila de `revisiones`
+  const [items, setItems] = useState([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [itemsError, setItemsError] = useState(null);
+
+  // Último valor guardado por ítem: evita un PUT si al salir del input no
+  // cambió nada. Map<id, fila>.
+  const guardados = useRef(new Map());
+  const [guardandoCampo, setGuardandoCampo] = useState(null);
+  const [errorCampo, setErrorCampo] = useState(null);
+
+  const [aEliminar, setAEliminar] = useState(null);
+  const [eliminando, setEliminando] = useState(false);
+
+  const [coloresMelamina, setColoresMelamina] = useState([]);
+
+  // ── Carga ──────────────────────────────────────────────────────────
+
+  const fetchRevisiones = () => {
+    setLoading(true);
+    setErrorCarga(null);
+    authFetch(`${API}/tabla-presupuestos/revisiones-confirmadas`)
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+        setRevisiones(
+          (Array.isArray(data) ? data : []).map((x) => ({
+            ...x,
+            id: `${x.numeropres}-${x.revision}`,
+          })),
+        );
+      })
+      .catch((e) => {
+        console.error(e);
+        setErrorCarga(e.message);
+        setRevisiones([]);
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchRevisiones();
+    authFetch(`${API}/articulos/colores-melamina`)
+      .then((r) => r.json())
+      .then((data) => setColoresMelamina(Array.isArray(data) ? data : []))
+      .catch(() => setColoresMelamina([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchItems = (numeropres, revision) => {
+    setItemsLoading(true);
+    setItemsError(null);
+    authFetch(
+      `${API}/confirmados/${encodeURIComponent(numeropres)}/${encodeURIComponent(revision)}`,
+    )
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+        const lista = Array.isArray(data) ? data : [];
+        guardados.current = new Map(lista.map((it) => [it.id, { ...it }]));
+        setItems(lista);
+      })
+      .catch((e) => {
+        console.error(e);
+        setItemsError(e.message);
+        setItems([]);
+      })
+      .finally(() => setItemsLoading(false));
+  };
+
+  const abrirRevision = (row) => {
+    setAbierta(row);
+    setErrorCampo(null);
+    fetchItems(row.numeropres, row.revision);
+  };
+
+  const cerrarPanel = () => {
+    setAbierta(null);
+    setItems([]);
+    setItemsError(null);
+    setErrorCampo(null);
+    setAEliminar(null);
+  };
+
+  // ── Edición inline ─────────────────────────────────────────────────
+
+  const handleCampoChange = (id, campo, valor) => {
+    setItems((prev) => prev.map((r) => (r.id === id ? { ...r, [campo]: valor } : r)));
+  };
+
+  const handleCampoBlur = async (row, campo) => {
+    const anterior = guardados.current.get(row.id)?.[campo];
+    if (String(anterior ?? "") === String(row[campo] ?? "")) return;
+
+    const key = `${row.id}-${campo}`;
+    let valor = row[campo];
+    if (valor === "" || valor === undefined) valor = null;
+    if (valor !== null && CAMPOS_NUMERICOS.includes(campo)) {
+      valor = Number(valor);
+      if (Number.isNaN(valor)) {
+        setErrorCampo(key);
+        return;
+      }
+    }
+
+    setGuardandoCampo(key);
+    setErrorCampo(null);
+    try {
+      const res = await authFetch(`${API}/confirmados/${row.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [campo]: valor }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      guardados.current.set(row.id, { ...guardados.current.get(row.id), [campo]: row[campo] });
+    } catch (e) {
+      console.error(`Error guardando ${campo}:`, e);
+      setErrorCampo(key);
+    } finally {
+      setGuardandoCampo(null);
+    }
+  };
+
+  // ── Baja de un ítem ────────────────────────────────────────────────
+
+  const handleDelete = async () => {
+    if (!aEliminar) return;
+    setEliminando(true);
+    try {
+      const res = await authFetch(`${API}/confirmados/${aEliminar.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      guardados.current.delete(aEliminar.id);
+      setItems((prev) => prev.filter((r) => r.id !== aEliminar.id));
+      setAEliminar(null);
+    } catch (e) {
+      console.error("Error borrando ítem de confirmados:", e);
+      alert("No se pudo borrar el ítem. Revisá la consola.");
+    } finally {
+      setEliminando(false);
+    }
+  };
+
+  // ── Filtro de la lista ─────────────────────────────────────────────
+
+  const q = search.trim().toLowerCase();
+  const filtered = revisiones.filter(
+    (r) =>
+      !q ||
+      String(r.numeropres ?? "").toLowerCase().includes(q) ||
+      fmtNumPres(r.numeropres).includes(q) ||
+      String(r.nombre ?? "").toLowerCase().includes(q) ||
+      String(r.direccion ?? "").toLowerCase().includes(q),
+  );
+  const totalObras = new Set(revisiones.map((r) => r.numeropres)).size;
+
+  // ── Estilos ────────────────────────────────────────────────────────
+
+  const estiloInput = (id, campo, ancho = "100px") => ({
+    width: "100%",
+    maxWidth: ancho,
+    padding: "4px 8px",
+    fontSize: "12px",
+    fontFamily: FUENTE,
+    border: `1.5px solid ${errorCampo === `${id}-${campo}` ? "#e57373" : "#b8d6ef"}`,
+    borderRadius: "4px",
+    background: guardandoCampo === `${id}-${campo}` ? "#fffbe6" : "#fff",
+    color: "#0a3a5c",
+  });
+
+  const inputTexto = (row, campo, ancho, maxLength = 255) => (
+    <input
+      type="text"
+      value={row[campo] ?? ""}
+      onChange={(e) => handleCampoChange(row.id, campo, e.target.value)}
+      onBlur={() => handleCampoBlur(row, campo)}
+      maxLength={maxLength}
+      style={estiloInput(row.id, campo, ancho)}
+    />
+  );
+
+  const inputNumero = (row, campo) => (
+    <input
+      type="number"
+      step="any"
+      value={row[campo] ?? ""}
+      onChange={(e) => handleCampoChange(row.id, campo, e.target.value)}
+      onBlur={() => handleCampoBlur(row, campo)}
+      style={estiloInput(row.id, campo, "90px")}
+    />
+  );
+
+  // ── Columnas ───────────────────────────────────────────────────────
+
+  const columnasRevisiones = [
+    { key: "numeropres", label: "Presup.", render: (v) => fmtNumPres(v) },
+    { key: "revision", label: "Rev.", render: (v) => v ?? "—" },
+    { key: "nombre", label: "Cliente", render: (v) => v ?? "—" },
+    { key: "direccion", label: "Dirección", render: (v) => v ?? "—" },
+    { key: "fecha", label: "Fecha", render: (v) => fmtFecha(v) },
+    { key: "total1", label: "Total", render: (v) => fmtMonto(v) },
+  ];
+
+  const columnasItems = [
+    {
+      key: "id",
+      label: "#",
+      render: (v) => <span style={{ fontSize: 11, color: "#8aabcc" }}>{v}</span>,
+    },
+    {
+      key: "nombreart",
+      label: "Producto",
+      render: (v, row) => inputTexto(row, "nombreart", "230px"),
+    },
+    {
+      key: "grupo",
+      label: "Grupo",
+      render: (v, row) => inputTexto(row, "grupo", "130px"),
+    },
+    {
+      key: "codartint",
+      label: "Cód. artículo",
+      render: (v, row) => inputTexto(row, "codartint", "120px", 50),
+    },
+    {
+      key: "color",
+      label: "Color",
+      render: (v, row) => {
+        const actual = row.color ?? "";
+        const enLista = coloresMelamina.some((c) => c.articulo === actual);
+        return (
+          <select
+            value={actual}
+            onChange={(e) => {
+              const valor = e.target.value;
+              handleCampoChange(row.id, "color", valor);
+              handleCampoBlur({ ...row, color: valor }, "color");
+            }}
+            style={estiloInput(row.id, "color", "180px")}
+          >
+            <option value="">—</option>
+            {actual && !enLista && <option value={actual}>{actual}</option>}
+            {coloresMelamina.map((c) => (
+              <option key={c.codartint} value={c.articulo}>
+                {c.articulo}
+              </option>
+            ))}
+          </select>
+        );
+      },
+    },
+    { key: "ancho", label: "Ancho", render: (v, row) => inputNumero(row, "ancho") },
+    { key: "alto", label: "Alto", render: (v, row) => inputNumero(row, "alto") },
+    {
+      key: "profundidad",
+      label: "Prof.",
+      render: (v, row) => inputNumero(row, "profundidad"),
+    },
+    {
+      key: "cantidad",
+      label: "Cant.",
+      render: (v, row) => inputNumero(row, "cantidad"),
+    },
+    {
+      key: "eliminar",
+      label: "",
+      render: (v, row) => (
+        <button
+          onClick={() => setAEliminar(row)}
+          title="Eliminar ítem"
+          style={{
+            border: "1px solid #f0a0a0",
+            background: "#fdf0f0",
+            color: "#c0392b",
+            borderRadius: 4,
+            padding: "3px 8px",
+            cursor: "pointer",
+            fontSize: 12,
+          }}
+        >
+          🗑
+        </button>
+      ),
+    },
+  ];
+
+  // ── Render ─────────────────────────────────────────────────────────
+
+  const primero = items[0];
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => (onInicio ? onInicio() : window.location.assign("/"))}
+        title="Volver al inicio"
+        style={{
+          background: "#eaf3fb",
+          color: "#0a3a5c",
+          border: "1px solid #b8d6ef",
+          borderRadius: "4px",
+          padding: "6px 12px",
+          fontSize: "12px",
+          fontWeight: 700,
+          cursor: "pointer",
+          fontFamily: FUENTE,
+          margin: "0 0 12px",
+        }}
+      >
+        ← Inicio
+      </button>
+
+      <ScreenHeader
+        icon="✅"
+        title="Confirmados"
+        subtitle="Copia de cada obra al confirmarla — lo que se edita acá se refleja en Producción"
+      />
+
+      <StatCards
+        stats={[
+          { label: "Revisiones confirmadas", value: revisiones.length },
+          { label: "Obras", value: totalObras },
+          { label: "Filtradas", value: filtered.length },
+        ]}
+      />
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          margin: "12px 0 4px",
+          flexWrap: "wrap",
+        }}
+      >
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="🔍 Buscar por N°, cliente o dirección..."
+          style={{
+            padding: "8px 12px",
+            fontSize: 13,
+            fontFamily: FUENTE,
+            border: "1.5px solid #b8d6ef",
+            borderRadius: 4,
+            minWidth: 280,
+            color: "#0a3a5c",
+          }}
+        />
+        <button
+          onClick={fetchRevisiones}
+          title="Volver a cargar la lista"
+          style={{
+            padding: "8px 12px",
+            fontSize: 12,
+            fontFamily: FUENTE,
+            fontWeight: 700,
+            border: "1.5px solid #b8d6ef",
+            borderRadius: 4,
+            background: "#fff",
+            color: "#0a3a5c",
+            cursor: "pointer",
+          }}
+        >
+          ↻ Actualizar
+        </button>
+      </div>
+
+      <p style={{ margin: "4px 0 12px", fontSize: 11, color: "#8aabb8", fontFamily: FUENTE }}>
+        Hacé clic en una fila para ver y editar los ítems confirmados de esa revisión.
+      </p>
+
+      {loading ? (
+        <p style={{ padding: 24, color: "#4a8ab5", fontFamily: FUENTE }}>
+          ⏳ Cargando confirmados...
+        </p>
+      ) : errorCarga ? (
+        <p style={{ padding: 24, color: "#c0392b", fontFamily: FUENTE }}>
+          ⚠ No se pudo cargar: {errorCarga}
+        </p>
+      ) : filtered.length === 0 ? (
+        <p style={{ padding: 24, color: "#8aabb8", fontFamily: FUENTE }}>
+          {revisiones.length === 0
+            ? "Todavía no hay obras confirmadas."
+            : "Ninguna obra coincide con la búsqueda."}
+        </p>
+      ) : (
+        <DataTable
+          columns={columnasRevisiones}
+          rows={filtered}
+          selectedId={abierta?.id ?? null}
+          onSelect={(row) => row && abrirRevision(row)}
+          storageKey="confirmados-revisiones"
+        />
+      )}
+
+      {abierta && (
+        <div
+          onClick={() => !eliminando && cerrarPanel()}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1150,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 1180,
+              maxHeight: "85vh",
+              overflowY: "auto",
+              background: "#fff",
+              borderRadius: 10,
+              padding: "20px 22px",
+              fontFamily: FUENTE,
+              color: "#0a3a5c",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                marginBottom: 4,
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16 }}>
+                  Presupuesto N° {fmtNumPres(abierta.numeropres)} — Rev. {abierta.revision}
+                </h3>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: "#8aabcc" }}>
+                  {[abierta.nombre, abierta.direccion].filter(Boolean).join(" · ") || "—"}
+                </p>
+                {primero && (
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: "#8aabcc" }}>
+                    Confirmado el {fmtFechaHora(primero.confirmado_en)}
+                    {primero.confirmado_por ? ` por ${primero.confirmado_por}` : ""}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={cerrarPanel}
+                style={{
+                  border: "none",
+                  background: "none",
+                  color: "#4a8ab5",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p style={{ margin: "8px 0 16px", fontSize: 12, color: "#4a8ab5" }}>
+              Los cambios se guardan al salir de cada campo. Producto, grupo, color,
+              código, medidas y cantidad se actualizan también en la fila de
+              Producción vinculada; el módulo y las etapas de producción no se tocan.
+            </p>
+
+            {itemsLoading ? (
+              <p style={{ color: "#4a8ab5", fontSize: 12 }}>⏳ Cargando ítems...</p>
+            ) : itemsError ? (
+              <p style={{ color: "#c0392b", fontSize: 12 }}>⚠ {itemsError}</p>
+            ) : items.length === 0 ? (
+              <p style={{ color: "#8aabb8", fontSize: 12 }}>
+                Esta revisión no tiene ítems en confirmados.
+              </p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <DataTable
+                  columns={columnasItems}
+                  rows={items}
+                  selectedId={null}
+                  onSelect={() => {}}
+                  storageKey="confirmados-items"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {aEliminar && (
+        <ConfirmDelete
+          item={aEliminar}
+          title="¿Eliminar este ítem confirmado?"
+          message={
+            <>
+              Vas a eliminar{" "}
+              <strong>{aEliminar.nombreart || aEliminar.codartint || `#${aEliminar.id}`}</strong>{" "}
+              de la obra confirmada. La fila de Producción vinculada{" "}
+              <strong>no se borra</strong>: queda desvinculada para que decidas a
+              mano qué hacer con ella. Esta acción no se puede deshacer.
+            </>
+          }
+          onConfirm={handleDelete}
+          onClose={() => !eliminando && setAEliminar(null)}
+        />
+      )}
+    </>
+  );
+}
