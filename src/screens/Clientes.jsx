@@ -52,6 +52,21 @@ const textoUbicacion = (ubicacion) => {
   return /^(https?:\/\/|www\.|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(u) ? "Ver mapa" : u;
 };
 
+// Destino de la ruta de un cliente:
+//  1. Si tiene Ubicación cargada, se usa esa (ver urlRutaMaps).
+//  2. Si no, se usa el Domicilio fiscal (o, si está vacío, el Dom. Remito)
+//     junto con la Localidad, y Maps resuelve la dirección al tocar el link.
+//     Para cambiar la prioridad, invertir el orden en `dom`.
+// Devuelve null si no hay nada con qué armar la ruta.
+const rutaCliente = (c) => {
+  const url = urlRutaMaps(c.ubicacion, c.localidad);
+  if (url) return { url, texto: textoUbicacion(c.ubicacion), esFallback: false };
+  const dom =
+    String(c["domicilio fiscal"] ?? "").trim() || String(c.domrem ?? "").trim();
+  if (!dom) return null;
+  return { url: urlRutaMaps(dom, c.localidad), texto: dom, esFallback: true };
+};
+
 const ESTILO_LINK_RUTA = {
   color: "#0a6fb5",
   textDecoration: "underline",
@@ -73,17 +88,25 @@ const COLUMNS = [
     key: "ubicacion",
     label: "Ubicación",
     render: (v, row) => {
-      const url = urlRutaMaps(row.ubicacion, row.localidad);
-      if (!url) return "—";
+      const ruta = rutaCliente(row);
+      if (!ruta) return "—";
       return (
         <a
-          href={url}
+          href={ruta.url}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          title="Abrir en Google Maps y ver la ruta"
+          title={
+            ruta.esFallback
+              ? "Sin ubicación cargada: abre Google Maps con la ruta al domicilio"
+              : "Abrir en Google Maps y ver la ruta"
+          }
           style={{
             ...ESTILO_LINK_RUTA,
+            // Sin Ubicación cargada (se usa el domicilio): más suave y en cursiva
+            ...(ruta.esFallback
+              ? { fontWeight: 400, fontStyle: "italic", color: "#4a8ab5" }
+              : {}),
             display: "inline-block",
             maxWidth: 180,
             overflow: "hidden",
@@ -92,7 +115,7 @@ const COLUMNS = [
             verticalAlign: "bottom",
           }}
         >
-          📍 {textoUbicacion(row.ubicacion)}
+          {ruta.esFallback ? "🧭" : "📍"} {ruta.texto}
         </a>
       );
     },
@@ -332,16 +355,23 @@ export default function Clientes({ clientes, onSave, onDelete, selected, onSelec
           <div className="form-grid">
             <div>
               {FIELDS_LEFT.map(f  => <FormField key={f.field} {...f} form={form} setForm={setForm} />)}
-              {urlRutaMaps(form.ubicacion, form.localidad) && (
-                <a
-                  href={urlRutaMaps(form.ubicacion, form.localidad)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ ...ESTILO_LINK_RUTA, display: "inline-block", margin: "-4px 0 8px" }}
-                >
-                  📍 Ver ruta en Google Maps
-                </a>
-              )}
+              {(() => {
+                const ruta = rutaCliente(form);
+                return (
+                  ruta && (
+                    <a
+                      href={ruta.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ ...ESTILO_LINK_RUTA, display: "inline-block", margin: "-4px 0 8px" }}
+                    >
+                      {ruta.esFallback
+                        ? "🧭 Ver ruta al domicilio en Google Maps (sin ubicación cargada)"
+                        : "📍 Ver ruta en Google Maps"}
+                    </a>
+                  )
+                );
+              })()}
             </div>
             <div>{FIELDS_RIGHT.map(f => <FormField key={f.field} {...f} form={form} setForm={setForm} highlight={camposFaltantes?.includes(f.field)} />)}</div>
           </div>
