@@ -21,6 +21,44 @@ const COLS_HISTORIAL_CLIENTE = COLS_ENCABEZADO.filter((c) =>
 // (mismo criterio que ClienteSection.jsx).
 const soloDigitos = (v) => String(v ?? "").replace(/\D/g, "");
 
+// Link de Google Maps con la RUTA hasta la ubicación del cliente. Sin
+// origen: Maps traza el camino desde donde esté la persona en ese momento.
+// Acepta lo que se cargue en el campo "Ubicación":
+//  - un link (http..., www..., maps.app.goo.gl...): se abre tal cual
+//  - coordenadas ("-38.7183,-62.2661"): destino = ese punto
+//  - texto (dirección, barrio): destino = texto + localidad del cliente,
+//    para que Maps no confunda "Centro" con otra ciudad
+// Devuelve null si el campo está vacío (entonces no se muestra el link).
+const urlRutaMaps = (ubicacion, localidad) => {
+  const u = String(ubicacion ?? "").trim();
+  if (!u) return null;
+  if (/^https?:\/\//i.test(u)) return u;
+  if (/^(www\.|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(u)) return `https://${u}`;
+
+  let destino = u;
+  const c = u.match(/^(-?\d+(?:\.\d+)?)\s*(?:[,;]|\s)\s*(-?\d+(?:\.\d+)?)$/);
+  if (c && Math.abs(Number(c[1])) <= 90 && Math.abs(Number(c[2])) <= 180) {
+    destino = `${c[1]},${c[2]}`;
+  } else {
+    const loc = String(localidad ?? "").trim();
+    if (loc && !u.toLowerCase().includes(loc.toLowerCase())) destino = `${u}, ${loc}`;
+  }
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino)}&travelmode=driving`;
+};
+
+// Si en Ubicación hay un link largo, se muestra "Ver mapa" en vez de la URL.
+const textoUbicacion = (ubicacion) => {
+  const u = String(ubicacion ?? "").trim();
+  return /^(https?:\/\/|www\.|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(u) ? "Ver mapa" : u;
+};
+
+const ESTILO_LINK_RUTA = {
+  color: "#0a6fb5",
+  textDecoration: "underline",
+  fontWeight: 700,
+  fontSize: 12,
+};
+
 const COLUMNS = [
   { key: "id",               label: "ID" },
   { key: "codcliente",       label: "Cód. Cliente" },
@@ -29,6 +67,36 @@ const COLUMNS = [
   { key: "nombre2",          label: "Nombre Ligado" },
   { key: "domicilio fiscal", label: "Domicilio" },
   { key: "localidad",        label: "Localidad" },
+  {
+    // Con dato en Ubicación es un link: abre Google Maps con la ruta. El
+    // clic no selecciona la fila (stopPropagation).
+    key: "ubicacion",
+    label: "Ubicación",
+    render: (v, row) => {
+      const url = urlRutaMaps(row.ubicacion, row.localidad);
+      if (!url) return "—";
+      return (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          title="Abrir en Google Maps y ver la ruta"
+          style={{
+            ...ESTILO_LINK_RUTA,
+            display: "inline-block",
+            maxWidth: 180,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            verticalAlign: "bottom",
+          }}
+        >
+          📍 {textoUbicacion(row.ubicacion)}
+        </a>
+      );
+    },
+  },
   { key: "telefono1",        label: "Teléfono" },
   { key: "cuit",             label: "CUIT" },
   { key: "tipofact",         label: "Tipo Fact." },
@@ -262,7 +330,19 @@ export default function Clientes({ clientes, onSave, onDelete, selected, onSelec
           )}
 
           <div className="form-grid">
-            <div>{FIELDS_LEFT.map(f  => <FormField key={f.field} {...f} form={form} setForm={setForm} />)}</div>
+            <div>
+              {FIELDS_LEFT.map(f  => <FormField key={f.field} {...f} form={form} setForm={setForm} />)}
+              {urlRutaMaps(form.ubicacion, form.localidad) && (
+                <a
+                  href={urlRutaMaps(form.ubicacion, form.localidad)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ ...ESTILO_LINK_RUTA, display: "inline-block", margin: "-4px 0 8px" }}
+                >
+                  📍 Ver ruta en Google Maps
+                </a>
+              )}
+            </div>
             <div>{FIELDS_RIGHT.map(f => <FormField key={f.field} {...f} form={form} setForm={setForm} highlight={camposFaltantes?.includes(f.field)} />)}</div>
           </div>
           <div className="form-actions">
