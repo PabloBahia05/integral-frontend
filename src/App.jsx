@@ -15,6 +15,7 @@ import ObrasConfirmadas from "./screens/ObrasConfirmadas";
 import Obras from "./screens/Obras";
 import Produccion from "./screens/Produccion";
 import ModulosDomus from "./screens/ModulosDomus";
+import Confirmados from "./screens/Confirmados";
 import MaterialesMelamina from "./screens/MaterialesMelamina";
 import Chat from "./screens/Chat";
 import MuebleEspecial from "./screens/MuebleEspecial";
@@ -52,6 +53,7 @@ const SCREENS = {
   "lista-presupuestos-2": { label: "LISTA PRESUPUESTOS", icon: "⚡" },
   "mueble-especial": { label: "MUEBLE ESPECIAL", icon: "🪚" },
   "obras-confirmadas": { label: "OBRAS CONFIRMADAS", icon: "✅" },
+  confirmados: { label: "CONFIRMADOS", icon: "🔒" },
   obras: { label: "OBRAS", icon: "🏗️" },
   produccion: { label: "PRODUCCIÓN", icon: "🏭" },
   "modulos-domus": { label: "MÓDULOS DOMUS", icon: "🏠" },
@@ -84,6 +86,7 @@ const PANTALLAS_MENU = [
   { id: "lista-presupuestos-2", label: "LISTA PRESUPUESTOS", icon: "⚡", color: "#7b61ff", ubicacionDefault: "principal" },
   { id: "cuenta-corriente", label: "CLIENTES ACTIVOS", icon: "💰", color: "#e67e22", ubicacionDefault: "principal" },
   { id: "obras-confirmadas", label: "OBRAS CONFIRMADAS", icon: "✅", color: "#00b4d8", ubicacionDefault: "principal" },
+  { id: "confirmados", label: "CONFIRMADOS", icon: "🔒", color: "#2a9d8f", ubicacionDefault: "principal" },
   { id: "obras", label: "OBRAS", icon: "🏗️", color: "#0077b6", ubicacionDefault: "principal" },
   { id: "produccion", label: "PRODUCCIÓN", icon: "🏭", color: "#8d6e63", ubicacionDefault: "principal" },
   { id: "modulos-domus", label: "MÓDULOS DOMUS", icon: "🏠", color: "#5c6b73", ubicacionDefault: "principal" },
@@ -1312,7 +1315,18 @@ function App() {
               />
             )}
             {screen === "produccion" && (
-              <Produccion authFetch={authFetch} token={token} />
+              <Produccion
+                authFetch={authFetch}
+                token={token}
+                onInicio={() => setScreen(null)}
+              />
+            )}
+            {screen === "confirmados" && (
+              <Confirmados
+                authFetch={authFetch}
+                token={token}
+                onInicio={() => setScreen(null)}
+              />
             )}
             {screen === "modulos-domus" && (
               <ModulosDomus authFetch={authFetch} token={token} />
