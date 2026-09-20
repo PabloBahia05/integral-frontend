@@ -392,7 +392,9 @@ function DetalleProduccion({
   );
 }
 
-export default function Produccion({ authFetch, token }) {
+// `onInicio` (opcional): función que lleva a la pantalla de inicio. Si el
+// padre no la pasa, el botón "Inicio" navega a la raíz del sitio ("/").
+export default function Produccion({ authFetch, token, onInicio }) {
   const isMobile = useIsMobile();
 
   // Rol del usuario logueado (viene del JWT). El botón CSV (descarga de
@@ -1220,6 +1222,26 @@ export default function Produccion({ authFetch, token }) {
 
   return (
     <>
+      <button
+        type="button"
+        onClick={() => (onInicio ? onInicio() : window.location.assign("/"))}
+        title="Volver al inicio"
+        style={{
+          background: "#eaf3fb",
+          color: "#0a3a5c",
+          border: "1px solid #b8d6ef",
+          borderRadius: "4px",
+          padding: "6px 12px",
+          fontSize: "12px",
+          fontWeight: 700,
+          cursor: "pointer",
+          fontFamily: "'Space Mono', monospace",
+          margin: "0 0 12px",
+        }}
+      >
+        ← Inicio
+      </button>
+
       <ScreenHeader
         icon="🏭"
         title="Producción"
