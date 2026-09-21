@@ -111,6 +111,10 @@ export default function TabCocina({
   const [articulosFamilia, setArticulosFamilia] = useState([]);
 
   // ── Fetch artículos cuando cambia la familia activa ───────
+  // GENERAL: los artículos sin familia puntual ya vienen incluidos por el
+  // backend en la MISMA respuesta de /articulos/por-familia (con su
+  // precio ya completado para cada línea de esta familia, vía el
+  // backfill de precioGenerico) — no hace falta pedirlos aparte acá.
   useEffect(() => {
     if (!cocinaFamilia) {
       setArticulosFamilia([]);
