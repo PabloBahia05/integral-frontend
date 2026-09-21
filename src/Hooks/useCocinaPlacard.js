@@ -295,6 +295,9 @@ export default function useCocinaPlacard({
 
   // Recargar artículos cuando cambia la familia activa (placard)
   // Nota: cocina maneja su propia familia internamente en TabCocina
+  // GENERAL: los artículos sin familia puntual ya vienen incluidos por el
+  // backend en la MISMA respuesta de /articulos/por-familia (backfill de
+  // precioGenerico) — no hace falta pedirlos aparte acá.
   const familiaActivaActual = tab === "placard" ? placardFamilia : null;
   useEffect(() => {
     if (!familiaActivaActual) {
