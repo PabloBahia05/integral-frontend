@@ -48,6 +48,10 @@ const CONFIG = {
   cliente: { x: 36, y: 84.8 }, // "Señor (es):"
   domicilio: { x: 27.6, y: 93.2 }, // "Calle:"
   ciudad: { x: 134.1, y: 93.2 }, // "Localidad:"
+  // El talonario no tiene casillero de teléfono: va en el mismo renglón de
+  // "Calle:", al final (el punteado llega hasta x=115). anchoMax = espacio
+  // disponible hasta ahí.
+  telefono: { x: 90, y: 93.2, anchoMax: 24 },
 
   // TODO: confirmar en qué casillero va "obra" (este formulario no tiene
   // un campo impreso que diga "Obra"). Candidatos: "N° Orden de Compra N°"
@@ -127,14 +131,40 @@ function dibujarEncabezado(doc, datos) {
   //   doc.text(String(datos.numeroRemito), CONFIG.numero.x, CONFIG.numero.y);
   // }
 
+  // Acepta los nombres alternativos con los que suelen venir los datos del
+  // cliente (direccion/calle, localidad, tel).
+  const domicilio = datos.domicilio ?? datos.direccion ?? datos.calle;
+  const ciudad = datos.ciudad ?? datos.localidad;
+  const telefono = datos.telefono ?? datos.tel;
+
   if (datos.cliente) {
     doc.text(String(datos.cliente), CONFIG.cliente.x, CONFIG.cliente.y);
   }
-  if (datos.domicilio) {
-    doc.text(String(datos.domicilio), CONFIG.domicilio.x, CONFIG.domicilio.y);
+  if (domicilio) {
+    const finCalle = telefono
+      ? CONFIG.telefono.x - 2
+      : CONFIG.telefono.x + CONFIG.telefono.anchoMax;
+    textoAjustado(
+      doc,
+      String(domicilio),
+      CONFIG.domicilio.x,
+      CONFIG.domicilio.y,
+      finCalle - CONFIG.domicilio.x,
+      CONFIG.fontSize,
+    );
   }
-  if (datos.ciudad) {
-    doc.text(String(datos.ciudad), CONFIG.ciudad.x, CONFIG.ciudad.y);
+  if (telefono) {
+    textoAjustado(
+      doc,
+      `Tel: ${telefono}`,
+      CONFIG.telefono.x,
+      CONFIG.telefono.y,
+      CONFIG.telefono.anchoMax,
+      CONFIG.fontSize,
+    );
+  }
+  if (ciudad) {
+    doc.text(String(ciudad), CONFIG.ciudad.x, CONFIG.ciudad.y);
   }
 
   // Desactivado hasta confirmar en qué casillero va "obra" (ver TODO en
@@ -149,8 +179,9 @@ function dibujarEncabezado(doc, datos) {
  *   fecha: "2026-09-15" | Date,
  *   numeroRemito: 3967 | null,   // ver nota en CONFIG.numero: no se imprime
  *   cliente: "UDUT RUBEN",
- *   domicilio: "WHITCOMB 2337",
- *   ciudad: "BAHIA BLANCA",
+ *   domicilio: "WHITCOMB 2337",   // también se acepta direccion / calle
+ *   telefono: "0291-4123456",     // también se acepta tel
+ *   ciudad: "BAHIA BLANCA",       // también se acepta localidad
  *   obra: 41,                    // ver TODO en CONFIG.obra: no se imprime aún
  *   items: [{ cantidad, grupo, codart, nombreart, ancho, alto, profundidad }],
  * }
