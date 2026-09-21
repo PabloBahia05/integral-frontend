@@ -3,11 +3,28 @@ import { generarPdfRecibo } from "../pdf/pdfRecibo";
 
 const API = "https://integral-backend-production.up.railway.app";
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+// Fecha LOCAL como YYYY-MM-DD. No usar toISOString(): devuelve la fecha en
+// UTC y, pasadas las 21 hs en Argentina, "hoy" pasaba a ser mañana.
+const aISO = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const hoy = () => aISO(new Date());
 const haceUnMes = () => {
   const d = new Date();
   d.setMonth(d.getMonth() - 1);
-  return d.toISOString().slice(0, 10);
+  return aISO(d);
+};
+
+const FORMAS_PAGO = ["Efectivo", "Transferencia", "Cheque", "Tarjeta", "Otro"];
+// Si un movimiento viejo trae una forma de pago escrita a mano que no está
+// en la lista, se conserva como opción para no perderla al editar.
+const opcionesForma = (actual) =>
+  !actual || FORMAS_PAGO.includes(actual) ? FORMAS_PAGO : [...FORMAS_PAGO, actual];
+
+const ORIGEN_LABEL = {
+  cobro: "Cobro",
+  ingreso_vario: "Ingreso",
+  factura: "Factura",
+  gasto: "Gasto",
 };
 
 const fmtMoneda = (n) =>
@@ -25,8 +42,17 @@ const EMPTY_GASTO = () => ({
   concepto: "",
   categoria: "",
   monto: "",
-  forma_pago: "",
+  forma_pago: "Efectivo",
   proveedor: "",
+});
+
+const EMPTY_INGRESO = () => ({
+  fecha: hoy(),
+  concepto: "",
+  categoria: "",
+  monto: "",
+  forma_pago: "Efectivo",
+  cliente: "",
 });
 
 const EMPTY_RECIBO = () => ({
@@ -120,6 +146,14 @@ const CSS = `
   .mo-cancel:hover { background:#e2e8f0; }
   .mo-save { padding:9px 18px; background:linear-gradient(135deg,#059669,#047857); color:#fff; border:none; border-radius:9px; font-family:'Syne',sans-serif; font-size:13px; font-weight:700; cursor:pointer; }
   .mo-err { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:8px; padding:8px 12px; font-size:12px; margin-bottom:12px; }
+
+  .btn-ingreso { background:linear-gradient(135deg,#0d9488,#0f766e); box-shadow:0 4px 12px rgba(13,148,136,.3); }
+  .ff-saldo-sub { font-size:11px; color:#94a3b8; margin-top:2px; }
+  .ff-alert { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; border-radius:10px; padding:10px 14px; font-size:12px; margin-bottom:16px; }
+  .ff-alert b { display:block; margin-bottom:4px; }
+  .ff-filtros { display:flex; gap:8px; align-items:center; }
+  .ff-filtros .ff-sel { padding:6px 10px; font-size:12px; }
+  .ff-chip { display:inline-block; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700; background:#f1f5f9; color:#64748b; white-space:nowrap; }
 `;
 
 export default function FlujoFondos({ token }) {
@@ -136,7 +170,20 @@ export default function FlujoFondos({ token }) {
   const [movimientos, setMovimientos] = useState([]);
   const [resumen, setResumen] = useState([]);
   const [gastos, setGastos] = useState([]);
+  const [ingresos, setIngresos] = useState([]);
+  const [saldoCaja, setSaldoCaja] = useState(null);
+  const [erroresCarga, setErroresCarga] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Filtros del listado de movimientos (solo afectan lo que se ve en la tabla)
+  const [filtroTipo, setFiltroTipo] = useState("");
+  const [filtroForma, setFiltroForma] = useState("");
+
+  // Ingresos varios (cobros cotidianos que no son el pago de una obra)
+  const [modalIngreso, setModalIngreso] = useState(false);
+  const [editIngresoId, setEditIngresoId] = useState(null);
+  const [formIngreso, setFormIngreso] = useState(EMPTY_INGRESO());
+  const [errorIngreso, setErrorIngreso] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -239,25 +286,47 @@ export default function FlujoFondos({ token }) {
   };
   // ── FIN Recibo ───────────────────────────────────────────────────────
 
+  // Antes cualquier error del backend (HTTP 500 con { error }) se tomaba
+  // como "lista vacía" y la pantalla mostraba 0 movimientos sin explicar
+  // nada. Ahora cada fuente se pide por separado y, si alguna falla, se
+  // muestra cuál y por qué (las demás siguen cargando normal).
+  const getJson = async (url) => {
+    const r = await authFetch(url);
+    const data = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+    return data;
+  };
+
   const cargarTodo = () => {
     setLoading(true);
     const qs = `?desde=${desde}&hasta=${hasta}`;
-    Promise.all([
-      authFetch(`${API}/flujo-fondos${qs}`).then((r) => r.json()),
-      authFetch(`${API}/flujo-fondos/resumen-periodo${qs}&agrupar=${agrupar}`).then((r) =>
-        r.json(),
-      ),
-      authFetch(`${API}/gastos${qs}`).then((r) => r.json()),
+    Promise.allSettled([
+      getJson(`${API}/flujo-fondos${qs}`),
+      getJson(`${API}/flujo-fondos/resumen-periodo${qs}&agrupar=${agrupar}`),
+      getJson(`${API}/gastos${qs}`),
+      getJson(`${API}/ingresos-varios${qs}`),
+      getJson(`${API}/flujo-fondos/saldo?hasta=${hasta}`),
     ])
-      .then(([mov, res, gas]) => {
-        setMovimientos(Array.isArray(mov) ? mov : []);
-        setResumen(Array.isArray(res) ? res : []);
-        setGastos(Array.isArray(gas) ? gas : []);
-      })
-      .catch(() => {
-        setMovimientos([]);
-        setResumen([]);
-        setGastos([]);
+      .then((rs) => {
+        const lista = (i) =>
+          rs[i].status === "fulfilled" && Array.isArray(rs[i].value) ? rs[i].value : [];
+        setMovimientos(lista(0));
+        setResumen(lista(1));
+        setGastos(lista(2));
+        setIngresos(lista(3));
+        setSaldoCaja(
+          rs[4].status === "fulfilled" && rs[4].value?.saldo != null
+            ? Number(rs[4].value.saldo)
+            : null,
+        );
+        const nombres = ["Movimientos", "Gráfico", "Gastos", "Ingresos varios", "Saldo de caja"];
+        setErroresCarga(
+          rs
+            .map((r, i) =>
+              r.status === "rejected" ? `${nombres[i]}: ${r.reason?.message ?? "error"}` : null,
+            )
+            .filter(Boolean),
+        );
       })
       .finally(() => setLoading(false));
   };
@@ -267,9 +336,25 @@ export default function FlujoFondos({ token }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [desde, hasta, agrupar]);
 
-  const saldoActual = movimientos.length
-    ? movimientos[movimientos.length - 1].saldo_acumulado
-    : 0;
+  // Efectivo en caja al día "Hasta": viene del backend acumulado desde el
+  // principio (no solo de lo que pasó dentro del rango elegido).
+  const saldoActual =
+    saldoCaja ??
+    (movimientos.length ? movimientos[movimientos.length - 1].saldo_acumulado : 0);
+
+  const formasEnListado = useMemo(
+    () => [...new Set(movimientos.map((m) => m.forma_pago).filter(Boolean))].sort(),
+    [movimientos],
+  );
+  const movimientosVisibles = useMemo(
+    () =>
+      movimientos.filter(
+        (m) =>
+          (!filtroTipo || m.tipo === filtroTipo) &&
+          (!filtroForma || (m.forma_pago || "") === filtroForma),
+      ),
+    [movimientos, filtroTipo, filtroForma],
+  );
 
   const totales = useMemo(() => {
     const ingresos = movimientos
@@ -335,6 +420,58 @@ export default function FlujoFondos({ token }) {
     cargarTodo();
   };
 
+  // ── Ingresos varios: alta / edición / baja ────────────────────────────
+  const openAddIngreso = () => {
+    setFormIngreso(EMPTY_INGRESO());
+    setEditIngresoId(null);
+    setErrorIngreso("");
+    setModalIngreso(true);
+  };
+
+  const openEditIngreso = (g) => {
+    setFormIngreso({
+      fecha: g.fecha?.slice(0, 10) ?? hoy(),
+      concepto: g.concepto ?? "",
+      categoria: g.categoria ?? "",
+      monto: g.monto ?? "",
+      forma_pago: g.forma_pago ?? "",
+      cliente: g.cliente ?? "",
+    });
+    setEditIngresoId(g.id);
+    setErrorIngreso("");
+    setModalIngreso(true);
+  };
+
+  const closeIngreso = () => setModalIngreso(false);
+
+  const guardarIngreso = async () => {
+    if (!formIngreso.concepto.trim()) return setErrorIngreso("El concepto es obligatorio");
+    const monto = parseFloat(String(formIngreso.monto).replace(",", "."));
+    if (!monto || monto <= 0) return setErrorIngreso("El monto tiene que ser mayor a 0");
+
+    const url = editIngresoId
+      ? `${API}/ingresos-varios/${editIngresoId}`
+      : `${API}/ingresos-varios`;
+    try {
+      const r = await authFetch(url, {
+        method: editIngresoId ? "PUT" : "POST",
+        body: JSON.stringify({ ...formIngreso, monto }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) return setErrorIngreso(data.error || "Error al guardar");
+      closeIngreso();
+      cargarTodo();
+    } catch {
+      setErrorIngreso("Error de conexión al guardar");
+    }
+  };
+
+  const eliminarIngreso = async (g) => {
+    if (!window.confirm(`¿Eliminar el ingreso "${g.concepto}"?`)) return;
+    await authFetch(`${API}/ingresos-varios/${g.id}`, { method: "DELETE" });
+    cargarTodo();
+  };
+
   const nombreMes = (clave) => {
     // clave puede ser "2026-09" (mes), "2026-09-07" (día o lunes de semana)
     const partes = clave.split("-");
@@ -364,6 +501,7 @@ export default function FlujoFondos({ token }) {
             <div className={`ff-saldo-val ${saldoActual >= 0 ? "pos" : "neg"}`}>
               {fmtMoneda(saldoActual)}
             </div>
+            <div className="ff-saldo-sub">acumulado al {fmtFecha(hasta)}</div>
           </div>
         </div>
 
@@ -401,6 +539,9 @@ export default function FlujoFondos({ token }) {
           <button className="btn-add" onClick={openAdd}>
             <span>＋</span> Nuevo gasto
           </button>
+          <button className="btn-add btn-ingreso" onClick={openAddIngreso}>
+            <span>＋</span> Nuevo ingreso
+          </button>
           <button className="btn-add btn-recibo" onClick={openRecibo}>
             <span>🧾</span> Recibo
           </button>
@@ -410,6 +551,15 @@ export default function FlujoFondos({ token }) {
               : `${movimientos.length} movimientos · ${fmtMoneda(totales.ingresos)} ingresos · ${fmtMoneda(totales.egresos)} egresos`}
           </span>
         </div>
+
+        {erroresCarga.length > 0 && (
+          <div className="ff-alert">
+            <b>No se pudo cargar todo el flujo de fondos:</b>
+            {erroresCarga.map((e) => (
+              <div key={e}>• {e}</div>
+            ))}
+          </div>
+        )}
 
         {/* ── Gráfico ── */}
         <div className="ff-card">
@@ -425,12 +575,12 @@ export default function FlujoFondos({ token }) {
           ) : (
             <div className="ff-chart-wrap">
               <svg
-                width={Math.max(560, resumen.length * 64)}
+                width={Math.max(560, resumen.length * 110)}
                 height="220"
                 style={{ display: "block" }}
               >
                 {resumen.map((p, i) => {
-                  const cx = i * 64 + 40;
+                  const cx = i * 110 + 55;
                   const escala = 80 / maxAbs;
                   const hIng = p.ingresos * escala;
                   const hEgr = p.egresos * escala;
@@ -454,9 +604,9 @@ export default function FlujoFondos({ token }) {
                         rx="2"
                       />
                       <line
-                        x1={cx - 30}
+                        x1={cx - 50}
                         y1={baseY}
-                        x2={cx + 30}
+                        x2={cx + 50}
                         y2={baseY}
                         stroke="#e8edf5"
                       />
@@ -493,12 +643,36 @@ export default function FlujoFondos({ token }) {
         <div className="ff-card">
           <div className="ff-card-hdr">
             <span className="ff-card-title">Movimientos</span>
+            <div className="ff-filtros">
+              <select
+                className="ff-sel"
+                value={filtroTipo}
+                onChange={(e) => setFiltroTipo(e.target.value)}
+              >
+                <option value="">Ingresos y egresos</option>
+                <option value="ingreso">Solo ingresos</option>
+                <option value="egreso">Solo egresos</option>
+              </select>
+              <select
+                className="ff-sel"
+                value={filtroForma}
+                onChange={(e) => setFiltroForma(e.target.value)}
+              >
+                <option value="">Todas las formas de pago</option>
+                {formasEnListado.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="ff-wrap">
             <table className="ff-tbl">
               <thead>
                 <tr>
                   <th>Fecha</th>
+                  <th>Concepto</th>
                   <th>Cliente</th>
                   <th>Proveedor</th>
                   <th>Rubro</th>
@@ -509,19 +683,25 @@ export default function FlujoFondos({ token }) {
                 </tr>
               </thead>
               <tbody>
-                {movimientos.length === 0 ? (
+                {movimientosVisibles.length === 0 ? (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <div className="ff-empty">
                         <div style={{ fontSize: 28 }}>💤</div>
-                        Sin movimientos en el período elegido
+                        {movimientos.length === 0
+                          ? "Sin movimientos en el período elegido"
+                          : "Ningún movimiento coincide con el filtro"}
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  movimientos.map((m, i) => (
+                  movimientosVisibles.map((m, i) => (
                     <tr key={`${m.origen}-${m.refId}-${i}`} title={m.concepto}>
                       <td>{fmtFecha(m.fecha)}</td>
+                      <td>
+                        <span className="ff-chip">{ORIGEN_LABEL[m.origen] ?? m.origen}</span>{" "}
+                        {m.concepto}
+                      </td>
                       <td>{m.cliente || "—"}</td>
                       <td>{m.proveedor || "—"}</td>
                       <td>{m.rubro || "—"}</td>
@@ -545,6 +725,68 @@ export default function FlujoFondos({ token }) {
                         </span>
                       </td>
                       <td>{m.forma_pago || "—"}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── Ingresos varios (para editar/eliminar) ── */}
+        <div className="ff-card">
+          <div className="ff-card-hdr">
+            <span className="ff-card-title">Ingresos varios</span>
+          </div>
+          <div className="ff-wrap">
+            <table className="ff-tbl">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Concepto</th>
+                  <th>Categoría</th>
+                  <th>Cliente</th>
+                  <th>Forma de pago</th>
+                  <th>Monto</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ingresos.length === 0 ? (
+                  <tr>
+                    <td colSpan={7}>
+                      <div className="ff-empty">Sin ingresos varios cargados en el período</div>
+                    </td>
+                  </tr>
+                ) : (
+                  ingresos.map((g) => (
+                    <tr key={g.id}>
+                      <td>{fmtFecha(g.fecha)}</td>
+                      <td>{g.concepto}</td>
+                      <td>{g.categoria || "—"}</td>
+                      <td>{g.cliente || "—"}</td>
+                      <td>{g.forma_pago || "—"}</td>
+                      <td>
+                        <span className="ff-monto ingreso">{fmtMoneda(g.monto)}</span>
+                      </td>
+                      <td>
+                        <div className="ff-acts">
+                          <button
+                            className="bic bic-ed"
+                            title="Editar"
+                            onClick={() => openEditIngreso(g)}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="bic bic-dl"
+                            title="Eliminar"
+                            onClick={() => eliminarIngreso(g)}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -678,14 +920,19 @@ export default function FlujoFondos({ token }) {
                 </div>
                 <div className="ff-fld">
                   <span className="ff-fld-lbl">Forma de pago</span>
-                  <input
-                    className="ff-inp"
+                  <select
+                    className="ff-sel"
                     value={form.forma_pago}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, forma_pago: e.target.value }))
                     }
-                    placeholder="Ej: Efectivo, Transferencia…"
-                  />
+                  >
+                    {opcionesForma(form.forma_pago).map((fp) => (
+                      <option key={fp} value={fp}>
+                        {fp}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="ff-fld full">
                   <span className="ff-fld-lbl">Proveedor (opcional)</span>
@@ -705,6 +952,108 @@ export default function FlujoFondos({ token }) {
                 </button>
                 <button className="mo-save" onClick={guardarGasto}>
                   {editId ? "Guardar cambios" : "Agregar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modal ingreso vario ── */}
+        {modalIngreso && (
+          <div className="mo" onClick={closeIngreso}>
+            <div className="mo-box" onClick={(e) => e.stopPropagation()}>
+              <div className="mo-hdr">
+                <span className="mo-title">
+                  {editIngresoId ? "Editar ingreso" : "Nuevo ingreso"}
+                </span>
+                <button className="mo-close" onClick={closeIngreso}>
+                  ✕
+                </button>
+              </div>
+
+              {errorIngreso && <div className="mo-err">{errorIngreso}</div>}
+
+              <div className="mo-grid">
+                <div className="ff-fld full">
+                  <span className="ff-fld-lbl">Concepto</span>
+                  <input
+                    className="ff-inp"
+                    value={formIngreso.concepto}
+                    onChange={(e) =>
+                      setFormIngreso((f) => ({ ...f, concepto: e.target.value }))
+                    }
+                    placeholder="Ej: Venta de sobrantes, cobro de contado…"
+                  />
+                </div>
+                <div className="ff-fld">
+                  <span className="ff-fld-lbl">Fecha</span>
+                  <input
+                    type="date"
+                    className="ff-inp"
+                    value={formIngreso.fecha}
+                    onChange={(e) =>
+                      setFormIngreso((f) => ({ ...f, fecha: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="ff-fld">
+                  <span className="ff-fld-lbl">Monto</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className="ff-inp"
+                    value={formIngreso.monto}
+                    onChange={(e) =>
+                      setFormIngreso((f) => ({ ...f, monto: e.target.value }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="ff-fld">
+                  <span className="ff-fld-lbl">Categoría</span>
+                  <input
+                    className="ff-inp"
+                    value={formIngreso.categoria}
+                    onChange={(e) =>
+                      setFormIngreso((f) => ({ ...f, categoria: e.target.value }))
+                    }
+                    placeholder="Ej: Ventas, Varios…"
+                  />
+                </div>
+                <div className="ff-fld">
+                  <span className="ff-fld-lbl">Forma de pago</span>
+                  <select
+                    className="ff-sel"
+                    value={formIngreso.forma_pago}
+                    onChange={(e) =>
+                      setFormIngreso((f) => ({ ...f, forma_pago: e.target.value }))
+                    }
+                  >
+                    {opcionesForma(formIngreso.forma_pago).map((fp) => (
+                      <option key={fp} value={fp}>
+                        {fp}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="ff-fld full">
+                  <span className="ff-fld-lbl">Cliente / quién paga (opcional)</span>
+                  <input
+                    className="ff-inp"
+                    value={formIngreso.cliente}
+                    onChange={(e) =>
+                      setFormIngreso((f) => ({ ...f, cliente: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="mo-acts">
+                <button className="mo-cancel" onClick={closeIngreso}>
+                  Cancelar
+                </button>
+                <button className="mo-save" onClick={guardarIngreso}>
+                  {editIngresoId ? "Guardar cambios" : "Agregar"}
                 </button>
               </div>
             </div>
