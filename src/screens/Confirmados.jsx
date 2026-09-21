@@ -19,7 +19,10 @@ const API = "https://integral-backend-production.up.railway.app";
 //     (producto, grupo, color, código de artículo, medidas y cantidad se
 //     propagan solos a la fila de producción vinculada; módulo, codpro y
 //     las etapas de producción no se tocan)
-//  4. Elimina un ítem                     → DELETE /confirmados/:id
+//  4. Agrega un ítem NUEVO a la obra      → POST /confirmados
+//     (lo suma a confirmados y lo envía a Producción como fila nueva del
+//     mismo cliente; todo o nada)
+//  5. Elimina un ítem                     → DELETE /confirmados/:id
 //     (NO borra la fila de producción: solo la desvincula)
 //
 // `onInicio` (opcional): función que lleva a la pantalla de inicio. Si el
@@ -77,6 +80,22 @@ export default function Confirmados({ authFetch, token, onInicio }) {
 
   const [aEliminar, setAEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
+
+  // Alta de un ítem nuevo en la obra abierta
+  const NUEVO_VACIO = {
+    nombreart: "",
+    codartint: "",
+    grupo: "",
+    color: "",
+    ancho: "",
+    alto: "",
+    profundidad: "",
+    cantidad: "1",
+  };
+  const [mostrarNuevo, setMostrarNuevo] = useState(false);
+  const [nuevo, setNuevo] = useState(NUEVO_VACIO);
+  const [agregando, setAgregando] = useState(false);
+  const [resultadoNuevo, setResultadoNuevo] = useState(null); // { ok, texto }
 
   const [coloresMelamina, setColoresMelamina] = useState([]);
 
@@ -137,6 +156,9 @@ export default function Confirmados({ authFetch, token, onInicio }) {
   const abrirRevision = (row) => {
     setAbierta(row);
     setErrorCampo(null);
+    setMostrarNuevo(false);
+    setNuevo(NUEVO_VACIO);
+    setResultadoNuevo(null);
     fetchItems(row.numeropres, row.revision);
   };
 
@@ -184,6 +206,46 @@ export default function Confirmados({ authFetch, token, onInicio }) {
       setErrorCampo(key);
     } finally {
       setGuardandoCampo(null);
+    }
+  };
+
+  // ── Alta de un ítem nuevo ──────────────────────────────────────────
+
+  const agregarItem = async () => {
+    setResultadoNuevo(null);
+    if (!nuevo.nombreart.trim() && !nuevo.codartint.trim()) {
+      setResultadoNuevo({ ok: false, texto: "Completá el producto o el código de artículo." });
+      return;
+    }
+    setAgregando(true);
+    try {
+      const res = await authFetch(`${API}/confirmados`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...nuevo,
+          numeropres: abierta.numeropres,
+          revision: abierta.revision,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      const n = data.produccion?.insertados;
+      setResultadoNuevo({
+        ok: true,
+        texto:
+          n > 0
+            ? "✓ Ítem agregado a la obra y enviado a Producción como fila nueva."
+            : "✓ Ítem agregado a la obra y vinculado con una fila de Producción que ya existía.",
+      });
+      setNuevo(NUEVO_VACIO);
+      fetchItems(abierta.numeropres, abierta.revision);
+    } catch (e) {
+      console.error("Error agregando ítem a confirmados:", e);
+      setResultadoNuevo({ ok: false, texto: e.message });
+    } finally {
+      setAgregando(false);
     }
   };
 
@@ -532,6 +594,123 @@ export default function Confirmados({ authFetch, token, onInicio }) {
               código, medidas y cantidad se actualizan también en la fila de
               Producción vinculada; el módulo y las etapas de producción no se tocan.
             </p>
+
+            <div style={{ margin: "0 0 14px" }}>
+              <button
+                onClick={() => setMostrarNuevo((v) => !v)}
+                style={{
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontFamily: FUENTE,
+                  fontWeight: 700,
+                  border: "1.5px solid #0a3a5c",
+                  borderRadius: 4,
+                  background: mostrarNuevo ? "#0a3a5c" : "#fff",
+                  color: mostrarNuevo ? "#fff" : "#0a3a5c",
+                  cursor: "pointer",
+                }}
+              >
+                {mostrarNuevo ? "− Cerrar" : "＋ Nuevo ítem"}
+              </button>
+
+              {mostrarNuevo && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    padding: 12,
+                    border: "1px solid #b8d6ef",
+                    borderRadius: 6,
+                    background: "#f5faff",
+                  }}
+                >
+                  <p style={{ margin: "0 0 10px", fontSize: 11, color: "#4a8ab5" }}>
+                    Se agrega a esta obra y se envía a Producción como un ítem nuevo del
+                    mismo cliente. No cambia el monto de la obra.
+                  </p>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+                      gap: 8,
+                    }}
+                  >
+                    {[
+                      ["nombreart", "Producto *"],
+                      ["codartint", "Cód. artículo"],
+                      ["grupo", "Grupo"],
+                    ].map(([campo, label]) => (
+                      <label key={campo} style={{ fontSize: 11, color: "#5a86ab" }}>
+                        {label}
+                        <input
+                          type="text"
+                          value={nuevo[campo]}
+                          onChange={(e) => setNuevo((n) => ({ ...n, [campo]: e.target.value }))}
+                          style={{ ...estiloInput("nuevo", campo, "100%"), display: "block", marginTop: 2 }}
+                        />
+                      </label>
+                    ))}
+                    <label style={{ fontSize: 11, color: "#5a86ab" }}>
+                      Color
+                      <select
+                        value={nuevo.color}
+                        onChange={(e) => setNuevo((n) => ({ ...n, color: e.target.value }))}
+                        style={{ ...estiloInput("nuevo", "color", "100%"), display: "block", marginTop: 2 }}
+                      >
+                        <option value="">—</option>
+                        {coloresMelamina.map((c) => (
+                          <option key={c.codartint} value={c.articulo}>
+                            {c.articulo}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {[
+                      ["ancho", "Ancho"],
+                      ["alto", "Alto"],
+                      ["profundidad", "Prof."],
+                      ["cantidad", "Cant."],
+                    ].map(([campo, label]) => (
+                      <label key={campo} style={{ fontSize: 11, color: "#5a86ab" }}>
+                        {label}
+                        <input
+                          type="number"
+                          step="any"
+                          value={nuevo[campo]}
+                          onChange={(e) => setNuevo((n) => ({ ...n, [campo]: e.target.value }))}
+                          style={{ ...estiloInput("nuevo", campo, "100%"), display: "block", marginTop: 2 }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
+                    <button
+                      onClick={agregarItem}
+                      disabled={agregando}
+                      style={{
+                        padding: "7px 14px",
+                        fontSize: 12,
+                        fontFamily: FUENTE,
+                        fontWeight: 700,
+                        border: "none",
+                        borderRadius: 4,
+                        background: "#0a3a5c",
+                        color: "#fff",
+                        cursor: agregando ? "wait" : "pointer",
+                        opacity: agregando ? 0.6 : 1,
+                      }}
+                    >
+                      {agregando ? "Agregando…" : "Agregar y enviar a Producción"}
+                    </button>
+                    {resultadoNuevo && (
+                      <span style={{ fontSize: 12, color: resultadoNuevo.ok ? "#1a7a44" : "#c0392b" }}>
+                        {resultadoNuevo.ok ? "" : "⚠ "}
+                        {resultadoNuevo.texto}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {itemsLoading ? (
               <p style={{ color: "#4a8ab5", fontSize: 12 }}>⏳ Cargando ítems...</p>
