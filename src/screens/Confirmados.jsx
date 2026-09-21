@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import DataTable from "../Component/DataTable";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
@@ -21,7 +21,8 @@ const API = "https://integral-backend-production.up.railway.app";
 //     las etapas de producción no se tocan)
 //  4. Agrega un ítem NUEVO a la obra      → POST /confirmados
 //     (lo suma a confirmados y lo envía a Producción como fila nueva del
-//     mismo cliente; todo o nada)
+//     mismo cliente; todo o nada). Producto y código se eligen del catálogo
+//     de `articulos` (GET /productos) o se escriben a mano si es un ítem nuevo
 //  5. Elimina un ítem                     → DELETE /confirmados/:id
 //     (NO borra la fila de producción: solo la desvincula)
 //
@@ -58,6 +59,199 @@ const fmtMonto = (v) =>
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
+
+// ── Selector de artículos (catálogo `articulos`) ──────────────────────────
+//
+// Input con lista desplegable que filtra el catálogo por nombre o código.
+// Elegir una opción llama a `onElegir(articulo)`; si lo escrito no está en el
+// catálogo se puede seguir tal cual (ítem nuevo, texto libre).
+//
+// Va definido acá afuera (a nivel módulo) a propósito: si estuviera dentro de
+// `Confirmados` se re-crearía en cada render y el input perdería el foco en
+// cada tecla.
+
+const MAX_OPCIONES = 50;
+
+function ArticuloCombo({
+  label,
+  value,
+  onTexto,
+  onElegir,
+  catalogo,
+  estadoCatalogo,
+  errorCatalogo,
+  estiloInput,
+  maxLength = 255,
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [activo, setActivo] = useState(-1);
+  const listaRef = useRef(null);
+
+  const texto = String(value ?? "");
+  const t = texto.trim().toLowerCase();
+
+  const opciones = useMemo(() => {
+    if (!t) return catalogo.slice(0, MAX_OPCIONES);
+    const palabras = t.split(/\s+/);
+    const res = [];
+    for (const a of catalogo) {
+      if (palabras.every((p) => a.hay.includes(p))) {
+        res.push(a);
+        if (res.length >= MAX_OPCIONES) break;
+      }
+    }
+    return res;
+  }, [t, catalogo]);
+
+  const hayExacto =
+    !!t &&
+    catalogo.some(
+      (a) => a.nombre.toLowerCase() === t || a.codartint.toLowerCase() === t,
+    );
+  const mostrarComoNuevo = !!t && !hayExacto && estadoCatalogo === "ok";
+  const total = opciones.length + (mostrarComoNuevo ? 1 : 0);
+
+  useEffect(() => {
+    if (activo < 0) return;
+    listaRef.current?.children[activo]?.scrollIntoView({ block: "nearest" });
+  }, [activo]);
+
+  const elegir = (a) => {
+    onElegir(a);
+    setAbierto(false);
+    setActivo(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setAbierto(true);
+      setActivo((i) => Math.min(i + 1, total - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActivo((i) => Math.max(i - 1, -1));
+    } else if (e.key === "Enter") {
+      if (abierto && activo >= 0 && activo < opciones.length) {
+        e.preventDefault();
+        elegir(opciones[activo]);
+      } else {
+        setAbierto(false);
+      }
+    } else if (e.key === "Escape") {
+      if (abierto) {
+        e.stopPropagation();
+        setAbierto(false);
+      }
+    }
+  };
+
+  const filaBase = {
+    padding: "6px 10px",
+    fontSize: 12,
+    fontFamily: FUENTE,
+    cursor: "pointer",
+    color: "#0a3a5c",
+  };
+
+  return (
+    <div style={{ position: "relative", fontSize: 11, color: "#5a86ab" }}>
+      <span>{label}</span>
+      <input
+        type="text"
+        role="combobox"
+        aria-expanded={abierto}
+        aria-label={label}
+        autoComplete="off"
+        value={texto}
+        maxLength={maxLength}
+        onChange={(e) => {
+          onTexto(e.target.value);
+          setAbierto(true);
+          setActivo(-1);
+        }}
+        onFocus={() => setAbierto(true)}
+        onBlur={() => setAbierto(false)}
+        onKeyDown={handleKeyDown}
+        style={{ ...estiloInput, display: "block", marginTop: 2 }}
+      />
+
+      {abierto && (
+        <div
+          ref={listaRef}
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            zIndex: 30,
+            width: "max(100%, 340px)",
+            maxWidth: "min(480px, 80vw)",
+            maxHeight: 240,
+            overflowY: "auto",
+            marginTop: 2,
+            background: "#fff",
+            border: "1.5px solid #b8d6ef",
+            borderRadius: 4,
+            boxShadow: "0 4px 14px rgba(10,58,92,0.18)",
+          }}
+        >
+          {estadoCatalogo === "cargando" && (
+            <div style={{ ...filaBase, cursor: "default", color: "#4a8ab5" }}>
+              ⏳ Cargando artículos...
+            </div>
+          )}
+          {estadoCatalogo === "error" && (
+            <div style={{ ...filaBase, cursor: "default", color: "#c0392b" }}>
+              ⚠ No se pudo cargar el catálogo{errorCatalogo ? ` (${errorCatalogo})` : ""}.
+              Podés escribir el ítem a mano.
+            </div>
+          )}
+          {estadoCatalogo === "ok" && opciones.length === 0 && !mostrarComoNuevo && (
+            <div style={{ ...filaBase, cursor: "default", color: "#8aabb8" }}>
+              No hay artículos en el catálogo.
+            </div>
+          )}
+
+          {opciones.map((a, i) => (
+            <div
+              key={`${a.codartint}-${i}`}
+              // onMouseDown (no onClick) para elegir antes de que el input pierda el foco
+              onMouseDown={(e) => {
+                e.preventDefault();
+                elegir(a);
+              }}
+              onMouseEnter={() => setActivo(i)}
+              style={{ ...filaBase, background: i === activo ? "#eaf3fb" : "#fff" }}
+            >
+              <span style={{ color: "#4a8ab5", fontWeight: 700, marginRight: 8 }}>
+                {a.codartint || "—"}
+              </span>
+              {a.nombre}
+            </div>
+          ))}
+
+          {mostrarComoNuevo && (
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setAbierto(false);
+                setActivo(-1);
+              }}
+              onMouseEnter={() => setActivo(opciones.length)}
+              style={{
+                ...filaBase,
+                borderTop: opciones.length ? "1px solid #d6e6f5" : "none",
+                fontWeight: 700,
+                background: activo === opciones.length ? "#eaf3fb" : "#f5faff",
+              }}
+            >
+              ＋ Usar «{texto.trim()}» como ítem nuevo
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Confirmados({ authFetch, token, onInicio }) {
   // ── Lista de revisiones confirmadas ────────────────────────────────
@@ -99,6 +293,12 @@ export default function Confirmados({ authFetch, token, onInicio }) {
 
   const [coloresMelamina, setColoresMelamina] = useState([]);
 
+  // Catálogo de la tabla `articulos` para elegir producto/código en "Nuevo ítem".
+  // Se carga una sola vez, la primera vez que se abre el formulario.
+  const [catalogo, setCatalogo] = useState([]);
+  const [estadoCatalogo, setEstadoCatalogo] = useState("idle"); // idle | cargando | ok | error
+  const [errorCatalogo, setErrorCatalogo] = useState(null);
+
   // ── Carga ──────────────────────────────────────────────────────────
 
   const fetchRevisiones = () => {
@@ -131,6 +331,33 @@ export default function Confirmados({ authFetch, token, onInicio }) {
       .catch(() => setColoresMelamina([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!mostrarNuevo || estadoCatalogo !== "idle") return;
+    setEstadoCatalogo("cargando");
+    setErrorCatalogo(null);
+    authFetch(`${API}/productos`)
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+        const lista = (Array.isArray(data) ? data : [])
+          .map((a) => {
+            const cod = String(a.codartint ?? a.codart ?? "").trim();
+            const nom = String(a.articulo ?? a.nombreart ?? a.nombre ?? "").trim();
+            return { codartint: cod, nombre: nom, hay: `${cod} ${nom}`.toLowerCase() };
+          })
+          .filter((a) => a.codartint || a.nombre)
+          .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+        setCatalogo(lista);
+        setEstadoCatalogo("ok");
+      })
+      .catch((e) => {
+        console.error("Error cargando artículos:", e);
+        setErrorCatalogo(e.message);
+        setEstadoCatalogo("error");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mostrarNuevo]);
 
   const fetchItems = (numeropres, revision) => {
     setItemsLoading(true);
@@ -417,6 +644,22 @@ export default function Confirmados({ authFetch, token, onInicio }) {
 
   const primero = items[0];
 
+  // Estado del ítem que se está cargando en "Nuevo ítem" respecto del catálogo
+  const codNuevo = nuevo.codartint.trim().toLowerCase();
+  const nomNuevo = nuevo.nombreart.trim().toLowerCase();
+  const articuloDelCatalogo = codNuevo
+    ? catalogo.find((a) => a.codartint.toLowerCase() === codNuevo)
+    : null;
+  const coincidePorNombre =
+    !codNuevo && nomNuevo
+      ? catalogo.find((a) => a.nombre.toLowerCase() === nomNuevo)
+      : null;
+  const esItemNuevo =
+    estadoCatalogo === "ok" &&
+    !articuloDelCatalogo &&
+    !coincidePorNombre &&
+    (nomNuevo || codNuevo);
+
   return (
     <>
       <button
@@ -635,20 +878,37 @@ export default function Confirmados({ authFetch, token, onInicio }) {
                     }}
                   >
                     {[
-                      ["nombreart", "Producto *"],
-                      ["codartint", "Cód. artículo"],
-                      ["grupo", "Grupo"],
-                    ].map(([campo, label]) => (
-                      <label key={campo} style={{ fontSize: 11, color: "#5a86ab" }}>
-                        {label}
-                        <input
-                          type="text"
-                          value={nuevo[campo]}
-                          onChange={(e) => setNuevo((n) => ({ ...n, [campo]: e.target.value }))}
-                          style={{ ...estiloInput("nuevo", campo, "100%"), display: "block", marginTop: 2 }}
-                        />
-                      </label>
+                      ["nombreart", "Producto *", 255],
+                      ["codartint", "Cód. artículo", 50],
+                    ].map(([campo, label, maxLength]) => (
+                      <ArticuloCombo
+                        key={campo}
+                        label={label}
+                        value={nuevo[campo]}
+                        maxLength={maxLength}
+                        catalogo={catalogo}
+                        estadoCatalogo={estadoCatalogo}
+                        errorCatalogo={errorCatalogo}
+                        estiloInput={estiloInput("nuevo", campo, "100%")}
+                        onTexto={(v) => setNuevo((n) => ({ ...n, [campo]: v }))}
+                        onElegir={(a) =>
+                          setNuevo((n) => ({
+                            ...n,
+                            nombreart: a.nombre,
+                            codartint: a.codartint,
+                          }))
+                        }
+                      />
                     ))}
+                    <label style={{ fontSize: 11, color: "#5a86ab" }}>
+                      Grupo
+                      <input
+                        type="text"
+                        value={nuevo.grupo}
+                        onChange={(e) => setNuevo((n) => ({ ...n, grupo: e.target.value }))}
+                        style={{ ...estiloInput("nuevo", "grupo", "100%"), display: "block", marginTop: 2 }}
+                      />
+                    </label>
                     <label style={{ fontSize: 11, color: "#5a86ab" }}>
                       Color
                       <select
@@ -682,6 +942,15 @@ export default function Confirmados({ authFetch, token, onInicio }) {
                       </label>
                     ))}
                   </div>
+                  {(articuloDelCatalogo || coincidePorNombre || esItemNuevo) && (
+                    <p style={{ margin: "8px 0 0", fontSize: 11, color: "#4a8ab5" }}>
+                      {articuloDelCatalogo
+                        ? `✓ Artículo del catálogo: ${articuloDelCatalogo.codartint} — ${articuloDelCatalogo.nombre}`
+                        : coincidePorNombre
+                          ? "Hay un artículo con ese nombre en el catálogo: elegilo de la lista para completar el código."
+                          : "＋ Ítem nuevo: no está en el catálogo de artículos, se envía tal cual lo escribiste."}
+                    </p>
+                  )}
                   <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
                     <button
                       onClick={agregarItem}
