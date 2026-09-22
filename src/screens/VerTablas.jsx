@@ -868,6 +868,7 @@ const TABLAS = [
 ];
 
 export default function VerTablas({
+  authFetch,
   clientes,
   clientesCRUD,
   selectedCliente,
@@ -1035,6 +1036,7 @@ export default function VerTablas({
           margen={margen ?? []}
           selected={selectedMargen}
           modal={modal}
+          authFetch={authFetch}
           {...localCRUD(margenCRUD ?? {})}
         />
       </div>
