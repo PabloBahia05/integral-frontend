@@ -1,11 +1,15 @@
 import Modal from "./Modal";
 
-export default function ConfirmDelete({ item, onConfirm, onClose }) {
+export default function ConfirmDelete({ item, title, message, onConfirm, onClose }) {
   if (!item) return null;
   return (
-    <Modal title="Confirmar eliminación" onClose={onClose}>
+    <Modal title={title || "Confirmar eliminación"} onClose={onClose}>
       <p className="confirm-text">
-        ¿Eliminar <span className="confirm-name">{item.nombre}</span>? Esta acción no se puede deshacer.
+        {message ?? (
+          <>
+            ¿Eliminar <span className="confirm-name">{item.nombre}</span>? Esta acción no se puede deshacer.
+          </>
+        )}
       </p>
       <div className="form-actions">
         <button className="btn-cancel" onClick={onClose}>Cancelar</button>

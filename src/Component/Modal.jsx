@@ -58,7 +58,12 @@ export default function Modal({ title, onClose, children }) {
         position: "fixed",
         inset: 0,
         background: "rgba(10,25,47,0.45)",
-        zIndex: 1000,
+        // 1200: por encima de cualquier backdrop propio de pantalla (p. ej. el
+        // panel de ítems de Confirmados.jsx usa zIndex:1150). Este Modal se usa
+        // tanto para paneles principales como para ConfirmDelete —si alguno de
+        // los dos se renderiza como hermano (no anidado) de otro overlay con
+        // zIndex más alto, quedaba tapado e inclickeable.
+        zIndex: 1200,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
