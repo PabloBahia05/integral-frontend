@@ -17,7 +17,7 @@ const COLUMNS = [
 
 const EMPTY = { CODART: "", ARTICULO: "", AREA: "", FAMILIA: "", MARGEN: "" };
 
-function BuscadorArticulo({ onSelect }) {
+function BuscadorArticulo({ onSelect, authFetch }) {
   const [buscar, setBuscar] = useState("");
   const [resultados, setResultados] = useState([]);
   const [buscando, setBuscando] = useState(false);
@@ -31,7 +31,8 @@ function BuscadorArticulo({ onSelect }) {
       }
       setBuscando(true);
       try {
-        const r = await fetch(
+        const doFetch = authFetch ?? fetch;
+        const r = await doFetch(
           `${API}/productos?search=${encodeURIComponent(buscar)}&limit=15`,
         );
         const d = await r.json();
@@ -129,6 +130,7 @@ export default function Margen({
   modal,
   onOpenModal,
   onCloseModal,
+  authFetch,
 }) {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
@@ -220,7 +222,7 @@ export default function Margen({
 
           {/* Buscador de artículo */}
           <div className="form-group">
-            <BuscadorArticulo onSelect={handleSelect} />
+            <BuscadorArticulo onSelect={handleSelect} authFetch={authFetch} />
           </div>
 
           {/* Campos autocargados — read only */}
