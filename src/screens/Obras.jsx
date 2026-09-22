@@ -293,8 +293,13 @@ export default function Obras({
     }
     setLoadingItems(true);
     Promise.all([
+      // Los ítems se leen de `confirmados` (no de tabla_presupuestos): es la
+      // copia congelada al momento de confirmar y la única fuente que se
+      // sigue editando después (ver Confirmados.jsx, PUT /confirmados/:id).
+      // Si Obras leyera tabla_presupuestos, mostraría datos desactualizados
+      // en cuanto se editara un ítem desde la pantalla Confirmados.
       authFetch(
-        `${API}/tabla-presupuestos?numeropres=${selected.numeropres}&revision=${selected.revision}`,
+        `${API}/confirmados/${encodeURIComponent(selected.numeropres)}/${encodeURIComponent(selected.revision)}`,
       ).then((r) => r.json()),
       authFetch(
         `${API}/produccion?numeropres=${selected.numeropres}&revision=${selected.revision}`,
@@ -357,8 +362,8 @@ export default function Obras({
       .values(),
   );
 
-  // Fetch liviano de ítems + producción + línea-por-grupo para el resumen
-  // rápido del desplegable — producción da el código (_produccionCodpro y
+  // Fetch liviano de ítems (desde `confirmados`) + producción + línea-por-
+  // grupo para el resumen rápido del desplegable — producción da el código (_produccionCodpro y
   // _produccionColor, vía cruzarConProduccion) y linea-grupo permite
   // resolver qué línea de precio quedó confirmada para el grupo de cada
   // ítem (columnas "Color" y "Línea" del resumen).
@@ -372,8 +377,10 @@ export default function Obras({
     if (!fila) return;
     setLoadingExpandido(true);
     Promise.all([
+      // Igual que en el fetch de la fila seleccionada: ítems desde
+      // `confirmados`, no desde tabla_presupuestos (ver comentario más abajo).
       authFetch(
-        `${API}/tabla-presupuestos?numeropres=${fila.numeropres}&revision=${fila.revision}`,
+        `${API}/confirmados/${encodeURIComponent(fila.numeropres)}/${encodeURIComponent(fila.revision)}`,
       ).then((r) => r.json()),
       authFetch(
         `${API}/produccion?numeropres=${fila.numeropres}&revision=${fila.revision}`,
