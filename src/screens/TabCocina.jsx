@@ -142,12 +142,15 @@ export default function TabCocina({
       .replace(/[\u0300-\u036f]/g, "");
 
   const productosFiltrados = articulosFamilia
-    .filter(
-      (a) =>
-        !cocinaSearch.trim() ||
-        normalizar(a.articulo).includes(normalizar(cocinaSearch)),
-    )
-    .slice(0, 10);
+    .filter((a) => {
+      if (!cocinaSearch.trim()) return true;
+      const q = normalizar(cocinaSearch);
+      return (
+        normalizar(a.articulo).includes(q) ||
+        normalizar(a.codartint ?? a.CODARTINT ?? "").includes(q)
+      );
+    })
+    .slice(0, 30);
 
   // Para ítems ya guardados sin `area` (guardados antes de que se
   // empezara a persistir esa columna): busca el área del artículo por
