@@ -234,16 +234,22 @@ export default function CuentaCorriente({
             String(o.revision) === String(row.revision),
         );
 
-        // OJO: "ciudad" y "codart"/"grupo" por ítem son nombres de campo
-        // supuestos a partir del ejemplo del talonario — revisar contra
-        // lo que realmente devuelven estos dos endpoints y ajustar acá
-        // si hace falta.
+        // Confirmado contra la respuesta real de
+        // /tabla-presupuestos/revisiones-confirmadas (21/09/2026): NO trae
+        // "ciudad" (se sacó de acá, no existe ese campo en el endpoint —
+        // si en algún momento se agrega, sumarlo devuelta). El teléfono
+        // viene como telefono1/telefono2 (no "telefono"), igual que en
+        // datosClienteRemito más abajo. "direccion" sí es el nombre
+        // correcto, pero OJO: hoy viene NULL para todos los clientes
+        // probados — no es un bug de este archivo, falta cargar ese dato
+        // en el origen (cliente/presupuesto) para que domicilio se
+        // imprima en el remito.
         generarPdfRemitoOficial({
           fecha: hoyISO(),
           numeroRemito: null, // TODO: falta definir numeración del talonario oficial
           cliente: obraInfo?.nombre ?? selectedCliente?.nombre,
           domicilio: obraInfo?.direccion,
-          ciudad: obraInfo?.ciudad ?? "",
+          telefono: obraInfo?.telefono1 || obraInfo?.telefono2 || "",
           obra: row.numeropres,
           items,
         });
