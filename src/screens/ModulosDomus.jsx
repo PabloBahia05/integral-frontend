@@ -451,6 +451,12 @@ export default function ModulosDomus({ authFetch, token }) {
   const [guardandoPieza, setGuardandoPieza] = useState(false);
   const [errorPieza, setErrorPieza] = useState(null);
 
+  // "Traer piezas del código": copia las piezas SIN variante (comunes al
+  // artículo) al subcódigo que se está viendo, para no tener que cargar de
+  // cero una variante que comparte casi todo con la base.
+  const [trayendoPiezas, setTrayendoPiezas] = useState(false);
+  const [errorTraer, setErrorTraer] = useState(null);
+
   // ── Fetch principal (grilla mezclada) ────────────────────────────────
 
   const fetchModulosDomus = () => {
@@ -657,6 +663,7 @@ export default function ModulosDomus({ authFetch, token }) {
   // variante anterior (evita cargar una pieza en el subcódigo equivocado).
   const abrirSubcodigo = (subcodigo) => {
     setPanelSubcodigo(subcodigo);
+    setErrorTraer(null);
     cerrarPieza();
   };
 
@@ -664,6 +671,7 @@ export default function ModulosDomus({ authFetch, token }) {
   const volverASubcodigos = () => {
     setPanelSubcodigo(null);
     setNuevoSubcodigoInput("");
+    setErrorTraer(null);
     cerrarPieza();
   };
 
@@ -789,6 +797,59 @@ export default function ModulosDomus({ authFetch, token }) {
     ...new Set(formulas.map(familiaDe).filter(Boolean)),
   ].sort((a, b) => a.localeCompare(b, "es"));
 
+  // Trae al subcódigo actual una copia de cada pieza "sin variante" (las
+  // comunes del artículo, subcodigo NULL/vacío) — así se arranca una
+  // variante nueva con el set completo de piezas y después solo se
+  // modifica la que haga falta, en vez de cargar todo de cero.
+  const handleTraerPiezasDelCodigo = async () => {
+    if (!panelCodartint || !panelSubcodigo) return;
+    const piezasBase = piezas.filter((p) => !String(p.subcodigo ?? "").trim());
+    if (piezasBase.length === 0) return;
+    if (
+      !window.confirm(
+        `Esto copia ${piezasBase.length} pieza(s) sin variante de ${panelCodartint} al subcódigo ${panelSubcodigo}. Después vas a poder modificar las que hagan falta. ¿Continuar?`,
+      )
+    ) {
+      return;
+    }
+    setTrayendoPiezas(true);
+    setErrorTraer(null);
+    try {
+      for (const p of piezasBase) {
+        const {
+          id: _id,
+          codform: _cf,
+          articulo_descripcion: _ad,
+          formulax_descripcion: _fxd,
+          formulay_descripcion: _fyd,
+          ...resto
+        } = p;
+        const res = await authFetch(`${API}/modulos-domus`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...resto, subcodigo: panelSubcodigo }),
+        });
+        if (!res.ok) {
+          let detalle = `HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            if (body?.error) detalle = body.error;
+          } catch {
+            // el body no era JSON parseable, nos quedamos con el status
+          }
+          throw new Error(detalle);
+        }
+      }
+      fetchPiezas(panelCodartint);
+      fetchModulosDomus();
+    } catch (e) {
+      console.error("Error trayendo piezas del código:", e);
+      setErrorTraer(e.message || "No se pudieron traer todas las piezas.");
+    } finally {
+      setTrayendoPiezas(false);
+    }
+  };
+
   const filtrarFormulas = (busqueda) => {
     const fq = busqueda.trim().toLowerCase();
     if (!fq && !filtroFamiliaFormula) return [];
@@ -806,6 +867,11 @@ export default function ModulosDomus({ authFetch, token }) {
   // se muestra en la vista de detalle, ya filtrado.
   const piezasDeVarianteActual = piezas.filter(
     (p) => String(p.subcodigo ?? "").trim() === (panelSubcodigo ?? ""),
+  );
+  // Piezas "sin variante" del artículo — la fuente de "Traer piezas del
+  // código" (ver handleTraerPiezasDelCodigo).
+  const piezasBaseSinVariante = piezas.filter(
+    (p) => !String(p.subcodigo ?? "").trim(),
   );
 
   const formulasFiltradas = filtrarFormulas(busquedaFormula);
@@ -1804,6 +1870,36 @@ export default function ModulosDomus({ authFetch, token }) {
                     </>
                   )}
                 </p>
+
+                {panelSubcodigo && piezasBaseSinVariante.length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <button
+                      onClick={handleTraerPiezasDelCodigo}
+                      disabled={trayendoPiezas}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 4,
+                        border: "1.5px solid #0a3a5c",
+                        background: "#fff",
+                        color: "#0a3a5c",
+                        cursor: trayendoPiezas ? "wait" : "pointer",
+                        fontFamily: "'Space Mono', monospace",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        opacity: trayendoPiezas ? 0.6 : 1,
+                      }}
+                    >
+                      {trayendoPiezas
+                        ? "Trayendo piezas…"
+                        : `⇩ Traer piezas del código (${piezasBaseSinVariante.length})`}
+                    </button>
+                    {errorTraer && (
+                      <p style={{ color: "#c0392b", fontSize: 12, margin: "6px 0 0" }}>
+                        ⚠ {errorTraer}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {familiasFormulas.length > 0 && (
                   <div
