@@ -434,6 +434,11 @@ export default function ModulosDomus({ authFetch, token }) {
   const [formulaFocus, setFormulaFocus] = useState(false);
   const [piezaFormula, setPiezaFormula] = useState("");
   const [piezaTitulo, setPiezaTitulo] = useState("");
+  // Subcódigo (variante puntual, ej. "02BAJO10MDF" para el codartint
+  // "02BAJO10") al que pertenece la pieza nueva. Vacío = pieza compartida
+  // por todas las variantes del artículo (ver nota en el backend,
+  // formulas-csv_routes.js).
+  const [piezaSubcodigo, setPiezaSubcodigo] = useState("");
   const [guardandoPieza, setGuardandoPieza] = useState(false);
   const [errorPieza, setErrorPieza] = useState(null);
 
@@ -615,6 +620,7 @@ export default function ModulosDomus({ authFetch, token }) {
     setBusquedaFormula("");
     setPiezaFormula("");
     setPiezaTitulo("");
+    setPiezaSubcodigo("");
     setErrorPieza(null);
   };
 
@@ -769,6 +775,34 @@ export default function ModulosDomus({ authFetch, token }) {
   };
   const formulasFiltradas = filtrarFormulas(busquedaFormula);
 
+  // Subcódigos (variantes) ya usados entre las piezas de ESTE artículo —
+  // sugerencias para el datalist, tanto al editar una pieza existente como
+  // al cargar una nueva. No incluye "" (piezas compartidas/sin variante).
+  const subcodigosDelArticulo = [
+    ...new Set(
+      piezas.map((p) => String(p.subcodigo ?? "").trim()).filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "es"));
+
+  // Piezas del panel agrupadas por subcodigo — el listado ya no es una
+  // sola tabla mezclada: cada variante tiene su propio grupo, y las piezas
+  // sin subcodigo (compartidas por todas las variantes) quedan en un grupo
+  // aparte al final.
+  const gruposPiezas = (() => {
+    const mapa = new Map();
+    piezas.forEach((p) => {
+      const key = String(p.subcodigo ?? "").trim();
+      if (!mapa.has(key)) mapa.set(key, []);
+      mapa.get(key).push(p);
+    });
+    return [...mapa.entries()].sort(([a], [b]) => {
+      if (a === b) return 0;
+      if (a === "") return 1; // "sin variante" siempre al final
+      if (b === "") return -1;
+      return a.localeCompare(b, "es");
+    });
+  })();
+
   const handleCrearPieza = async () => {
     if (!panelCodartint) return;
     setGuardandoPieza(true);
@@ -779,6 +813,7 @@ export default function ModulosDomus({ authFetch, token }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           codartint: panelCodartint,
+          subcodigo: piezaSubcodigo.trim() || null,
           formulax: String(piezaFormula ?? "").trim() || null,
           formulay: String(piezaFormula ?? "").trim() || null,
           titulo: piezaTitulo.trim() || null,
@@ -1034,6 +1069,23 @@ export default function ModulosDomus({ authFetch, token }) {
         >
           {duplicandoId === row.id ? "⏳" : "⧉"}
         </button>
+      ),
+    },
+    {
+      key: "subcodigo",
+      label: "Subcódigo",
+      render: (v, row) => (
+        <input
+          type="text"
+          value={row.subcodigo ?? ""}
+          placeholder="Sin variante"
+          list={`subcodigos-pieza-${panelCodartint}`}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => handlePiezaCampoChange(row.id, "subcodigo", e.target.value)}
+          onBlur={() => handlePiezaCampoBlur(row, "subcodigo")}
+          maxLength={50}
+          style={estiloInput(row.id, "subcodigo", "140px")}
+        />
       ),
     },
     {
@@ -1638,15 +1690,51 @@ export default function ModulosDomus({ authFetch, token }) {
                 Todavía no cargaste piezas para este artículo.
               </p>
             ) : (
-              <div style={{ overflowX: "auto", marginBottom: 16 }}>
-                <DataTable
-                  columns={columnasPieza}
-                  rows={piezas}
-                  selectedId={null}
-                  onSelect={() => {}}
-                  storageKey={`modulos-domus-piezas-${panelCodartint}`}
-                />
-              </div>
+              <>
+                {subcodigosDelArticulo.length > 0 && (
+                  <datalist id={`subcodigos-pieza-${panelCodartint}`}>
+                    {subcodigosDelArticulo.map((s) => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                )}
+                {gruposPiezas.map(([subcodigo, piezasDelGrupo]) => (
+                  <div key={subcodigo || "__sin_variante__"} style={{ marginBottom: 20 }}>
+                    <h4
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        margin: "0 0 8px",
+                        fontSize: 12,
+                        fontFamily: "'Space Mono',monospace",
+                        color: subcodigo ? "#0a3a5c" : "#5a86ab",
+                        fontStyle: subcodigo ? "normal" : "italic",
+                      }}
+                    >
+                      {subcodigo || "Sin variante (compartidas por todas)"}
+                      <span
+                        style={{
+                          fontStyle: "normal",
+                          fontWeight: 400,
+                          color: "#8aabb8",
+                        }}
+                      >
+                        ({piezasDelGrupo.length})
+                      </span>
+                    </h4>
+                    <div style={{ overflowX: "auto", marginBottom: 8 }}>
+                      <DataTable
+                        columns={columnasPieza}
+                        rows={piezasDelGrupo}
+                        selectedId={null}
+                        onSelect={() => {}}
+                        storageKey={`modulos-domus-piezas-${panelCodartint}-${subcodigo || "sin-variante"}`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </>
             )}
 
             {!piezaAbierta ? (
@@ -1698,6 +1786,28 @@ export default function ModulosDomus({ authFetch, token }) {
                   </div>
                   <CodigoFormulaResuelto codigo={piezaFormula} formulas={formulas} />
                 </div>
+
+                <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+                  Subcódigo (variante — dejalo vacío si la pieza es compartida por todas)
+                </label>
+                <input
+                  type="text"
+                  value={piezaSubcodigo}
+                  onChange={(e) => setPiezaSubcodigo(e.target.value)}
+                  placeholder="Ej: 02BAJO10MDF"
+                  list={`subcodigos-pieza-${panelCodartint}`}
+                  maxLength={50}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "6px 8px",
+                    fontSize: 13,
+                    fontFamily: "'Space Mono',monospace",
+                    border: "1.5px solid #b8d6ef",
+                    borderRadius: 4,
+                    marginBottom: 12,
+                  }}
+                />
 
                 <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
                   Título de la pieza (editable)
