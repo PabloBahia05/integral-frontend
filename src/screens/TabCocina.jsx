@@ -28,11 +28,16 @@ const tipoAccesorioParaItem = (fila, proveedor) => {
   const esEsquineroBajo =
     nombreart.startsWith("ESQUINERO BAJO") ||
     articulo.startsWith("ESQUINERO BAJO");
-  if (
-    esEsquineroBajo &&
-    String(proveedor ?? "").trim().toUpperCase() === "DANIEL ROQUE SRL"
-  ) {
-    return "ESQ";
+  if (esEsquineroBajo) {
+    // Nunca cae al fallback CAJ/PTA de abajo: el nombre de estos muebles
+    // suele terminar en "... 2 Pta" (cantidad de puertas del mueble, no
+    // el tipo de accesorio), lo que hacía matchear el substring "PTA" por
+    // error y mostraba accesorios de puerta/cajón en vez de ESQ. Si el
+    // proveedor no matchea (comprado, no fabricado en casa), se devuelve
+    // null en vez de arriesgar una clasificación falsa.
+    return String(proveedor ?? "").trim().toUpperCase() === "DANIEL ROQUE SRL"
+      ? "ESQ"
+      : null;
   }
   const nombre = `${nombreart} ${articulo}`;
   if (nombre.includes("CAJ")) return "CAJ";
