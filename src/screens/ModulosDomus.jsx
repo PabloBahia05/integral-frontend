@@ -406,6 +406,15 @@ export default function ModulosDomus({ authFetch, token }) {
   // Panel de un artículo puntual: sus piezas + alta de piezas nuevas.
   const [panelCodartint, setPanelCodartint] = useState(null);
   const [panelArticulo, setPanelArticulo] = useState("");
+  // Subcódigo elegido dentro del panel: `null` = todavía no se eligió
+  // ninguno, se muestra el selector de variantes; string ("" incluido,
+  // para "sin variante") = ya se eligió una y se muestra su lista de
+  // piezas. Se resetea a `null` cada vez que se abre/cierra el panel de un
+  // artículo (ver abrirPanel/cerrarPanel).
+  const [panelSubcodigo, setPanelSubcodigo] = useState(null);
+  // Texto del campo "nueva variante" en el selector, para crear un
+  // subcódigo que todavía no tiene ninguna pieza cargada.
+  const [nuevoSubcodigoInput, setNuevoSubcodigoInput] = useState("");
   const [piezas, setPiezas] = useState([]);
   const [piezasLoading, setPiezasLoading] = useState(false);
   const [piezasError, setPiezasError] = useState(null);
@@ -627,6 +636,8 @@ export default function ModulosDomus({ authFetch, token }) {
   const abrirPanel = (row) => {
     setPanelCodartint(row.codartint);
     setPanelArticulo(row.articulo_descripcion ?? "");
+    setPanelSubcodigo(null);
+    setNuevoSubcodigoInput("");
     fetchPiezas(row.codartint);
     fetchFormulas();
   };
@@ -634,8 +645,25 @@ export default function ModulosDomus({ authFetch, token }) {
   const cerrarPanel = () => {
     setPanelCodartint(null);
     setPanelArticulo("");
+    setPanelSubcodigo(null);
+    setNuevoSubcodigoInput("");
     setPiezas([]);
     setPiezasError(null);
+    cerrarPieza();
+  };
+
+  // Elegir una variante en el selector: pasa a mostrar solo sus piezas.
+  // Cierra el formulario de "nueva pieza" si había quedado abierto de la
+  // variante anterior (evita cargar una pieza en el subcódigo equivocado).
+  const abrirSubcodigo = (subcodigo) => {
+    setPanelSubcodigo(subcodigo);
+    cerrarPieza();
+  };
+
+  // Volver del listado de piezas de una variante al selector de variantes.
+  const volverASubcodigos = () => {
+    setPanelSubcodigo(null);
+    setNuevoSubcodigoInput("");
     cerrarPieza();
   };
 
@@ -710,6 +738,7 @@ export default function ModulosDomus({ authFetch, token }) {
 
   const abrirPieza = () => {
     fetchFormulas();
+    setPiezaSubcodigo(panelSubcodigo ?? "");
     setPiezaAbierta(true);
   };
 
@@ -773,6 +802,12 @@ export default function ModulosDomus({ authFetch, token }) {
       )
       .slice(0, 20);
   };
+  // Piezas de la variante elegida en el selector (panelSubcodigo) — lo que
+  // se muestra en la vista de detalle, ya filtrado.
+  const piezasDeVarianteActual = piezas.filter(
+    (p) => String(p.subcodigo ?? "").trim() === (panelSubcodigo ?? ""),
+  );
+
   const formulasFiltradas = filtrarFormulas(busquedaFormula);
 
   // Subcódigos (variantes) ya usados entre las piezas de ESTE artículo —
@@ -1615,265 +1650,381 @@ export default function ModulosDomus({ authFetch, token }) {
               </button>
             </div>
 
-            <p style={{ margin: "8px 0 16px", fontSize: 12, color: "#4a8ab5" }}>
-              Cada pieza con fórmula asignada genera un renglón en el CSV de
-              fórmulas de producción de este artículo.
-            </p>
-
-            {familiasFormulas.length > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  margin: "0 0 12px",
-                }}
-              >
-                <label
-                  htmlFor="filtro-familia-formula"
-                  style={{ fontSize: 11, color: "#5a86ab" }}
-                >
-                  Familia de fórmula
-                </label>
-                <select
-                  id="filtro-familia-formula"
-                  value={filtroFamiliaFormula}
-                  onChange={(e) => setFiltroFamiliaFormula(e.target.value)}
-                  style={{
-                    padding: "4px 8px",
-                    fontSize: 12,
-                    fontFamily: "'Space Mono',monospace",
-                    border: "1.5px solid #b8d6ef",
-                    borderRadius: 4,
-                    color: "#0a3a5c",
-                    background: "#fff",
-                    maxWidth: 260,
-                  }}
-                >
-                  <option value="">Todas</option>
-                  {familiasFormulas.map((fam) => (
-                    <option key={fam} value={fam}>
-                      {fam}
-                    </option>
-                  ))}
-                </select>
-                {filtroFamiliaFormula && (
-                  <button
-                    onClick={() => setFiltroFamiliaFormula("")}
-                    style={{
-                      border: "none",
-                      background: "none",
-                      color: "#4a8ab5",
-                      cursor: "pointer",
-                      fontSize: 11,
-                      textDecoration: "underline",
-                    }}
-                  >
-                    Quitar filtro
-                  </button>
-                )}
-              </div>
+            {subcodigosDelArticulo.length > 0 && (
+              <datalist id={`subcodigos-pieza-${panelCodartint}`}>
+                {subcodigosDelArticulo.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
             )}
 
-            {errorDuplicar && (
-              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 8px" }}>
-                ⚠ {errorDuplicar}
-              </p>
-            )}
-
-            {piezasLoading ? (
-              <p style={{ color: "#4a8ab5", fontSize: 12 }}>⏳ Cargando piezas...</p>
-            ) : piezasError ? (
-              <p style={{ color: "#c0392b", fontSize: 12 }}>⚠ {piezasError}</p>
-            ) : piezas.length === 0 ? (
-              <p style={{ color: "#8aabb8", fontSize: 12 }}>
-                Todavía no cargaste piezas para este artículo.
-              </p>
-            ) : (
+            {panelSubcodigo === null ? (
+              // ── Paso 1: elegir variante ──────────────────────────────
               <>
-                {subcodigosDelArticulo.length > 0 && (
-                  <datalist id={`subcodigos-pieza-${panelCodartint}`}>
-                    {subcodigosDelArticulo.map((s) => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
-                )}
-                {gruposPiezas.map(([subcodigo, piezasDelGrupo]) => (
-                  <div key={subcodigo || "__sin_variante__"} style={{ marginBottom: 20 }}>
-                    <h4
+                <p style={{ margin: "8px 0 16px", fontSize: 12, color: "#4a8ab5" }}>
+                  Elegí un subcódigo para ver (o empezar a cargar) sus piezas.
+                </p>
+
+                {piezasLoading ? (
+                  <p style={{ color: "#4a8ab5", fontSize: 12 }}>⏳ Cargando piezas...</p>
+                ) : piezasError ? (
+                  <p style={{ color: "#c0392b", fontSize: 12 }}>⚠ {piezasError}</p>
+                ) : (
+                  <>
+                    <div
                       style={{
                         display: "flex",
-                        alignItems: "center",
+                        flexWrap: "wrap",
                         gap: 8,
-                        margin: "0 0 8px",
-                        fontSize: 12,
-                        fontFamily: "'Space Mono',monospace",
-                        color: subcodigo ? "#0a3a5c" : "#5a86ab",
-                        fontStyle: subcodigo ? "normal" : "italic",
+                        marginBottom: 16,
                       }}
                     >
-                      {subcodigo || "Sin variante (compartidas por todas)"}
-                      <span
+                      {gruposPiezas
+                        .filter(([subcodigo]) => subcodigo !== "")
+                        .map(([subcodigo, piezasDelGrupo]) => (
+                          <button
+                            key={subcodigo}
+                            onClick={() => abrirSubcodigo(subcodigo)}
+                            style={{
+                              padding: "10px 16px",
+                              borderRadius: 6,
+                              border: "1.5px solid #b8d6ef",
+                              background: "#eaf3fb",
+                              color: "#0a3a5c",
+                              cursor: "pointer",
+                              fontFamily: "'Space Mono', monospace",
+                              fontSize: 12,
+                              fontWeight: 700,
+                              textAlign: "left",
+                            }}
+                          >
+                            {subcodigo}
+                            <span style={{ fontWeight: 400, color: "#5a86ab", marginLeft: 6 }}>
+                              ({piezasDelGrupo.length})
+                            </span>
+                          </button>
+                        ))}
+                      <button
+                        onClick={() => abrirSubcodigo("")}
                         style={{
-                          fontStyle: "normal",
-                          fontWeight: 400,
-                          color: "#8aabb8",
+                          padding: "10px 16px",
+                          borderRadius: 6,
+                          border: "1.5px dashed #b8d6ef",
+                          background: "#fff",
+                          color: "#5a86ab",
+                          cursor: "pointer",
+                          fontFamily: "'Space Mono', monospace",
+                          fontSize: 12,
+                          fontStyle: "italic",
+                          textAlign: "left",
                         }}
                       >
-                        ({piezasDelGrupo.length})
-                      </span>
-                    </h4>
-                    <div style={{ overflowX: "auto", marginBottom: 8 }}>
-                      <DataTable
-                        columns={columnasPieza}
-                        rows={piezasDelGrupo}
-                        selectedId={null}
-                        onSelect={() => {}}
-                        storageKey={`modulos-domus-piezas-${panelCodartint}-${subcodigo || "sin-variante"}`}
-                      />
+                        Sin variante (compartidas)
+                        <span style={{ fontStyle: "normal", marginLeft: 6 }}>
+                          ({(gruposPiezas.find(([s]) => s === "")?.[1] ?? []).length})
+                        </span>
+                      </button>
                     </div>
-                  </div>
-                ))}
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="text"
+                        value={nuevoSubcodigoInput}
+                        onChange={(e) => setNuevoSubcodigoInput(e.target.value)}
+                        placeholder="Nuevo subcódigo, ej: 02BAJO10MDF"
+                        maxLength={50}
+                        style={{
+                          padding: "6px 8px",
+                          fontSize: 12,
+                          fontFamily: "'Space Mono',monospace",
+                          border: "1.5px solid #b8d6ef",
+                          borderRadius: 4,
+                          color: "#0a3a5c",
+                          flex: 1,
+                          maxWidth: 260,
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          const v = nuevoSubcodigoInput.trim();
+                          if (v) abrirSubcodigo(v);
+                        }}
+                        disabled={!nuevoSubcodigoInput.trim()}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 4,
+                          border: "none",
+                          background: "#0a3a5c",
+                          color: "#fff",
+                          cursor: nuevoSubcodigoInput.trim() ? "pointer" : "default",
+                          fontFamily: "'Space Mono', monospace",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          opacity: nuevoSubcodigoInput.trim() ? 1 : 0.5,
+                        }}
+                      >
+                        + Nueva variante
+                      </button>
+                    </div>
+                  </>
+                )}
               </>
-            )}
-
-            {!piezaAbierta ? (
-              <button
-                onClick={abrirPieza}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 4,
-                  border: "none",
-                  background: "#0a3a5c",
-                  color: "#fff",
-                  cursor: "pointer",
-                  fontFamily: "'Space Mono', monospace",
-                  fontSize: 12,
-                  fontWeight: 700,
-                }}
-              >
-                + Nueva pieza
-              </button>
             ) : (
-              <div
-                style={{
-                  border: "1.5px solid #b8d6ef",
-                  borderRadius: 8,
-                  padding: 14,
-                  marginTop: 4,
-                }}
-              >
-                <BuscadorFormulaCampo
-                  label="Fórmula (Alto, Ancho y Profundidad) — buscar por código o descripción"
-                  placeholder="Ej: FORM-01 o Lateral..."
-                  busqueda={busquedaFormula}
-                  onBusquedaChange={setBusquedaFormula}
-                  focus={formulaFocus}
-                  onFocus={() => setFormulaFocus(true)}
-                  onBlur={() => setTimeout(() => setFormulaFocus(false), 160)}
-                  resultados={formulasFiltradas}
-                  onElegir={(f) => {
-                    setPiezaFormula(f.codform);
-                    if (!piezaTitulo.trim()) setPiezaTitulo(f.descripcion || "");
-                    setBusquedaFormula(`${f.descripcion || f.codform} — ${f.codform}`);
-                    setFormulaFocus(false);
+              // ── Paso 2: piezas de la variante elegida ────────────────
+              <>
+                <button
+                  onClick={volverASubcodigos}
+                  style={{
+                    border: "none",
+                    background: "none",
+                    color: "#4a8ab5",
+                    cursor: "pointer",
+                    fontFamily: "'Space Mono', monospace",
+                    fontSize: 12,
+                    padding: 0,
+                    marginBottom: 12,
                   }}
-                />
+                >
+                  ← Variantes
+                </button>
 
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 10, color: "#5a86ab", marginBottom: 2 }}>
-                    Fórmula asignada
+                <p style={{ margin: "0 0 16px", fontSize: 12, color: "#4a8ab5" }}>
+                  {panelSubcodigo ? (
+                    <>
+                      Subcódigo <strong>{panelSubcodigo}</strong> — cada pieza con
+                      fórmula asignada genera un renglón en el CSV de fórmulas de
+                      producción de esta variante.
+                    </>
+                  ) : (
+                    <>
+                      Piezas <em>sin variante</em> (compartidas por todos los
+                      subcódigos de este artículo) — cada una con fórmula asignada
+                      genera un renglón en el CSV, además de las propias de cada
+                      variante puntual.
+                    </>
+                  )}
+                </p>
+
+                {familiasFormulas.length > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      margin: "0 0 12px",
+                    }}
+                  >
+                    <label
+                      htmlFor="filtro-familia-formula"
+                      style={{ fontSize: 11, color: "#5a86ab" }}
+                    >
+                      Familia de fórmula
+                    </label>
+                    <select
+                      id="filtro-familia-formula"
+                      value={filtroFamiliaFormula}
+                      onChange={(e) => setFiltroFamiliaFormula(e.target.value)}
+                      style={{
+                        padding: "4px 8px",
+                        fontSize: 12,
+                        fontFamily: "'Space Mono',monospace",
+                        border: "1.5px solid #b8d6ef",
+                        borderRadius: 4,
+                        color: "#0a3a5c",
+                        background: "#fff",
+                        maxWidth: 260,
+                      }}
+                    >
+                      <option value="">Todas</option>
+                      {familiasFormulas.map((fam) => (
+                        <option key={fam} value={fam}>
+                          {fam}
+                        </option>
+                      ))}
+                    </select>
+                    {filtroFamiliaFormula && (
+                      <button
+                        onClick={() => setFiltroFamiliaFormula("")}
+                        style={{
+                          border: "none",
+                          background: "none",
+                          color: "#4a8ab5",
+                          cursor: "pointer",
+                          fontSize: 11,
+                          textDecoration: "underline",
+                        }}
+                      >
+                        Quitar filtro
+                      </button>
+                    )}
                   </div>
-                  <CodigoFormulaResuelto codigo={piezaFormula} formulas={formulas} />
-                </div>
+                )}
 
-                <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
-                  Subcódigo (variante — dejalo vacío si la pieza es compartida por todas)
-                </label>
-                <input
-                  type="text"
-                  value={piezaSubcodigo}
-                  onChange={(e) => setPiezaSubcodigo(e.target.value)}
-                  placeholder="Ej: 02BAJO10MDF"
-                  list={`subcodigos-pieza-${panelCodartint}`}
-                  maxLength={50}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "6px 8px",
-                    fontSize: 13,
-                    fontFamily: "'Space Mono',monospace",
-                    border: "1.5px solid #b8d6ef",
-                    borderRadius: 4,
-                    marginBottom: 12,
-                  }}
-                />
-
-                <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
-                  Título de la pieza (editable)
-                </label>
-                <input
-                  type="text"
-                  value={piezaTitulo}
-                  onChange={(e) => setPiezaTitulo(e.target.value)}
-                  placeholder="Ej: Lateral izquierdo"
-                  maxLength={255}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "6px 8px",
-                    fontSize: 13,
-                    fontFamily: "'Space Mono',monospace",
-                    border: "1.5px solid #b8d6ef",
-                    borderRadius: 4,
-                    marginBottom: 12,
-                  }}
-                />
-
-                {errorPieza && (
-                  <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
-                    {errorPieza}
+                {errorDuplicar && (
+                  <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 8px" }}>
+                    ⚠ {errorDuplicar}
                   </p>
                 )}
 
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                {piezasLoading ? (
+                  <p style={{ color: "#4a8ab5", fontSize: 12 }}>⏳ Cargando piezas...</p>
+                ) : piezasError ? (
+                  <p style={{ color: "#c0392b", fontSize: 12 }}>⚠ {piezasError}</p>
+                ) : piezasDeVarianteActual.length === 0 ? (
+                  <p style={{ color: "#8aabb8", fontSize: 12 }}>
+                    Todavía no cargaste piezas para esta variante.
+                  </p>
+                ) : (
+                  <div style={{ overflowX: "auto", marginBottom: 16 }}>
+                    <DataTable
+                      columns={columnasPieza}
+                      rows={piezasDeVarianteActual}
+                      selectedId={null}
+                      onSelect={() => {}}
+                      storageKey={`modulos-domus-piezas-${panelCodartint}-${panelSubcodigo || "sin-variante"}`}
+                    />
+                  </div>
+                )}
+
+                {!piezaAbierta ? (
                   <button
-                    onClick={cerrarPieza}
-                    disabled={guardandoPieza}
+                    onClick={abrirPieza}
                     style={{
                       padding: "8px 14px",
                       borderRadius: 4,
-                      border: "1.5px solid #b8d6ef",
-                      background: "#fff",
-                      color: "#4a8ab5",
+                      border: "none",
+                      background: "#0a3a5c",
+                      color: "#fff",
                       cursor: "pointer",
                       fontFamily: "'Space Mono', monospace",
                       fontSize: 12,
                       fontWeight: 700,
                     }}
                   >
-                    Cancelar
+                    + Nueva pieza
                   </button>
-                  <button
-                    onClick={handleCrearPieza}
-                    disabled={guardandoPieza}
+                ) : (
+                  <div
                     style={{
-                      padding: "8px 14px",
-                      borderRadius: 4,
-                      border: "none",
-                      background: "#1a7a44",
-                      color: "#fff",
-                      cursor: guardandoPieza ? "wait" : "pointer",
-                      fontFamily: "'Space Mono', monospace",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      opacity: guardandoPieza ? 0.6 : 1,
+                      border: "1.5px solid #b8d6ef",
+                      borderRadius: 8,
+                      padding: 14,
+                      marginTop: 4,
                     }}
                   >
-                    {guardandoPieza ? "Guardando…" : "Guardar pieza"}
-                  </button>
-                </div>
-              </div>
+                    <BuscadorFormulaCampo
+                      label="Fórmula (Alto, Ancho y Profundidad) — buscar por código o descripción"
+                      placeholder="Ej: FORM-01 o Lateral..."
+                      busqueda={busquedaFormula}
+                      onBusquedaChange={setBusquedaFormula}
+                      focus={formulaFocus}
+                      onFocus={() => setFormulaFocus(true)}
+                      onBlur={() => setTimeout(() => setFormulaFocus(false), 160)}
+                      resultados={formulasFiltradas}
+                      onElegir={(f) => {
+                        setPiezaFormula(f.codform);
+                        if (!piezaTitulo.trim()) setPiezaTitulo(f.descripcion || "");
+                        setBusquedaFormula(`${f.descripcion || f.codform} — ${f.codform}`);
+                        setFormulaFocus(false);
+                      }}
+                    />
+
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 10, color: "#5a86ab", marginBottom: 2 }}>
+                        Fórmula asignada
+                      </div>
+                      <CodigoFormulaResuelto codigo={piezaFormula} formulas={formulas} />
+                    </div>
+
+                    <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+                      Subcódigo (variante — dejalo vacío si la pieza es compartida por todas)
+                    </label>
+                    <input
+                      type="text"
+                      value={piezaSubcodigo}
+                      onChange={(e) => setPiezaSubcodigo(e.target.value)}
+                      placeholder="Ej: 02BAJO10MDF"
+                      list={`subcodigos-pieza-${panelCodartint}`}
+                      maxLength={50}
+                      style={{
+                        width: "100%",
+                        boxSizing: "border-box",
+                        padding: "6px 8px",
+                        fontSize: 13,
+                        fontFamily: "'Space Mono',monospace",
+                        border: "1.5px solid #b8d6ef",
+                        borderRadius: 4,
+                        marginBottom: 12,
+                      }}
+                    />
+
+                    <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+                      Título de la pieza (editable)
+                    </label>
+                    <input
+                      type="text"
+                      value={piezaTitulo}
+                      onChange={(e) => setPiezaTitulo(e.target.value)}
+                      placeholder="Ej: Lateral izquierdo"
+                      maxLength={255}
+                      style={{
+                        width: "100%",
+                        boxSizing: "border-box",
+                        padding: "6px 8px",
+                        fontSize: 13,
+                        fontFamily: "'Space Mono',monospace",
+                        border: "1.5px solid #b8d6ef",
+                        borderRadius: 4,
+                        marginBottom: 12,
+                      }}
+                    />
+
+                    {errorPieza && (
+                      <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
+                        {errorPieza}
+                      </p>
+                    )}
+
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                      <button
+                        onClick={cerrarPieza}
+                        disabled={guardandoPieza}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 4,
+                          border: "1.5px solid #b8d6ef",
+                          background: "#fff",
+                          color: "#4a8ab5",
+                          cursor: "pointer",
+                          fontFamily: "'Space Mono', monospace",
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleCrearPieza}
+                        disabled={guardandoPieza}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 4,
+                          border: "none",
+                          background: "#1a7a44",
+                          color: "#fff",
+                          cursor: guardandoPieza ? "wait" : "pointer",
+                          fontFamily: "'Space Mono', monospace",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          opacity: guardandoPieza ? 0.6 : 1,
+                        }}
+                      >
+                        {guardandoPieza ? "Guardando…" : "Guardar pieza"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
