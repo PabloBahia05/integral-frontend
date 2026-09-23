@@ -60,7 +60,7 @@ const CONFIG = {
   obra: { x: 150, y: 101.4 },
 
   items: {
-    startY: 123.5, // línea base de la 1ª fila (línea inferior de la fila: 125.1)
+    startY: 118.5, // línea base de la 1ª fila (línea inferior de la fila: 125.1)123.5
     rowHeight: 6.35, // paso real de las filas del talonario (1/4")
     maxFilas: 19, // filas que entran entre el encabezado y el pie
     colCantidad: 22.2, // CENTRO de la columna "Cantidad" (12.8–31.5)
