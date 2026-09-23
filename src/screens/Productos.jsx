@@ -133,6 +133,17 @@ const makeColumns = (onVer) => [
   { key: "linea", label: "Línea", width: 90 },
   { key: "color", label: "Color", width: 90 },
   { key: "area", label: "Área", width: 80 },
+  {
+    key: "aplicacion",
+    label: "Aplicación",
+    width: 100,
+    render: (v) =>
+      v ? (
+        <span style={{ color: "#0a3a5c", fontSize: 12 }}>{v}</span>
+      ) : (
+        <span style={{ color: "#bbb" }}>—</span>
+      ),
+  },
   { key: "mca", label: "MCA", width: 80 },
   {
     key: "veta",
