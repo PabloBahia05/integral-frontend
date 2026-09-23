@@ -89,6 +89,7 @@ function useIsMobile(breakpoint = 640) {
 function DetalleProduccion({
   row,
   melaminas,
+  subcodigosDisponibles,
   onClose,
   onModuloChange,
   onModuloBlur,
@@ -285,6 +286,34 @@ function DetalleProduccion({
             />,
           );
         })}
+
+        {fila(
+          "Subcódigo",
+          <>
+            <input
+              type="text"
+              value={row.subcodigo ?? ""}
+              placeholder={row.codartint ? "Sin variante" : "Sin artículo"}
+              list={`subcodigos-detalle-${row.id}`}
+              onChange={(e) =>
+                onTextoCampoChange(row.id, "subcodigo", e.target.value)
+              }
+              onBlur={() => onTextoCampoBlur(row, "subcodigo")}
+              maxLength={50}
+              style={estiloInputModal(
+                guardandoCampo === `${row.id}-subcodigo`,
+                errorCampo === `${row.id}-subcodigo`,
+              )}
+            />
+            {subcodigosDisponibles.length > 0 && (
+              <datalist id={`subcodigos-detalle-${row.id}`}>
+                {subcodigosDisponibles.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            )}
+          </>,
+        )}
 
         {fila(
           "Color",
@@ -524,6 +553,16 @@ export default function Produccion({ authFetch, token, onInicio }) {
   // tabla modulos-domus. `null` = todavía no cargó o falló la carga; en ese
   // caso el botón CSV usa `row.tiene_formula` como respaldo.
   const [modulosConFormula, setModulosConFormula] = useState(null);
+
+  // Subcódigos (variantes puntuales, ej. "02BAJO10MDF" para el codartint
+  // "02BAJO10") ya usados en piezas de modulos-domus, agrupados por
+  // codartint normalizado — para sugerir opciones (datalist) en el campo
+  // `subcodigo` de esta pantalla sin obligar a escribirlo de memoria. Un
+  // codartint sin ninguna variante cargada todavía no aparece en el mapa
+  // (el campo sigue siendo editable a mano igual).
+  const [subcodigosPorArticulo, setSubcodigosPorArticulo] = useState(
+    new Map(),
+  );
   const nombreMelamina = (codartint) =>
     melaminas.find((m) => m.codartint === codartint)?.articulo ?? codartint;
 
@@ -588,6 +627,21 @@ export default function Produccion({ authFetch, token, onInicio }) {
             .map((m) => normalizarCodigo(m[MODULOS_DOMUS_CAMPO_CODIGO])),
         );
         setModulosConFormula(codigos);
+
+        // Subcódigos ya usados por artículo (para el datalist del campo
+        // `subcodigo` más abajo) — de TODAS las piezas, tengan o no
+        // fórmula asignada todavía.
+        const porArticulo = new Map();
+        lista.forEach((m) => {
+          const sub = String(m.subcodigo ?? "").trim();
+          if (!sub) return;
+          const codigo = normalizarCodigo(m.codartint);
+          if (!porArticulo.has(codigo)) porArticulo.set(codigo, new Set());
+          porArticulo.get(codigo).add(sub);
+        });
+        setSubcodigosPorArticulo(
+          new Map([...porArticulo].map(([k, v]) => [k, [...v].sort()])),
+        );
       })
       .catch((e) => console.error("Error cargando modulos-domus:", e));
   }, []);
@@ -824,6 +878,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
         (r.producto ?? "").toLowerCase().includes(q) ||
         (r.modulo ?? "").toLowerCase().includes(q) ||
         (r.color ? nombreMelamina(r.color) : "").toLowerCase().includes(q) ||
+        (r.subcodigo ?? "").toLowerCase().includes(q) ||
         (r.OP ?? "").toLowerCase().includes(q) ||
         (r.USPER ?? "").toLowerCase().includes(q) ||
         (r.USARM ?? "").toLowerCase().includes(q) ||
@@ -1024,6 +1079,47 @@ export default function Produccion({ authFetch, token, onInicio }) {
         />
       ),
     })),
+    // Variante puntual del codartint (ej. "02BAJO10MDF" para el codartint
+    // "02BAJO10"): determina qué piezas de modulos-domus se usan al armar
+    // el CSV de fórmulas (ver handleDescargarCSV). El datalist sugiere las
+    // variantes ya cargadas para ese codartint en Módulos Domus, pero el
+    // campo admite escribir una nueva libremente.
+    {
+      key: "subcodigo",
+      label: "Subcódigo",
+      render: (v, row) => {
+        const opciones =
+          subcodigosPorArticulo.get(normalizarCodigo(row.codartint)) ?? [];
+        const listId = `subcodigos-${row.id}`;
+        return (
+          <>
+            <input
+              type="text"
+              value={row.subcodigo ?? ""}
+              placeholder={row.codartint ? "Sin variante" : "Sin artículo"}
+              list={listId}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) =>
+                handleTextoCampoChange(row.id, "subcodigo", e.target.value)
+              }
+              onBlur={() => handleTextoCampoBlur(row, "subcodigo")}
+              maxLength={50}
+              style={{
+                ...estiloInput(row, "subcodigo", guardandoCampo, errorCampo),
+                maxWidth: "150px",
+              }}
+            />
+            {opciones.length > 0 && (
+              <datalist id={listId}>
+                {opciones.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            )}
+          </>
+        );
+      },
+    },
     {
       key: "color",
       label: "Color",
@@ -1422,6 +1518,11 @@ export default function Produccion({ authFetch, token, onInicio }) {
         <DetalleProduccion
           row={rows.find((r) => r.id === detalle.id) ?? detalle}
           melaminas={melaminas}
+          subcodigosDisponibles={
+            subcodigosPorArticulo.get(
+              normalizarCodigo((rows.find((r) => r.id === detalle.id) ?? detalle).codartint),
+            ) ?? []
+          }
           onClose={() => setDetalle(null)}
           onModuloChange={handleModuloChange}
           onModuloBlur={handleModuloBlur}
