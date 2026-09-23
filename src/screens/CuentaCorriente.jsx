@@ -227,7 +227,18 @@ export default function CuentaCorriente({
       ),
     ])
       .then(([pendientes, confirmadas]) => {
-        const items = Array.isArray(pendientes) ? pendientes : [];
+        const items = (Array.isArray(pendientes) ? pendientes : []).map(
+          (it) => ({
+            ...it,
+            // pdfRemitoOficial.js lee `cantidad`, pero /remitos/pendientes
+            // devuelve cantidad_pendiente/cantidad_total (ver comentario
+            // más arriba, "pendientesRemito"). Al no haber acá un paso de
+            // "cuánto entregar" (es el PDF de prueba/borrador, sin guardar
+            // remito todavía), se usa lo pendiente como cantidad a
+            // imprimir.
+            cantidad: it.cantidad_pendiente ?? it.cantidad_total ?? "",
+          }),
+        );
         const obraInfo = (Array.isArray(confirmadas) ? confirmadas : []).find(
           (o) =>
             String(o.numeropres) === String(row.numeropres) &&
