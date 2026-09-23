@@ -164,14 +164,26 @@ export default function TabCocina({
   // guardado/recarga previo.
   const resolverAreaItem = (fila) => {
     if (fila.area != null) return fila.area;
+    // Prioridad 1: codartint. Es estable aunque el nombre del artículo se
+    // haya editado en el catálogo después de guardado el presupuesto (ej.
+    // "...2 Pta" -> "...2 Ptas"), a diferencia del match por nombre exacto
+    // de abajo, que rompe con cualquier diferencia de un carácter.
     // fila.nombreart es el nombre REAL del catálogo (columna "Articulo" en
     // la tabla); fila.articulo es el nombre que quedó guardado como
     // display y puede diferir (ej. otra medida del mismo modelo). Por eso
-    // se prioriza nombreart en el match — comparar solo por fila.articulo
-    // hacía fallar el matching en varios ítems ya guardados.
-    const match = articulosFamilia.find(
-      (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
-    );
+    // se prioriza nombreart en el match por nombre — comparar solo por
+    // fila.articulo hacía fallar el matching en varios ítems ya guardados.
+    const matchPorCodigo = fila.codartint
+      ? articulosFamilia.find(
+          (a) =>
+            String(a.codartint ?? a.CODARTINT ?? "") === String(fila.codartint),
+        )
+      : null;
+    const match =
+      matchPorCodigo ??
+      articulosFamilia.find(
+        (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
+      );
     return match ? (match.area ?? match.AREA ?? null) : null;
   };
 
@@ -180,9 +192,23 @@ export default function TabCocina({
   // en el catálogo). Se usa para clasificar el ítem como "ESQ" en
   // tipoAccesorioParaItem (ver arriba del archivo).
   const resolverProveedorItem = (fila) => {
-    const match = articulosFamilia.find(
-      (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
-    );
+    // Mismo criterio que resolverAreaItem: codartint primero (estable),
+    // nombre exacto como fallback. Antes matcheaba solo por nombre, así
+    // que un artículo renombrado en el catálogo (ej. "...2 Pta" ->
+    // "...2 Ptas") dejaba esto en null, y como tipoAccesorioParaItem exige
+    // proveedor === "DANIEL ROQUE SRL" para clasificar un Esquinero Bajo
+    // como "ESQ", el popover de accesorios quedaba sin filtrar.
+    const matchPorCodigo = fila.codartint
+      ? articulosFamilia.find(
+          (a) =>
+            String(a.codartint ?? a.CODARTINT ?? "") === String(fila.codartint),
+        )
+      : null;
+    const match =
+      matchPorCodigo ??
+      articulosFamilia.find(
+        (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
+      );
     return match ? (match.proveedor ?? match.PROVEEDOR ?? null) : null;
   };
 
