@@ -396,6 +396,17 @@ export default function ModulosDomus({ authFetch, token }) {
   // handleCrearYVincularCodigo. Mismo patrón que Producción.jsx.
   const [codigosPorArticulo, setCodigosPorArticulo] = useState(new Map());
 
+  // Modal "Relaciones": muestra TODOS los códigos de producción del
+  // catálogo con los artículos vinculados a cada uno (vista inversa de
+  // codigosPorArticulo, agrupada por código en vez de por artículo). Se
+  // carga bajo demanda, al abrir el modal — no en cada render de la
+  // pantalla principal.
+  const [relacionesAbierto, setRelacionesAbierto] = useState(false);
+  const [relacionesLoading, setRelacionesLoading] = useState(false);
+  const [relacionesError, setRelacionesError] = useState(null);
+  const [relacionesCodigos, setRelacionesCodigos] = useState([]);
+  const [quitandoVinculoId, setQuitandoVinculoId] = useState(null);
+
   // Pieza a eliminar — puede venir de la grilla principal o del panel de
   // un artículo, por eso no distingue origen, solo necesita `id`.
   const [aEliminar, setAEliminar] = useState(null);
@@ -576,6 +587,104 @@ export default function ModulosDomus({ authFetch, token }) {
     } catch (e) {
       console.error("Error creando código de producción:", e);
       alert(e.message || "No se pudo crear/vincular el código de producción.");
+    }
+  };
+
+  // ── Modal "Relaciones" (códigos de producción → artículos vinculados) ───
+  //
+  // Trae de una el catálogo completo (`/codigos-produccion`) y TODOS los
+  // vínculos (`/articulo-produccion`, sin filtro) y arma, por cada código,
+  // la lista de artículos que lo tienen habilitado — la inversa de
+  // codigosPorArticulo. Incluye también los códigos sin ningún artículo
+  // vinculado todavía (lista vacía), para poder detectarlos de un vistazo.
+  const fetchRelaciones = () => {
+    setRelacionesLoading(true);
+    setRelacionesError(null);
+    Promise.all([
+      authFetch(`${API}/codigos-produccion`).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      }),
+      authFetch(`${API}/articulo-produccion`).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      }),
+    ])
+      .then(([codigos, vinculos]) => {
+        const listaCodigos = Array.isArray(codigos) ? codigos : [];
+        const listaVinculos = Array.isArray(vinculos) ? vinculos : [];
+        const armado = listaCodigos
+          .map((c) => ({
+            id: c.id,
+            codigo: c.codigo,
+            descripcion: c.descripcion,
+            articulos: listaVinculos
+              .filter((v) => v.codigo_produccion_id === c.id)
+              .map((v) => ({
+                vinculoId: v.id,
+                codartint: v.codartint,
+                articulo_descripcion: v.articulo_descripcion,
+              }))
+              .sort((a, b) => a.codartint.localeCompare(b.codartint, "es")),
+          }))
+          .sort((a, b) => a.codigo.localeCompare(b.codigo, "es"));
+        setRelacionesCodigos(armado);
+      })
+      .catch((e) => {
+        console.error("Error cargando relaciones:", e);
+        setRelacionesError(e.message || "No se pudieron cargar las relaciones.");
+        setRelacionesCodigos([]);
+      })
+      .finally(() => setRelacionesLoading(false));
+  };
+
+  const abrirRelaciones = () => {
+    setRelacionesAbierto(true);
+    fetchRelaciones();
+  };
+
+  const cerrarRelaciones = () => {
+    setRelacionesAbierto(false);
+    setRelacionesError(null);
+  };
+
+  // Quita el vínculo artículo↔código (no borra el código ni las piezas ya
+  // cargadas con ese codigo_produccion_id — quedan igual, solo que el
+  // artículo deja de ofrecer ese código en los selectores). Actualiza el
+  // modal y codigosPorArticulo en optimista, sin esperar a un refetch.
+  const handleQuitarVinculo = async (vinculo, codigoId) => {
+    if (
+      !window.confirm(
+        `¿Quitar ${vinculo.codartint} del código de producción seleccionado? No borra piezas ni el código en sí.`,
+      )
+    ) {
+      return;
+    }
+    setQuitandoVinculoId(vinculo.vinculoId);
+    try {
+      const res = await authFetch(`${API}/articulo-produccion/${vinculo.vinculoId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setRelacionesCodigos((prev) =>
+        prev.map((c) =>
+          c.id === codigoId
+            ? { ...c, articulos: c.articulos.filter((a) => a.vinculoId !== vinculo.vinculoId) }
+            : c,
+        ),
+      );
+      setCodigosPorArticulo((prev) => {
+        const next = new Map(prev);
+        const clave = normalizarCodigo(vinculo.codartint);
+        const lista = (next.get(clave) ?? []).filter((o) => o.id !== codigoId);
+        next.set(clave, lista);
+        return next;
+      });
+    } catch (e) {
+      console.error("Error quitando vínculo:", e);
+      alert("No se pudo quitar el vínculo. Revisá la consola.");
+    } finally {
+      setQuitandoVinculoId(null);
     }
   };
 
@@ -1599,6 +1708,23 @@ export default function ModulosDomus({ authFetch, token }) {
           search={search}
           onSearch={setSearch}
         />
+        <button
+          onClick={abrirRelaciones}
+          style={{
+            padding: "8px 14px",
+            borderRadius: 6,
+            border: "1.5px solid #b8d6ef",
+            background: "#fff",
+            color: "#0a3a5c",
+            cursor: "pointer",
+            fontFamily: "'Space Mono', monospace",
+            fontSize: 12,
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+          }}
+        >
+          🔗 Relaciones
+        </button>
       </div>
 
       <p style={{ margin: "4px 0 12px", fontSize: 11, color: "#8aabb8", fontFamily: "'Space Mono',monospace" }}>
@@ -1834,6 +1960,146 @@ export default function ModulosDomus({ authFetch, token }) {
               >
                 {guardandoNuevo ? "Guardando…" : "Guardar"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {relacionesAbierto && (
+        <div
+          onClick={cerrarRelaciones}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 700,
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              background: "#fff",
+              borderRadius: 10,
+              padding: "20px 22px",
+              fontFamily: "'Space Mono', monospace",
+              color: "#0a3a5c",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                marginBottom: 4,
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 15 }}>
+                Relaciones — códigos de producción → artículos
+              </h3>
+              <button
+                onClick={cerrarRelaciones}
+                style={{
+                  border: "none",
+                  background: "none",
+                  color: "#4a8ab5",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <p style={{ margin: "0 0 14px", fontSize: 12, color: "#4a8ab5" }}>
+              Cada código de producción con los artículos (codartint) que lo
+              tienen habilitado — vínculos de <code>articulo_produccion</code>.
+            </p>
+
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              {relacionesLoading ? (
+                <p style={{ color: "#4a8ab5", fontSize: 12 }}>⏳ Cargando relaciones...</p>
+              ) : relacionesError ? (
+                <p style={{ color: "#c0392b", fontSize: 12 }}>⚠ {relacionesError}</p>
+              ) : relacionesCodigos.length === 0 ? (
+                <p style={{ color: "#8aabb8", fontSize: 12 }}>
+                  Todavía no hay códigos de producción cargados.
+                </p>
+              ) : (
+                relacionesCodigos.map((c) => (
+                  <div
+                    key={c.id}
+                    style={{
+                      border: "1.5px solid #dbe9f5",
+                      borderRadius: 6,
+                      padding: "10px 12px",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+                      {c.codigo}
+                      {c.descripcion && (
+                        <span style={{ fontWeight: 400, color: "#4a8ab5", marginLeft: 8 }}>
+                          — {c.descripcion}
+                        </span>
+                      )}
+                      <span style={{ fontWeight: 400, color: "#8aabb8", marginLeft: 8, fontSize: 11 }}>
+                        ({c.articulos.length} artículo{c.articulos.length === 1 ? "" : "s"})
+                      </span>
+                    </div>
+                    {c.articulos.length === 0 ? (
+                      <p style={{ margin: 0, fontSize: 11, color: "#b8cfe0" }}>
+                        Sin artículos vinculados todavía.
+                      </p>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {c.articulos.map((a) => (
+                          <div
+                            key={a.vinculoId}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              fontSize: 12,
+                              padding: "4px 8px",
+                              background: "#f4f9fd",
+                              borderRadius: 4,
+                            }}
+                          >
+                            <span>
+                              <strong>{a.codartint}</strong>
+                              {a.articulo_descripcion ? ` — ${a.articulo_descripcion}` : ""}
+                            </span>
+                            <button
+                              onClick={() => handleQuitarVinculo(a, c.id)}
+                              disabled={quitandoVinculoId === a.vinculoId}
+                              title="Quitar vínculo (no borra el código ni las piezas)"
+                              style={{
+                                border: "none",
+                                background: "none",
+                                color: "#c0392b",
+                                cursor: quitandoVinculoId === a.vinculoId ? "default" : "pointer",
+                                fontSize: 12,
+                                opacity: quitandoVinculoId === a.vinculoId ? 0.4 : 1,
+                              }}
+                            >
+                              {quitandoVinculoId === a.vinculoId ? "⏳" : "Quitar ✕"}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
