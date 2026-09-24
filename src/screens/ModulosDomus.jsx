@@ -13,6 +13,17 @@ const API = "https://integral-backend-production.up.railway.app";
 const CAMPO_FAMILIA_FORMULA = "familia";
 const familiaDe = (f) => String(f?.[CAMPO_FAMILIA_FORMULA] ?? "").trim();
 
+// Códigos de producción: cada pieza puede colgar de un `codigo_produccion_id`
+// (catálogo `codigos_produccion`, vinculado a artículos vía la tabla puente
+// `articulo_produccion` — ver tabla-produccion_routes.js). Es lo que
+// consulta formulas-csv.routes.js para armar el CSV de un código puntual;
+// `codartint` sigue siendo el que organiza el panel de este archivo, pero ya
+// no alcanza para que la pieza entre al CSV de ningún código. Mismo criterio
+// que Producción.jsx: `codigosPorArticulo` mapea codartint normalizado →
+// lista de códigos vinculados, con "+ Nuevo código…" para crear y vincular
+// en un solo paso.
+const normalizarCodigo = (c) => String(c ?? "").trim().toUpperCase();
+
 // ── Componente ────────────────────────────────────────────────────────────
 //
 // CRUD de `modulos-domus`: guarda las PIEZAS que componen cada artículo
@@ -380,6 +391,11 @@ export default function ModulosDomus({ authFetch, token }) {
   const [search, setSearch] = useState("");
   const [filtroModulo, setFiltroModulo] = useState(null);
 
+  // Vínculos artículo↔código de producción (articulo_produccion), agrupados
+  // por codartint normalizado — ver fetch más abajo y
+  // handleCrearYVincularCodigo. Mismo patrón que Producción.jsx.
+  const [codigosPorArticulo, setCodigosPorArticulo] = useState(new Map());
+
   // Pieza a eliminar — puede venir de la grilla principal o del panel de
   // un artículo, por eso no distingue origen, solo necesita `id`.
   const [aEliminar, setAEliminar] = useState(null);
@@ -448,6 +464,9 @@ export default function ModulosDomus({ authFetch, token }) {
   // por todas las variantes del artículo (ver nota en el backend,
   // formulas-csv_routes.js).
   const [piezaSubcodigo, setPiezaSubcodigo] = useState("");
+  // Código de producción de la pieza nueva (ver columna homónima en
+  // columnasPieza y en la grilla principal, y handleCrearYVincularCodigo).
+  const [piezaCodigoProduccion, setPiezaCodigoProduccion] = useState("");
   const [guardandoPieza, setGuardandoPieza] = useState(false);
   const [errorPieza, setErrorPieza] = useState(null);
 
@@ -490,6 +509,75 @@ export default function ModulosDomus({ authFetch, token }) {
       .then((data) => setColoresMelamina(Array.isArray(data) ? data : []))
       .catch(() => setColoresMelamina([]));
   }, []);
+
+  // Vínculos artículo↔código de producción: se traen todos de una y se
+  // agrupan acá por codartint, mismo criterio que Producción.jsx.
+  useEffect(() => {
+    authFetch(`${API}/articulo-produccion`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        const lista = Array.isArray(data) ? data : [];
+        const porArticulo = new Map();
+        lista.forEach((v) => {
+          const clave = normalizarCodigo(v.codartint);
+          if (!porArticulo.has(clave)) porArticulo.set(clave, []);
+          porArticulo.get(clave).push({
+            id: v.codigo_produccion_id,
+            codigo: v.codigo,
+            descripcion: v.descripcion,
+          });
+        });
+        setCodigosPorArticulo(porArticulo);
+      })
+      .catch((e) => console.error("Error cargando articulo-produccion:", e));
+  }, []);
+
+  // Alta rápida: crea un código de producción nuevo y lo vincula al
+  // artículo indicado, todo en un solo paso. `aplicar(nuevoId)` es quien
+  // efectivamente guarda ese id en la pieza (fila de la grilla principal o
+  // del panel) que disparó el alta — mismo patrón que
+  // handleCrearYVincularCodigo en Producción.jsx.
+  const handleCrearYVincularCodigo = async (codartint, aplicar) => {
+    if (!codartint) return;
+    const codigo = window.prompt("Código de producción nuevo (ej: PRD-00123):");
+    if (!codigo || !codigo.trim()) return;
+    try {
+      const resCod = await authFetch(`${API}/codigos-produccion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo: codigo.trim() }),
+      });
+      const nuevoCodigo = await resCod.json().catch(() => null);
+      if (!resCod.ok) {
+        throw new Error(nuevoCodigo?.error || `HTTP ${resCod.status}`);
+      }
+      const resVinculo = await authFetch(`${API}/articulo-produccion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codartint, codigo_produccion_id: nuevoCodigo.id }),
+      });
+      if (!resVinculo.ok) throw new Error(`HTTP ${resVinculo.status}`);
+      setCodigosPorArticulo((prev) => {
+        const next = new Map(prev);
+        const clave = normalizarCodigo(codartint);
+        const lista = next.get(clave) ?? [];
+        next.set(clave, [
+          ...lista,
+          {
+            id: nuevoCodigo.id,
+            codigo: nuevoCodigo.codigo,
+            descripcion: nuevoCodigo.descripcion ?? null,
+          },
+        ]);
+        return next;
+      });
+      aplicar(nuevoCodigo.id);
+    } catch (e) {
+      console.error("Error creando código de producción:", e);
+      alert(e.message || "No se pudo crear/vincular el código de producción.");
+    }
+  };
 
   // Búsqueda server-side (con debounce) de artículos para "Nuevo
   // artículo" — mismo patrón que el buscador de Material Placa/Guías en
@@ -636,6 +724,7 @@ export default function ModulosDomus({ authFetch, token }) {
     setPiezaFormula("");
     setPiezaTitulo("");
     setPiezaSubcodigo("");
+    setPiezaCodigoProduccion("");
     setErrorPieza(null);
   };
 
@@ -918,6 +1007,7 @@ export default function ModulosDomus({ authFetch, token }) {
           formulax: String(piezaFormula ?? "").trim() || null,
           formulay: String(piezaFormula ?? "").trim() || null,
           titulo: piezaTitulo.trim() || null,
+          codigo_produccion_id: piezaCodigoProduccion ? Number(piezaCodigoProduccion) : null,
         }),
       });
       if (!res.ok) {
@@ -1011,6 +1101,50 @@ export default function ModulosDomus({ authFetch, token }) {
           style={estiloInput(row.id, "modulo", "140px")}
         />
       ),
+    },
+    {
+      // Código de producción de ESTA pieza (la primera del artículo, ya que
+      // la grilla mezclada muestra un renglón por codartint — ver
+      // filteredPorArticulo). Para asignarlo pieza por pieza cuando hay
+      // varias, se edita desde el panel (columnasPieza más abajo).
+      key: "codigo_produccion_id",
+      label: "Cód. Producción",
+      render: (v, row) => {
+        const valorActual = row.codigo_produccion_id ?? "";
+        const opciones = codigosPorArticulo.get(normalizarCodigo(row.codartint)) ?? [];
+        const tieneActual = opciones.some((o) => String(o.id) === String(valorActual));
+        return (
+          <select
+            value={valorActual}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              if (e.target.value === "__nuevo__") {
+                handleCrearYVincularCodigo(row.codartint, (nuevoId) => {
+                  handleCampoChange(row.id, "codigo_produccion_id", nuevoId);
+                  handleCampoBlur({ ...row, codigo_produccion_id: nuevoId }, "codigo_produccion_id");
+                });
+                return;
+              }
+              const valor = e.target.value ? Number(e.target.value) : null;
+              handleCampoChange(row.id, "codigo_produccion_id", valor);
+              handleCampoBlur({ ...row, codigo_produccion_id: valor }, "codigo_produccion_id");
+            }}
+            style={estiloInput(row.id, "codigo_produccion_id", "150px")}
+          >
+            <option value="">Sin código</option>
+            {!tieneActual && valorActual && (
+              <option value={valorActual}>{valorActual} (vínculo no vigente)</option>
+            )}
+            {opciones.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.codigo}
+                {o.descripcion ? ` — ${o.descripcion}` : ""}
+              </option>
+            ))}
+            <option value="__nuevo__">+ Nuevo código…</option>
+          </select>
+        );
+      },
     },
     {
       key: "titulo",
@@ -1188,6 +1322,52 @@ export default function ModulosDomus({ authFetch, token }) {
           style={estiloInput(row.id, "subcodigo", "140px")}
         />
       ),
+    },
+    {
+      // Código de producción de ESTA pieza puntual — determina si entra al
+      // CSV de ese código (ver /produccion/:id/formulas-csv en
+      // formulas-csv.routes.js, que ahora resuelve por codigo_produccion_id
+      // y no por codartint). Las opciones son los códigos ya vinculados al
+      // artículo del panel (articulo_produccion); "+ Nuevo código…" crea y
+      // vincula uno al vuelo.
+      key: "codigo_produccion_id",
+      label: "Cód. Producción",
+      render: (v, row) => {
+        const valorActual = row.codigo_produccion_id ?? "";
+        const opciones = codigosPorArticulo.get(normalizarCodigo(panelCodartint)) ?? [];
+        const tieneActual = opciones.some((o) => String(o.id) === String(valorActual));
+        return (
+          <select
+            value={valorActual}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              if (e.target.value === "__nuevo__") {
+                handleCrearYVincularCodigo(panelCodartint, (nuevoId) => {
+                  handlePiezaCampoChange(row.id, "codigo_produccion_id", nuevoId);
+                  guardarPiezaCampo(row.id, "codigo_produccion_id", nuevoId);
+                });
+                return;
+              }
+              const valor = e.target.value ? Number(e.target.value) : null;
+              handlePiezaCampoChange(row.id, "codigo_produccion_id", valor);
+              guardarPiezaCampo(row.id, "codigo_produccion_id", valor);
+            }}
+            style={estiloInput(row.id, "codigo_produccion_id", "150px")}
+          >
+            <option value="">Sin código</option>
+            {!tieneActual && valorActual && (
+              <option value={valorActual}>{valorActual} (vínculo no vigente)</option>
+            )}
+            {opciones.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.codigo}
+                {o.descripcion ? ` — ${o.descripcion}` : ""}
+              </option>
+            ))}
+            <option value="__nuevo__">+ Nuevo código…</option>
+          </select>
+        );
+      },
     },
     {
       key: "titulo",
@@ -2053,6 +2233,46 @@ export default function ModulosDomus({ authFetch, token }) {
                         marginBottom: 12,
                       }}
                     />
+
+                    <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+                      Código de producción (define si esta pieza entra al CSV de ese código)
+                    </label>
+                    {(() => {
+                      const opciones = codigosPorArticulo.get(normalizarCodigo(panelCodartint)) ?? [];
+                      return (
+                        <select
+                          value={piezaCodigoProduccion}
+                          onChange={(e) => {
+                            if (e.target.value === "__nuevo__") {
+                              handleCrearYVincularCodigo(panelCodartint, (nuevoId) =>
+                                setPiezaCodigoProduccion(String(nuevoId)),
+                              );
+                              return;
+                            }
+                            setPiezaCodigoProduccion(e.target.value);
+                          }}
+                          style={{
+                            width: "100%",
+                            boxSizing: "border-box",
+                            padding: "6px 8px",
+                            fontSize: 13,
+                            fontFamily: "'Space Mono',monospace",
+                            border: "1.5px solid #b8d6ef",
+                            borderRadius: 4,
+                            marginBottom: 12,
+                          }}
+                        >
+                          <option value="">Sin código</option>
+                          {opciones.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.codigo}
+                              {o.descripcion ? ` — ${o.descripcion}` : ""}
+                            </option>
+                          ))}
+                          <option value="__nuevo__">+ Nuevo código…</option>
+                        </select>
+                      );
+                    })()}
 
                     <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
                       Título de la pieza (editable)
