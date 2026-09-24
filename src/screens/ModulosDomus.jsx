@@ -406,6 +406,14 @@ export default function ModulosDomus({ authFetch, token }) {
   const [relacionesError, setRelacionesError] = useState(null);
   const [relacionesCodigos, setRelacionesCodigos] = useState([]);
   const [quitandoVinculoId, setQuitandoVinculoId] = useState(null);
+  // Borrado del código de producción EN SÍ (no solo su vínculo con un
+  // artículo puntual) — para códigos que quedaron sueltos/huérfanos (ver
+  // handleEliminarCodigo). El backend bloquea con 409 "en_uso" si el código
+  // todavía está vinculado a algún artículo y/o tiene piezas de
+  // modulos-domus con ese codigo_produccion_id — ahí se muestra el detalle
+  // que manda el backend, para que el usuario sepa qué le falta soltar.
+  const [eliminandoCodigoId, setEliminandoCodigoId] = useState(null);
+  const [errorEliminarCodigoId, setErrorEliminarCodigoId] = useState(null);
 
   // Pieza a eliminar — puede venir de la grilla principal o del panel de
   // un artículo, por eso no distingue origen, solo necesita `id`.
@@ -685,6 +693,50 @@ export default function ModulosDomus({ authFetch, token }) {
       alert("No se pudo quitar el vínculo. Revisá la consola.");
     } finally {
       setQuitandoVinculoId(null);
+    }
+  };
+
+  // Borra el código de producción en sí (no un vínculo puntual). El backend
+  // devuelve 409 { error: "en_uso", detail } si todavía está vinculado a
+  // algún artículo y/o tiene piezas con ese codigo_produccion_id — ese
+  // detalle se muestra debajo del código para que el usuario sepa qué le
+  // falta soltar antes de poder borrarlo (típicamente: sacar el vínculo con
+  // "Quitar ✕" y/o reasignar/vaciar el código en las piezas del panel).
+  const handleEliminarCodigo = async (codigo) => {
+    if (
+      !window.confirm(
+        `¿Eliminar el código de producción "${codigo.codigo}" del catálogo? Esta acción no se puede deshacer.`,
+      )
+    ) {
+      return;
+    }
+    setEliminandoCodigoId(codigo.id);
+    setErrorEliminarCodigoId(null);
+    try {
+      const res = await authFetch(`${API}/codigos-produccion/${codigo.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        if (res.status === 409 && data?.detail) {
+          setErrorEliminarCodigoId({ id: codigo.id, mensaje: data.detail });
+          return;
+        }
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+      setRelacionesCodigos((prev) => prev.filter((c) => c.id !== codigo.id));
+      setCodigosPorArticulo((prev) => {
+        const next = new Map(prev);
+        for (const [clave, lista] of next) {
+          next.set(clave, lista.filter((o) => o.id !== codigo.id));
+        }
+        return next;
+      });
+    } catch (e) {
+      console.error("Error eliminando código de producción:", e);
+      alert(e.message || "No se pudo eliminar el código de producción.");
+    } finally {
+      setEliminandoCodigoId(null);
     }
   };
 
@@ -2044,17 +2096,61 @@ export default function ModulosDomus({ authFetch, token }) {
                       marginBottom: 10,
                     }}
                   >
-                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
-                      {c.codigo}
-                      {c.descripcion && (
-                        <span style={{ fontWeight: 400, color: "#4a8ab5", marginLeft: 8 }}>
-                          — {c.descripcion}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: 8,
+                        marginBottom: 6,
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>
+                        {c.codigo}
+                        {c.descripcion && (
+                          <span style={{ fontWeight: 400, color: "#4a8ab5", marginLeft: 8 }}>
+                            — {c.descripcion}
+                          </span>
+                        )}
+                        <span style={{ fontWeight: 400, color: "#8aabb8", marginLeft: 8, fontSize: 11 }}>
+                          ({c.articulos.length} artículo{c.articulos.length === 1 ? "" : "s"})
                         </span>
-                      )}
-                      <span style={{ fontWeight: 400, color: "#8aabb8", marginLeft: 8, fontSize: 11 }}>
-                        ({c.articulos.length} artículo{c.articulos.length === 1 ? "" : "s"})
-                      </span>
+                      </div>
+                      <button
+                        onClick={() => handleEliminarCodigo(c)}
+                        disabled={eliminandoCodigoId === c.id}
+                        title="Eliminar este código de producción del catálogo"
+                        style={{
+                          border: "1.5px solid #f0c2c2",
+                          background: "#fff",
+                          color: "#c0392b",
+                          cursor: eliminandoCodigoId === c.id ? "default" : "pointer",
+                          fontSize: 11,
+                          fontFamily: "'Space Mono', monospace",
+                          fontWeight: 700,
+                          borderRadius: 4,
+                          padding: "3px 8px",
+                          whiteSpace: "nowrap",
+                          opacity: eliminandoCodigoId === c.id ? 0.5 : 1,
+                        }}
+                      >
+                        {eliminandoCodigoId === c.id ? "⏳" : "🗑 Eliminar código"}
+                      </button>
                     </div>
+                    {errorEliminarCodigoId?.id === c.id && (
+                      <p
+                        style={{
+                          margin: "0 0 8px",
+                          fontSize: 11,
+                          color: "#c0392b",
+                          background: "#fdecea",
+                          padding: "6px 8px",
+                          borderRadius: 4,
+                        }}
+                      >
+                        ⚠ {errorEliminarCodigoId.mensaje}
+                      </p>
+                    )}
                     {c.articulos.length === 0 ? (
                       <p style={{ margin: 0, fontSize: 11, color: "#b8cfe0" }}>
                         Sin artículos vinculados todavía.
