@@ -9,12 +9,12 @@ import VisorDWG from "./VisorDWG";
 
 const API = "https://integral-backend-production.up.railway.app";
 
-// Tabla modulos-domus (una fila por pieza de cada artículo): se usa para saber
-// si el código de `modulo` de una fila tiene fórmula de producción (botón CSV
-// verde/azul vs rojo). El código se compara contra `codartint`; el código
-// cuenta como "con fórmula" si alguna de sus piezas tiene `formulax` o
+// Tabla modulos-domus (una fila por pieza): se usa para saber si el CÓDIGO
+// DE PRODUCCIÓN elegido en una fila (`row.codigo_produccion_id`) tiene
+// fórmula asociada (botón CSV verde/azul vs rojo). Reemplaza al esquema
+// viejo, donde `modulo` era un texto libre que se comparaba a mano contra
+// `codartint`. Una pieza cuenta como "con fórmula" si tiene `formulax` o
 // `formulay` cargada.
-const MODULOS_DOMUS_CAMPO_CODIGO = "codartint";
 const tieneAlgunaFormula = (fila) =>
   ["formulax", "formulay"].some((k) => String(fila[k] ?? "").trim() !== "");
 const normalizarCodigo = (c) => String(c ?? "").trim().toUpperCase();
@@ -90,9 +90,10 @@ function DetalleProduccion({
   row,
   melaminas,
   subcodigosDisponibles,
+  codigosProduccionDisponibles,
   onClose,
-  onModuloChange,
-  onModuloBlur,
+  onCodigoProduccionChange,
+  onCrearYVincularCodigo,
   onColorChange,
   onTextoCampoChange,
   onTextoCampoBlur,
@@ -251,19 +252,44 @@ function DetalleProduccion({
         {fila("Producto", row.producto ?? "—")}
 
         {fila(
-          "Módulo",
-          <input
-            type="text"
-            value={row.modulo ?? ""}
-            placeholder="Sin cargar"
-            onChange={(e) => onModuloChange(row.id, e.target.value)}
-            onBlur={() => onModuloBlur(row)}
-            maxLength={50}
-            style={estiloInputModal(
-              guardandoId === row.id,
-              errorGuardadoId === row.id,
-            )}
-          />,
+          "Cód. Producción",
+          (() => {
+            const valorActual = row.codigo_produccion_id ?? "";
+            const tieneActual = codigosProduccionDisponibles.some(
+              (o) => String(o.id) === String(valorActual),
+            );
+            return (
+              <select
+                value={valorActual}
+                disabled={!row.codartint}
+                onChange={(e) => {
+                  if (e.target.value === "__nuevo__") {
+                    onCrearYVincularCodigo(row);
+                    return;
+                  }
+                  onCodigoProduccionChange(row, e.target.value);
+                }}
+                style={estiloInputModal(
+                  guardandoId === row.id,
+                  errorGuardadoId === row.id,
+                )}
+              >
+                <option value="">Sin código</option>
+                {!tieneActual && valorActual && (
+                  <option value={valorActual}>
+                    {row.modulo || valorActual} (vínculo no vigente)
+                  </option>
+                )}
+                {codigosProduccionDisponibles.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.codigo}
+                    {o.descripcion ? ` — ${o.descripcion}` : ""}
+                  </option>
+                ))}
+                <option value="__nuevo__">+ Nuevo código…</option>
+              </select>
+            );
+          })(),
         )}
 
         {["ancho", "profundidad", "alto"].map((campoMedida) => {
@@ -497,17 +523,17 @@ export default function Produccion({ authFetch, token, onInicio }) {
   };
 
   // Estado del botón CSV de una fila:
-  //  - "sinFormula": el código de módulo está vacío o no figura con fórmula
-  //    en la tabla modulos-domus → rojo, deshabilitado.
+  //  - "sinFormula": no tiene código de producción elegido, o el código
+  //    elegido no tiene fórmula cargada en modulos-domus → rojo,
+  //    deshabilitado.
   //  - "descargado": ya se descargó el CSV de esa fila → azul.
   //  - "conFormula": tiene fórmula y todavía no se descargó → verde.
   // Si modulos-domus no pudo cargarse, se usa `row.tiene_formula` (si el
   // backend lo manda) o se asume que sí tiene fórmula.
   const estadoBotonCSV = (row) => {
-    const tieneModulo = !!(row.modulo && row.modulo.trim());
-    if (!tieneModulo) return "sinFormula";
-    const tieneFormula = modulosConFormula
-      ? modulosConFormula.has(normalizarCodigo(row.modulo))
+    if (!row.codigo_produccion_id) return "sinFormula";
+    const tieneFormula = codigosConFormula
+      ? codigosConFormula.has(Number(row.codigo_produccion_id))
       : row.tiene_formula !== false;
     if (!tieneFormula) return "sinFormula";
     if (row.csv_descargado || csvDescargados.has(row.id)) return "descargado";
@@ -549,10 +575,17 @@ export default function Produccion({ authFetch, token, onInicio }) {
   // (el nombre), vía este mapa.
   const [melaminas, setMelaminas] = useState([]);
 
-  // Códigos de módulo (normalizados) que tienen fórmula de producción en la
-  // tabla modulos-domus. `null` = todavía no cargó o falló la carga; en ese
-  // caso el botón CSV usa `row.tiene_formula` como respaldo.
-  const [modulosConFormula, setModulosConFormula] = useState(null);
+  // Ids de código de producción que tienen fórmula asociada en la tabla
+  // modulos-domus (alguna pieza con formulax/formulay cargada). `null` =
+  // todavía no cargó o falló la carga; en ese caso el botón CSV usa
+  // `row.tiene_formula` como respaldo.
+  const [codigosConFormula, setCodigosConFormula] = useState(null);
+
+  // Vínculos artículo↔código de producción (N a N, ver articulo_produccion
+  // en el backend), agrupados por codartint normalizado — mismo criterio
+  // que subcodigosPorArticulo más abajo: se carga la tabla completa una
+  // sola vez y se agrupa acá, en vez de pedir por artículo bajo demanda.
+  const [codigosPorArticulo, setCodigosPorArticulo] = useState(new Map());
 
   // Subcódigos (variantes puntuales, ej. "02BAJO10MDF" para el codartint
   // "02BAJO10") ya usados en piezas de modulos-domus, agrupados por
@@ -624,9 +657,10 @@ export default function Produccion({ authFetch, token, onInicio }) {
         const codigos = new Set(
           lista
             .filter(tieneAlgunaFormula)
-            .map((m) => normalizarCodigo(m[MODULOS_DOMUS_CAMPO_CODIGO])),
+            .filter((m) => m.codigo_produccion_id != null)
+            .map((m) => Number(m.codigo_produccion_id)),
         );
-        setModulosConFormula(codigos);
+        setCodigosConFormula(codigos);
 
         // Subcódigos ya usados por artículo (para el datalist del campo
         // `subcodigo` más abajo) — de TODAS las piezas, tengan o no
@@ -644,31 +678,112 @@ export default function Produccion({ authFetch, token, onInicio }) {
         );
       })
       .catch((e) => console.error("Error cargando modulos-domus:", e));
+    // Vínculos artículo↔código de producción (ver articulo_produccion en el
+    // backend): se traen todos de una y se agrupan acá por codartint, mismo
+    // criterio que subcodigosPorArticulo de arriba.
+    authFetch(`${API}/articulo-produccion`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        const lista = Array.isArray(data) ? data : [];
+        const porArticulo = new Map();
+        lista.forEach((v) => {
+          const codigo = normalizarCodigo(v.codartint);
+          if (!porArticulo.has(codigo)) porArticulo.set(codigo, []);
+          porArticulo.get(codigo).push({
+            id: v.codigo_produccion_id,
+            codigo: v.codigo,
+            descripcion: v.descripcion,
+          });
+        });
+        setCodigosPorArticulo(porArticulo);
+      })
+      .catch((e) => console.error("Error cargando articulo-produccion:", e));
   }, []);
 
-  // ── Edición de `modulo` (inline, se guarda al salir del campo) ─────────
-
-  const handleModuloChange = (id, valor) => {
+  // ── Edición del código de producción ────────────────────────────────────
+  //
+  // Reemplaza a `modulo` como texto libre: ahora se elige de los códigos
+  // vinculados al artículo de la fila (ver articulo_produccion). Se guarda
+  // al cambiar (no hay blur, es un <select>), mismo patrón que handleColorChange.
+  // El backend sincroniza `modulo` solo (texto legacy, usado en el CSV y en
+  // el buscador de esta pantalla) — acá se actualiza también en optimista
+  // para que se vea al toque sin esperar el refetch.
+  const handleCodigoProduccionChange = async (row, valorId) => {
+    const nuevoId = valorId ? Number(valorId) : null;
+    const codigoTexto = nuevoId
+      ? (codigosPorArticulo.get(normalizarCodigo(row.codartint)) ?? []).find(
+          (c) => c.id === nuevoId,
+        )?.codigo ?? row.modulo
+      : null;
     setRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, modulo: valor } : r)),
+      prev.map((r) =>
+        r.id === row.id
+          ? { ...r, codigo_produccion_id: nuevoId, modulo: codigoTexto }
+          : r,
+      ),
     );
-  };
-
-  const handleModuloBlur = async (row) => {
     setGuardandoId(row.id);
     setErrorGuardadoId(null);
     try {
       const res = await authFetch(`${API}/produccion/${row.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modulo: row.modulo || null }),
+        body: JSON.stringify({ codigo_produccion_id: nuevoId }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (e) {
-      console.error("Error guardando módulo:", e);
+      console.error("Error guardando código de producción:", e);
       setErrorGuardadoId(row.id);
     } finally {
       setGuardandoId(null);
+    }
+  };
+
+  // Alta rápida: crea un código de producción nuevo y lo vincula al
+  // artículo de la fila, todo en un solo paso. Sustituye, por ahora, a una
+  // pantalla de administración separada para armar los vínculos
+  // artículo↔código (pendiente, no incluida en esta tanda).
+  const handleCrearYVincularCodigo = async (row) => {
+    const codigo = window.prompt("Código de producción nuevo (ej: PRD-00123):");
+    if (!codigo || !codigo.trim()) return;
+    try {
+      const resCod = await authFetch(`${API}/codigos-produccion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo: codigo.trim() }),
+      });
+      const nuevoCodigo = await resCod.json().catch(() => null);
+      if (!resCod.ok) {
+        throw new Error(nuevoCodigo?.error || `HTTP ${resCod.status}`);
+      }
+      const resVinculo = await authFetch(`${API}/articulo-produccion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          codartint: row.codartint,
+          codigo_produccion_id: nuevoCodigo.id,
+        }),
+      });
+      if (!resVinculo.ok) throw new Error(`HTTP ${resVinculo.status}`);
+      setCodigosPorArticulo((prev) => {
+        const next = new Map(prev);
+        const codigoArt = normalizarCodigo(row.codartint);
+        const lista = next.get(codigoArt) ?? [];
+        next.set(codigoArt, [
+          ...lista,
+          {
+            id: nuevoCodigo.id,
+            codigo: nuevoCodigo.codigo,
+            descripcion: nuevoCodigo.descripcion ?? null,
+          },
+        ]);
+        return next;
+      });
+      handleCodigoProduccionChange(row, String(nuevoCodigo.id));
+    } catch (e) {
+      console.error("Error creando código de producción:", e);
+      alert(e.message || "No se pudo crear/vincular el código de producción.");
     }
   };
 
@@ -768,6 +883,17 @@ export default function Produccion({ authFetch, token, onInicio }) {
     try {
       const res = await authFetch(`${API}/produccion/${row.id}/formulas-csv`);
       if (res.status === 422) {
+        const data = await res.json().catch(() => ({}));
+        const faltantes = Array.isArray(data.faltantes) ? data.faltantes : [];
+        // El panel provisorio solo carga codartint/ancho/alto. Si lo que
+        // falta es el código de producción, se lo pide acá mismo (se elige
+        // en la columna "Cód. Producción") — el panel no maneja ese campo.
+        if (faltantes.includes("codigo_produccion")) {
+          alert(
+            'A este ítem le falta elegir un código de producción (columna "Cód. Producción").',
+          );
+          if (faltantes.every((f) => f === "codigo_produccion")) return;
+        }
         // Faltan codartint/ancho/alto — pedirlos con el panel provisorio.
         setPanelCSV({
           row,
@@ -1028,31 +1154,60 @@ export default function Produccion({ authFetch, token, onInicio }) {
     },
     {
       key: "modulo",
-      label: "Módulo",
-      render: (v, row) => (
-        <input
-          type="text"
-          value={row.modulo ?? ""}
-          placeholder="Sin cargar"
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handleModuloChange(row.id, e.target.value)}
-          onBlur={() => handleModuloBlur(row)}
-          maxLength={50}
-          style={{
-            width: "100%",
-            maxWidth: "180px",
-            padding: "4px 8px",
-            fontSize: "12px",
-            fontFamily: "'Space Mono',monospace",
-            border: `1.5px solid ${
-              errorGuardadoId === row.id ? "#e57373" : "#b8d6ef"
-            }`,
-            borderRadius: "4px",
-            background: guardandoId === row.id ? "#fffbe6" : "#fff",
-            color: "#0a3a5c",
-          }}
-        />
-      ),
+      label: "Cód. Producción",
+      render: (v, row) => {
+        const opciones =
+          codigosPorArticulo.get(normalizarCodigo(row.codartint)) ?? [];
+        const valorActual = row.codigo_produccion_id ?? "";
+        // Si el código actual no está entre los vínculos vigentes para este
+        // artículo (p.ej. cambió el artículo de la fila), se agrega como
+        // opción suelta para no perder la selección visualmente.
+        const tieneActual = opciones.some(
+          (o) => String(o.id) === String(valorActual),
+        );
+        return (
+          <select
+            value={valorActual}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              if (e.target.value === "__nuevo__") {
+                handleCrearYVincularCodigo(row);
+                return;
+              }
+              handleCodigoProduccionChange(row, e.target.value);
+            }}
+            disabled={!row.codartint}
+            title={!row.codartint ? "Este ítem no tiene artículo vinculado" : ""}
+            style={{
+              width: "100%",
+              maxWidth: "180px",
+              padding: "4px 8px",
+              fontSize: "12px",
+              fontFamily: "'Space Mono',monospace",
+              border: `1.5px solid ${
+                errorGuardadoId === row.id ? "#e57373" : "#b8d6ef"
+              }`,
+              borderRadius: "4px",
+              background: guardandoId === row.id ? "#fffbe6" : "#fff",
+              color: "#0a3a5c",
+            }}
+          >
+            <option value="">Sin código</option>
+            {!tieneActual && valorActual && (
+              <option value={valorActual}>
+                {row.modulo || valorActual} (vínculo no vigente)
+              </option>
+            )}
+            {opciones.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.codigo}
+                {o.descripcion ? ` — ${o.descripcion}` : ""}
+              </option>
+            ))}
+            <option value="__nuevo__">+ Nuevo código…</option>
+          </select>
+        );
+      },
     },
     // Medidas del módulo (mm), usadas también para calcular las fórmulas
     // del CSV de producción (ver handleDescargarCSV/panelCSV más abajo).
@@ -1194,7 +1349,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
             disabled={sinFormula || generando}
             title={
               sinFormula
-                ? `${est.title} (módulo: "${row.modulo || ""}")`
+                ? `${est.title} (código: "${row.modulo || ""}")`
                 : est.title
             }
             style={{
@@ -1523,9 +1678,14 @@ export default function Produccion({ authFetch, token, onInicio }) {
               normalizarCodigo((rows.find((r) => r.id === detalle.id) ?? detalle).codartint),
             ) ?? []
           }
+          codigosProduccionDisponibles={
+            codigosPorArticulo.get(
+              normalizarCodigo((rows.find((r) => r.id === detalle.id) ?? detalle).codartint),
+            ) ?? []
+          }
           onClose={() => setDetalle(null)}
-          onModuloChange={handleModuloChange}
-          onModuloBlur={handleModuloBlur}
+          onCodigoProduccionChange={handleCodigoProduccionChange}
+          onCrearYVincularCodigo={handleCrearYVincularCodigo}
           onColorChange={handleColorChange}
           onTextoCampoChange={handleTextoCampoChange}
           onTextoCampoBlur={handleTextoCampoBlur}
