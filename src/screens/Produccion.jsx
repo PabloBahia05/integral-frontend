@@ -570,6 +570,17 @@ export default function Produccion({ authFetch, token, onInicio }) {
   const [panelCSV, setPanelCSV] = useState(null);
   const [guardandoPanelCSV, setGuardandoPanelCSV] = useState(false);
 
+  // Elegir variante antes de generar el CSV: cuando el artículo de la fila
+  // tiene más de un código de producción vinculado (ver articulo_produccion),
+  // clickear "CSV" ya no genera directo con el código que haya quedado
+  // guardado en la fila — abre este selector para que se elija ahí mismo
+  // cuál de los códigos vinculados aplica a ESTE ítem. Guarda `row` (la fila
+  // de origen), `opciones` (los códigos vinculados al artículo) y
+  // `seleccionado` (id elegido en el <select>, arranca en el que ya tuviera
+  // la fila si es uno de los vinculados, si no en el primero).
+  const [selectorCodigoCSV, setSelectorCodigoCSV] = useState(null);
+  const [confirmandoCodigoCSV, setConfirmandoCodigoCSV] = useState(false);
+
   // Melaminas disponibles para el desplegable de `color` (ver
   // GET /productos/melaminas en articulos_controller.js — filtra
   // articulos por rubro "melamina"/"MELAMINA"). Se guarda el `codartint`
@@ -911,7 +922,51 @@ export default function Produccion({ authFetch, token, onInicio }) {
   // backend — falta construirlo cuando esté lista la pantalla de Asociación
   // de Fórmulas (qué fórmulas aplican a qué artículo).
 
-  const handleDescargarCSV = async (row) => {
+  const handleDescargarCSV = (row) => {
+    // Si el artículo de esta fila tiene más de un código de producción
+    // vinculado, no se asume cuál usar (ni siquiera el que ya tuviera
+    // guardado la fila) — se pregunta acá mismo. Con 0 o 1 vinculado no hay
+    // nada que elegir, sigue directo (0 → el backend va a pedir que se
+    // vincule uno, mismo mensaje de siempre).
+    const opciones = codigosPorArticulo.get(normalizarCodigo(row.codartint)) ?? [];
+    if (opciones.length > 1) {
+      const actualEsValido = opciones.some(
+        (o) => String(o.id) === String(row.codigo_produccion_id ?? ""),
+      );
+      setSelectorCodigoCSV({
+        row,
+        opciones,
+        seleccionado: actualEsValido ? row.codigo_produccion_id : opciones[0].id,
+      });
+      return;
+    }
+    ejecutarDescargaCSV(row);
+  };
+
+  // Confirmación del selector de variante: si la elección difiere de lo que
+  // ya tenía guardado la fila, primero la persiste (mismo PUT que usa el
+  // desplegable "Cód. Producción" de la tabla) y recién con eso hecho pide
+  // el CSV — el backend arma las piezas a partir del codigo_produccion_id
+  // guardado en `produccion`, así que tiene que estar guardado ANTES de
+  // pedir /formulas-csv.
+  const handleConfirmarCodigoCSV = async () => {
+    if (!selectorCodigoCSV) return;
+    const { row, seleccionado } = selectorCodigoCSV;
+    setConfirmandoCodigoCSV(true);
+    try {
+      let filaParaCSV = row;
+      if (String(seleccionado) !== String(row.codigo_produccion_id ?? "")) {
+        await handleCodigoProduccionChange(row, seleccionado);
+        filaParaCSV = { ...row, codigo_produccion_id: Number(seleccionado) };
+      }
+      setSelectorCodigoCSV(null);
+      await ejecutarDescargaCSV(filaParaCSV);
+    } finally {
+      setConfirmandoCodigoCSV(false);
+    }
+  };
+
+  const ejecutarDescargaCSV = async (row) => {
     setGenerandoCSV(row.id);
     try {
       const res = await authFetch(`${API}/produccion/${row.id}/formulas-csv`);
@@ -1934,6 +1989,112 @@ export default function Produccion({ authFetch, token, onInicio }) {
                 }}
               >
                 {guardandoPanelCSV ? "Generando…" : "Guardar y generar CSV"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {selectorCodigoCSV && (
+        <div
+          onClick={() => !confirmandoCodigoCSV && setSelectorCodigoCSV(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "90%",
+              maxWidth: 420,
+              background: "#fff",
+              borderRadius: 10,
+              padding: "20px 22px",
+              fontFamily: "'Space Mono', monospace",
+              color: "#0a3a5c",
+            }}
+          >
+            <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>
+              ¿Qué variante aplica?
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#4a8ab5" }}>
+              <strong>
+                {selectorCodigoCSV.row.producto ?? selectorCodigoCSV.row.codpro}
+              </strong>{" "}
+              tiene más de un código de producción vinculado. Elegí cuál
+              aplica a este ítem antes de generar el CSV — los marcados con
+              ✓ ya tienen piezas con fórmula cargada en Módulos Domus.
+            </p>
+
+            <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+              Código de producción
+            </label>
+            <select
+              value={selectorCodigoCSV.seleccionado}
+              onChange={(e) =>
+                setSelectorCodigoCSV((s) => ({ ...s, seleccionado: e.target.value }))
+              }
+              disabled={confirmandoCodigoCSV}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "6px 8px",
+                fontSize: 13,
+                fontFamily: "'Space Mono',monospace",
+                border: "1.5px solid #b8d6ef",
+                borderRadius: 4,
+                marginBottom: 16,
+              }}
+            >
+              {selectorCodigoCSV.opciones.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.codigo}
+                  {o.descripcion ? ` — ${o.descripcion}` : ""}
+                  {codigosConFormula?.has(Number(o.id)) ? " ✓" : ""}
+                </option>
+              ))}
+            </select>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                onClick={() => setSelectorCodigoCSV(null)}
+                disabled={confirmandoCodigoCSV}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "1.5px solid #b8d6ef",
+                  background: "#fff",
+                  color: "#4a8ab5",
+                  cursor: "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarCodigoCSV}
+                disabled={confirmandoCodigoCSV}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "none",
+                  background: "#1a7a44",
+                  color: "#fff",
+                  cursor: confirmandoCodigoCSV ? "wait" : "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  opacity: confirmandoCodigoCSV ? 0.6 : 1,
+                }}
+              >
+                {confirmandoCodigoCSV ? "Generando…" : "Generar CSV"}
               </button>
             </div>
           </div>
