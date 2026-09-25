@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import DataTable from "../Component/DataTable";
 import ActionBar from "../Component/ActionBar";
 import ScreenHeader from "../Component/ScreenHeader";
@@ -91,6 +91,7 @@ function DetalleProduccion({
   melaminas,
   subcodigosDisponibles,
   codigosProduccionDisponibles,
+  codigosConFormula,
   onClose,
   onCodigoProduccionChange,
   onCrearYVincularCodigo,
@@ -284,6 +285,7 @@ function DetalleProduccion({
                   <option key={o.id} value={o.id}>
                     {o.codigo}
                     {o.descripcion ? ` — ${o.descripcion}` : ""}
+                    {codigosConFormula?.has(Number(o.id)) ? " ✓" : ""}
                   </option>
                 ))}
                 <option value="__nuevo__">+ Nuevo código…</option>
@@ -739,6 +741,37 @@ export default function Produccion({ authFetch, token, onInicio }) {
       setGuardandoId(null);
     }
   };
+
+  // Ids de fila para los que ya se intentó la auto-asignación de más abajo
+  // (con éxito o no) — evita reintentar en cada render mientras se espera
+  // la respuesta del PUT, y evita re-disparar sobre una fila donde el
+  // usuario ya eligió "Sin código" a propósito.
+  const autoAsignados = useRef(new Set());
+
+  // Auto-selección del código de producción "correcto" cuando el ítem
+  // llega desde el presupuesto SIN ninguno elegido (codigo_produccion_id
+  // null) y el artículo tiene varios códigos vinculados (ver
+  // articulo_produccion): en vez de dejar el botón CSV en rojo hasta que
+  // alguien adivine cuál de todos elegir a mano, se busca — entre los
+  // códigos vinculados a ESE artículo — cuál es el único que ya tiene
+  // piezas con fórmula cargada en Módulos Domus (`codigosConFormula`, el
+  // mismo criterio que usa el botón CSV para pintarse verde). Si hay
+  // exactamente uno así, se asigna solo. Si hay cero o más de uno sigue
+  // ambiguo — no se adivina, queda para elegir a mano en el desplegable
+  // (que ahora marca con ✓ cuáles tienen fórmula, ver columna "Cód.
+  // Producción").
+  useEffect(() => {
+    if (!codigosConFormula || codigosPorArticulo.size === 0) return;
+    rows.forEach((row) => {
+      if (row.codigo_produccion_id || !row.codartint) return;
+      if (autoAsignados.current.has(row.id)) return;
+      const vinculados = codigosPorArticulo.get(normalizarCodigo(row.codartint)) ?? [];
+      const conFormula = vinculados.filter((o) => codigosConFormula.has(Number(o.id)));
+      if (conFormula.length !== 1) return;
+      autoAsignados.current.add(row.id);
+      handleCodigoProduccionChange(row, conFormula[0].id);
+    });
+  }, [rows, codigosPorArticulo, codigosConFormula]);
 
   // Alta rápida: crea un código de producción nuevo y lo vincula al
   // artículo de la fila, todo en un solo paso. Sustituye, por ahora, a una
@@ -1202,6 +1235,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
               <option key={o.id} value={o.id}>
                 {o.codigo}
                 {o.descripcion ? ` — ${o.descripcion}` : ""}
+                {codigosConFormula?.has(Number(o.id)) ? " ✓" : ""}
               </option>
             ))}
             <option value="__nuevo__">+ Nuevo código…</option>
@@ -1683,6 +1717,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
               normalizarCodigo((rows.find((r) => r.id === detalle.id) ?? detalle).codartint),
             ) ?? []
           }
+          codigosConFormula={codigosConFormula}
           onClose={() => setDetalle(null)}
           onCodigoProduccionChange={handleCodigoProduccionChange}
           onCrearYVincularCodigo={handleCrearYVincularCodigo}
