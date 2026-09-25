@@ -3925,18 +3925,14 @@ export default function PresupuestoNuevo({
           <button
             className="pn-tool-btn"
             onClick={iniciarGeneracionPDF}
-            disabled={presupuestoItems.length === 0 || generandoPDF}
-            title={
-              presupuestoItems.length === 0
-                ? "Agregá al menos un ítem al presupuesto para generar el PDF"
-                : "Genera y descarga el PDF del presupuesto"
-            }
+            disabled={generandoPDF}
+            title="Genera y descarga el PDF del presupuesto"
             style={{
               background: "#e8f0f7",
               borderColor: "#2277bb",
               color: "#0a3a5c",
               fontWeight: 700,
-              opacity: presupuestoItems.length === 0 || generandoPDF ? 0.5 : 1,
+              opacity: generandoPDF ? 0.5 : 1,
             }}
           >
             🖨️ {generandoPDF ? "Generando..." : "Generar PDF"}
@@ -3944,23 +3940,18 @@ export default function PresupuestoNuevo({
           <button
             className="pn-tool-btn"
             onClick={iniciarGeneracionWord}
-            disabled={presupuestoItems.length === 0 || generandoWord || confirmado}
+            disabled={generandoWord || confirmado}
             title={
-              presupuestoItems.length === 0
-                ? "Agregá al menos un ítem al presupuesto para generar el Word"
-                : confirmado
-                  ? "Generar Word todavía no está disponible para obras confirmadas — usá el PDF"
-                  : "Genera y descarga el Word (editable) del presupuesto"
+              confirmado
+                ? "Generar Word todavía no está disponible para obras confirmadas — usá el PDF"
+                : "Genera y descarga el Word (editable) del presupuesto"
             }
             style={{
               background: "#e8f4ee",
               borderColor: "#1e7a4d",
               color: "#0d3d26",
               fontWeight: 700,
-              opacity:
-                presupuestoItems.length === 0 || generandoWord || confirmado
-                  ? 0.5
-                  : 1,
+              opacity: generandoWord || confirmado ? 0.5 : 1,
             }}
           >
             📝 {generandoWord ? "Generando..." : "Generar Word"}
