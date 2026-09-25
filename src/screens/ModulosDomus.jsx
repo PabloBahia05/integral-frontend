@@ -414,6 +414,18 @@ export default function ModulosDomus({ authFetch, token }) {
   // que manda el backend, para que el usuario sepa qué le falta soltar.
   const [eliminandoCodigoId, setEliminandoCodigoId] = useState(null);
   const [errorEliminarCodigoId, setErrorEliminarCodigoId] = useState(null);
+  // Alta de un vínculo artículo↔código directamente desde una tarjeta del
+  // modal de Relaciones ("+ Agregar artículo") — busca por descripción/
+  // código (mismo endpoint que "Nuevo artículo") y al elegir uno vincula
+  // ese artículo al código de esa tarjeta. Un solo buscador abierto a la
+  // vez, identificado por el id del código (agregarArticuloCodigoId).
+  const [agregarArticuloCodigoId, setAgregarArticuloCodigoId] = useState(null);
+  const [agregarBusqueda, setAgregarBusqueda] = useState("");
+  const [agregarResultados, setAgregarResultados] = useState([]);
+  const [agregarFocus, setAgregarFocus] = useState(false);
+  const [buscandoArticuloAgregar, setBuscandoArticuloAgregar] = useState(false);
+  const [agregandoVinculo, setAgregandoVinculo] = useState(false);
+  const [errorAgregarVinculo, setErrorAgregarVinculo] = useState(null);
 
   // Pieza a eliminar — puede venir de la grilla principal o del panel de
   // un artículo, por eso no distingue origen, solo necesita `id`.
@@ -740,6 +752,83 @@ export default function ModulosDomus({ authFetch, token }) {
     }
   };
 
+  const abrirAgregarArticulo = (codigoId) => {
+    setAgregarArticuloCodigoId(codigoId);
+    setAgregarBusqueda("");
+    setAgregarResultados([]);
+    setErrorAgregarVinculo(null);
+  };
+
+  const cerrarAgregarArticulo = () => {
+    setAgregarArticuloCodigoId(null);
+    setAgregarBusqueda("");
+    setAgregarResultados([]);
+    setErrorAgregarVinculo(null);
+  };
+
+  // Vincula un artículo ya existente (elegido del buscador) al código de
+  // producción de la tarjeta abierta — mismo POST a /articulo-produccion
+  // que usa handleCrearYVincularCodigo, pero contra un código que ya
+  // existe en vez de crear uno nuevo. Bloquea de entrada si el artículo ya
+  // estaba vinculado a ese código (evita el 500/409 del backend por
+  // duplicado) y actualiza el modal + codigosPorArticulo en optimista.
+  const handleAgregarVinculo = async (codigo, articulo) => {
+    const yaVinculado = codigo.articulos.some(
+      (a) => normalizarCodigo(a.codartint) === normalizarCodigo(articulo.codartint),
+    );
+    if (yaVinculado) {
+      setErrorAgregarVinculo("Ese artículo ya está vinculado a este código.");
+      return;
+    }
+    setAgregandoVinculo(true);
+    setErrorAgregarVinculo(null);
+    try {
+      const res = await authFetch(`${API}/articulo-produccion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          codartint: articulo.codartint,
+          codigo_produccion_id: codigo.id,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      setRelacionesCodigos((prev) =>
+        prev.map((c) =>
+          c.id === codigo.id
+            ? {
+                ...c,
+                articulos: [
+                  ...c.articulos,
+                  {
+                    vinculoId: data?.id,
+                    codartint: articulo.codartint,
+                    articulo_descripcion: articulo.articulo,
+                  },
+                ].sort((a, b) => a.codartint.localeCompare(b.codartint, "es")),
+              }
+            : c,
+        ),
+      );
+      setCodigosPorArticulo((prev) => {
+        const next = new Map(prev);
+        const clave = normalizarCodigo(articulo.codartint);
+        const lista = next.get(clave) ?? [];
+        next.set(clave, [
+          ...lista,
+          { id: codigo.id, codigo: codigo.codigo, descripcion: codigo.descripcion },
+        ]);
+        return next;
+      });
+      cerrarAgregarArticulo();
+    } catch (e) {
+      console.error("Error vinculando artículo:", e);
+      setErrorAgregarVinculo(e.message || "No se pudo vincular el artículo.");
+    } finally {
+      setAgregandoVinculo(false);
+    }
+  };
+
   // Búsqueda server-side (con debounce) de artículos para "Nuevo
   // artículo" — mismo patrón que el buscador de Material Placa/Guías en
   // PresupuestoNuevo.jsx, contra /articulos/buscar-descripcion.
@@ -761,6 +850,29 @@ export default function ModulosDomus({ authFetch, token }) {
     }, 300);
     return () => clearTimeout(timer);
   }, [nuevoBusqueda, authFetch]);
+
+  // Búsqueda server-side (con debounce) de artículos para "+ Agregar
+  // artículo" dentro de una tarjeta del modal de Relaciones — mismo
+  // endpoint que el buscador de "Nuevo artículo" de arriba, pero con su
+  // propio estado porque son dos buscadores independientes.
+  useEffect(() => {
+    if (!agregarBusqueda.trim()) {
+      setAgregarResultados([]);
+      setBuscandoArticuloAgregar(false);
+      return;
+    }
+    setBuscandoArticuloAgregar(true);
+    const timer = setTimeout(() => {
+      authFetch(
+        `${API}/articulos/buscar-descripcion?q=${encodeURIComponent(agregarBusqueda.trim())}`,
+      )
+        .then((r) => r.json())
+        .then((data) => setAgregarResultados(Array.isArray(data) ? data : []))
+        .catch(() => setAgregarResultados([]))
+        .finally(() => setBuscandoArticuloAgregar(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [agregarBusqueda, authFetch]);
 
   // ── Edición inline de la grilla principal (por id de pieza) ──────────
 
@@ -2193,6 +2305,145 @@ export default function ModulosDomus({ authFetch, token }) {
                         ))}
                       </div>
                     )}
+
+                    <div style={{ marginTop: 8 }}>
+                      {agregarArticuloCodigoId === c.id ? (
+                        <div style={{ position: "relative" }}>
+                          <input
+                            type="text"
+                            autoFocus
+                            value={agregarBusqueda}
+                            onChange={(e) => setAgregarBusqueda(e.target.value)}
+                            onFocus={() => setAgregarFocus(true)}
+                            onBlur={() => setTimeout(() => setAgregarFocus(false), 160)}
+                            placeholder="Buscar artículo por código o nombre..."
+                            autoComplete="off"
+                            disabled={agregandoVinculo}
+                            style={{
+                              width: "100%",
+                              boxSizing: "border-box",
+                              padding: "5px 8px",
+                              fontSize: 12,
+                              fontFamily: "'Space Mono',monospace",
+                              border: "1.5px solid #b8d6ef",
+                              borderRadius: 4,
+                            }}
+                          />
+                          {agregarFocus && agregarResultados.length > 0 && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: "100%",
+                                left: 0,
+                                right: 0,
+                                background: "#fff",
+                                border: "1px solid #b8cfe0",
+                                borderTop: "none",
+                                zIndex: 1200,
+                                boxShadow: "0 6px 18px #0002",
+                                maxHeight: 180,
+                                overflowY: "auto",
+                                borderRadius: "0 0 3px 3px",
+                              }}
+                            >
+                              {agregarResultados.map((a) => (
+                                <div
+                                  key={a.codartint}
+                                  onMouseDown={() => handleAgregarVinculo(c, a)}
+                                  style={{
+                                    padding: "7px 12px",
+                                    cursor: "pointer",
+                                    fontSize: 12,
+                                    fontFamily: "'Space Mono',monospace",
+                                    borderBottom: "1px solid #eef2f6",
+                                    color: "#0a3a5c",
+                                  }}
+                                  onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
+                                  onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+                                >
+                                  <span style={{ fontWeight: 700 }}>{a.articulo}</span>
+                                  <span style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}>
+                                    {a.codartint}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {agregarFocus &&
+                            !buscandoArticuloAgregar &&
+                            agregarResultados.length === 0 &&
+                            agregarBusqueda.trim().length > 0 && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "100%",
+                                  left: 0,
+                                  right: 0,
+                                  background: "#fff",
+                                  border: "1px solid #b8cfe0",
+                                  borderTop: "none",
+                                  zIndex: 1200,
+                                  padding: "8px 12px",
+                                  color: "#8aabcc",
+                                  fontSize: 11,
+                                  borderRadius: "0 0 3px 3px",
+                                }}
+                              >
+                                Sin resultados
+                              </div>
+                            )}
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              marginTop: 4,
+                              minHeight: 14,
+                            }}
+                          >
+                            {errorAgregarVinculo ? (
+                              <span style={{ fontSize: 11, color: "#c0392b" }}>
+                                ⚠ {errorAgregarVinculo}
+                              </span>
+                            ) : agregandoVinculo ? (
+                              <span style={{ fontSize: 11, color: "#4a8ab5" }}>⏳ Vinculando...</span>
+                            ) : (
+                              <span />
+                            )}
+                            <button
+                              onClick={cerrarAgregarArticulo}
+                              style={{
+                                border: "none",
+                                background: "none",
+                                color: "#4a8ab5",
+                                cursor: "pointer",
+                                fontSize: 11,
+                                fontFamily: "'Space Mono', monospace",
+                              }}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => abrirAgregarArticulo(c.id)}
+                          style={{
+                            border: "1.5px dashed #b8d6ef",
+                            background: "#fff",
+                            color: "#1c6ea4",
+                            cursor: "pointer",
+                            fontSize: 11,
+                            fontFamily: "'Space Mono', monospace",
+                            fontWeight: 700,
+                            borderRadius: 4,
+                            padding: "4px 10px",
+                          }}
+                        >
+                          + Agregar artículo
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
