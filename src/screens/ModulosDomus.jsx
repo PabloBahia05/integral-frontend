@@ -427,6 +427,88 @@ export default function ModulosDomus({ authFetch, token }) {
   const [agregandoVinculo, setAgregandoVinculo] = useState(false);
   const [errorAgregarVinculo, setErrorAgregarVinculo] = useState(null);
 
+  // Auditoría "Piezas sin vínculo válido": una pieza de modulos-domus tiene
+  // codigo_produccion_id apuntando a un código, pero SU PROPIO codartint
+  // nunca quedó vinculado a ese código en articulo_produccion (no pasó por
+  // el desplegable, o el artículo/código cambiaron después). El modal
+  // "Relaciones" no lo detecta porque solo recorre articulo_produccion —
+  // nunca modulos-domus — así que esta inconsistencia era invisible. Se
+  // trae el conteo apenas carga la pantalla (mismo criterio que
+  // codigosPorArticulo) para mostrar el badge sin tener que abrir nada.
+  const [auditoriaFilas, setAuditoriaFilas] = useState([]);
+  const [auditoriaAbierto, setAuditoriaAbierto] = useState(false);
+  const [auditoriaLoading, setAuditoriaLoading] = useState(false);
+  const [auditoriaError, setAuditoriaError] = useState(null);
+  const [vinculandoAuditoriaId, setVinculandoAuditoriaId] = useState(null);
+
+  const fetchAuditoria = () => {
+    setAuditoriaLoading(true);
+    setAuditoriaError(null);
+    authFetch(`${API}/modulos-domus/auditoria-vinculos`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        setAuditoriaFilas(Array.isArray(data) ? data : []);
+      })
+      .catch((e) => {
+        console.error("Error cargando auditoría de vínculos:", e);
+        setAuditoriaError(e.message || "No se pudo cargar la auditoría.");
+        setAuditoriaFilas([]);
+      })
+      .finally(() => setAuditoriaLoading(false));
+  };
+
+  useEffect(() => {
+    fetchAuditoria();
+  }, []);
+
+  const abrirAuditoria = () => {
+    setAuditoriaAbierto(true);
+    fetchAuditoria();
+  };
+
+  const cerrarAuditoria = () => setAuditoriaAbierto(false);
+
+  // Crea la fila que falta en articulo_produccion para que la pieza quede
+  // respaldada por un vínculo real — mismo POST que usa "+ Agregar
+  // artículo" en el modal de Relaciones, pero disparado desde acá con los
+  // datos que ya trae la fila de auditoría. No toca la pieza en sí.
+  const handleVincularDesdeAuditoria = async (fila) => {
+    setVinculandoAuditoriaId(fila.id);
+    try {
+      const res = await authFetch(`${API}/articulo-produccion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          codartint: fila.codartint,
+          codigo_produccion_id: fila.codigo_produccion_id,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      setAuditoriaFilas((prev) => prev.filter((f) => f.id !== fila.id));
+      setCodigosPorArticulo((prev) => {
+        const next = new Map(prev);
+        const clave = normalizarCodigo(fila.codartint);
+        const lista = next.get(clave) ?? [];
+        next.set(clave, [
+          ...lista,
+          {
+            id: fila.codigo_produccion_id,
+            codigo: fila.codigo_asignado,
+            descripcion: null,
+          },
+        ]);
+        return next;
+      });
+    } catch (e) {
+      console.error("Error vinculando desde auditoría:", e);
+      alert(e.message || "No se pudo crear el vínculo.");
+    } finally {
+      setVinculandoAuditoriaId(null);
+    }
+  };
+
   // Pieza a eliminar — puede venir de la grilla principal o del panel de
   // un artículo, por eso no distingue origen, solo necesita `id`.
   const [aEliminar, setAEliminar] = useState(null);
@@ -2029,6 +2111,25 @@ export default function ModulosDomus({ authFetch, token }) {
         >
           🔗 Relaciones
         </button>
+        {auditoriaFilas.length > 0 && (
+          <button
+            onClick={abrirAuditoria}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 6,
+              border: "1.5px solid #f0c2c2",
+              background: "#fdecea",
+              color: "#c0392b",
+              cursor: "pointer",
+              fontFamily: "'Space Mono', monospace",
+              fontSize: 12,
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+            }}
+          >
+            ⚠ Piezas sin vínculo válido ({auditoriaFilas.length})
+          </button>
+        )}
       </div>
 
       <p style={{ margin: "4px 0 12px", fontSize: 11, color: "#8aabb8", fontFamily: "'Space Mono',monospace" }}>
@@ -2630,6 +2731,149 @@ export default function ModulosDomus({ authFetch, token }) {
                           + Agregar artículo
                         </button>
                       )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {auditoriaAbierto && (
+        <div
+          onClick={cerrarAuditoria}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 700,
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              background: "#fff",
+              borderRadius: 10,
+              padding: "20px 22px",
+              fontFamily: "'Space Mono', monospace",
+              color: "#0a3a5c",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                marginBottom: 4,
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 15 }}>Piezas sin vínculo válido</h3>
+              <button
+                onClick={cerrarAuditoria}
+                style={{
+                  border: "none",
+                  background: "none",
+                  color: "#4a8ab5",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <p style={{ margin: "0 0 14px", fontSize: 12, color: "#4a8ab5" }}>
+              Piezas con un código de producción asignado que su propio artículo
+              nunca tuvo habilitado en <code>articulo_produccion</code> — no
+              aparecen como "relación rota" en ningún otro lado. "Vincular ahora"
+              crea ese vínculo faltante sin tocar la pieza; "Abrir artículo" lleva
+              al panel para reasignarla a otro código en cambio.
+            </p>
+
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              {auditoriaLoading ? (
+                <p style={{ color: "#4a8ab5", fontSize: 12 }}>⏳ Cargando...</p>
+              ) : auditoriaError ? (
+                <p style={{ color: "#c0392b", fontSize: 12 }}>⚠ {auditoriaError}</p>
+              ) : auditoriaFilas.length === 0 ? (
+                <p style={{ color: "#8aabb8", fontSize: 12 }}>
+                  Sin inconsistencias — todas las piezas con código de producción
+                  asignado tienen su vínculo respaldado.
+                </p>
+              ) : (
+                auditoriaFilas.map((f) => (
+                  <div
+                    key={f.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
+                      border: "1.5px solid #f0c2c2",
+                      borderRadius: 6,
+                      padding: "8px 12px",
+                      marginBottom: 8,
+                      fontSize: 12,
+                    }}
+                  >
+                    <div>
+                      <strong>{f.codartint}</strong>
+                      {f.articulo_descripcion ? ` — ${f.articulo_descripcion}` : ""}
+                      <div style={{ color: "#8aabb8", fontSize: 11, marginTop: 2 }}>
+                        Pieza "{f.titulo || `#${f.id}`}" → código{" "}
+                        <strong>{f.codigo_asignado ?? `id ${f.codigo_produccion_id}`}</strong>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={() => {
+                          cerrarAuditoria();
+                          abrirPanel({ codartint: f.codartint, articulo_descripcion: f.articulo_descripcion });
+                        }}
+                        style={{
+                          border: "1.5px solid #b8d6ef",
+                          background: "#fff",
+                          color: "#0a3a5c",
+                          cursor: "pointer",
+                          fontSize: 11,
+                          fontFamily: "'Space Mono', monospace",
+                          fontWeight: 700,
+                          borderRadius: 4,
+                          padding: "4px 8px",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Abrir artículo
+                      </button>
+                      <button
+                        onClick={() => handleVincularDesdeAuditoria(f)}
+                        disabled={vinculandoAuditoriaId === f.id}
+                        style={{
+                          border: "none",
+                          background: "#1a7a44",
+                          color: "#fff",
+                          cursor: vinculandoAuditoriaId === f.id ? "default" : "pointer",
+                          fontSize: 11,
+                          fontFamily: "'Space Mono', monospace",
+                          fontWeight: 700,
+                          borderRadius: 4,
+                          padding: "4px 8px",
+                          whiteSpace: "nowrap",
+                          opacity: vinculandoAuditoriaId === f.id ? 0.6 : 1,
+                        }}
+                      >
+                        {vinculandoAuditoriaId === f.id ? "⏳" : "Vincular ahora"}
+                      </button>
                     </div>
                   </div>
                 ))
