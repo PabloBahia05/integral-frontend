@@ -13,36 +13,21 @@ const API = "https://integral-backend-production.up.railway.app";
 const CAMPO_FAMILIA_FORMULA = "familia";
 const familiaDe = (f) => String(f?.[CAMPO_FAMILIA_FORMULA] ?? "").trim();
 
-// Códigos de producción: cada pieza puede colgar de un `codigo_produccion_id`
-// (catálogo `codigos_produccion`, vinculado a artículos vía la tabla puente
-// `articulo_produccion` — ver tabla-produccion_routes.js). Es lo que
-// consulta formulas-csv.routes.js para armar el CSV de un código puntual;
-// `codartint` sigue siendo el que organiza el panel de este archivo, pero ya
-// no alcanza para que la pieza entre al CSV de ningún código. Mismo criterio
-// que Producción.jsx: `codigosPorArticulo` mapea codartint normalizado →
-// lista de códigos vinculados, con "+ Nuevo código…" para crear y vincular
-// en un solo paso.
-const normalizarCodigo = (c) => String(c ?? "").trim().toUpperCase();
-
 // ── Componente ────────────────────────────────────────────────────────────
 //
-// CRUD de `modulos-domus`: guarda las PIEZAS que componen cada artículo
-// (codartint), cada una con dos fórmulas asociadas INDEPENDIENTES
-// (formulax → Alto, formulay → Ancho, ambas referencias a
-// formulas_produccion) y los datos que completa el CSV de fórmulas de
-// producción (bpp, cant1-4, color) — ver GET /produccion/:id/formulas-csv
-// en tabla-produccion_routes.js, que arma un renglón de CSV por cada pieza
-// con formulax y/o formulay asignada.
+// MODELO (rediseño): la pieza de `modulos-domus` cuelga SOLO de un
+// `codigo_produccion_id` (catálogo `codigos_produccion`) — ya no de un
+// artículo. Cargás una pieza una sola vez para un código y esa misma pieza
+// aplica a TODOS los artículos que ese código tenga vinculados en
+// `articulo_produccion` (el modal "🔗 Relaciones", que sigue siendo el
+// único lugar donde se ata código↔artículo — eso no cambió). `codartint`
+// por pieza queda como dato histórico de piezas viejas; ya no se pide al
+// cargar una pieza nueva ni se usa para nada acá.
 //
-// Un mismo codartint puede tener varias piezas, así que ya no hay upsert
-// por codartint: alta = POST /modulos-domus (siempre inserta), edición y
-// borrado = PUT/DELETE /modulos-domus/:id (id de la pieza puntual).
-//
-// La grilla principal muestra TODAS las piezas de TODOS los artículos
-// mezcladas (como siempre). Al hacer clic en una fila se abre un panel
-// filtrado por ese artículo, con sus piezas y un alta guiada por
-// búsqueda de fórmula (mismo patrón de buscador+desplegable que el modal
-// "Nuevo artículo").
+// La pantalla principal lista CÓDIGOS DE PRODUCCIÓN (no artículos). Al
+// hacer clic en uno se abre su panel de piezas, con el mismo flujo de
+// variantes (subcódigo) y alta guiada por búsqueda de fórmula que ya
+// existía, ahora escapado por código en vez de por artículo.
 
 const CAMPOS_TEXTO = [
   { campo: "bpp", label: "BPP", maxLength: 30 },
@@ -53,8 +38,7 @@ const CAMPOS_TEXTO = [
 ];
 
 // Cant1 a Cant4 dejan de ser texto libre: son un desplegable fijo con
-// estas opciones (más "—" vacío), usado tanto en la grilla principal
-// como en el mini-table de piezas del panel.
+// estas opciones (más "—" vacío), usado en el mini-table de piezas del panel.
 const OPCIONES_CANT = ["1", "2", "3", "4", "BLANCO-045"];
 
 const CAMPOS_NUMERICOS = [
@@ -285,7 +269,6 @@ function TextoFormulaCampo({ codigo, formulas, campo }) {
   );
 }
 
-// propio estado de busqueda/foco/resultados manejado por el padre.
 function BuscadorFormulaCampo({
   label,
   placeholder,
@@ -385,243 +368,39 @@ function BuscadorFormulaCampo({
 }
 
 export default function ModulosDomus({ authFetch, token }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [errorCarga, setErrorCarga] = useState(null);
   const [search, setSearch] = useState("");
-  const [filtroModulo, setFiltroModulo] = useState(null);
 
-  // Vínculos artículo↔código de producción (articulo_produccion), agrupados
-  // por codartint normalizado — ver fetch más abajo y
-  // handleCrearYVincularCodigo. Mismo patrón que Producción.jsx.
-  const [codigosPorArticulo, setCodigosPorArticulo] = useState(new Map());
-
-  // Modal "Relaciones": muestra TODOS los códigos de producción del
-  // catálogo con los artículos vinculados a cada uno (vista inversa de
-  // codigosPorArticulo, agrupada por código en vez de por artículo). Se
-  // carga bajo demanda, al abrir el modal — no en cada render de la
-  // pantalla principal.
-  const [relacionesAbierto, setRelacionesAbierto] = useState(false);
-  const [relacionesLoading, setRelacionesLoading] = useState(false);
-  const [relacionesError, setRelacionesError] = useState(null);
-  const [relacionesCodigos, setRelacionesCodigos] = useState([]);
-  const [quitandoVinculoId, setQuitandoVinculoId] = useState(null);
-  // Borrado del código de producción EN SÍ (no solo su vínculo con un
-  // artículo puntual) — para códigos que quedaron sueltos/huérfanos (ver
-  // handleEliminarCodigo). El backend bloquea con 409 "en_uso" si el código
-  // todavía está vinculado a algún artículo y/o tiene piezas de
-  // modulos-domus con ese codigo_produccion_id — ahí se muestra el detalle
-  // que manda el backend, para que el usuario sepa qué le falta soltar.
-  const [eliminandoCodigoId, setEliminandoCodigoId] = useState(null);
-  const [errorEliminarCodigoId, setErrorEliminarCodigoId] = useState(null);
-  // Alta de un vínculo artículo↔código directamente desde una tarjeta del
-  // modal de Relaciones ("+ Agregar artículo") — busca por descripción/
-  // código (mismo endpoint que "Nuevo artículo") y al elegir uno vincula
-  // ese artículo al código de esa tarjeta. Un solo buscador abierto a la
-  // vez, identificado por el id del código (agregarArticuloCodigoId).
-  const [agregarArticuloCodigoId, setAgregarArticuloCodigoId] = useState(null);
-  const [agregarBusqueda, setAgregarBusqueda] = useState("");
-  const [agregarResultados, setAgregarResultados] = useState([]);
-  const [agregarFocus, setAgregarFocus] = useState(false);
-  const [buscandoArticuloAgregar, setBuscandoArticuloAgregar] = useState(false);
-  const [agregandoVinculo, setAgregandoVinculo] = useState(false);
-  const [errorAgregarVinculo, setErrorAgregarVinculo] = useState(null);
-
-  // Auditoría "Piezas sin vínculo válido": una pieza de modulos-domus tiene
-  // codigo_produccion_id apuntando a un código, pero SU PROPIO codartint
-  // nunca quedó vinculado a ese código en articulo_produccion (no pasó por
-  // el desplegable, o el artículo/código cambiaron después). El modal
-  // "Relaciones" no lo detecta porque solo recorre articulo_produccion —
-  // nunca modulos-domus — así que esta inconsistencia era invisible. Se
-  // trae el conteo apenas carga la pantalla (mismo criterio que
-  // codigosPorArticulo) para mostrar el badge sin tener que abrir nada.
-  const [auditoriaFilas, setAuditoriaFilas] = useState([]);
-  const [auditoriaAbierto, setAuditoriaAbierto] = useState(false);
-  const [auditoriaLoading, setAuditoriaLoading] = useState(false);
-  const [auditoriaError, setAuditoriaError] = useState(null);
-  const [vinculandoAuditoriaId, setVinculandoAuditoriaId] = useState(null);
-
-  const fetchAuditoria = () => {
-    setAuditoriaLoading(true);
-    setAuditoriaError(null);
-    authFetch(`${API}/modulos-domus/auditoria-vinculos`)
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data = await r.json();
-        setAuditoriaFilas(Array.isArray(data) ? data : []);
-      })
-      .catch((e) => {
-        console.error("Error cargando auditoría de vínculos:", e);
-        setAuditoriaError(e.message || "No se pudo cargar la auditoría.");
-        setAuditoriaFilas([]);
-      })
-      .finally(() => setAuditoriaLoading(false));
-  };
-
-  useEffect(() => {
-    fetchAuditoria();
-  }, []);
-
-  const abrirAuditoria = () => {
-    setAuditoriaAbierto(true);
-    fetchAuditoria();
-  };
-
-  const cerrarAuditoria = () => setAuditoriaAbierto(false);
-
-  // Crea la fila que falta en articulo_produccion para que la pieza quede
-  // respaldada por un vínculo real — mismo POST que usa "+ Agregar
-  // artículo" en el modal de Relaciones, pero disparado desde acá con los
-  // datos que ya trae la fila de auditoría. No toca la pieza en sí.
-  const handleVincularDesdeAuditoria = async (fila) => {
-    setVinculandoAuditoriaId(fila.id);
-    try {
-      const res = await authFetch(`${API}/articulo-produccion`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          codartint: fila.codartint,
-          codigo_produccion_id: fila.codigo_produccion_id,
-        }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-      setAuditoriaFilas((prev) => prev.filter((f) => f.id !== fila.id));
-      setCodigosPorArticulo((prev) => {
-        const next = new Map(prev);
-        const clave = normalizarCodigo(fila.codartint);
-        const lista = next.get(clave) ?? [];
-        next.set(clave, [
-          ...lista,
-          {
-            id: fila.codigo_produccion_id,
-            codigo: fila.codigo_asignado,
-            descripcion: null,
-          },
-        ]);
-        return next;
-      });
-    } catch (e) {
-      console.error("Error vinculando desde auditoría:", e);
-      alert(e.message || "No se pudo crear el vínculo.");
-    } finally {
-      setVinculandoAuditoriaId(null);
-    }
-  };
-
-  // Pieza a eliminar — puede venir de la grilla principal o del panel de
-  // un artículo, por eso no distingue origen, solo necesita `id`.
-  const [aEliminar, setAEliminar] = useState(null);
-  const [eliminando, setEliminando] = useState(false);
-
-  // Guardado inline por campo: key = `${id}-${campo}`, ahora por `id` de
-  // PIEZA (antes era por codartint — dejó de servir porque un mismo
-  // codartint puede repetirse en varias filas).
-  const [guardandoCampo, setGuardandoCampo] = useState(null);
-  const [errorCampo, setErrorCampo] = useState(null);
-
-  // Modal "Nuevo artículo": da de alta la primera pieza de un artículo
-  // (nuevo o ya existente), buscándolo por código o nombre.
-  const [nuevoAbierto, setNuevoAbierto] = useState(false);
-  const [nuevoCodartint, setNuevoCodartint] = useState("");
-  const [nuevoModulo, setNuevoModulo] = useState("");
-  const [nuevoBusqueda, setNuevoBusqueda] = useState("");
-  const [nuevoResultados, setNuevoResultados] = useState([]);
-  const [nuevoFocus, setNuevoFocus] = useState(false);
-  const [buscandoArticulo, setBuscandoArticulo] = useState(false);
-  const [guardandoNuevo, setGuardandoNuevo] = useState(false);
-  const [errorNuevo, setErrorNuevo] = useState(null);
-
-  // Panel de un artículo puntual: sus piezas + alta de piezas nuevas.
-  const [panelCodartint, setPanelCodartint] = useState(null);
+  // ── Catálogo de códigos de producción (grilla principal) ────────────
+  const [codigosProduccion, setCodigosProduccion] = useState([]);
+  const [loadingCodigos, setLoadingCodigos] = useState(true);
+  const [errorCargaCodigos, setErrorCargaCodigos] = useState(null);
   // Fila resaltada de la grilla principal, para que "Editar"/"Eliminar" del
-  // toolbar (al lado de "+ Nuevo") tengan algo sobre qué actuar — mismo
-  // patrón que ya usa Producción.jsx (selected + handleSelect). El click en
-  // la fila sigue abriendo el panel de piezas como siempre (no hace falta
-  // un segundo click para eso): simplemente ahora TAMBIÉN queda marcada
-  // como seleccionada al mismo tiempo.
+  // toolbar tengan algo sobre qué actuar.
   const [seleccionado, setSeleccionado] = useState(null);
-  const [panelArticulo, setPanelArticulo] = useState("");
-  // Subcódigo elegido dentro del panel: `null` = todavía no se eligió
-  // ninguno, se muestra el selector de variantes; string ("" incluido,
-  // para "sin variante") = ya se eligió una y se muestra su lista de
-  // piezas. Se resetea a `null` cada vez que se abre/cierra el panel de un
-  // artículo (ver abrirPanel/cerrarPanel).
-  const [panelSubcodigo, setPanelSubcodigo] = useState(null);
-  // Texto del campo "nueva variante" en el selector, para crear un
-  // subcódigo que todavía no tiene ninguna pieza cargada.
-  const [nuevoSubcodigoInput, setNuevoSubcodigoInput] = useState("");
-  const [piezas, setPiezas] = useState([]);
-  const [piezasLoading, setPiezasLoading] = useState(false);
-  const [piezasError, setPiezasError] = useState(null);
-  // Duplicar una pieza existente: id de la pieza que se está copiando
-  // (para deshabilitar/mostrar spinner solo en ese renglón) y un error
-  // puntual si el POST falla, sin tapar la tabla como hace piezasError.
-  const [duplicandoId, setDuplicandoId] = useState(null);
-  const [errorDuplicar, setErrorDuplicar] = useState(null);
 
-  // Alta de pieza nueva, dentro del panel: buscador de fórmula (catálogo
-  // completo de formulas_produccion, cargado una vez y filtrado acá
-  // mismo — a diferencia de la búsqueda de artículos, esta lista no suele
-  // ser gigante, así que no hace falta pegarle al backend en cada tecla).
-  const [piezaAbierta, setPiezaAbierta] = useState(false);
-  const [formulas, setFormulas] = useState([]);
-  const [formulasCargadas, setFormulasCargadas] = useState(false);
-  // Un solo buscador: se guarda el MISMO codform en formulax y formulay
-  // de la pieza nueva. Alto/Ancho/Profundidad se resuelven después en el
-  // backend contra el Valor 1 (`formula`), Valor 2 (`formula2`) y Valor 3
-  // (`formula3`) de ese registro — formulas_produccion no tiene columnas
-  // separadas "formula_ancho"/"formula_alto"/"formula_profundidad".
-  const [busquedaFormula, setBusquedaFormula] = useState("");
-  // Filtro por familia de fórmula: aplica a todos los buscadores de fórmula
-  // del panel (el de cada pieza y el de "Nueva pieza"). "" = todas.
-  const [filtroFamiliaFormula, setFiltroFamiliaFormula] = useState("");
-  const [formulaFocus, setFormulaFocus] = useState(false);
-  const [piezaFormula, setPiezaFormula] = useState("");
-  const [piezaTitulo, setPiezaTitulo] = useState("");
-  // Subcódigo (variante puntual, ej. "02BAJO10MDF" para el codartint
-  // "02BAJO10") al que pertenece la pieza nueva. Vacío = pieza compartida
-  // por todas las variantes del artículo (ver nota en el backend,
-  // formulas-csv_routes.js).
-  const [piezaSubcodigo, setPiezaSubcodigo] = useState("");
-  // Código de producción de la pieza nueva (ver columna homónima en
-  // columnasPieza y en la grilla principal, y handleCrearYVincularCodigo).
-  const [piezaCodigoProduccion, setPiezaCodigoProduccion] = useState("");
-  const [guardandoPieza, setGuardandoPieza] = useState(false);
-  const [errorPieza, setErrorPieza] = useState(null);
-
-  // "Traer piezas del código": copia las piezas SIN variante (comunes al
-  // artículo) al subcódigo que se está viendo, para no tener que cargar de
-  // cero una variante que comparte casi todo con la base.
-  const [trayendoPiezas, setTrayendoPiezas] = useState(false);
-  const [errorTraer, setErrorTraer] = useState(null);
-
-  // ── Fetch principal (grilla mezclada) ────────────────────────────────
-
-  const fetchModulosDomus = () => {
-    setLoading(true);
-    setErrorCarga(null);
-    authFetch(`${API}/modulos-domus`)
+  const fetchCodigosProduccion = () => {
+    setLoadingCodigos(true);
+    setErrorCargaCodigos(null);
+    authFetch(`${API}/codigos-produccion`)
       .then(async (r) => {
         const data = await r.json().catch(() => null);
         if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
-        setRows(Array.isArray(data) ? data : []);
+        setCodigosProduccion(Array.isArray(data) ? data : []);
       })
       .catch((e) => {
-        console.error(e);
-        setErrorCarga(e.message);
-        setRows([]);
+        console.error("Error cargando códigos de producción:", e);
+        setErrorCargaCodigos(e.message);
+        setCodigosProduccion([]);
       })
-      .finally(() => setLoading(false));
+      .finally(() => setLoadingCodigos(false));
   };
 
   useEffect(() => {
-    fetchModulosDomus();
+    fetchCodigosProduccion();
   }, []);
 
   // Colores de melamina: artículos con area=MELAMINA, para el desplegable
-  // de la columna Color (reemplaza el texto libre — el color de cada
-  // pieza tiene que ser uno de los artículos de melamina existentes).
+  // de la columna Color del panel de piezas.
   const [coloresMelamina, setColoresMelamina] = useState([]);
   useEffect(() => {
     authFetch(`${API}/articulos/colores-melamina`)
@@ -630,72 +409,69 @@ export default function ModulosDomus({ authFetch, token }) {
       .catch(() => setColoresMelamina([]));
   }, []);
 
-  // Vínculos artículo↔código de producción: se traen todos de una y se
-  // agrupan acá por codartint, mismo criterio que Producción.jsx.
-  useEffect(() => {
-    authFetch(`${API}/articulo-produccion`)
+  // ── Piezas sin código de producción asignado ─────────────────────────
+  //
+  // El único caso que necesita atención con este modelo: una pieza que
+  // todavía no cuelga de ningún código, así que no aparece bajo ninguna
+  // fila de la grilla principal. Se resuelve asignándole un código
+  // existente acá mismo, sin tener que abrir ningún panel.
+  const [sinCodigo, setSinCodigo] = useState([]);
+  const [sinCodigoAbierto, setSinCodigoAbierto] = useState(false);
+  const [sinCodigoLoading, setSinCodigoLoading] = useState(false);
+  const [sinCodigoError, setSinCodigoError] = useState(null);
+  const [asignandoSinCodigoId, setAsignandoSinCodigoId] = useState(null);
+
+  const fetchSinCodigo = () => {
+    setSinCodigoLoading(true);
+    setSinCodigoError(null);
+    authFetch(`${API}/modulos-domus/sin-codigo`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
-        const lista = Array.isArray(data) ? data : [];
-        const porArticulo = new Map();
-        lista.forEach((v) => {
-          const clave = normalizarCodigo(v.codartint);
-          if (!porArticulo.has(clave)) porArticulo.set(clave, []);
-          porArticulo.get(clave).push({
-            id: v.codigo_produccion_id,
-            codigo: v.codigo,
-            descripcion: v.descripcion,
-          });
-        });
-        setCodigosPorArticulo(porArticulo);
+        setSinCodigo(Array.isArray(data) ? data : []);
       })
-      .catch((e) => console.error("Error cargando articulo-produccion:", e));
+      .catch((e) => {
+        console.error("Error cargando piezas sin código:", e);
+        setSinCodigoError(e.message || "No se pudo cargar.");
+        setSinCodigo([]);
+      })
+      .finally(() => setSinCodigoLoading(false));
+  };
+
+  useEffect(() => {
+    fetchSinCodigo();
   }, []);
 
-  // Alta rápida: crea un código de producción nuevo y lo vincula al
-  // artículo indicado, todo en un solo paso. `aplicar(nuevoId)` es quien
-  // efectivamente guarda ese id en la pieza (fila de la grilla principal o
-  // del panel) que disparó el alta — mismo patrón que
-  // handleCrearYVincularCodigo en Producción.jsx.
-  const handleCrearYVincularCodigo = async (codartint, aplicar) => {
-    if (!codartint) return;
-    const codigo = window.prompt("Código de producción nuevo (ej: PRD-00123):");
-    if (!codigo || !codigo.trim()) return;
+  const abrirSinCodigo = () => {
+    setSinCodigoAbierto(true);
+    fetchSinCodigo();
+  };
+
+  const cerrarSinCodigo = () => setSinCodigoAbierto(false);
+
+  const handleAsignarSinCodigo = async (fila, codigoId) => {
+    if (!codigoId) return;
+    setAsignandoSinCodigoId(fila.id);
     try {
-      const resCod = await authFetch(`${API}/codigos-produccion`, {
-        method: "POST",
+      const res = await authFetch(`${API}/modulos-domus/${fila.id}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo: codigo.trim() }),
+        body: JSON.stringify({ codigo_produccion_id: Number(codigoId) }),
       });
-      const nuevoCodigo = await resCod.json().catch(() => null);
-      if (!resCod.ok) {
-        throw new Error(nuevoCodigo?.error || `HTTP ${resCod.status}`);
-      }
-      const resVinculo = await authFetch(`${API}/articulo-produccion`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codartint, codigo_produccion_id: nuevoCodigo.id }),
-      });
-      if (!resVinculo.ok) throw new Error(`HTTP ${resVinculo.status}`);
-      setCodigosPorArticulo((prev) => {
-        const next = new Map(prev);
-        const clave = normalizarCodigo(codartint);
-        const lista = next.get(clave) ?? [];
-        next.set(clave, [
-          ...lista,
-          {
-            id: nuevoCodigo.id,
-            codigo: nuevoCodigo.codigo,
-            descripcion: nuevoCodigo.descripcion ?? null,
-          },
-        ]);
-        return next;
-      });
-      aplicar(nuevoCodigo.id);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSinCodigo((prev) => prev.filter((f) => f.id !== fila.id));
+      setCodigosProduccion((prev) =>
+        prev.map((c) =>
+          String(c.id) === String(codigoId)
+            ? { ...c, cant_piezas: Number(c.cant_piezas ?? 0) + 1 }
+            : c,
+        ),
+      );
     } catch (e) {
-      console.error("Error creando código de producción:", e);
-      alert(e.message || "No se pudo crear/vincular el código de producción.");
+      console.error("Error asignando código a la pieza:", e);
+      alert(e.message || "No se pudo asignar el código.");
+    } finally {
+      setAsignandoSinCodigoId(null);
     }
   };
 
@@ -703,9 +479,32 @@ export default function ModulosDomus({ authFetch, token }) {
   //
   // Trae de una el catálogo completo (`/codigos-produccion`) y TODOS los
   // vínculos (`/articulo-produccion`, sin filtro) y arma, por cada código,
-  // la lista de artículos que lo tienen habilitado — la inversa de
-  // codigosPorArticulo. Incluye también los códigos sin ningún artículo
-  // vinculado todavía (lista vacía), para poder detectarlos de un vistazo.
+  // la lista de artículos que lo tienen habilitado. Incluye también los
+  // códigos sin ningún artículo vinculado todavía (lista vacía), para
+  // poder detectarlos de un vistazo. Este modal es el ÚNICO lugar donde se
+  // edita el vínculo código↔artículo — no cambió con el rediseño.
+  const [relacionesAbierto, setRelacionesAbierto] = useState(false);
+  const [relacionesLoading, setRelacionesLoading] = useState(false);
+  const [relacionesError, setRelacionesError] = useState(null);
+  const [relacionesCodigos, setRelacionesCodigos] = useState([]);
+  const [quitandoVinculoId, setQuitandoVinculoId] = useState(null);
+  // Borrado del código de producción EN SÍ (no solo su vínculo con un
+  // artículo puntual). El backend bloquea con 409 "en_uso" si el código
+  // todavía está vinculado a algún artículo y/o tiene piezas de
+  // modulos-domus con ese codigo_produccion_id — con ?forzar=true se
+  // salta el bloqueo: borra los vínculos y desasigna (no borra) las piezas.
+  const [eliminandoCodigoId, setEliminandoCodigoId] = useState(null);
+  const [errorEliminarCodigoId, setErrorEliminarCodigoId] = useState(null);
+  // Alta de un vínculo artículo↔código directamente desde una tarjeta del
+  // modal de Relaciones ("+ Agregar artículo").
+  const [agregarArticuloCodigoId, setAgregarArticuloCodigoId] = useState(null);
+  const [agregarBusqueda, setAgregarBusqueda] = useState("");
+  const [agregarResultados, setAgregarResultados] = useState([]);
+  const [agregarFocus, setAgregarFocus] = useState(false);
+  const [buscandoArticuloAgregar, setBuscandoArticuloAgregar] = useState(false);
+  const [agregandoVinculo, setAgregandoVinculo] = useState(false);
+  const [errorAgregarVinculo, setErrorAgregarVinculo] = useState(null);
+
   const fetchRelaciones = () => {
     setRelacionesLoading(true);
     setRelacionesError(null);
@@ -759,9 +558,7 @@ export default function ModulosDomus({ authFetch, token }) {
   };
 
   // Quita el vínculo artículo↔código (no borra el código ni las piezas ya
-  // cargadas con ese codigo_produccion_id — quedan igual, solo que el
-  // artículo deja de ofrecer ese código en los selectores). Actualiza el
-  // modal y codigosPorArticulo en optimista, sin esperar a un refetch.
+  // cargadas con ese codigo_produccion_id).
   const handleQuitarVinculo = async (vinculo, codigoId) => {
     const codigo = relacionesCodigos.find((c) => c.id === codigoId);
     const esUltimoVinculo = (codigo?.articulos.length ?? 0) <= 1;
@@ -789,13 +586,13 @@ export default function ModulosDomus({ authFetch, token }) {
             : c,
         ),
       );
-      setCodigosPorArticulo((prev) => {
-        const next = new Map(prev);
-        const clave = normalizarCodigo(vinculo.codartint);
-        const lista = (next.get(clave) ?? []).filter((o) => o.id !== codigoId);
-        next.set(clave, lista);
-        return next;
-      });
+      setCodigosProduccion((prev) =>
+        prev.map((c) =>
+          c.id === codigoId
+            ? { ...c, cant_articulos: Math.max(0, Number(c.cant_articulos ?? 1) - 1) }
+            : c,
+        ),
+      );
     } catch (e) {
       console.error("Error quitando vínculo:", e);
       alert("No se pudo quitar el vínculo. Revisá la consola.");
@@ -807,13 +604,12 @@ export default function ModulosDomus({ authFetch, token }) {
   // Borra el código de producción en sí (no un vínculo puntual). Por
   // defecto el backend devuelve 409 { error: "en_uso", detail, enUso,
   // conPiezas } si todavía está vinculado a algún artículo y/o tiene
-  // piezas con ese codigo_produccion_id — ese detalle se muestra debajo
-  // del código, junto con el botón "Forzar borrado" (forzar=true) que
-  // pasa por encima: borra los vínculos en articulo_produccion y
-  // desasigna (no borra) las piezas correspondientes en modulos-domus.
+  // piezas con ese codigo_produccion_id — con forzar=true se salta el
+  // bloqueo: borra los vínculos en articulo_produccion y desasigna (NO
+  // borra) las piezas de modulos-domus que tenían este código.
   const handleEliminarCodigo = async (codigo, forzar = false) => {
     const confirmMsg = forzar
-      ? `¿Forzar el borrado de "${codigo.codigo}"? Se van a quitar todos sus vínculos con artículos y las piezas que tenía asignado este código van a quedar SIN código de producción (podés reasignarlas después desde "⚠ Piezas sin vínculo válido" o el panel del artículo). Esta acción no se puede deshacer.`
+      ? `¿Forzar el borrado de "${codigo.codigo}"? Se van a quitar todos sus vínculos con artículos y las piezas que tenía asignado este código van a quedar SIN código de producción (podés reasignarlas después desde "⚠ Piezas sin código"). Esta acción no se puede deshacer.`
       : `¿Eliminar el código de producción "${codigo.codigo}" del catálogo? Esta acción no se puede deshacer.`;
     if (!window.confirm(confirmMsg)) return;
 
@@ -838,16 +634,9 @@ export default function ModulosDomus({ authFetch, token }) {
         throw new Error(data?.error || `HTTP ${res.status}`);
       }
       setRelacionesCodigos((prev) => prev.filter((c) => c.id !== codigo.id));
-      setCodigosPorArticulo((prev) => {
-        const next = new Map(prev);
-        for (const [clave, lista] of next) {
-          next.set(clave, lista.filter((o) => o.id !== codigo.id));
-        }
-        return next;
-      });
-      if (forzar) {
-        setAuditoriaFilas((prev) => prev.filter((f) => f.codigo_produccion_id !== codigo.id));
-      }
+      setCodigosProduccion((prev) => prev.filter((c) => c.id !== codigo.id));
+      if (panelCodigo?.id === codigo.id) cerrarPanel();
+      if (forzar) fetchSinCodigo();
     } catch (e) {
       console.error("Error eliminando código de producción:", e);
       alert(e.message || "No se pudo eliminar el código de producción.");
@@ -871,14 +660,10 @@ export default function ModulosDomus({ authFetch, token }) {
   };
 
   // Vincula un artículo ya existente (elegido del buscador) al código de
-  // producción de la tarjeta abierta — mismo POST a /articulo-produccion
-  // que usa handleCrearYVincularCodigo, pero contra un código que ya
-  // existe en vez de crear uno nuevo. Bloquea de entrada si el artículo ya
-  // estaba vinculado a ese código (evita el 500/409 del backend por
-  // duplicado) y actualiza el modal + codigosPorArticulo en optimista.
+  // producción de la tarjeta abierta.
   const handleAgregarVinculo = async (codigo, articulo) => {
     const yaVinculado = codigo.articulos.some(
-      (a) => normalizarCodigo(a.codartint) === normalizarCodigo(articulo.codartint),
+      (a) => String(a.codartint).trim().toUpperCase() === String(articulo.codartint).trim().toUpperCase(),
     );
     if (yaVinculado) {
       setErrorAgregarVinculo("Ese artículo ya está vinculado a este código.");
@@ -914,16 +699,13 @@ export default function ModulosDomus({ authFetch, token }) {
             : c,
         ),
       );
-      setCodigosPorArticulo((prev) => {
-        const next = new Map(prev);
-        const clave = normalizarCodigo(articulo.codartint);
-        const lista = next.get(clave) ?? [];
-        next.set(clave, [
-          ...lista,
-          { id: codigo.id, codigo: codigo.codigo, descripcion: codigo.descripcion },
-        ]);
-        return next;
-      });
+      setCodigosProduccion((prev) =>
+        prev.map((c) =>
+          c.id === codigo.id
+            ? { ...c, cant_articulos: Number(c.cant_articulos ?? 0) + 1 }
+            : c,
+        ),
+      );
       cerrarAgregarArticulo();
     } catch (e) {
       console.error("Error vinculando artículo:", e);
@@ -933,32 +715,8 @@ export default function ModulosDomus({ authFetch, token }) {
     }
   };
 
-  // Búsqueda server-side (con debounce) de artículos para "Nuevo
-  // artículo" — mismo patrón que el buscador de Material Placa/Guías en
-  // PresupuestoNuevo.jsx, contra /articulos/buscar-descripcion.
-  useEffect(() => {
-    if (!nuevoBusqueda.trim()) {
-      setNuevoResultados([]);
-      setBuscandoArticulo(false);
-      return;
-    }
-    setBuscandoArticulo(true);
-    const timer = setTimeout(() => {
-      authFetch(
-        `${API}/articulos/buscar-descripcion?q=${encodeURIComponent(nuevoBusqueda.trim())}`,
-      )
-        .then((r) => r.json())
-        .then((data) => setNuevoResultados(Array.isArray(data) ? data : []))
-        .catch(() => setNuevoResultados([]))
-        .finally(() => setBuscandoArticulo(false));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [nuevoBusqueda, authFetch]);
-
   // Búsqueda server-side (con debounce) de artículos para "+ Agregar
-  // artículo" dentro de una tarjeta del modal de Relaciones — mismo
-  // endpoint que el buscador de "Nuevo artículo" de arriba, pero con su
-  // propio estado porque son dos buscadores independientes.
+  // artículo" dentro de una tarjeta del modal de Relaciones.
   useEffect(() => {
     if (!agregarBusqueda.trim()) {
       setAgregarResultados([]);
@@ -978,186 +736,129 @@ export default function ModulosDomus({ authFetch, token }) {
     return () => clearTimeout(timer);
   }, [agregarBusqueda, authFetch]);
 
-  // ── Edición inline de la grilla principal (por id de pieza) ──────────
+  // ── Edición inline del catálogo de códigos (grilla principal) ────────
 
-  const handleCampoChange = (id, campo, valor) => {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [campo]: valor } : r)));
+  const [guardandoCampo, setGuardandoCampo] = useState(null);
+  const [errorCampo, setErrorCampo] = useState(null);
+
+  const handleCodigoCampoChange = (id, campo, valor) => {
+    setCodigosProduccion((prev) => prev.map((c) => (c.id === id ? { ...c, [campo]: valor } : c)));
   };
 
-  const handleCampoBlur = async (row, campo) => {
+  const handleCodigoCampoBlur = async (row, campo) => {
     const key = `${row.id}-${campo}`;
     setGuardandoCampo(key);
     setErrorCampo(null);
     try {
-      const res = await authFetch(`${API}/modulos-domus/${row.id}`, {
+      const res = await authFetch(`${API}/codigos-produccion/${row.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [campo]: row[campo] === "" ? null : row[campo] }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (panelCodigo?.id === row.id) {
+        setPanelCodigo((prev) => (prev ? { ...prev, [campo]: row[campo] } : prev));
+      }
     } catch (e) {
-      console.error(`Error guardando ${campo}:`, e);
+      console.error(`Error guardando ${campo} del código:`, e);
       setErrorCampo(key);
     } finally {
       setGuardandoCampo(null);
     }
   };
 
-  // `modulo` cambia el agrupamiento, así que además de guardarlo hay que
-  // refrescar la lista de módulos (para los botones de filtro).
-  const handleModuloBlur = async (row) => {
-    await handleCampoBlur(row, "modulo");
-    fetchModulosDomus();
+  // ── Alta de un código de producción nuevo ────────────────────────────
+
+  const [nuevoCodigoAbierto, setNuevoCodigoAbierto] = useState(false);
+  const [nuevoCodigoTexto, setNuevoCodigoTexto] = useState("");
+  const [nuevoCodigoDescripcion, setNuevoCodigoDescripcion] = useState("");
+  const [guardandoNuevoCodigo, setGuardandoNuevoCodigo] = useState(false);
+  const [errorNuevoCodigo, setErrorNuevoCodigo] = useState(null);
+
+  const cerrarNuevoCodigo = () => {
+    setNuevoCodigoAbierto(false);
+    setNuevoCodigoTexto("");
+    setNuevoCodigoDescripcion("");
+    setErrorNuevoCodigo(null);
   };
 
-  // Edición inline del nombre del artículo (columna "Artículo"): a
-  // diferencia del resto de las columnas de esta grilla, `articulo_descripcion`
-  // NO vive en `modulos-domus` — viene del JOIN contra la tabla `articulos`
-  // por codartint. Por eso no puede pasar por handleCampoBlur (que hace
-  // PUT /modulos-domus/:id): hace falta su propio PUT contra el artículo.
-  // Como puede haber varias piezas (varias filas de `rows`) para el mismo
-  // codartint, al guardar se refleja el nombre nuevo en todas — si se
-  // dejara solo en la fila tocada, el resto quedaría con el nombre viejo
-  // en memoria hasta recargar la pantalla.
-  const handleArticuloDescripcionChange = (id, valor) => {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, articulo_descripcion: valor } : r)));
-  };
-
-  const handleArticuloDescripcionBlur = async (row) => {
-    const codartint = row.codartint;
-    const valor = (row.articulo_descripcion ?? "").trim();
-    const key = `${row.id}-articulo_descripcion`;
-    setGuardandoCampo(key);
-    setErrorCampo(null);
+  const handleCrearCodigoNuevo = async () => {
+    if (!nuevoCodigoTexto.trim()) return;
+    setGuardandoNuevoCodigo(true);
+    setErrorNuevoCodigo(null);
     try {
-      const res = await authFetch(`${API}/articulos/${encodeURIComponent(codartint)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articulo: valor }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setRows((prev) =>
-        prev.map((r) => (r.codartint === codartint ? { ...r, articulo_descripcion: valor } : r)),
-      );
-    } catch (e) {
-      console.error("Error guardando nombre de artículo:", e);
-      setErrorCampo(key);
-    } finally {
-      setGuardandoCampo(null);
-    }
-  };
-
-  // ── Alta de artículo nuevo (su primera pieza) ────────────────────────
-
-  const cerrarNuevo = () => {
-    setNuevoAbierto(false);
-    setNuevoBusqueda("");
-    setNuevoResultados([]);
-  };
-
-  const handleCrearNuevo = async () => {
-    if (!nuevoCodartint.trim()) return;
-    setGuardandoNuevo(true);
-    setErrorNuevo(null);
-    try {
-      const res = await authFetch(`${API}/modulos-domus`, {
+      const res = await authFetch(`${API}/codigos-produccion`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          codartint: nuevoCodartint.trim(),
-          modulo: nuevoModulo.trim() || null,
+          codigo: nuevoCodigoTexto.trim(),
+          descripcion: nuevoCodigoDescripcion.trim() || null,
         }),
       });
-      if (!res.ok) {
-        let detalle = `HTTP ${res.status}`;
-        try {
-          const body = await res.json();
-          if (body?.error) detalle = body.error;
-        } catch {
-          // el body no era JSON parseable, nos quedamos con el status
-        }
-        throw new Error(detalle);
-      }
-      setNuevoAbierto(false);
-      setNuevoCodartint("");
-      setNuevoModulo("");
-      setNuevoBusqueda("");
-      setNuevoResultados([]);
-      fetchModulosDomus();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      const nuevo = {
+        id: data.id,
+        codigo: data.codigo,
+        descripcion: data.descripcion ?? null,
+        cant_articulos: 0,
+        cant_piezas: 0,
+      };
+      setCodigosProduccion((prev) => [...prev, nuevo].sort((a, b) => a.codigo.localeCompare(b.codigo, "es")));
+      cerrarNuevoCodigo();
+      abrirPanel(nuevo);
     } catch (e) {
-      console.error("Error creando pieza en modulos-domus:", e);
-      setErrorNuevo(e.message || "No se pudo guardar.");
+      console.error("Error creando código de producción:", e);
+      setErrorNuevoCodigo(e.message || "No se pudo guardar.");
     } finally {
-      setGuardandoNuevo(false);
+      setGuardandoNuevoCodigo(false);
     }
   };
 
-  // ── DELETE de una pieza puntual (id) ─────────────────────────────────
+  // ── Panel de un código de producción (sus piezas) ────────────────────
 
-  const handleDelete = async () => {
-    if (!aEliminar) return;
-    setEliminando(true);
-    try {
-      const res = await authFetch(`${API}/modulos-domus/${aEliminar.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setRows((prev) => prev.filter((r) => r.id !== aEliminar.id));
-      setPiezas((prev) => prev.filter((p) => p.id !== aEliminar.id));
-      setAEliminar(null);
-    } catch (e) {
-      console.error("Error borrando pieza de modulos-domus:", e);
-      alert("No se pudo borrar la pieza. Revisá la consola.");
-    } finally {
-      setEliminando(false);
-    }
-  };
+  // Código abierto en el panel: { id, codigo, descripcion } o null.
+  const [panelCodigo, setPanelCodigo] = useState(null);
+  // Artículos vinculados a este código (solo lectura acá — se editan desde
+  // "🔗 Relaciones"), para que quede a la vista sin tener que ir y volver.
+  const [panelVinculos, setPanelVinculos] = useState([]);
+  const [panelVinculosLoading, setPanelVinculosLoading] = useState(false);
+  // Subcódigo elegido dentro del panel: `null` = todavía no se eligió
+  // ninguno, se muestra el selector de variantes; string ("" incluido,
+  // para "sin variante") = ya se eligió una y se muestra su lista de
+  // piezas.
+  const [panelSubcodigo, setPanelSubcodigo] = useState(null);
+  const [nuevoSubcodigoInput, setNuevoSubcodigoInput] = useState("");
+  const [piezas, setPiezas] = useState([]);
+  const [piezasLoading, setPiezasLoading] = useState(false);
+  const [piezasError, setPiezasError] = useState(null);
+  const [duplicandoId, setDuplicandoId] = useState(null);
+  const [errorDuplicar, setErrorDuplicar] = useState(null);
 
-  // ── DELETE de un artículo entero (todas sus piezas) ──────────────────
-  // No hay endpoint de borrado masivo en el backend, así que se borra pieza
-  // por pieza con el mismo DELETE /modulos-domus/:id de handleDelete, en
-  // paralelo. Si alguna falla a mitad de camino, el artículo puede quedar
-  // con menos piezas que antes pero no del todo borrado — se avisa y se
-  // deja la grilla como haya quedado en el backend (no se revierte nada).
-  const [aEliminarArticulo, setAEliminarArticulo] = useState(null);
-  const [eliminandoArticulo, setEliminandoArticulo] = useState(false);
+  // Alta de pieza nueva, dentro del panel.
+  const [piezaAbierta, setPiezaAbierta] = useState(false);
+  const [formulas, setFormulas] = useState([]);
+  const [formulasCargadas, setFormulasCargadas] = useState(false);
+  const [busquedaFormula, setBusquedaFormula] = useState("");
+  const [filtroFamiliaFormula, setFiltroFamiliaFormula] = useState("");
+  const [formulaFocus, setFormulaFocus] = useState(false);
+  const [piezaFormula, setPiezaFormula] = useState("");
+  const [piezaTitulo, setPiezaTitulo] = useState("");
+  const [piezaSubcodigo, setPiezaSubcodigo] = useState("");
+  const [guardandoPieza, setGuardandoPieza] = useState(false);
+  const [errorPieza, setErrorPieza] = useState(null);
 
-  const handleEliminarArticulo = async () => {
-    if (!aEliminarArticulo) return;
-    const { codartint } = aEliminarArticulo;
-    setEliminandoArticulo(true);
-    try {
-      const piezasDelArticulo = rows.filter((r) => r.codartint === codartint);
-      const respuestas = await Promise.all(
-        piezasDelArticulo.map((p) =>
-          authFetch(`${API}/modulos-domus/${p.id}`, { method: "DELETE" }),
-        ),
-      );
-      const fallo = respuestas.find((res) => !res.ok);
-      if (fallo) throw new Error(`HTTP ${fallo.status}`);
-      setRows((prev) => prev.filter((r) => r.codartint !== codartint));
-      setPiezas((prev) => prev.filter((p) => p.codartint !== codartint));
-      setAEliminarArticulo(null);
-      // Si el artículo borrado era el seleccionado del toolbar (o el que
-      // tenía el panel abierto), se limpian los dos — ya no existe.
-      setSeleccionado((prev) => (prev?.codartint === codartint ? null : prev));
-      if (panelCodartint === codartint) cerrarPanel();
-    } catch (e) {
-      console.error("Error borrando artículo completo de modulos-domus:", e);
-      alert(
-        "No se pudo borrar el artículo completo — puede haber quedado con piezas borradas a medias. Revisá la grilla y la consola.",
-      );
-    } finally {
-      setEliminandoArticulo(false);
-    }
-  };
+  const [trayendoPiezas, setTrayendoPiezas] = useState(false);
+  const [errorTraer, setErrorTraer] = useState(null);
 
-  // ── Panel de un artículo (sus piezas) ────────────────────────────────
+  // Pieza a eliminar (ConfirmDelete).
+  const [aEliminar, setAEliminar] = useState(null);
+  const [eliminando, setEliminando] = useState(false);
 
-  const fetchPiezas = (codartint) => {
+  const fetchPiezas = (codigoId) => {
     setPiezasLoading(true);
     setPiezasError(null);
-    authFetch(`${API}/modulos-domus/por-articulo/${encodeURIComponent(codartint)}`)
+    authFetch(`${API}/modulos-domus/por-codigo-produccion/${codigoId}`)
       .then(async (r) => {
         const data = await r.json().catch(() => null);
         if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
@@ -1171,29 +872,40 @@ export default function ModulosDomus({ authFetch, token }) {
       .finally(() => setPiezasLoading(false));
   };
 
+  const fetchVinculosDelCodigo = (codigoId) => {
+    setPanelVinculosLoading(true);
+    authFetch(`${API}/articulo-produccion?codigo_produccion_id=${codigoId}`)
+      .then((r) => r.json())
+      .then((data) => setPanelVinculos(Array.isArray(data) ? data : []))
+      .catch((e) => {
+        console.error("Error cargando artículos vinculados:", e);
+        setPanelVinculos([]);
+      })
+      .finally(() => setPanelVinculosLoading(false));
+  };
+
   const cerrarPieza = () => {
     setPiezaAbierta(false);
     setBusquedaFormula("");
     setPiezaFormula("");
     setPiezaTitulo("");
     setPiezaSubcodigo("");
-    setPiezaCodigoProduccion("");
     setErrorPieza(null);
   };
 
   const abrirPanel = (row) => {
     setSeleccionado(row);
-    setPanelCodartint(row.codartint);
-    setPanelArticulo(row.articulo_descripcion ?? "");
+    setPanelCodigo(row);
     setPanelSubcodigo(null);
     setNuevoSubcodigoInput("");
-    fetchPiezas(row.codartint);
+    fetchPiezas(row.id);
+    fetchVinculosDelCodigo(row.id);
     fetchFormulas();
   };
 
   const cerrarPanel = () => {
-    setPanelCodartint(null);
-    setPanelArticulo("");
+    setPanelCodigo(null);
+    setPanelVinculos([]);
     setPanelSubcodigo(null);
     setNuevoSubcodigoInput("");
     setPiezas([]);
@@ -1202,15 +914,12 @@ export default function ModulosDomus({ authFetch, token }) {
   };
 
   // Elegir una variante en el selector: pasa a mostrar solo sus piezas.
-  // Cierra el formulario de "nueva pieza" si había quedado abierto de la
-  // variante anterior (evita cargar una pieza en el subcódigo equivocado).
   const abrirSubcodigo = (subcodigo) => {
     setPanelSubcodigo(subcodigo);
     setErrorTraer(null);
     cerrarPieza();
   };
 
-  // Volver del listado de piezas de una variante al selector de variantes.
   const volverASubcodigos = () => {
     setPanelSubcodigo(null);
     setNuevoSubcodigoInput("");
@@ -1222,9 +931,6 @@ export default function ModulosDomus({ authFetch, token }) {
     setPiezas((prev) => prev.map((p) => (p.id === id ? { ...p, [campo]: valor } : p)));
   };
 
-  // Guarda un campo de una pieza por `id` directo (sin depender de leer el
-  // valor de un objeto `row` completo) — lo usa tanto el blur de los
-  // inputs de texto/número como el selector de fórmula.
   const guardarPiezaCampo = async (id, campo, valor) => {
     const key = `${id}-${campo}`;
     setGuardandoCampo(key);
@@ -1236,9 +942,6 @@ export default function ModulosDomus({ authFetch, token }) {
         body: JSON.stringify({ [campo]: valor === "" ? null : valor }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      // La grilla principal muestra todo mezclado — reflejar el cambio
-      // ahí también, sin esperar a un refetch completo.
-      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [campo]: valor } : r)));
     } catch (e) {
       console.error(`Error guardando ${campo} de la pieza:`, e);
       setErrorCampo(key);
@@ -1251,14 +954,7 @@ export default function ModulosDomus({ authFetch, token }) {
     guardarPiezaCampo(pieza.id, campo, pieza[campo]);
 
   // Elegir una fórmula del catálogo para una pieza existente: se guarda el
-  // MISMO codform en formulax Y formulay. El backend (/produccion/:id/
-  // formulas-csv) es el que resuelve Alto con el Valor 1 (`formula`),
-  // Ancho con el Valor 2 (`formula2`) y Profundidad con el Valor 3
-  // (`formula3`) de ese mismo registro — acá no hace falta pedirle
-  // columnas distintas a formulas_produccion, que no existen (esa tabla no
-  // tiene "formula_ancho"/"formula_alto"/"formula_profundidad").
-  // Además el título se completa SOLO si la pieza todavía no tenía uno
-  // propio cargado (no pisa un título que el usuario ya haya editado).
+  // MISMO codform en formulax Y formulay.
   const elegirFormulaPieza = (row, f) => {
     const yaTeniaTitulo = (row.titulo ?? "").trim().length > 0;
     const nuevoTitulo = yaTeniaTitulo ? row.titulo : f.descripcion || "";
@@ -1273,8 +969,6 @@ export default function ModulosDomus({ authFetch, token }) {
       guardarPiezaCampo(row.id, "titulo", nuevoTitulo);
     }
   };
-
-  // ── Alta de pieza nueva (buscador de fórmula) ────────────────────────
 
   const fetchFormulas = () => {
     if (formulasCargadas) return;
@@ -1294,21 +988,21 @@ export default function ModulosDomus({ authFetch, token }) {
   };
 
   // Duplica una pieza tal cual está: manda todo su contenido (menos id y
-  // los campos resueltos por JOIN, que el backend igual descarta en el
-  // POST) como alta nueva. Queda en el mismo artículo, con el mismo
-  // título — el usuario la distingue y ajusta a mano después (es más
-  // rápido partir de una copia que cargar todo de cero).
+  // los campos resueltos por JOIN) como alta nueva, en el mismo código.
   const handleDuplicarPieza = async (row) => {
-    if (!panelCodartint) return;
+    if (!panelCodigo) return;
     setDuplicandoId(row.id);
     setErrorDuplicar(null);
     try {
       const {
         id: _id,
         codform: _cf,
-        articulo_descripcion: _ad,
         formulax_descripcion: _fxd,
         formulay_descripcion: _fyd,
+        formulax_formula: _fxf,
+        formulax_formula2: _fxf2,
+        formulax_formula3: _fxf3,
+        formulay_formula: _fyf,
         ...resto
       } = row;
       const res = await authFetch(`${API}/modulos-domus`, {
@@ -1326,8 +1020,12 @@ export default function ModulosDomus({ authFetch, token }) {
         }
         throw new Error(detalle);
       }
-      fetchPiezas(panelCodartint);
-      fetchModulosDomus();
+      fetchPiezas(panelCodigo.id);
+      setCodigosProduccion((prev) =>
+        prev.map((c) =>
+          c.id === panelCodigo.id ? { ...c, cant_piezas: Number(c.cant_piezas ?? 0) + 1 } : c,
+        ),
+      );
     } catch (e) {
       console.error("Error duplicando pieza:", e);
       setErrorDuplicar(e.message || "No se pudo duplicar la pieza.");
@@ -1341,16 +1039,15 @@ export default function ModulosDomus({ authFetch, token }) {
   ].sort((a, b) => a.localeCompare(b, "es"));
 
   // Trae al subcódigo actual una copia de cada pieza "sin variante" (las
-  // comunes del artículo, subcodigo NULL/vacío) — así se arranca una
-  // variante nueva con el set completo de piezas y después solo se
-  // modifica la que haga falta, en vez de cargar todo de cero.
+  // comunes del código), para no tener que cargar de cero una variante
+  // que comparte casi todo con la base.
   const handleTraerPiezasDelCodigo = async () => {
-    if (!panelCodartint || !panelSubcodigo) return;
+    if (!panelCodigo || !panelSubcodigo) return;
     const piezasBase = piezas.filter((p) => !String(p.subcodigo ?? "").trim());
     if (piezasBase.length === 0) return;
     if (
       !window.confirm(
-        `Esto copia ${piezasBase.length} pieza(s) sin variante de ${panelCodartint} al subcódigo ${panelSubcodigo}. Después vas a poder modificar las que hagan falta. ¿Continuar?`,
+        `Esto copia ${piezasBase.length} pieza(s) sin variante de ${panelCodigo.codigo} al subcódigo ${panelSubcodigo}. Después vas a poder modificar las que hagan falta. ¿Continuar?`,
       )
     ) {
       return;
@@ -1362,9 +1059,12 @@ export default function ModulosDomus({ authFetch, token }) {
         const {
           id: _id,
           codform: _cf,
-          articulo_descripcion: _ad,
           formulax_descripcion: _fxd,
           formulay_descripcion: _fyd,
+          formulax_formula: _fxf,
+          formulax_formula2: _fxf2,
+          formulax_formula3: _fxf3,
+          formulay_formula: _fyf,
           ...resto
         } = p;
         const res = await authFetch(`${API}/modulos-domus`, {
@@ -1383,8 +1083,14 @@ export default function ModulosDomus({ authFetch, token }) {
           throw new Error(detalle);
         }
       }
-      fetchPiezas(panelCodartint);
-      fetchModulosDomus();
+      fetchPiezas(panelCodigo.id);
+      setCodigosProduccion((prev) =>
+        prev.map((c) =>
+          c.id === panelCodigo.id
+            ? { ...c, cant_piezas: Number(c.cant_piezas ?? 0) + piezasBase.length }
+            : c,
+        ),
+      );
     } catch (e) {
       console.error("Error trayendo piezas del código:", e);
       setErrorTraer(e.message || "No se pudieron traer todas las piezas.");
@@ -1406,12 +1112,12 @@ export default function ModulosDomus({ authFetch, token }) {
       )
       .slice(0, 20);
   };
-  // Piezas de la variante elegida en el selector (panelSubcodigo) — lo que
-  // se muestra en la vista de detalle, ya filtrado.
+
+  // Piezas de la variante elegida en el selector (panelSubcodigo).
   const piezasDeVarianteActual = piezas.filter(
     (p) => String(p.subcodigo ?? "").trim() === (panelSubcodigo ?? ""),
   );
-  // Piezas "sin variante" del artículo — la fuente de "Traer piezas del
+  // Piezas "sin variante" del código — la fuente de "Traer piezas del
   // código" (ver handleTraerPiezasDelCodigo).
   const piezasBaseSinVariante = piezas.filter(
     (p) => !String(p.subcodigo ?? "").trim(),
@@ -1419,19 +1125,18 @@ export default function ModulosDomus({ authFetch, token }) {
 
   const formulasFiltradas = filtrarFormulas(busquedaFormula);
 
-  // Subcódigos (variantes) ya usados entre las piezas de ESTE artículo —
-  // sugerencias para el datalist, tanto al editar una pieza existente como
-  // al cargar una nueva. No incluye "" (piezas compartidas/sin variante).
-  const subcodigosDelArticulo = [
+  // Subcódigos (variantes) ya usados entre las piezas de ESTE código —
+  // sugerencias para el datalist. Se calculan del lado del cliente, del
+  // mismo `piezas` que ya está cargado (no hace falta pegarle al backend).
+  const subcodigosDelCodigo = [
     ...new Set(
       piezas.map((p) => String(p.subcodigo ?? "").trim()).filter(Boolean),
     ),
   ].sort((a, b) => a.localeCompare(b, "es"));
 
-  // Piezas del panel agrupadas por subcodigo — el listado ya no es una
-  // sola tabla mezclada: cada variante tiene su propio grupo, y las piezas
-  // sin subcodigo (compartidas por todas las variantes) quedan en un grupo
-  // aparte al final.
+  // Piezas del panel agrupadas por subcodigo — cada variante tiene su
+  // propio grupo, y las piezas sin subcodigo (compartidas por todas las
+  // variantes) quedan en un grupo aparte al final.
   const gruposPiezas = (() => {
     const mapa = new Map();
     piezas.forEach((p) => {
@@ -1448,7 +1153,7 @@ export default function ModulosDomus({ authFetch, token }) {
   })();
 
   const handleCrearPieza = async () => {
-    if (!panelCodartint) return;
+    if (!panelCodigo) return;
     setGuardandoPieza(true);
     setErrorPieza(null);
     try {
@@ -1456,12 +1161,11 @@ export default function ModulosDomus({ authFetch, token }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          codartint: panelCodartint,
+          codigo_produccion_id: panelCodigo.id,
           subcodigo: piezaSubcodigo.trim() || null,
           formulax: String(piezaFormula ?? "").trim() || null,
           formulay: String(piezaFormula ?? "").trim() || null,
           titulo: piezaTitulo.trim() || null,
-          codigo_produccion_id: piezaCodigoProduccion ? Number(piezaCodigoProduccion) : null,
         }),
       });
       if (!res.ok) {
@@ -1475,8 +1179,12 @@ export default function ModulosDomus({ authFetch, token }) {
         throw new Error(detalle);
       }
       cerrarPieza();
-      fetchPiezas(panelCodartint);
-      fetchModulosDomus();
+      fetchPiezas(panelCodigo.id);
+      setCodigosProduccion((prev) =>
+        prev.map((c) =>
+          c.id === panelCodigo.id ? { ...c, cant_piezas: Number(c.cant_piezas ?? 0) + 1 } : c,
+        ),
+      );
     } catch (e) {
       console.error("Error creando pieza:", e);
       setErrorPieza(e.message || "No se pudo guardar.");
@@ -1485,41 +1193,46 @@ export default function ModulosDomus({ authFetch, token }) {
     }
   };
 
-  // ── Filtro por módulo + búsqueda (grilla principal) ──────────────────
+  // ── DELETE de una pieza puntual (id) ─────────────────────────────────
 
-  const modulos = [...new Set(rows.map((r) => r.modulo).filter(Boolean))].sort();
+  const handleDelete = async () => {
+    if (!aEliminar) return;
+    setEliminando(true);
+    try {
+      const res = await authFetch(`${API}/modulos-domus/${aEliminar.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setPiezas((prev) => prev.filter((p) => p.id !== aEliminar.id));
+      setCodigosProduccion((prev) =>
+        prev.map((c) =>
+          panelCodigo && c.id === panelCodigo.id
+            ? { ...c, cant_piezas: Math.max(0, Number(c.cant_piezas ?? 1) - 1) }
+            : c,
+        ),
+      );
+      setAEliminar(null);
+    } catch (e) {
+      console.error("Error borrando pieza de modulos-domus:", e);
+      alert("No se pudo borrar la pieza. Revisá la consola.");
+    } finally {
+      setEliminando(false);
+    }
+  };
+
+  // ── Filtro por búsqueda (grilla principal) ───────────────────────────
 
   const q = search.toLowerCase();
-  const filtered = rows.filter(
-    (r) =>
-      (!filtroModulo || r.modulo === filtroModulo) &&
-      ((r.codartint ?? "").toLowerCase().includes(q) ||
-        (r.articulo_descripcion ?? "").toLowerCase().includes(q) ||
-        (r.modulo ?? "").toLowerCase().includes(q) ||
-        (r.titulo ?? "").toLowerCase().includes(q) ||
-        (r.bpp ?? "").toLowerCase().includes(q) ||
-        (r.color ?? "").toLowerCase().includes(q)),
+  const filtrados = codigosProduccion.filter(
+    (c) =>
+      (c.codigo ?? "").toLowerCase().includes(q) ||
+      (c.descripcion ?? "").toLowerCase().includes(q),
   );
 
-  // La grilla principal muestra UN renglón por artículo (no una fila por
-  // pieza) — se queda con la primera pieza de cada codartint, en el mismo
-  // orden en que vino de `filtered`. Al hacer clic en el renglón igual se
-  // abre el panel con TODAS las piezas de ese artículo (fetchPiezas más
-  // abajo no depende de esto, sigue trayendo todo por codartint).
-  const vistos = new Set();
-  const filteredPorArticulo = filtered.filter((r) => {
-    if (vistos.has(r.codartint)) return false;
-    vistos.add(r.codartint);
-    return true;
-  });
-
-  // "Sin módulo" y "Total artículos" cuentan ARTÍCULOS distintos, no
-  // piezas — si un artículo tiene 3 piezas sin módulo, sigue siendo 1
-  // artículo sin módulo.
-  const totalArticulos = new Set(rows.map((r) => r.codartint)).size;
-  const articulosSinModulo = new Set(
-    rows.filter((r) => !r.modulo || !r.modulo.trim()).map((r) => r.codartint),
-  ).size;
+  const totalCodigos = codigosProduccion.length;
+  const codigosSinArticulo = codigosProduccion.filter(
+    (c) => Number(c.cant_articulos ?? 0) === 0,
+  ).length;
 
   // ── Estilos de los inputs editables ─────────────────────────────────
 
@@ -1535,255 +1248,98 @@ export default function ModulosDomus({ authFetch, token }) {
     color: "#0a3a5c",
   });
 
-  // ── Columnas de la grilla principal (todo mezclado) ──────────────────
+  // ── Columnas de la grilla principal (catálogo de códigos) ────────────
 
   const columns = [
-    { key: "codartint", label: "Código", render: (v) => v ?? "—" },
     {
-      key: "articulo_descripcion",
-      label: "Artículo",
+      key: "codigo",
+      label: "Código",
       render: (v, row) => (
         <input
           type="text"
-          value={row.articulo_descripcion ?? ""}
-          placeholder="Sin nombre"
+          value={row.codigo ?? ""}
           onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handleArticuloDescripcionChange(row.id, e.target.value)}
-          onBlur={() => handleArticuloDescripcionBlur(row)}
-          maxLength={150}
-          style={estiloInput(row.id, "articulo_descripcion", "220px")}
-        />
-      ),
-    },
-    {
-      key: "modulo",
-      label: "Módulo",
-      render: (v, row) => (
-        <input
-          type="text"
-          value={row.modulo ?? ""}
-          placeholder="Sin cargar"
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handleCampoChange(row.id, "modulo", e.target.value)}
-          onBlur={() => handleModuloBlur(row)}
+          onChange={(e) => handleCodigoCampoChange(row.id, "codigo", e.target.value)}
+          onBlur={() => handleCodigoCampoBlur(row, "codigo")}
           maxLength={50}
-          style={estiloInput(row.id, "modulo", "140px")}
+          style={estiloInput(row.id, "codigo", "160px")}
         />
       ),
     },
     {
-      // Código de producción de ESTA pieza (la primera del artículo, ya que
-      // la grilla mezclada muestra un renglón por codartint — ver
-      // filteredPorArticulo). Para asignarlo pieza por pieza cuando hay
-      // varias, se edita desde el panel (columnasPieza más abajo).
-      key: "codigo_produccion_id",
-      label: "Cód. Producción",
-      render: (v, row) => {
-        const valorActual = row.codigo_produccion_id ?? "";
-        const opciones = codigosPorArticulo.get(normalizarCodigo(row.codartint)) ?? [];
-        const tieneActual = opciones.some((o) => String(o.id) === String(valorActual));
-        return (
-          <select
-            value={valorActual}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => {
-              if (e.target.value === "__nuevo__") {
-                handleCrearYVincularCodigo(row.codartint, (nuevoId) => {
-                  handleCampoChange(row.id, "codigo_produccion_id", nuevoId);
-                  handleCampoBlur({ ...row, codigo_produccion_id: nuevoId }, "codigo_produccion_id");
-                });
-                return;
-              }
-              const valor = e.target.value ? Number(e.target.value) : null;
-              handleCampoChange(row.id, "codigo_produccion_id", valor);
-              handleCampoBlur({ ...row, codigo_produccion_id: valor }, "codigo_produccion_id");
-            }}
-            style={estiloInput(row.id, "codigo_produccion_id", "150px")}
-          >
-            <option value="">Sin código</option>
-            {!tieneActual && valorActual && (
-              <option value={valorActual}>{valorActual} (vínculo no vigente)</option>
-            )}
-            {opciones.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.codigo}
-                {o.descripcion ? ` — ${o.descripcion}` : ""}
-              </option>
-            ))}
-            <option value="__nuevo__">+ Nuevo código…</option>
-          </select>
-        );
-      },
-    },
-    {
-      key: "titulo",
-      label: "Pieza",
-      render: (v, row) => (
-        <span style={{ fontSize: 11 }}>
-          {row.titulo || <em style={{ color: "#b8cfe0" }}>sin nombre</em>}
-        </span>
-      ),
-    },
-    {
-      // Muestra la EXPRESIÓN (Valor 1 de formulax), no la descripción —
-      // es lo que el backend evalúa como Alto en el CSV, en los dos modos
-      // (una sola fórmula o independientes): siempre Valor 1 de formulax.
-      key: "formulax",
-      label: "Fórmula Alto",
-      render: (v, row) => (
-        <span style={{ fontSize: 11 }} title={row.formulax_descripcion || ""}>
-          {row.formulax ? (
-            row.formulax_formula || <em style={{ color: "#b8cfe0" }}>(sin cargar)</em>
-          ) : (
-            <em style={{ color: "#b8cfe0" }}>sin fórmula</em>
-          )}
-        </span>
-      ),
-    },
-    {
-      // Idem, pero lo que el backend evalúa como Ancho: Valor 2 de
-      // formulax si formulax===formulay (una sola fórmula, el flujo
-      // actual del panel), o Valor 1 de formulay si son distintas
-      // (piezas viejas, modo independiente).
-      key: "formulay",
-      label: "Fórmula Ancho",
-      render: (v, row) => {
-        const unaSolaFormula = !!row.formulax && row.formulax === row.formulay;
-        const expresion = unaSolaFormula ? row.formulax_formula2 : row.formulay_formula;
-        const descripcion = unaSolaFormula ? row.formulax_descripcion : row.formulay_descripcion;
-        return (
-          <span style={{ fontSize: 11 }} title={descripcion || ""}>
-            {row.formulay ? (
-              expresion || <em style={{ color: "#b8cfe0" }}>(sin cargar)</em>
-            ) : (
-              <em style={{ color: "#b8cfe0" }}>sin fórmula</em>
-            )}
-          </span>
-        );
-      },
-    },
-    ...CAMPOS_NUMERICOS.map(({ campo, label }) => ({
-      key: campo,
-      label,
+      key: "descripcion",
+      label: "Descripción",
       render: (v, row) => (
         <input
-          type="number"
-          step="0.1"
-          value={row[campo] ?? ""}
-          placeholder="—"
+          type="text"
+          value={row.descripcion ?? ""}
+          placeholder="Sin descripción"
           onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handleCampoChange(row.id, campo, e.target.value)}
-          onBlur={() => handleCampoBlur(row, campo)}
-          style={estiloInput(row.id, campo, "90px")}
+          onChange={(e) => handleCodigoCampoChange(row.id, "descripcion", e.target.value)}
+          onBlur={() => handleCodigoCampoBlur(row, "descripcion")}
+          maxLength={255}
+          style={estiloInput(row.id, "descripcion", "260px")}
         />
-      ),
-    })),
-    ...CAMPOS_TEXTO.map(({ campo, label, maxLength }) => {
-      if (campo.startsWith("cant")) {
-        return {
-          key: campo,
-          label,
-          render: (v, row) => (
-            <select
-              value={row[campo] ?? ""}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => {
-                const valor = e.target.value;
-                handleCampoChange(row.id, campo, valor);
-                handleCampoBlur({ ...row, [campo]: valor }, campo);
-              }}
-              style={estiloInput(row.id, campo, "100px")}
-            >
-              <option value="">—</option>
-              {OPCIONES_CANT.map((op) => (
-                <option key={op} value={op}>
-                  {op}
-                </option>
-              ))}
-            </select>
-          ),
-        };
-      }
-      return {
-        key: campo,
-        label,
-        render: (v, row) => (
-          <input
-            type="text"
-            value={row[campo] ?? ""}
-            placeholder="—"
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => handleCampoChange(row.id, campo, e.target.value)}
-            onBlur={() => handleCampoBlur(row, campo)}
-            maxLength={maxLength}
-            style={estiloInput(row.id, campo, "100px")}
-          />
-        ),
-      };
-    }),
-    {
-      key: "color",
-      label: "Color",
-      render: (v, row) => (
-        <select
-          value={row.color ?? ""}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => {
-            const valor = e.target.value;
-            handleCampoChange(row.id, "color", valor);
-            handleCampoBlur({ ...row, color: valor }, "color");
-          }}
-          style={estiloInput(row.id, "color", "140px")}
-        >
-          <option value="">—</option>
-          {coloresMelamina.map((c) => (
-            <option key={c.codartint} value={c.articulo}>
-              {c.articulo}
-            </option>
-          ))}
-        </select>
       ),
     },
     {
-      // Borra el artículo ENTERO de Módulos Domus: todas sus piezas (todas
-      // las filas de `modulos-domus` con este codartint), no solo la que se
-      // ve acá (la grilla mezclada solo muestra la primera). No toca el
-      // artículo en la tabla `articulos` (Productos) ni ningún código de
-      // producción — solo borra lo cargado en esta pantalla para ese
-      // artículo. Separado del 🗑 de "Eliminar pieza" del panel, que borra
-      // una pieza puntual.
-      key: "_accionesArticulo",
+      key: "cant_articulos",
+      label: "Artículos",
+      render: (v, row) => (
+        <span
+          style={{
+            fontSize: 12,
+            fontFamily: "'Space Mono',monospace",
+            color: Number(row.cant_articulos ?? 0) === 0 ? "#c0392b" : "#0a3a5c",
+          }}
+        >
+          {row.cant_articulos ?? 0}
+        </span>
+      ),
+    },
+    {
+      key: "cant_piezas",
+      label: "Piezas",
+      render: (v, row) => (
+        <span style={{ fontSize: 12, fontFamily: "'Space Mono',monospace" }}>
+          {row.cant_piezas ?? 0}
+        </span>
+      ),
+    },
+    {
+      key: "_borrar",
       label: "",
       render: (v, row) => (
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setAEliminarArticulo(row);
+            handleEliminarCodigo(row);
           }}
-          title="Eliminar este artículo (todas sus piezas) de Módulos Domus"
+          disabled={eliminandoCodigoId === row.id}
+          title="Eliminar este código de producción del catálogo"
           style={{
-            border: "1.5px solid #e57373",
+            border: "1.5px solid #f0c2c2",
             background: "#fff",
             color: "#c0392b",
-            cursor: "pointer",
+            cursor: eliminandoCodigoId === row.id ? "default" : "pointer",
             fontSize: 11,
             fontFamily: "'Space Mono', monospace",
             fontWeight: 700,
             borderRadius: 4,
-            padding: "4px 8px",
+            padding: "3px 8px",
             whiteSpace: "nowrap",
+            opacity: eliminandoCodigoId === row.id ? 0.5 : 1,
           }}
         >
-          🗑 Eliminar artículo
+          {eliminandoCodigoId === row.id ? "⏳" : "🗑 Eliminar"}
         </button>
       ),
     },
   ];
 
-  // Columnas del mini-table de piezas dentro del panel: mismos campos que
-  // la grilla grande (menos Código/Artículo, que ya están fijos por el
-  // panel), más el nombre de la pieza, la fórmula asignada y un borrar
-  // puntual.
+  // Columnas del mini-table de piezas dentro del panel — ya no incluyen
+  // "Código de producción" (el panel entero ya está fijo en un código, no
+  // hay nada que elegir pieza por pieza).
   const columnasPieza = [
     {
       key: "_duplicar",
@@ -1817,7 +1373,7 @@ export default function ModulosDomus({ authFetch, token }) {
           type="text"
           value={row.subcodigo ?? ""}
           placeholder="Sin variante"
-          list={`subcodigos-pieza-${panelCodartint}`}
+          list={`subcodigos-pieza-${panelCodigo?.id}`}
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => handlePiezaCampoChange(row.id, "subcodigo", e.target.value)}
           onBlur={() => handlePiezaCampoBlur(row, "subcodigo")}
@@ -1825,52 +1381,6 @@ export default function ModulosDomus({ authFetch, token }) {
           style={estiloInput(row.id, "subcodigo", "140px")}
         />
       ),
-    },
-    {
-      // Código de producción de ESTA pieza puntual — determina si entra al
-      // CSV de ese código (ver /produccion/:id/formulas-csv en
-      // formulas-csv.routes.js, que ahora resuelve por codigo_produccion_id
-      // y no por codartint). Las opciones son los códigos ya vinculados al
-      // artículo del panel (articulo_produccion); "+ Nuevo código…" crea y
-      // vincula uno al vuelo.
-      key: "codigo_produccion_id",
-      label: "Cód. Producción",
-      render: (v, row) => {
-        const valorActual = row.codigo_produccion_id ?? "";
-        const opciones = codigosPorArticulo.get(normalizarCodigo(panelCodartint)) ?? [];
-        const tieneActual = opciones.some((o) => String(o.id) === String(valorActual));
-        return (
-          <select
-            value={valorActual}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => {
-              if (e.target.value === "__nuevo__") {
-                handleCrearYVincularCodigo(panelCodartint, (nuevoId) => {
-                  handlePiezaCampoChange(row.id, "codigo_produccion_id", nuevoId);
-                  guardarPiezaCampo(row.id, "codigo_produccion_id", nuevoId);
-                });
-                return;
-              }
-              const valor = e.target.value ? Number(e.target.value) : null;
-              handlePiezaCampoChange(row.id, "codigo_produccion_id", valor);
-              guardarPiezaCampo(row.id, "codigo_produccion_id", valor);
-            }}
-            style={estiloInput(row.id, "codigo_produccion_id", "150px")}
-          >
-            <option value="">Sin código</option>
-            {!tieneActual && valorActual && (
-              <option value={valorActual}>{valorActual} (vínculo no vigente)</option>
-            )}
-            {opciones.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.codigo}
-                {o.descripcion ? ` — ${o.descripcion}` : ""}
-              </option>
-            ))}
-            <option value="__nuevo__">+ Nuevo código…</option>
-          </select>
-        );
-      },
     },
     {
       key: "titulo",
@@ -1901,35 +1411,21 @@ export default function ModulosDomus({ authFetch, token }) {
       ),
     },
     {
-      // Solo lectura: la fórmula guardada en la pieza (formulax y formulay
-      // son siempre el mismo código desde acá — Alto sale de su Valor 1,
-      // Ancho de su Valor 2 y Profundidad de su Valor 3 en el backend). No
-      // se edita acá directo — se recarga eligiendo de nuevo en "Buscar
-      // fórmula".
       key: "formula_resuelta",
       label: "Fórmula asignada",
       render: (v, row) => <CodigoFormulaResuelto codigo={row.formulax} formulas={formulas} />,
     },
     {
-      // Solo lectura, solo informativo: el texto de la expresión (Valor 1
-      // de formulas_produccion) que el backend va a evaluar como Alto al
-      // generar el CSV. No se calcula acá — se recarga solo al elegir de
-      // nuevo en "Buscar fórmula". Va primero en la tabla por ser la
-      // primera columna del CSV.
       key: "formula",
       label: "Fórmula (Alto)",
       render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula" />,
     },
     {
-      // Ídem anterior, pero Valor 2 (`formula2`) — lo que el backend
-      // evalúa como Ancho. Segunda columna, igual que en el CSV.
       key: "formula2",
       label: "Fórmula (Ancho)",
       render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula2" />,
     },
     {
-      // Ídem anterior, pero Valor 3 (`formula3`) — lo que el backend
-      // evalúa como Profundidad. Tercera columna, igual que en el CSV.
       key: "formula3",
       label: "Fórmula (Profundidad)",
       render: (v, row) => <TextoFormulaCampo codigo={row.formulax} formulas={formulas} campo="formula3" />,
@@ -1988,7 +1484,7 @@ export default function ModulosDomus({ authFetch, token }) {
             onChange={(e) => handlePiezaCampoChange(row.id, campo, e.target.value)}
             onBlur={() => handlePiezaCampoBlur(row, campo)}
             maxLength={maxLength}
-            style={estiloInput(row.id, campo, "90px")}
+            style={estiloInput(row.id, campo, "100px")}
           />
         ),
       };
@@ -2005,7 +1501,7 @@ export default function ModulosDomus({ authFetch, token }) {
             handlePiezaCampoChange(row.id, "color", valor);
             guardarPiezaCampo(row.id, "color", valor);
           }}
-          style={estiloInput(row.id, "color", "120px")}
+          style={estiloInput(row.id, "color", "140px")}
         >
           <option value="">—</option>
           {coloresMelamina.map((c) => (
@@ -2047,58 +1543,24 @@ export default function ModulosDomus({ authFetch, token }) {
       <ScreenHeader
         icon="🧩"
         title="Módulos Domus"
-        subtitle="Piezas por artículo para el CSV de fórmulas de producción"
+        subtitle="Piezas por código de producción para el CSV de fórmulas de producción"
       />
 
       <StatCards
         stats={[
-          { label: "Total artículos", value: totalArticulos },
-          { label: "Sin módulo", value: articulosSinModulo },
-          { label: "Filtrados", value: filteredPorArticulo.length },
+          { label: "Códigos de producción", value: totalCodigos },
+          { label: "Sin artículos vinculados", value: codigosSinArticulo },
+          { label: "Piezas sin código", value: sinCodigo.length },
+          { label: "Filtrados", value: filtrados.length },
         ]}
       />
-
-      {modulos.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            margin: "12px 0",
-            flexWrap: "wrap",
-          }}
-        >
-          {modulos.map((m) => {
-            const activo = filtroModulo === m;
-            return (
-              <button
-                key={m}
-                onClick={() => setFiltroModulo(activo ? null : m)}
-                style={{
-                  padding: "6px 14px",
-                  fontSize: "12px",
-                  fontFamily: "'Space Mono', monospace",
-                  fontWeight: 700,
-                  borderRadius: "6px",
-                  border: `1.5px solid ${activo ? "#0a3a5c" : "#b8d6ef"}`,
-                  background: activo ? "#0a3a5c" : "#fff",
-                  color: activo ? "#fff" : "#0a3a5c",
-                  cursor: "pointer",
-                }}
-              >
-                {m}
-              </button>
-            );
-          })}
-        </div>
-      )}
 
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <ActionBar
           selected={seleccionado}
-          onNew={() => setNuevoAbierto(true)}
+          onNew={() => setNuevoCodigoAbierto(true)}
           onEdit={seleccionado ? () => abrirPanel(seleccionado) : null}
-          onDelete={seleccionado ? () => setAEliminarArticulo(seleccionado) : null}
+          onDelete={seleccionado ? () => handleEliminarCodigo(seleccionado) : null}
           search={search}
           onSearch={setSearch}
         />
@@ -2119,9 +1581,9 @@ export default function ModulosDomus({ authFetch, token }) {
         >
           🔗 Relaciones
         </button>
-        {auditoriaFilas.length > 0 && (
+        {sinCodigo.length > 0 && (
           <button
-            onClick={abrirAuditoria}
+            onClick={abrirSinCodigo}
             style={{
               padding: "8px 14px",
               borderRadius: 6,
@@ -2135,34 +1597,34 @@ export default function ModulosDomus({ authFetch, token }) {
               whiteSpace: "nowrap",
             }}
           >
-            ⚠ Piezas sin vínculo válido ({auditoriaFilas.length})
+            ⚠ Piezas sin código ({sinCodigo.length})
           </button>
         )}
       </div>
 
       <p style={{ margin: "4px 0 12px", fontSize: 11, color: "#8aabb8", fontFamily: "'Space Mono',monospace" }}>
-        Hacé clic en una fila para ver y cargar las piezas de ese artículo.
+        Hacé clic en un código para ver y cargar sus piezas.
       </p>
 
-      {loading ? (
+      {loadingCodigos ? (
         <p style={{ padding: "24px", color: "#4a8ab5", fontFamily: "'Space Mono',monospace" }}>
-          ⏳ Cargando módulos Domus...
+          ⏳ Cargando códigos de producción...
         </p>
-      ) : errorCarga ? (
+      ) : errorCargaCodigos ? (
         <p style={{ padding: "24px", color: "#c0392b", fontFamily: "'Space Mono',monospace" }}>
-          ⚠ No se pudo cargar: {errorCarga}
+          ⚠ No se pudo cargar: {errorCargaCodigos}
         </p>
-      ) : filteredPorArticulo.length === 0 ? (
+      ) : filtrados.length === 0 ? (
         <p style={{ padding: "24px", color: "#8aabb8", fontFamily: "'Space Mono',monospace" }}>
-          No hay artículos cargados todavía. Usá "Nuevo" para agregar el primero.
+          No hay códigos de producción cargados todavía. Usá "Nuevo" para agregar el primero.
         </p>
       ) : (
         <DataTable
           columns={columns}
-          rows={filteredPorArticulo}
+          rows={filtrados}
           selectedId={seleccionado?.id ?? null}
           onSelect={(row) => row && abrirPanel(row)}
-          storageKey={`modulos-domus-${filtroModulo ?? "todos"}`}
+          storageKey="modulos-domus-codigos"
         />
       )}
 
@@ -2175,10 +1637,9 @@ export default function ModulosDomus({ authFetch, token }) {
               Vas a eliminar la pieza{" "}
               <strong>
                 {aEliminar.titulo || aEliminar.formulax || aEliminar.formulay || `#${aEliminar.id}`}
-              </strong>{" "}
-              de <strong>{aEliminar.articulo_descripcion ?? aEliminar.codartint}</strong>.
-              Esto la saca del próximo CSV de producción que se genere para ese
-              artículo. Esta acción no se puede deshacer.
+              </strong>
+              . Esto la saca del próximo CSV de producción que se genere para este
+              código. Esta acción no se puede deshacer.
             </>
           }
           onConfirm={handleDelete}
@@ -2186,34 +1647,9 @@ export default function ModulosDomus({ authFetch, token }) {
         />
       )}
 
-      {aEliminarArticulo && (
-        <ConfirmDelete
-          item={aEliminarArticulo}
-          title="¿Eliminar este artículo de Módulos Domus?"
-          message={
-            <>
-              Vas a eliminar{" "}
-              <strong>
-                {rows.filter((r) => r.codartint === aEliminarArticulo.codartint).length}
-              </strong>{" "}
-              pieza(s) de{" "}
-              <strong>
-                {aEliminarArticulo.articulo_descripcion ?? aEliminarArticulo.codartint}
-              </strong>{" "}
-              ({aEliminarArticulo.codartint}) — todas las piezas cargadas para este
-              artículo en Módulos Domus. No borra el artículo del catálogo de
-              Productos ni ningún código de producción, solo lo cargado acá. Esta
-              acción no se puede deshacer.
-            </>
-          }
-          onConfirm={handleEliminarArticulo}
-          onClose={() => !eliminandoArticulo && setAEliminarArticulo(null)}
-        />
-      )}
-
-      {nuevoAbierto && (
+      {nuevoCodigoAbierto && (
         <div
-          onClick={() => !guardandoNuevo && cerrarNuevo()}
+          onClick={() => !guardandoNuevoCodigo && cerrarNuevoCodigo()}
           style={{
             position: "fixed",
             inset: 0,
@@ -2237,115 +1673,23 @@ export default function ModulosDomus({ authFetch, token }) {
             }}
           >
             <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>
-              Nuevo artículo en Módulos Domus
+              Nuevo código de producción
             </h3>
             <p style={{ margin: "0 0 16px", fontSize: 12, color: "#4a8ab5" }}>
-              Esto da de alta la primera pieza del artículo. El resto de las
-              piezas se agregan después, abriendo su panel desde la tabla.
+              Esto da de alta el código en el catálogo y abre su panel para
+              empezar a cargar piezas. Para vincularlo a artículos, usá
+              "🔗 Relaciones" después de crearlo.
             </p>
 
             <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
-              Artículo (buscar por código o nombre)
-            </label>
-            <div style={{ position: "relative", marginBottom: 12 }}>
-              <input
-                type="text"
-                value={nuevoBusqueda}
-                onChange={(e) => {
-                  setNuevoBusqueda(e.target.value);
-                  setNuevoCodartint(e.target.value);
-                }}
-                onFocus={() => setNuevoFocus(true)}
-                onBlur={() => setTimeout(() => setNuevoFocus(false), 160)}
-                placeholder="Ej: KITMP000 o Kit Melamina..."
-                autoComplete="off"
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "6px 8px",
-                  fontSize: 13,
-                  fontFamily: "'Space Mono',monospace",
-                  border: "1.5px solid #b8d6ef",
-                  borderRadius: 4,
-                }}
-              />
-              {nuevoFocus && nuevoResultados.length > 0 && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "100%",
-                    left: 0,
-                    right: 0,
-                    background: "#fff",
-                    border: "1px solid #b8cfe0",
-                    borderTop: "none",
-                    zIndex: 1200,
-                    boxShadow: "0 6px 18px #0002",
-                    maxHeight: 220,
-                    overflowY: "auto",
-                    borderRadius: "0 0 3px 3px",
-                  }}
-                >
-                  {nuevoResultados.map((a) => (
-                    <div
-                      key={a.codartint}
-                      onMouseDown={() => {
-                        setNuevoCodartint(a.codartint);
-                        setNuevoBusqueda(`${a.articulo} — ${a.codartint}`);
-                        setNuevoResultados([]);
-                      }}
-                      style={{
-                        padding: "8px 14px",
-                        cursor: "pointer",
-                        fontSize: 12,
-                        fontFamily: "'Space Mono',monospace",
-                        borderBottom: "1px solid #eef2f6",
-                        color: "#0a3a5c",
-                      }}
-                      onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
-                      onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
-                    >
-                      <span style={{ fontWeight: 700 }}>{a.articulo}</span>
-                      <span style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}>
-                        {a.codartint}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {nuevoFocus &&
-                !buscandoArticulo &&
-                nuevoResultados.length === 0 &&
-                nuevoBusqueda.trim().length > 0 && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      background: "#fff",
-                      border: "1px solid #b8cfe0",
-                      borderTop: "none",
-                      zIndex: 1200,
-                      padding: "10px 14px",
-                      color: "#8aabcc",
-                      fontSize: 11,
-                      borderRadius: "0 0 3px 3px",
-                    }}
-                  >
-                    Sin resultados — se usará el código tipeado tal cual
-                  </div>
-                )}
-            </div>
-
-            <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
-              Módulo (opcional)
+              Código (ej: PRD-00123)
             </label>
             <input
               type="text"
-              value={nuevoModulo}
-              onChange={(e) => setNuevoModulo(e.target.value)}
-              placeholder="Ej: MP-01"
+              value={nuevoCodigoTexto}
+              onChange={(e) => setNuevoCodigoTexto(e.target.value)}
+              placeholder="Ej: 02BAJO2P"
+              maxLength={50}
               style={{
                 width: "100%",
                 boxSizing: "border-box",
@@ -2358,14 +1702,35 @@ export default function ModulosDomus({ authFetch, token }) {
               }}
             />
 
-            {errorNuevo && (
-              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>{errorNuevo}</p>
+            <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+              Descripción (opcional)
+            </label>
+            <input
+              type="text"
+              value={nuevoCodigoDescripcion}
+              onChange={(e) => setNuevoCodigoDescripcion(e.target.value)}
+              placeholder="Ej: Bajomesada 2 puertas"
+              maxLength={255}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "6px 8px",
+                fontSize: 13,
+                fontFamily: "'Space Mono',monospace",
+                border: "1.5px solid #b8d6ef",
+                borderRadius: 4,
+                marginBottom: 12,
+              }}
+            />
+
+            {errorNuevoCodigo && (
+              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>{errorNuevoCodigo}</p>
             )}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button
-                onClick={cerrarNuevo}
-                disabled={guardandoNuevo}
+                onClick={cerrarNuevoCodigo}
+                disabled={guardandoNuevoCodigo}
                 style={{
                   padding: "8px 14px",
                   borderRadius: 4,
@@ -2381,22 +1746,22 @@ export default function ModulosDomus({ authFetch, token }) {
                 Cancelar
               </button>
               <button
-                onClick={handleCrearNuevo}
-                disabled={guardandoNuevo || !nuevoCodartint.trim()}
+                onClick={handleCrearCodigoNuevo}
+                disabled={guardandoNuevoCodigo || !nuevoCodigoTexto.trim()}
                 style={{
                   padding: "8px 14px",
                   borderRadius: 4,
                   border: "none",
                   background: "#1a7a44",
                   color: "#fff",
-                  cursor: guardandoNuevo ? "wait" : "pointer",
+                  cursor: guardandoNuevoCodigo ? "wait" : "pointer",
                   fontFamily: "'Space Mono', monospace",
                   fontSize: 12,
                   fontWeight: 700,
-                  opacity: guardandoNuevo ? 0.6 : 1,
+                  opacity: guardandoNuevoCodigo ? 0.6 : 1,
                 }}
               >
-                {guardandoNuevo ? "Guardando…" : "Guardar"}
+                {guardandoNuevoCodigo ? "Guardando…" : "Guardar"}
               </button>
             </div>
           </div>
@@ -2467,18 +1832,14 @@ export default function ModulosDomus({ authFetch, token }) {
                 <p style={{ color: "#4a8ab5", fontSize: 12 }}>⏳ Cargando relaciones...</p>
               ) : relacionesError ? (
                 <p style={{ color: "#c0392b", fontSize: 12 }}>⚠ {relacionesError}</p>
-              ) : relacionesCodigos.length === 0 ? (
-                <p style={{ color: "#8aabb8", fontSize: 12 }}>
-                  Todavía no hay códigos de producción cargados.
-                </p>
               ) : (
                 relacionesCodigos.map((c) => (
                   <div
                     key={c.id}
                     style={{
                       border: "1.5px solid #dbe9f5",
-                      borderRadius: 6,
-                      padding: "10px 12px",
+                      borderRadius: 8,
+                      padding: "10px 14px",
                       marginBottom: 10,
                     }}
                   >
@@ -2486,18 +1847,31 @@ export default function ModulosDomus({ authFetch, token }) {
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        gap: 8,
+                        alignItems: "center",
                         marginBottom: 6,
                       }}
                     >
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>
-                        {c.codigo}
-                        {c.descripcion && (
-                          <span style={{ fontWeight: 400, color: "#4a8ab5", marginLeft: 8 }}>
-                            — {c.descripcion}
-                          </span>
-                        )}
+                      <div>
+                        <button
+                          onClick={() => {
+                            cerrarRelaciones();
+                            abrirPanel(c);
+                          }}
+                          style={{
+                            border: "none",
+                            background: "none",
+                            color: "#0a3a5c",
+                            cursor: "pointer",
+                            fontSize: 13,
+                            fontWeight: 700,
+                            fontFamily: "'Space Mono', monospace",
+                            padding: 0,
+                            textDecoration: "underline",
+                          }}
+                          title="Abrir piezas de este código"
+                        >
+                          {c.codigo}
+                        </button>
                         <span style={{ fontWeight: 400, color: "#8aabb8", marginLeft: 8, fontSize: 11 }}>
                           ({c.articulos.length} artículo{c.articulos.length === 1 ? "" : "s"})
                         </span>
@@ -2576,187 +1950,143 @@ export default function ModulosDomus({ authFetch, token }) {
                             ⚠ Igual tiene {c.piezas} pieza{c.piezas === 1 ? "" : "s"} cargada
                             {c.piezas === 1 ? "" : "s"} en Módulos Domus con este código — por eso
                             "Eliminar código" lo va a rechazar. Para poder borrarlo, primero hay que
-                            reasignar o borrar esas piezas desde el panel del artículo.
+                            reasignar o borrar esas piezas desde el panel del código.
                           </p>
                         )}
                       </>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        {c.articulos.map((a) => (
-                          <div
-                            key={a.vinculoId}
+                      c.articulos.map((a) => (
+                        <div
+                          key={a.vinculoId}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "4px 0",
+                            fontSize: 12,
+                          }}
+                        >
+                          <span>
+                            <strong>{a.codartint}</strong>
+                            {a.articulo_descripcion ? ` — ${a.articulo_descripcion}` : ""}
+                          </span>
+                          <button
+                            onClick={() => handleQuitarVinculo(a, c.id)}
+                            disabled={quitandoVinculoId === a.vinculoId}
                             style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              fontSize: 12,
-                              padding: "4px 8px",
-                              background: "#f4f9fd",
-                              borderRadius: 4,
+                              border: "none",
+                              background: "none",
+                              color: "#c0392b",
+                              cursor: quitandoVinculoId === a.vinculoId ? "default" : "pointer",
+                              fontSize: 11,
+                              fontFamily: "'Space Mono', monospace",
                             }}
                           >
-                            <span>
-                              <strong>{a.codartint}</strong>
-                              {a.articulo_descripcion ? ` — ${a.articulo_descripcion}` : ""}
-                            </span>
-                            <button
-                              onClick={() => handleQuitarVinculo(a, c.id)}
-                              disabled={quitandoVinculoId === a.vinculoId}
-                              title="Quitar vínculo (no borra el código ni las piezas)"
-                              style={{
-                                border: "none",
-                                background: "none",
-                                color: "#c0392b",
-                                cursor: quitandoVinculoId === a.vinculoId ? "default" : "pointer",
-                                fontSize: 12,
-                                opacity: quitandoVinculoId === a.vinculoId ? 0.4 : 1,
-                              }}
-                            >
-                              {quitandoVinculoId === a.vinculoId ? "⏳" : "Quitar ✕"}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                            {quitandoVinculoId === a.vinculoId ? "⏳" : "Quitar ✕"}
+                          </button>
+                        </div>
+                      ))
                     )}
 
-                    <div style={{ marginTop: 8 }}>
-                      {agregarArticuloCodigoId === c.id ? (
-                        <div style={{ position: "relative" }}>
-                          <input
-                            type="text"
-                            autoFocus
-                            value={agregarBusqueda}
-                            onChange={(e) => setAgregarBusqueda(e.target.value)}
-                            onFocus={() => setAgregarFocus(true)}
-                            onBlur={() => setTimeout(() => setAgregarFocus(false), 160)}
-                            placeholder="Buscar artículo por código o nombre..."
-                            autoComplete="off"
-                            disabled={agregandoVinculo}
-                            style={{
-                              width: "100%",
-                              boxSizing: "border-box",
-                              padding: "5px 8px",
-                              fontSize: 12,
-                              fontFamily: "'Space Mono',monospace",
-                              border: "1.5px solid #b8d6ef",
-                              borderRadius: 4,
-                            }}
-                          />
-                          {agregarFocus && agregarResultados.length > 0 && (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: "100%",
-                                left: 0,
-                                right: 0,
-                                background: "#fff",
-                                border: "1px solid #b8cfe0",
-                                borderTop: "none",
-                                zIndex: 1200,
-                                boxShadow: "0 6px 18px #0002",
-                                maxHeight: 180,
-                                overflowY: "auto",
-                                borderRadius: "0 0 3px 3px",
-                              }}
-                            >
-                              {agregarResultados.map((a) => (
-                                <div
-                                  key={a.codartint}
-                                  onMouseDown={() => handleAgregarVinculo(c, a)}
-                                  style={{
-                                    padding: "7px 12px",
-                                    cursor: "pointer",
-                                    fontSize: 12,
-                                    fontFamily: "'Space Mono',monospace",
-                                    borderBottom: "1px solid #eef2f6",
-                                    color: "#0a3a5c",
-                                  }}
-                                  onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
-                                  onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
-                                >
-                                  <span style={{ fontWeight: 700 }}>{a.articulo}</span>
-                                  <span style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}>
-                                    {a.codartint}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {agregarFocus &&
-                            !buscandoArticuloAgregar &&
-                            agregarResultados.length === 0 &&
-                            agregarBusqueda.trim().length > 0 && (
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  top: "100%",
-                                  left: 0,
-                                  right: 0,
-                                  background: "#fff",
-                                  border: "1px solid #b8cfe0",
-                                  borderTop: "none",
-                                  zIndex: 1200,
-                                  padding: "8px 12px",
-                                  color: "#8aabcc",
-                                  fontSize: 11,
-                                  borderRadius: "0 0 3px 3px",
-                                }}
-                              >
-                                Sin resultados
-                              </div>
-                            )}
+                    {agregarArticuloCodigoId === c.id ? (
+                      <div style={{ position: "relative", marginTop: 8 }}>
+                        <input
+                          type="text"
+                          value={agregarBusqueda}
+                          onChange={(e) => setAgregarBusqueda(e.target.value)}
+                          onFocus={() => setAgregarFocus(true)}
+                          onBlur={() => setTimeout(() => setAgregarFocus(false), 160)}
+                          placeholder="Buscar artículo por código o nombre..."
+                          autoComplete="off"
+                          style={{
+                            width: "100%",
+                            boxSizing: "border-box",
+                            padding: "6px 8px",
+                            fontSize: 12,
+                            fontFamily: "'Space Mono',monospace",
+                            border: "1.5px solid #b8d6ef",
+                            borderRadius: 4,
+                          }}
+                        />
+                        {agregarFocus && agregarResultados.length > 0 && (
                           <div
                             style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              marginTop: 4,
-                              minHeight: 14,
+                              position: "absolute",
+                              top: "100%",
+                              left: 0,
+                              right: 0,
+                              background: "#fff",
+                              border: "1px solid #b8cfe0",
+                              borderTop: "none",
+                              zIndex: 1200,
+                              boxShadow: "0 6px 18px #0002",
+                              maxHeight: 200,
+                              overflowY: "auto",
+                              borderRadius: "0 0 3px 3px",
                             }}
                           >
-                            {errorAgregarVinculo ? (
-                              <span style={{ fontSize: 11, color: "#c0392b" }}>
-                                ⚠ {errorAgregarVinculo}
-                              </span>
-                            ) : agregandoVinculo ? (
-                              <span style={{ fontSize: 11, color: "#4a8ab5" }}>⏳ Vinculando...</span>
-                            ) : (
-                              <span />
-                            )}
-                            <button
-                              onClick={cerrarAgregarArticulo}
-                              style={{
-                                border: "none",
-                                background: "none",
-                                color: "#4a8ab5",
-                                cursor: "pointer",
-                                fontSize: 11,
-                                fontFamily: "'Space Mono', monospace",
-                              }}
-                            >
-                              Cancelar
-                            </button>
+                            {agregarResultados.map((a) => (
+                              <div
+                                key={a.codartint}
+                                onMouseDown={() => handleAgregarVinculo(c, a)}
+                                style={{
+                                  padding: "8px 14px",
+                                  cursor: "pointer",
+                                  fontSize: 12,
+                                  fontFamily: "'Space Mono',monospace",
+                                  borderBottom: "1px solid #eef2f6",
+                                  color: "#0a3a5c",
+                                }}
+                                onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
+                                onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+                              >
+                                <span style={{ fontWeight: 700 }}>{a.articulo}</span>
+                                <span style={{ color: "#8aabcc", marginLeft: 8, fontSize: 10 }}>
+                                  {a.codartint}
+                                </span>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                      ) : (
+                        )}
+                        {errorAgregarVinculo && (
+                          <p style={{ color: "#c0392b", fontSize: 11, margin: "4px 0 0" }}>
+                            {errorAgregarVinculo}
+                          </p>
+                        )}
                         <button
-                          onClick={() => abrirAgregarArticulo(c.id)}
+                          onClick={cerrarAgregarArticulo}
                           style={{
-                            border: "1.5px dashed #b8d6ef",
-                            background: "#fff",
-                            color: "#1c6ea4",
+                            border: "none",
+                            background: "none",
+                            color: "#4a8ab5",
                             cursor: "pointer",
                             fontSize: 11,
                             fontFamily: "'Space Mono', monospace",
-                            fontWeight: 700,
-                            borderRadius: 4,
-                            padding: "4px 10px",
+                            marginTop: 4,
                           }}
                         >
-                          + Agregar artículo
+                          Cancelar
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => abrirAgregarArticulo(c.id)}
+                        style={{
+                          marginTop: 8,
+                          border: "1.5px dashed #b8d6ef",
+                          background: "#fff",
+                          color: "#0a3a5c",
+                          cursor: "pointer",
+                          fontSize: 11,
+                          fontFamily: "'Space Mono', monospace",
+                          fontWeight: 700,
+                          borderRadius: 4,
+                          padding: "4px 10px",
+                        }}
+                      >
+                        + Agregar artículo
+                      </button>
+                    )}
                   </div>
                 ))
               )}
@@ -2765,9 +2095,9 @@ export default function ModulosDomus({ authFetch, token }) {
         </div>
       )}
 
-      {auditoriaAbierto && (
+      {sinCodigoAbierto && (
         <div
-          onClick={cerrarAuditoria}
+          onClick={cerrarSinCodigo}
           style={{
             position: "fixed",
             inset: 0,
@@ -2802,9 +2132,9 @@ export default function ModulosDomus({ authFetch, token }) {
                 marginBottom: 4,
               }}
             >
-              <h3 style={{ margin: 0, fontSize: 15 }}>Piezas sin vínculo válido</h3>
+              <h3 style={{ margin: 0, fontSize: 15 }}>Piezas sin código de producción</h3>
               <button
-                onClick={cerrarAuditoria}
+                onClick={cerrarSinCodigo}
                 style={{
                   border: "none",
                   background: "none",
@@ -2818,25 +2148,22 @@ export default function ModulosDomus({ authFetch, token }) {
               </button>
             </div>
             <p style={{ margin: "0 0 14px", fontSize: 12, color: "#4a8ab5" }}>
-              Piezas con un código de producción asignado que su propio artículo
-              nunca tuvo habilitado en <code>articulo_produccion</code> — no
-              aparecen como "relación rota" en ningún otro lado. "Vincular ahora"
-              crea ese vínculo faltante sin tocar la pieza; "Abrir artículo" lleva
-              al panel para reasignarla a otro código en cambio.
+              Piezas viejas que todavía no cuelgan de ningún código de
+              producción — no aparecen bajo ninguna fila de la grilla
+              principal hasta que se les asigne uno.
             </p>
 
             <div style={{ overflowY: "auto", flex: 1 }}>
-              {auditoriaLoading ? (
+              {sinCodigoLoading ? (
                 <p style={{ color: "#4a8ab5", fontSize: 12 }}>⏳ Cargando...</p>
-              ) : auditoriaError ? (
-                <p style={{ color: "#c0392b", fontSize: 12 }}>⚠ {auditoriaError}</p>
-              ) : auditoriaFilas.length === 0 ? (
+              ) : sinCodigoError ? (
+                <p style={{ color: "#c0392b", fontSize: 12 }}>⚠ {sinCodigoError}</p>
+              ) : sinCodigo.length === 0 ? (
                 <p style={{ color: "#8aabb8", fontSize: 12 }}>
-                  Sin inconsistencias — todas las piezas con código de producción
-                  asignado tienen su vínculo respaldado.
+                  Sin pendientes — todas las piezas tienen un código de producción asignado.
                 </p>
               ) : (
-                auditoriaFilas.map((f) => (
+                sinCodigo.map((f) => (
                   <div
                     key={f.id}
                     style={{
@@ -2852,54 +2179,36 @@ export default function ModulosDomus({ authFetch, token }) {
                     }}
                   >
                     <div>
-                      <strong>{f.codartint}</strong>
-                      {f.articulo_descripcion ? ` — ${f.articulo_descripcion}` : ""}
+                      <strong>{f.titulo || `Pieza #${f.id}`}</strong>
                       <div style={{ color: "#8aabb8", fontSize: 11, marginTop: 2 }}>
-                        Pieza "{f.titulo || `#${f.id}`}" → código{" "}
-                        <strong>{f.codigo_asignado ?? `id ${f.codigo_produccion_id}`}</strong>
+                        {f.codartint ? `${f.codartint} — ` : ""}
+                        {f.articulo_descripcion || "artículo histórico sin datos"}
+                        {f.modulo ? ` · módulo ${f.modulo}` : ""}
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                      <button
-                        onClick={() => {
-                          cerrarAuditoria();
-                          abrirPanel({ codartint: f.codartint, articulo_descripcion: f.articulo_descripcion });
-                        }}
-                        style={{
-                          border: "1.5px solid #b8d6ef",
-                          background: "#fff",
-                          color: "#0a3a5c",
-                          cursor: "pointer",
-                          fontSize: 11,
-                          fontFamily: "'Space Mono', monospace",
-                          fontWeight: 700,
-                          borderRadius: 4,
-                          padding: "4px 8px",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        Abrir artículo
-                      </button>
-                      <button
-                        onClick={() => handleVincularDesdeAuditoria(f)}
-                        disabled={vinculandoAuditoriaId === f.id}
-                        style={{
-                          border: "none",
-                          background: "#1a7a44",
-                          color: "#fff",
-                          cursor: vinculandoAuditoriaId === f.id ? "default" : "pointer",
-                          fontSize: 11,
-                          fontFamily: "'Space Mono', monospace",
-                          fontWeight: 700,
-                          borderRadius: 4,
-                          padding: "4px 8px",
-                          whiteSpace: "nowrap",
-                          opacity: vinculandoAuditoriaId === f.id ? 0.6 : 1,
-                        }}
-                      >
-                        {vinculandoAuditoriaId === f.id ? "⏳" : "Vincular ahora"}
-                      </button>
-                    </div>
+                    <select
+                      onChange={(e) => handleAsignarSinCodigo(f, e.target.value)}
+                      disabled={asignandoSinCodigoId === f.id}
+                      defaultValue=""
+                      style={{
+                        border: "1.5px solid #b8d6ef",
+                        borderRadius: 4,
+                        padding: "4px 8px",
+                        fontSize: 11,
+                        fontFamily: "'Space Mono', monospace",
+                        color: "#0a3a5c",
+                      }}
+                    >
+                      <option value="" disabled>
+                        {asignandoSinCodigoId === f.id ? "Asignando…" : "Asignar código…"}
+                      </option>
+                      {codigosProduccion.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.codigo}
+                          {c.descripcion ? ` — ${c.descripcion}` : ""}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 ))
               )}
@@ -2908,7 +2217,7 @@ export default function ModulosDomus({ authFetch, token }) {
         </div>
       )}
 
-      {panelCodartint && (
+      {panelCodigo && (
         <div
           onClick={cerrarPanel}
           style={{
@@ -2945,9 +2254,22 @@ export default function ModulosDomus({ authFetch, token }) {
               }}
             >
               <div>
-                <h3 style={{ margin: 0, fontSize: 16 }}>{panelArticulo || panelCodartint}</h3>
-                <p style={{ margin: "2px 0 0", fontSize: 11, color: "#8aabcc" }}>
-                  {panelCodartint}
+                <h3 style={{ margin: 0, fontSize: 16 }}>
+                  {panelCodigo.codigo}
+                  {panelCodigo.descripcion ? (
+                    <span style={{ fontWeight: 400, color: "#5a86ab", marginLeft: 8, fontSize: 13 }}>
+                      — {panelCodigo.descripcion}
+                    </span>
+                  ) : null}
+                </h3>
+                <p style={{ margin: "4px 0 0", fontSize: 11, color: "#8aabcc" }}>
+                  {panelVinculosLoading
+                    ? "Cargando artículos vinculados..."
+                    : panelVinculos.length === 0
+                    ? "Sin artículos vinculados todavía — gestionalo desde 🔗 Relaciones."
+                    : `Artículos: ${panelVinculos
+                        .map((v) => v.codartint)
+                        .join(", ")}`}
                 </p>
               </div>
               <button
@@ -2965,9 +2287,9 @@ export default function ModulosDomus({ authFetch, token }) {
               </button>
             </div>
 
-            {subcodigosDelArticulo.length > 0 && (
-              <datalist id={`subcodigos-pieza-${panelCodartint}`}>
-                {subcodigosDelArticulo.map((s) => (
+            {subcodigosDelCodigo.length > 0 && (
+              <datalist id={`subcodigos-pieza-${panelCodigo.id}`}>
+                {subcodigosDelCodigo.map((s) => (
                   <option key={s} value={s} />
                 ))}
               </datalist>
@@ -3113,7 +2435,7 @@ export default function ModulosDomus({ authFetch, token }) {
                   ) : (
                     <>
                       Piezas <em>sin variante</em> (compartidas por todos los
-                      subcódigos de este artículo) — cada una con fórmula asignada
+                      subcódigos de este código) — cada una con fórmula asignada
                       genera un renglón en el CSV, además de las propias de cada
                       variante puntual.
                     </>
@@ -3226,7 +2548,7 @@ export default function ModulosDomus({ authFetch, token }) {
                       rows={piezasDeVarianteActual}
                       selectedId={null}
                       onSelect={() => {}}
-                      storageKey={`modulos-domus-piezas-${panelCodartint}-${panelSubcodigo || "sin-variante"}`}
+                      storageKey={`modulos-domus-piezas-${panelCodigo.id}-${panelSubcodigo || "sin-variante"}`}
                     />
                   </div>
                 )}
@@ -3289,7 +2611,7 @@ export default function ModulosDomus({ authFetch, token }) {
                       value={piezaSubcodigo}
                       onChange={(e) => setPiezaSubcodigo(e.target.value)}
                       placeholder="Ej: 02BAJO10MDF"
-                      list={`subcodigos-pieza-${panelCodartint}`}
+                      list={`subcodigos-pieza-${panelCodigo.id}`}
                       maxLength={50}
                       style={{
                         width: "100%",
@@ -3302,46 +2624,6 @@ export default function ModulosDomus({ authFetch, token }) {
                         marginBottom: 12,
                       }}
                     />
-
-                    <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
-                      Código de producción (define si esta pieza entra al CSV de ese código)
-                    </label>
-                    {(() => {
-                      const opciones = codigosPorArticulo.get(normalizarCodigo(panelCodartint)) ?? [];
-                      return (
-                        <select
-                          value={piezaCodigoProduccion}
-                          onChange={(e) => {
-                            if (e.target.value === "__nuevo__") {
-                              handleCrearYVincularCodigo(panelCodartint, (nuevoId) =>
-                                setPiezaCodigoProduccion(String(nuevoId)),
-                              );
-                              return;
-                            }
-                            setPiezaCodigoProduccion(e.target.value);
-                          }}
-                          style={{
-                            width: "100%",
-                            boxSizing: "border-box",
-                            padding: "6px 8px",
-                            fontSize: 13,
-                            fontFamily: "'Space Mono',monospace",
-                            border: "1.5px solid #b8d6ef",
-                            borderRadius: 4,
-                            marginBottom: 12,
-                          }}
-                        >
-                          <option value="">Sin código</option>
-                          {opciones.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.codigo}
-                              {o.descripcion ? ` — ${o.descripcion}` : ""}
-                            </option>
-                          ))}
-                          <option value="__nuevo__">+ Nuevo código…</option>
-                        </select>
-                      );
-                    })()}
 
                     <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
                       Título de la pieza (editable)
