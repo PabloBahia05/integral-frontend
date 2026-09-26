@@ -452,6 +452,13 @@ export default function ModulosDomus({ authFetch, token }) {
 
   // Panel de un artículo puntual: sus piezas + alta de piezas nuevas.
   const [panelCodartint, setPanelCodartint] = useState(null);
+  // Fila resaltada de la grilla principal, para que "Editar"/"Eliminar" del
+  // toolbar (al lado de "+ Nuevo") tengan algo sobre qué actuar — mismo
+  // patrón que ya usa Producción.jsx (selected + handleSelect). El click en
+  // la fila sigue abriendo el panel de piezas como siempre (no hace falta
+  // un segundo click para eso): simplemente ahora TAMBIÉN queda marcada
+  // como seleccionada al mismo tiempo.
+  const [seleccionado, setSeleccionado] = useState(null);
   const [panelArticulo, setPanelArticulo] = useState("");
   // Subcódigo elegido dentro del panel: `null` = todavía no se eligió
   // ninguno, se muestra el selector de variantes; string ("" incluido,
@@ -1034,6 +1041,10 @@ export default function ModulosDomus({ authFetch, token }) {
       setRows((prev) => prev.filter((r) => r.codartint !== codartint));
       setPiezas((prev) => prev.filter((p) => p.codartint !== codartint));
       setAEliminarArticulo(null);
+      // Si el artículo borrado era el seleccionado del toolbar (o el que
+      // tenía el panel abierto), se limpian los dos — ya no existe.
+      setSeleccionado((prev) => (prev?.codartint === codartint ? null : prev));
+      if (panelCodartint === codartint) cerrarPanel();
     } catch (e) {
       console.error("Error borrando artículo completo de modulos-domus:", e);
       alert(
@@ -1074,6 +1085,7 @@ export default function ModulosDomus({ authFetch, token }) {
   };
 
   const abrirPanel = (row) => {
+    setSeleccionado(row);
     setPanelCodartint(row.codartint);
     setPanelArticulo(row.articulo_descripcion ?? "");
     setPanelSubcodigo(null);
@@ -1986,10 +1998,10 @@ export default function ModulosDomus({ authFetch, token }) {
 
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <ActionBar
-          selected={null}
+          selected={seleccionado}
           onNew={() => setNuevoAbierto(true)}
-          onEdit={null}
-          onDelete={null}
+          onEdit={seleccionado ? () => abrirPanel(seleccionado) : null}
+          onDelete={seleccionado ? () => setAEliminarArticulo(seleccionado) : null}
           search={search}
           onSearch={setSearch}
         />
@@ -2032,7 +2044,7 @@ export default function ModulosDomus({ authFetch, token }) {
         <DataTable
           columns={columns}
           rows={filteredPorArticulo}
-          selectedId={null}
+          selectedId={seleccionado?.id ?? null}
           onSelect={(row) => row && abrirPanel(row)}
           storageKey={`modulos-domus-${filtroModulo ?? "todos"}`}
         />
