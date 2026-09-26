@@ -1009,6 +1009,41 @@ export default function ModulosDomus({ authFetch, token }) {
     }
   };
 
+  // ── DELETE de un artículo entero (todas sus piezas) ──────────────────
+  // No hay endpoint de borrado masivo en el backend, así que se borra pieza
+  // por pieza con el mismo DELETE /modulos-domus/:id de handleDelete, en
+  // paralelo. Si alguna falla a mitad de camino, el artículo puede quedar
+  // con menos piezas que antes pero no del todo borrado — se avisa y se
+  // deja la grilla como haya quedado en el backend (no se revierte nada).
+  const [aEliminarArticulo, setAEliminarArticulo] = useState(null);
+  const [eliminandoArticulo, setEliminandoArticulo] = useState(false);
+
+  const handleEliminarArticulo = async () => {
+    if (!aEliminarArticulo) return;
+    const { codartint } = aEliminarArticulo;
+    setEliminandoArticulo(true);
+    try {
+      const piezasDelArticulo = rows.filter((r) => r.codartint === codartint);
+      const respuestas = await Promise.all(
+        piezasDelArticulo.map((p) =>
+          authFetch(`${API}/modulos-domus/${p.id}`, { method: "DELETE" }),
+        ),
+      );
+      const fallo = respuestas.find((res) => !res.ok);
+      if (fallo) throw new Error(`HTTP ${fallo.status}`);
+      setRows((prev) => prev.filter((r) => r.codartint !== codartint));
+      setPiezas((prev) => prev.filter((p) => p.codartint !== codartint));
+      setAEliminarArticulo(null);
+    } catch (e) {
+      console.error("Error borrando artículo completo de modulos-domus:", e);
+      alert(
+        "No se pudo borrar el artículo completo — puede haber quedado con piezas borradas a medias. Revisá la grilla y la consola.",
+      );
+    } finally {
+      setEliminandoArticulo(false);
+    }
+  };
+
   // ── Panel de un artículo (sus piezas) ────────────────────────────────
 
   const fetchPiezas = (codartint) => {
@@ -1600,6 +1635,40 @@ export default function ModulosDomus({ authFetch, token }) {
         </select>
       ),
     },
+    {
+      // Borra el artículo ENTERO de Módulos Domus: todas sus piezas (todas
+      // las filas de `modulos-domus` con este codartint), no solo la que se
+      // ve acá (la grilla mezclada solo muestra la primera). No toca el
+      // artículo en la tabla `articulos` (Productos) ni ningún código de
+      // producción — solo borra lo cargado en esta pantalla para ese
+      // artículo. Separado del 🗑 de "Eliminar pieza" del panel, que borra
+      // una pieza puntual.
+      key: "_accionesArticulo",
+      label: "",
+      render: (v, row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setAEliminarArticulo(row);
+          }}
+          title="Eliminar este artículo (todas sus piezas) de Módulos Domus"
+          style={{
+            border: "1.5px solid #e57373",
+            background: "#fff",
+            color: "#c0392b",
+            cursor: "pointer",
+            fontSize: 11,
+            fontFamily: "'Space Mono', monospace",
+            fontWeight: 700,
+            borderRadius: 4,
+            padding: "4px 8px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          🗑 Eliminar artículo
+        </button>
+      ),
+    },
   ];
 
   // Columnas del mini-table de piezas dentro del panel: mismos campos que
@@ -1986,6 +2055,31 @@ export default function ModulosDomus({ authFetch, token }) {
           }
           onConfirm={handleDelete}
           onClose={() => !eliminando && setAEliminar(null)}
+        />
+      )}
+
+      {aEliminarArticulo && (
+        <ConfirmDelete
+          item={aEliminarArticulo}
+          title="¿Eliminar este artículo de Módulos Domus?"
+          message={
+            <>
+              Vas a eliminar{" "}
+              <strong>
+                {rows.filter((r) => r.codartint === aEliminarArticulo.codartint).length}
+              </strong>{" "}
+              pieza(s) de{" "}
+              <strong>
+                {aEliminarArticulo.articulo_descripcion ?? aEliminarArticulo.codartint}
+              </strong>{" "}
+              ({aEliminarArticulo.codartint}) — todas las piezas cargadas para este
+              artículo en Módulos Domus. No borra el artículo del catálogo de
+              Productos ni ningún código de producción, solo lo cargado acá. Esta
+              acción no se puede deshacer.
+            </>
+          }
+          onConfirm={handleEliminarArticulo}
+          onClose={() => !eliminandoArticulo && setAEliminarArticulo(null)}
         />
       )}
 
