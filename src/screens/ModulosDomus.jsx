@@ -804,30 +804,35 @@ export default function ModulosDomus({ authFetch, token }) {
     }
   };
 
-  // Borra el código de producción en sí (no un vínculo puntual). El backend
-  // devuelve 409 { error: "en_uso", detail } si todavía está vinculado a
-  // algún artículo y/o tiene piezas con ese codigo_produccion_id — ese
-  // detalle se muestra debajo del código para que el usuario sepa qué le
-  // falta soltar antes de poder borrarlo (típicamente: sacar el vínculo con
-  // "Quitar ✕" y/o reasignar/vaciar el código en las piezas del panel).
-  const handleEliminarCodigo = async (codigo) => {
-    if (
-      !window.confirm(
-        `¿Eliminar el código de producción "${codigo.codigo}" del catálogo? Esta acción no se puede deshacer.`,
-      )
-    ) {
-      return;
-    }
+  // Borra el código de producción en sí (no un vínculo puntual). Por
+  // defecto el backend devuelve 409 { error: "en_uso", detail, enUso,
+  // conPiezas } si todavía está vinculado a algún artículo y/o tiene
+  // piezas con ese codigo_produccion_id — ese detalle se muestra debajo
+  // del código, junto con el botón "Forzar borrado" (forzar=true) que
+  // pasa por encima: borra los vínculos en articulo_produccion y
+  // desasigna (no borra) las piezas correspondientes en modulos-domus.
+  const handleEliminarCodigo = async (codigo, forzar = false) => {
+    const confirmMsg = forzar
+      ? `¿Forzar el borrado de "${codigo.codigo}"? Se van a quitar todos sus vínculos con artículos y las piezas que tenía asignado este código van a quedar SIN código de producción (podés reasignarlas después desde "⚠ Piezas sin vínculo válido" o el panel del artículo). Esta acción no se puede deshacer.`
+      : `¿Eliminar el código de producción "${codigo.codigo}" del catálogo? Esta acción no se puede deshacer.`;
+    if (!window.confirm(confirmMsg)) return;
+
     setEliminandoCodigoId(codigo.id);
     setErrorEliminarCodigoId(null);
     try {
-      const res = await authFetch(`${API}/codigos-produccion/${codigo.id}`, {
-        method: "DELETE",
-      });
+      const res = await authFetch(
+        `${API}/codigos-produccion/${codigo.id}${forzar ? "?forzar=true" : ""}`,
+        { method: "DELETE" },
+      );
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         if (res.status === 409 && data?.detail) {
-          setErrorEliminarCodigoId({ id: codigo.id, mensaje: data.detail });
+          setErrorEliminarCodigoId({
+            id: codigo.id,
+            mensaje: data.detail,
+            enUso: data.enUso,
+            conPiezas: data.conPiezas,
+          });
           return;
         }
         throw new Error(data?.error || `HTTP ${res.status}`);
@@ -840,6 +845,9 @@ export default function ModulosDomus({ authFetch, token }) {
         }
         return next;
       });
+      if (forzar) {
+        setAuditoriaFilas((prev) => prev.filter((f) => f.codigo_produccion_id !== codigo.id));
+      }
     } catch (e) {
       console.error("Error eliminando código de producción:", e);
       alert(e.message || "No se pudo eliminar el código de producción.");
@@ -2528,7 +2536,7 @@ export default function ModulosDomus({ authFetch, token }) {
                       </button>
                     </div>
                     {errorEliminarCodigoId?.id === c.id && (
-                      <p
+                      <div
                         style={{
                           margin: "0 0 8px",
                           fontSize: 11,
@@ -2538,8 +2546,25 @@ export default function ModulosDomus({ authFetch, token }) {
                           borderRadius: 4,
                         }}
                       >
-                        ⚠ {errorEliminarCodigoId.mensaje}
-                      </p>
+                        <p style={{ margin: "0 0 6px" }}>⚠ {errorEliminarCodigoId.mensaje}</p>
+                        <button
+                          onClick={() => handleEliminarCodigo(c, true)}
+                          disabled={eliminandoCodigoId === c.id}
+                          style={{
+                            border: "1.5px solid #c0392b",
+                            background: "#fff",
+                            color: "#c0392b",
+                            cursor: eliminandoCodigoId === c.id ? "default" : "pointer",
+                            fontSize: 11,
+                            fontFamily: "'Space Mono', monospace",
+                            fontWeight: 700,
+                            borderRadius: 4,
+                            padding: "3px 8px",
+                          }}
+                        >
+                          {eliminandoCodigoId === c.id ? "⏳" : "Forzar borrado"}
+                        </button>
+                      </div>
                     )}
                     {c.articulos.length === 0 ? (
                       <>
