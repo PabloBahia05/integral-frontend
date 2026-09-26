@@ -645,6 +645,7 @@ export default function ModulosDomus({ authFetch, token }) {
             id: c.id,
             codigo: c.codigo,
             descripcion: c.descripcion,
+            piezas: Number(c.cant_piezas ?? 0),
             articulos: listaVinculos
               .filter((v) => v.codigo_produccion_id === c.id)
               .map((v) => ({
@@ -680,9 +681,15 @@ export default function ModulosDomus({ authFetch, token }) {
   // artículo deja de ofrecer ese código en los selectores). Actualiza el
   // modal y codigosPorArticulo en optimista, sin esperar a un refetch.
   const handleQuitarVinculo = async (vinculo, codigoId) => {
+    const codigo = relacionesCodigos.find((c) => c.id === codigoId);
+    const esUltimoVinculo = (codigo?.articulos.length ?? 0) <= 1;
+    const advertenciaPiezas =
+      esUltimoVinculo && codigo?.piezas > 0
+        ? `\n\n⚠ Este código tiene ${codigo.piezas} pieza${codigo.piezas === 1 ? "" : "s"} cargada${codigo.piezas === 1 ? "" : "s"} en Módulos Domus — van a quedar sin ningún artículo vinculado al código.`
+        : "";
     if (
       !window.confirm(
-        `¿Quitar ${vinculo.codartint} del código de producción seleccionado? No borra piezas ni el código en sí.`,
+        `¿Quitar ${vinculo.codartint} del código de producción seleccionado? No borra piezas ni el código en sí.${advertenciaPiezas}`,
       )
     ) {
       return;
@@ -2385,6 +2392,18 @@ export default function ModulosDomus({ authFetch, token }) {
                         <span style={{ fontWeight: 400, color: "#8aabb8", marginLeft: 8, fontSize: 11 }}>
                           ({c.articulos.length} artículo{c.articulos.length === 1 ? "" : "s"})
                         </span>
+                        {c.piezas > 0 && (
+                          <span
+                            style={{
+                              fontWeight: 400,
+                              marginLeft: 8,
+                              fontSize: 11,
+                              color: c.articulos.length === 0 ? "#c0392b" : "#8aabb8",
+                            }}
+                          >
+                            · {c.piezas} pieza{c.piezas === 1 ? "" : "s"} en Módulos Domus
+                          </span>
+                        )}
                       </div>
                       <button
                         onClick={() => handleEliminarCodigo(c)}
@@ -2422,9 +2441,19 @@ export default function ModulosDomus({ authFetch, token }) {
                       </p>
                     )}
                     {c.articulos.length === 0 ? (
-                      <p style={{ margin: 0, fontSize: 11, color: "#b8cfe0" }}>
-                        Sin artículos vinculados todavía.
-                      </p>
+                      <>
+                        <p style={{ margin: 0, fontSize: 11, color: "#b8cfe0" }}>
+                          Sin artículos vinculados todavía.
+                        </p>
+                        {c.piezas > 0 && (
+                          <p style={{ margin: "4px 0 0", fontSize: 11, color: "#c0392b" }}>
+                            ⚠ Igual tiene {c.piezas} pieza{c.piezas === 1 ? "" : "s"} cargada
+                            {c.piezas === 1 ? "" : "s"} en Módulos Domus con este código — por eso
+                            "Eliminar código" lo va a rechazar. Para poder borrarlo, primero hay que
+                            reasignar o borrar esas piezas desde el panel del artículo.
+                          </p>
+                        )}
+                      </>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                         {c.articulos.map((a) => (
