@@ -906,6 +906,43 @@ export default function ModulosDomus({ authFetch, token }) {
     fetchModulosDomus();
   };
 
+  // Edición inline del nombre del artículo (columna "Artículo"): a
+  // diferencia del resto de las columnas de esta grilla, `articulo_descripcion`
+  // NO vive en `modulos-domus` — viene del JOIN contra la tabla `articulos`
+  // por codartint. Por eso no puede pasar por handleCampoBlur (que hace
+  // PUT /modulos-domus/:id): hace falta su propio PUT contra el artículo.
+  // Como puede haber varias piezas (varias filas de `rows`) para el mismo
+  // codartint, al guardar se refleja el nombre nuevo en todas — si se
+  // dejara solo en la fila tocada, el resto quedaría con el nombre viejo
+  // en memoria hasta recargar la pantalla.
+  const handleArticuloDescripcionChange = (id, valor) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, articulo_descripcion: valor } : r)));
+  };
+
+  const handleArticuloDescripcionBlur = async (row) => {
+    const codartint = row.codartint;
+    const valor = (row.articulo_descripcion ?? "").trim();
+    const key = `${row.id}-articulo_descripcion`;
+    setGuardandoCampo(key);
+    setErrorCampo(null);
+    try {
+      const res = await authFetch(`${API}/articulos/${encodeURIComponent(codartint)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articulo: valor }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setRows((prev) =>
+        prev.map((r) => (r.codartint === codartint ? { ...r, articulo_descripcion: valor } : r)),
+      );
+    } catch (e) {
+      console.error("Error guardando nombre de artículo:", e);
+      setErrorCampo(key);
+    } finally {
+      setGuardandoCampo(null);
+    }
+  };
+
   // ── Alta de artículo nuevo (su primera pieza) ────────────────────────
 
   const cerrarNuevo = () => {
@@ -1358,7 +1395,22 @@ export default function ModulosDomus({ authFetch, token }) {
 
   const columns = [
     { key: "codartint", label: "Código", render: (v) => v ?? "—" },
-    { key: "articulo_descripcion", label: "Artículo", render: (v) => v ?? "—" },
+    {
+      key: "articulo_descripcion",
+      label: "Artículo",
+      render: (v, row) => (
+        <input
+          type="text"
+          value={row.articulo_descripcion ?? ""}
+          placeholder="Sin nombre"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => handleArticuloDescripcionChange(row.id, e.target.value)}
+          onBlur={() => handleArticuloDescripcionBlur(row)}
+          maxLength={150}
+          style={estiloInput(row.id, "articulo_descripcion", "220px")}
+        />
+      ),
+    },
     {
       key: "modulo",
       label: "Módulo",
