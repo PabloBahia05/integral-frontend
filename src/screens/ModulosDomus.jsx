@@ -2484,9 +2484,13 @@ export default function ModulosDomus({ authFetch, token }) {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: "100%",
-              maxWidth: 920,
-              maxHeight: "85vh",
-              overflowY: "auto",
+              maxWidth: 1600,
+              minWidth: 380,
+              height: "85vh",
+              minHeight: 300,
+              maxHeight: "95vh",
+              resize: "both",
+              overflow: "auto",
               background: "#fff",
               borderRadius: 10,
               padding: "20px 22px",
