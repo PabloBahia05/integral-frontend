@@ -1062,6 +1062,17 @@ export default function ModulosDomus({ authFetch, token }) {
     setPiezas((prev) => prev.map((p) => (p.id === id ? { ...p, [campo]: valor } : p)));
   };
 
+  // Buffer aparte para el campo `subcodigo`: a diferencia de los demás
+  // campos, `subcodigo` decide a qué grupo pertenece la fila
+  // (piezasDeVarianteActual/piezasBaseSinVariante se filtran por ese
+  // valor). Si actualizáramos `piezas` en cada tecla (como hacen los demás
+  // campos vía handlePiezaCampoChange), la fila deja de matchear el filtro
+  // de la pantalla actual apenas se escribe el primer carácter y
+  // desaparece de la tabla a mitad de tipeo — nunca llega a guardarse. Acá
+  // se guarda el valor en edición aparte y recién se aplica a `piezas` (y
+  // se dispara el PUT) al salir del campo.
+  const [subcodigoDraft, setSubcodigoDraft] = useState({});
+
   const guardarPiezaCampo = async (id, campo, valor) => {
     const key = `${id}-${campo}`;
     setGuardandoCampo(key);
@@ -1511,12 +1522,25 @@ export default function ModulosDomus({ authFetch, token }) {
       render: (v, row) => (
         <input
           type="text"
-          value={row.subcodigo ?? ""}
+          value={subcodigoDraft[row.id] ?? row.subcodigo ?? ""}
           placeholder="Sin variante"
           list={`subcodigos-pieza-${panelCodigo?.id}`}
           onClick={(e) => e.stopPropagation()}
-          onChange={(e) => handlePiezaCampoChange(row.id, "subcodigo", e.target.value)}
-          onBlur={() => handlePiezaCampoBlur(row, "subcodigo")}
+          onChange={(e) => {
+            const valor = e.target.value;
+            setSubcodigoDraft((prev) => ({ ...prev, [row.id]: valor }));
+          }}
+          onBlur={() => {
+            const valor = subcodigoDraft[row.id];
+            setSubcodigoDraft((prev) => {
+              const next = { ...prev };
+              delete next[row.id];
+              return next;
+            });
+            if (valor === undefined || valor === (row.subcodigo ?? "")) return;
+            handlePiezaCampoChange(row.id, "subcodigo", valor);
+            guardarPiezaCampo(row.id, "subcodigo", valor);
+          }}
           maxLength={50}
           style={estiloInput(row.id, "subcodigo", "140px")}
         />
