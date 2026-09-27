@@ -1189,6 +1189,80 @@ export default function ModulosDomus({ authFetch, token }) {
     ...new Set(formulas.map(familiaDe).filter(Boolean)),
   ].sort((a, b) => a.localeCompare(b, "es"));
 
+  // Duplica TODAS las piezas de un subcódigo existente hacia uno nuevo —
+  // para variantes que comparten casi todo entre sí (ej. una puerta
+  // derecha vs. izquierda) sin tener que recrear cada pieza a mano.
+  const [duplicandoSubcodigo, setDuplicandoSubcodigo] = useState(null);
+  const [errorDuplicarSubcodigo, setErrorDuplicarSubcodigo] = useState(null);
+  const handleDuplicarSubcodigo = async (subcodigoOrigen) => {
+    if (!panelCodigo) return;
+    const piezasOrigen = piezas.filter(
+      (p) => String(p.subcodigo ?? "").trim() === subcodigoOrigen,
+    );
+    if (piezasOrigen.length === 0) return;
+    const nuevo = window
+      .prompt(
+        `Nuevo subcódigo (copia de ${subcodigoOrigen}, ${piezasOrigen.length} pieza(s)):`,
+        "",
+      )
+      ?.trim();
+    if (!nuevo) return;
+    if (nuevo === subcodigoOrigen) {
+      window.alert("El nuevo subcódigo tiene que ser distinto del original.");
+      return;
+    }
+    if (gruposPiezas.some(([s]) => s === nuevo)) {
+      window.alert(`Ya existe el subcódigo "${nuevo}" — elegí otro nombre.`);
+      return;
+    }
+    setDuplicandoSubcodigo(subcodigoOrigen);
+    setErrorDuplicarSubcodigo(null);
+    try {
+      for (const p of piezasOrigen) {
+        const {
+          id: _id,
+          codform: _cf,
+          formulax_descripcion: _fxd,
+          formulay_descripcion: _fyd,
+          formulax_formula: _fxf,
+          formulax_formula2: _fxf2,
+          formulax_formula3: _fxf3,
+          formulay_formula: _fyf,
+          ...resto
+        } = p;
+        const res = await authFetch(`${API}/modulos-domus`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...resto, subcodigo: nuevo }),
+        });
+        if (!res.ok) {
+          let detalle = `HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            if (body?.error) detalle = body.error;
+          } catch {
+            // el body no era JSON parseable, nos quedamos con el status
+          }
+          throw new Error(detalle);
+        }
+      }
+      fetchPiezas(panelCodigo.id);
+      setCodigosProduccion((prev) =>
+        prev.map((c) =>
+          c.id === panelCodigo.id
+            ? { ...c, cant_piezas: Number(c.cant_piezas ?? 0) + piezasOrigen.length }
+            : c,
+        ),
+      );
+      abrirSubcodigo(nuevo);
+    } catch (e) {
+      console.error("Error duplicando subcódigo:", e);
+      setErrorDuplicarSubcodigo(e.message || "No se pudo duplicar el subcódigo.");
+    } finally {
+      setDuplicandoSubcodigo(null);
+    }
+  };
+
   // Trae al subcódigo actual una copia de cada pieza "sin variante" (las
   // comunes del código), para no tener que cargar de cero una variante
   // que comparte casi todo con la base.
@@ -2596,27 +2670,56 @@ export default function ModulosDomus({ authFetch, token }) {
                       {gruposPiezas
                         .filter(([subcodigo]) => subcodigo !== "")
                         .map(([subcodigo, piezasDelGrupo]) => (
-                          <button
+                          <div
                             key={subcodigo}
-                            onClick={() => abrirSubcodigo(subcodigo)}
                             style={{
-                              padding: "10px 16px",
+                              display: "flex",
+                              alignItems: "stretch",
                               borderRadius: 6,
                               border: "1.5px solid #b8d6ef",
-                              background: "#eaf3fb",
-                              color: "#0a3a5c",
-                              cursor: "pointer",
-                              fontFamily: "'Space Mono', monospace",
-                              fontSize: 12,
-                              fontWeight: 700,
-                              textAlign: "left",
+                              overflow: "hidden",
                             }}
                           >
-                            {subcodigo}
-                            <span style={{ fontWeight: 400, color: "#5a86ab", marginLeft: 6 }}>
-                              ({piezasDelGrupo.length})
-                            </span>
-                          </button>
+                            <button
+                              onClick={() => abrirSubcodigo(subcodigo)}
+                              style={{
+                                padding: "10px 16px",
+                                border: "none",
+                                background: "#eaf3fb",
+                                color: "#0a3a5c",
+                                cursor: "pointer",
+                                fontFamily: "'Space Mono', monospace",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                textAlign: "left",
+                              }}
+                            >
+                              {subcodigo}
+                              <span style={{ fontWeight: 400, color: "#5a86ab", marginLeft: 6 }}>
+                                ({piezasDelGrupo.length})
+                              </span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDuplicarSubcodigo(subcodigo);
+                              }}
+                              disabled={duplicandoSubcodigo === subcodigo}
+                              title={`Duplicar subcódigo ${subcodigo} a uno nuevo`}
+                              style={{
+                                padding: "10px 12px",
+                                border: "none",
+                                borderLeft: "1.5px solid #b8d6ef",
+                                background: "#fff",
+                                color: "#0a3a5c",
+                                cursor: duplicandoSubcodigo === subcodigo ? "wait" : "pointer",
+                                fontSize: 14,
+                                opacity: duplicandoSubcodigo === subcodigo ? 0.4 : 1,
+                              }}
+                            >
+                              {duplicandoSubcodigo === subcodigo ? "⏳" : "⧉"}
+                            </button>
+                          </div>
                         ))}
                       <button
                         onClick={() => abrirSubcodigo("")}
@@ -2639,6 +2742,12 @@ export default function ModulosDomus({ authFetch, token }) {
                         </span>
                       </button>
                     </div>
+
+                    {errorDuplicarSubcodigo && (
+                      <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
+                        ⚠ {errorDuplicarSubcodigo}
+                      </p>
+                    )}
 
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <input
