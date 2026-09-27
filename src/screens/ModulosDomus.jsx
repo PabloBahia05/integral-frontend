@@ -409,6 +409,17 @@ export default function ModulosDomus({ authFetch, token }) {
       .catch(() => setColoresMelamina([]));
   }, []);
 
+  // Materiales de fondo: mismo endpoint, filtrando area=FONDO. Se ofrecen
+  // en el desplegable de Color en vez de coloresMelamina cuando la fórmula
+  // de la pieza es de fondo (ver `esPiezaDeFondo` más abajo).
+  const [coloresFondo, setColoresFondo] = useState([]);
+  useEffect(() => {
+    authFetch(`${API}/articulos/colores-melamina?area=FONDO`)
+      .then((r) => r.json())
+      .then((data) => setColoresFondo(Array.isArray(data) ? data : []))
+      .catch(() => setColoresFondo([]));
+  }, []);
+
   // ── Piezas sin código de producción asignado ─────────────────────────
   //
   // El único caso que necesita atención con este modelo: una pieza que
@@ -815,6 +826,103 @@ export default function ModulosDomus({ authFetch, token }) {
     }
   };
 
+  // ── Duplicar un código de producción completo (con sus piezas) ──────
+  //
+  // Copia código+descripción y TODAS las piezas de todos los subcódigos
+  // del original, colgándolas del nuevo código. NO duplica los artículos
+  // vinculados (eso se arma aparte desde "🔗 Relaciones").
+
+  const [duplicarCodigoOrigen, setDuplicarCodigoOrigen] = useState(null);
+  const [duplicarCodigoTexto, setDuplicarCodigoTexto] = useState("");
+  const [duplicandoCodigo, setDuplicandoCodigo] = useState(false);
+  const [errorDuplicarCodigo, setErrorDuplicarCodigo] = useState(null);
+
+  const abrirDuplicarCodigo = (codigo) => {
+    setDuplicarCodigoOrigen(codigo);
+    setDuplicarCodigoTexto("");
+    setErrorDuplicarCodigo(null);
+  };
+
+  const cerrarDuplicarCodigo = () => {
+    if (duplicandoCodigo) return;
+    setDuplicarCodigoOrigen(null);
+    setDuplicarCodigoTexto("");
+    setErrorDuplicarCodigo(null);
+  };
+
+  const handleDuplicarCodigo = async () => {
+    if (!duplicarCodigoOrigen || !duplicarCodigoTexto.trim()) return;
+    setDuplicandoCodigo(true);
+    setErrorDuplicarCodigo(null);
+    try {
+      // 1. Alta del nuevo código, con la misma descripción que el original.
+      const resCodigo = await authFetch(`${API}/codigos-produccion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          codigo: duplicarCodigoTexto.trim(),
+          descripcion: duplicarCodigoOrigen.descripcion ?? null,
+        }),
+      });
+      const dataCodigo = await resCodigo.json().catch(() => null);
+      if (!resCodigo.ok) throw new Error(dataCodigo?.error || `HTTP ${resCodigo.status}`);
+      const nuevoId = dataCodigo.id;
+
+      // 2. Traer TODAS las piezas del código original (todos los
+      //    subcódigos/variantes, más las piezas sin variante).
+      const resPiezas = await authFetch(
+        `${API}/modulos-domus/por-codigo-produccion/${duplicarCodigoOrigen.id}`,
+      );
+      const piezasOriginales = await resPiezas.json().catch(() => null);
+      if (!resPiezas.ok) throw new Error(piezasOriginales?.error || `HTTP ${resPiezas.status}`);
+
+      // 3. Duplicar cada pieza colgándola del nuevo código — mismo criterio
+      //    de limpieza de campos que ya usa handleDuplicarPieza (saca id y
+      //    los campos derivados/join de fórmula, que se resuelven solos
+      //    por formulax/formulay).
+      for (const pieza of Array.isArray(piezasOriginales) ? piezasOriginales : []) {
+        const {
+          id: _id,
+          codform: _cf,
+          formulax_descripcion: _fxd,
+          formulay_descripcion: _fyd,
+          formulax_formula: _fxf,
+          formulax_formula2: _fxf2,
+          formulax_formula3: _fxf3,
+          formulay_formula: _fyf,
+          ...resto
+        } = pieza;
+        const resPieza = await authFetch(`${API}/modulos-domus`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...resto, codigo_produccion_id: nuevoId }),
+        });
+        if (!resPieza.ok) {
+          const body = await resPieza.json().catch(() => null);
+          throw new Error(body?.error || `HTTP ${resPieza.status} al duplicar una pieza`);
+        }
+      }
+
+      // 4. Reflejar el nuevo código en la lista principal.
+      const nuevo = {
+        id: nuevoId,
+        codigo: dataCodigo.codigo,
+        descripcion: dataCodigo.descripcion ?? null,
+        cant_articulos: 0,
+        cant_piezas: Array.isArray(piezasOriginales) ? piezasOriginales.length : 0,
+      };
+      setCodigosProduccion((prev) =>
+        [...prev, nuevo].sort((a, b) => a.codigo.localeCompare(b.codigo, "es")),
+      );
+      cerrarDuplicarCodigo();
+    } catch (e) {
+      console.error("Error duplicando código de producción:", e);
+      setErrorDuplicarCodigo(e.message || "No se pudo duplicar el código.");
+    } finally {
+      setDuplicandoCodigo(false);
+    }
+  };
+
   // ── Panel de un código de producción (sus piezas) ────────────────────
 
   // Código abierto en el panel: { id, codigo, descripcion } o null.
@@ -968,6 +1076,15 @@ export default function ModulosDomus({ authFetch, token }) {
     if (!yaTeniaTitulo) {
       guardarPiezaCampo(row.id, "titulo", nuevoTitulo);
     }
+  };
+
+  // Una pieza es "de fondo" cuando la descripción de su fórmula asignada
+  // (formulax, buscada en el catálogo `formulas`) contiene la palabra
+  // "fondo" (sin importar mayúsculas). En ese caso el desplegable de Color
+  // debe ofrecer materiales con area=FONDO en vez de area=MELAMINA.
+  const esPiezaDeFondo = (row) => {
+    const f = formulas.find((f) => f.codform === row.formulax);
+    return (f?.descripcion ?? "").toLowerCase().includes("fondo");
   };
 
   const fetchFormulas = () => {
@@ -1492,25 +1609,28 @@ export default function ModulosDomus({ authFetch, token }) {
     {
       key: "color",
       label: "Color",
-      render: (v, row) => (
-        <select
-          value={row.color ?? ""}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => {
-            const valor = e.target.value;
-            handlePiezaCampoChange(row.id, "color", valor);
-            guardarPiezaCampo(row.id, "color", valor);
-          }}
-          style={estiloInput(row.id, "color", "140px")}
-        >
-          <option value="">—</option>
-          {coloresMelamina.map((c) => (
-            <option key={c.codartint} value={c.articulo}>
-              {c.articulo}
-            </option>
-          ))}
-        </select>
-      ),
+      render: (v, row) => {
+        const opciones = esPiezaDeFondo(row) ? coloresFondo : coloresMelamina;
+        return (
+          <select
+            value={row.color ?? ""}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              const valor = e.target.value;
+              handlePiezaCampoChange(row.id, "color", valor);
+              guardarPiezaCampo(row.id, "color", valor);
+            }}
+            style={estiloInput(row.id, "color", "140px")}
+          >
+            <option value="">—</option>
+            {opciones.map((c) => (
+              <option key={c.codartint} value={c.articulo}>
+                {c.articulo}
+              </option>
+            ))}
+          </select>
+        );
+      },
     },
     {
       key: "_borrar",
@@ -1560,6 +1680,7 @@ export default function ModulosDomus({ authFetch, token }) {
           selected={seleccionado}
           onNew={() => setNuevoCodigoAbierto(true)}
           onEdit={seleccionado ? () => abrirPanel(seleccionado) : null}
+          onDuplicate={seleccionado ? () => abrirDuplicarCodigo(seleccionado) : null}
           onDelete={seleccionado ? () => handleEliminarCodigo(seleccionado) : null}
           search={search}
           onSearch={setSearch}
@@ -1762,6 +1883,111 @@ export default function ModulosDomus({ authFetch, token }) {
                 }}
               >
                 {guardandoNuevoCodigo ? "Guardando…" : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {duplicarCodigoOrigen && (
+        <div
+          onClick={cerrarDuplicarCodigo}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "90%",
+              maxWidth: 380,
+              background: "#fff",
+              borderRadius: 10,
+              padding: "20px 22px",
+              fontFamily: "'Space Mono', monospace",
+              color: "#0a3a5c",
+            }}
+          >
+            <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>
+              Duplicar código de producción
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#4a8ab5" }}>
+              Se va a crear un código nuevo con la misma descripción y una
+              copia de TODAS las piezas de{" "}
+              <strong>{duplicarCodigoOrigen.codigo}</strong> (todos los
+              subcódigos). Los artículos vinculados no se copian — se
+              vinculan aparte desde "🔗 Relaciones".
+            </p>
+
+            <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+              Código nuevo (ej: PRD-00123)
+            </label>
+            <input
+              type="text"
+              value={duplicarCodigoTexto}
+              onChange={(e) => setDuplicarCodigoTexto(e.target.value)}
+              placeholder="Ej: 02BAJO2P"
+              maxLength={50}
+              autoFocus
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "6px 8px",
+                fontSize: 13,
+                fontFamily: "'Space Mono',monospace",
+                border: "1.5px solid #b8d6ef",
+                borderRadius: 4,
+                marginBottom: 12,
+              }}
+            />
+
+            {errorDuplicarCodigo && (
+              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
+                {errorDuplicarCodigo}
+              </p>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                onClick={cerrarDuplicarCodigo}
+                disabled={duplicandoCodigo}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "1.5px solid #b8d6ef",
+                  background: "#fff",
+                  color: "#4a8ab5",
+                  cursor: "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDuplicarCodigo}
+                disabled={duplicandoCodigo || !duplicarCodigoTexto.trim()}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "none",
+                  background: "#1a7a44",
+                  color: "#fff",
+                  cursor: duplicandoCodigo ? "wait" : "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  opacity: duplicandoCodigo ? 0.6 : 1,
+                }}
+              >
+                {duplicandoCodigo ? "Duplicando…" : "Duplicar"}
               </button>
             </div>
           </div>
