@@ -262,7 +262,6 @@ function DetalleProduccion({
             return (
               <select
                 value={valorActual}
-                disabled={!row.codartint}
                 onChange={(e) => {
                   if (e.target.value === "__nuevo__") {
                     onCrearYVincularCodigo(row);
@@ -610,6 +609,12 @@ export default function Produccion({ authFetch, token, onInicio }) {
   // sola vez y se agrupa acá, en vez de pedir por artículo bajo demanda.
   const [codigosPorArticulo, setCodigosPorArticulo] = useState(new Map());
 
+  // Lista COMPLETA de códigos de producción existentes (no solo los ya
+  // vinculados al artículo de la fila) — para poder aplicar cualquier
+  // código a cualquier ítem, tenga o no artículo asociado (ej. renglones
+  // de servicio como "Colocación", sin codartint).
+  const [todosLosCodigosProduccion, setTodosLosCodigosProduccion] = useState([]);
+
   // Subcódigos (variantes puntuales, ej. "02BAJO10MDF") ya cargados en
   // piezas de modulos-domus, agrupados por `codigo_produccion_id` — para
   // sugerir opciones (datalist) en el campo `subcodigo` de esta pantalla
@@ -726,6 +731,13 @@ export default function Produccion({ authFetch, token, onInicio }) {
         setCodigosPorArticulo(porArticulo);
       })
       .catch((e) => console.error("Error cargando articulo-produccion:", e));
+    authFetch(`${API}/codigos-produccion`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        setTodosLosCodigosProduccion(Array.isArray(data) ? data : []);
+      })
+      .catch((e) => console.error("Error cargando codigos-produccion:", e));
   }, []);
 
   // ── Edición del código de producción ────────────────────────────────────
@@ -739,9 +751,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
   const handleCodigoProduccionChange = async (row, valorId) => {
     const nuevoId = valorId ? Number(valorId) : null;
     const codigoTexto = nuevoId
-      ? (codigosPorArticulo.get(normalizarCodigo(row.codartint)) ?? []).find(
-          (c) => c.id === nuevoId,
-        )?.codigo ?? row.modulo
+      ? todosLosCodigosProduccion.find((c) => c.id === nuevoId)?.codigo ?? row.modulo
       : null;
     setRows((prev) =>
       prev.map((r) =>
@@ -798,10 +808,10 @@ export default function Produccion({ authFetch, token, onInicio }) {
     });
   }, [rows, codigosPorArticulo, codigosConFormula]);
 
-  // Alta rápida: crea un código de producción nuevo y lo vincula al
-  // artículo de la fila, todo en un solo paso. Sustituye, por ahora, a una
-  // pantalla de administración separada para armar los vínculos
-  // artículo↔código (pendiente, no incluida en esta tanda).
+  // Alta rápida: crea un código de producción nuevo y, si el ítem tiene
+  // artículo (codartint), lo vincula también vía articulo_produccion — si
+  // no tiene (ej. renglones de servicio como "Colocación"), se salta ese
+  // paso y el código queda igual asignado directo en produccion.codigo_produccion_id.
   const handleCrearYVincularCodigo = async (row) => {
     const codigo = window.prompt("Código de producción nuevo (ej: PRD-00123):");
     if (!codigo || !codigo.trim()) return;
@@ -815,29 +825,39 @@ export default function Produccion({ authFetch, token, onInicio }) {
       if (!resCod.ok) {
         throw new Error(nuevoCodigo?.error || `HTTP ${resCod.status}`);
       }
-      const resVinculo = await authFetch(`${API}/articulo-produccion`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          codartint: row.codartint,
-          codigo_produccion_id: nuevoCodigo.id,
-        }),
-      });
-      if (!resVinculo.ok) throw new Error(`HTTP ${resVinculo.status}`);
-      setCodigosPorArticulo((prev) => {
-        const next = new Map(prev);
-        const codigoArt = normalizarCodigo(row.codartint);
-        const lista = next.get(codigoArt) ?? [];
-        next.set(codigoArt, [
-          ...lista,
-          {
-            id: nuevoCodigo.id,
-            codigo: nuevoCodigo.codigo,
-            descripcion: nuevoCodigo.descripcion ?? null,
-          },
-        ]);
-        return next;
-      });
+      if (row.codartint) {
+        const resVinculo = await authFetch(`${API}/articulo-produccion`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            codartint: row.codartint,
+            codigo_produccion_id: nuevoCodigo.id,
+          }),
+        });
+        if (!resVinculo.ok) throw new Error(`HTTP ${resVinculo.status}`);
+        setCodigosPorArticulo((prev) => {
+          const next = new Map(prev);
+          const codigoArt = normalizarCodigo(row.codartint);
+          const lista = next.get(codigoArt) ?? [];
+          next.set(codigoArt, [
+            ...lista,
+            {
+              id: nuevoCodigo.id,
+              codigo: nuevoCodigo.codigo,
+              descripcion: nuevoCodigo.descripcion ?? null,
+            },
+          ]);
+          return next;
+        });
+      }
+      setTodosLosCodigosProduccion((prev) => [
+        ...prev,
+        {
+          id: nuevoCodigo.id,
+          codigo: nuevoCodigo.codigo,
+          descripcion: nuevoCodigo.descripcion ?? null,
+        },
+      ]);
       handleCodigoProduccionChange(row, String(nuevoCodigo.id));
     } catch (e) {
       console.error("Error creando código de producción:", e);
@@ -1324,12 +1344,10 @@ export default function Produccion({ authFetch, token, onInicio }) {
       key: "modulo",
       label: "Cód. Producción",
       render: (v, row) => {
-        const opciones =
-          codigosPorArticulo.get(normalizarCodigo(row.codartint)) ?? [];
+        const opciones = todosLosCodigosProduccion;
         const valorActual = row.codigo_produccion_id ?? "";
-        // Si el código actual no está entre los vínculos vigentes para este
-        // artículo (p.ej. cambió el artículo de la fila), se agrega como
-        // opción suelta para no perder la selección visualmente.
+        // Si el código actual no está entre los existentes (p.ej. se borró),
+        // se agrega como opción suelta para no perder la selección visualmente.
         const tieneActual = opciones.some(
           (o) => String(o.id) === String(valorActual),
         );
@@ -1344,8 +1362,6 @@ export default function Produccion({ authFetch, token, onInicio }) {
               }
               handleCodigoProduccionChange(row, e.target.value);
             }}
-            disabled={!row.codartint}
-            title={!row.codartint ? "Este ítem no tiene artículo vinculado" : ""}
             style={{
               width: "100%",
               maxWidth: "180px",
@@ -1851,11 +1867,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
               ? subcodigosPorCodigoProduccion.get(Number(codigoId)) ?? []
               : [];
           })()}
-          codigosProduccionDisponibles={
-            codigosPorArticulo.get(
-              normalizarCodigo((rows.find((r) => r.id === detalle.id) ?? detalle).codartint),
-            ) ?? []
-          }
+          codigosProduccionDisponibles={todosLosCodigosProduccion}
           codigosConFormula={codigosConFormula}
           onClose={() => setDetalle(null)}
           onCodigoProduccionChange={handleCodigoProduccionChange}
