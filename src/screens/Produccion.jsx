@@ -581,6 +581,16 @@ export default function Produccion({ authFetch, token, onInicio }) {
   const [selectorCodigoCSV, setSelectorCodigoCSV] = useState(null);
   const [confirmandoCodigoCSV, setConfirmandoCodigoCSV] = useState(false);
 
+  // Igual que selectorCodigoCSV pero para el subcódigo (variante puntual):
+  // cuando el código de producción ya resuelto para el ítem tiene alguna
+  // variante cargada en Módulos Domus, no se asume "sin variante" (ni lo
+  // que ya tuviera guardado la fila) — se pregunta acá mismo antes de
+  // generar el CSV, para no errar de variante al picar. Guarda `row`,
+  // `opciones` (subcódigos ya usados para ese codigo_produccion_id) y
+  // `seleccionado` ("" = sin variante, o el subcódigo elegido).
+  const [selectorSubcodigoCSV, setSelectorSubcodigoCSV] = useState(null);
+  const [confirmandoSubcodigoCSV, setConfirmandoSubcodigoCSV] = useState(false);
+
   // Melaminas disponibles para el desplegable de `color` (ver
   // GET /productos/melaminas en articulos_controller.js — filtra
   // articulos por rubro "melamina"/"MELAMINA"). Se guarda el `codartint`
@@ -926,6 +936,72 @@ export default function Produccion({ authFetch, token, onInicio }) {
   // backend — falta construirlo cuando esté lista la pantalla de Asociación
   // de Fórmulas (qué fórmulas aplican a qué artículo).
 
+  // Guarda `subcodigo` con un valor explícito (no depende de que `rows` ya
+  // se haya actualizado antes del blur) — mismo PUT que usa el campo de
+  // texto de la columna, para el selector de variante previo al CSV.
+  const handleSubcodigoGuardar = async (row, valor) => {
+    const key = `${row.id}-subcodigo`;
+    setGuardandoCampo(key);
+    setErrorCampo(null);
+    try {
+      const res = await authFetch(`${API}/produccion/${row.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subcodigo: valor || null }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      handleTextoCampoChange(row.id, "subcodigo", valor || "");
+    } catch (e) {
+      console.error("Error guardando subcodigo:", e);
+      setErrorCampo(key);
+      throw e;
+    } finally {
+      setGuardandoCampo(null);
+    }
+  };
+
+  // Paso intermedio entre "ya se sabe qué código de producción aplica" y
+  // "generar el CSV": si ese código tiene alguna variante (subcódigo)
+  // cargada en Módulos Domus, no se asume "sin variante" — se pregunta acá
+  // mismo (ver selectorSubcodigoCSV). Sin ninguna variante cargada no hay
+  // nada que elegir, sigue directo.
+  const continuarHaciaSubcodigoOEjecutar = (row) => {
+    const opciones =
+      row.codigo_produccion_id != null
+        ? subcodigosPorCodigoProduccion.get(Number(row.codigo_produccion_id)) ?? []
+        : [];
+    if (opciones.length > 0) {
+      setSelectorSubcodigoCSV({
+        row,
+        opciones,
+        seleccionado: opciones.includes(row.subcodigo ?? "") ? row.subcodigo : "",
+      });
+      return;
+    }
+    ejecutarDescargaCSV(row);
+  };
+
+  // Confirmación del selector de subcódigo: si la elección difiere de lo
+  // que ya tenía guardado la fila, primero la persiste y recién con eso
+  // hecho pide el CSV (mismo motivo que handleConfirmarCodigoCSV: el
+  // backend arma las piezas a partir de lo guardado en `produccion`).
+  const handleConfirmarSubcodigoCSV = async () => {
+    if (!selectorSubcodigoCSV) return;
+    const { row, seleccionado } = selectorSubcodigoCSV;
+    setConfirmandoSubcodigoCSV(true);
+    try {
+      let filaParaCSV = row;
+      if ((seleccionado || "") !== (row.subcodigo ?? "")) {
+        await handleSubcodigoGuardar(row, seleccionado);
+        filaParaCSV = { ...row, subcodigo: seleccionado || null };
+      }
+      setSelectorSubcodigoCSV(null);
+      await ejecutarDescargaCSV(filaParaCSV);
+    } finally {
+      setConfirmandoSubcodigoCSV(false);
+    }
+  };
+
   const handleDescargarCSV = (row) => {
     // Si el artículo de esta fila tiene más de un código de producción
     // vinculado, no se asume cuál usar (ni siquiera el que ya tuviera
@@ -944,7 +1020,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
       });
       return;
     }
-    ejecutarDescargaCSV(row);
+    continuarHaciaSubcodigoOEjecutar(row);
   };
 
   // Confirmación del selector de variante: si la elección difiere de lo que
@@ -964,7 +1040,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
         filaParaCSV = { ...row, codigo_produccion_id: Number(seleccionado) };
       }
       setSelectorCodigoCSV(null);
-      await ejecutarDescargaCSV(filaParaCSV);
+      continuarHaciaSubcodigoOEjecutar(filaParaCSV);
     } finally {
       setConfirmandoCodigoCSV(false);
     }
@@ -2103,6 +2179,112 @@ export default function Produccion({ authFetch, token, onInicio }) {
                 }}
               >
                 {confirmandoCodigoCSV ? "Generando…" : "Generar CSV"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectorSubcodigoCSV && (
+        <div
+          onClick={() => !confirmandoSubcodigoCSV && setSelectorSubcodigoCSV(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "90%",
+              maxWidth: 420,
+              background: "#fff",
+              borderRadius: 10,
+              padding: "20px 22px",
+              fontFamily: "'Space Mono', monospace",
+              color: "#0a3a5c",
+            }}
+          >
+            <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>
+              ¿Qué subcódigo aplica?
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#4a8ab5" }}>
+              <strong>
+                {selectorSubcodigoCSV.row.producto ?? selectorSubcodigoCSV.row.codpro}
+              </strong>{" "}
+              tiene variantes (subcódigos) cargadas en Módulos Domus para este
+              código de producción. Elegí cuál aplica a este ítem antes de
+              generar el CSV — "Sin variante" usa las piezas compartidas.
+            </p>
+
+            <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+              Subcódigo
+            </label>
+            <select
+              value={selectorSubcodigoCSV.seleccionado}
+              onChange={(e) =>
+                setSelectorSubcodigoCSV((s) => ({ ...s, seleccionado: e.target.value }))
+              }
+              disabled={confirmandoSubcodigoCSV}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "6px 8px",
+                fontSize: 13,
+                fontFamily: "'Space Mono',monospace",
+                border: "1.5px solid #b8d6ef",
+                borderRadius: 4,
+                marginBottom: 16,
+              }}
+            >
+              <option value="">Sin variante (compartidas)</option>
+              {selectorSubcodigoCSV.opciones.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                onClick={() => setSelectorSubcodigoCSV(null)}
+                disabled={confirmandoSubcodigoCSV}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "1.5px solid #b8d6ef",
+                  background: "#fff",
+                  color: "#4a8ab5",
+                  cursor: "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarSubcodigoCSV}
+                disabled={confirmandoSubcodigoCSV}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "none",
+                  background: "#1a7a44",
+                  color: "#fff",
+                  cursor: confirmandoSubcodigoCSV ? "wait" : "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  opacity: confirmandoSubcodigoCSV ? 0.6 : 1,
+                }}
+              >
+                {confirmandoSubcodigoCSV ? "Generando…" : "Generar CSV"}
               </button>
             </div>
           </div>
