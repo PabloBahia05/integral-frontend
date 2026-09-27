@@ -596,17 +596,20 @@ export default function Produccion({ authFetch, token, onInicio }) {
 
   // Vínculos artículo↔código de producción (N a N, ver articulo_produccion
   // en el backend), agrupados por codartint normalizado — mismo criterio
-  // que subcodigosPorArticulo más abajo: se carga la tabla completa una
+  // que subcodigosPorCodigoProduccion más abajo: se carga la tabla completa una
   // sola vez y se agrupa acá, en vez de pedir por artículo bajo demanda.
   const [codigosPorArticulo, setCodigosPorArticulo] = useState(new Map());
 
-  // Subcódigos (variantes puntuales, ej. "02BAJO10MDF" para el codartint
-  // "02BAJO10") ya usados en piezas de modulos-domus, agrupados por
-  // codartint normalizado — para sugerir opciones (datalist) en el campo
-  // `subcodigo` de esta pantalla sin obligar a escribirlo de memoria. Un
-  // codartint sin ninguna variante cargada todavía no aparece en el mapa
-  // (el campo sigue siendo editable a mano igual).
-  const [subcodigosPorArticulo, setSubcodigosPorArticulo] = useState(
+  // Subcódigos (variantes puntuales, ej. "02BAJO10MDF") ya cargados en
+  // piezas de modulos-domus, agrupados por `codigo_produccion_id` — para
+  // sugerir opciones (datalist) en el campo `subcodigo` de esta pantalla
+  // sin obligar a escribirlo de memoria. Antes se agrupaba por `codartint`
+  // de la pieza, pero ese campo casi siempre viene vacío (las piezas
+  // cuelgan de codigo_produccion_id, el vínculo a artículos es aparte) —
+  // por eso nunca aparecían sugerencias. Un código de producción sin
+  // ninguna variante cargada todavía no aparece en el mapa (el campo sigue
+  // siendo editable a mano igual).
+  const [subcodigosPorCodigoProduccion, setSubcodigosPorCodigoProduccion] = useState(
     new Map(),
   );
   const nombreMelamina = (codartint) =>
@@ -675,25 +678,26 @@ export default function Produccion({ authFetch, token, onInicio }) {
         );
         setCodigosConFormula(codigos);
 
-        // Subcódigos ya usados por artículo (para el datalist del campo
-        // `subcodigo` más abajo) — de TODAS las piezas, tengan o no
-        // fórmula asignada todavía.
-        const porArticulo = new Map();
+        // Subcódigos ya usados por código de producción (para el datalist
+        // del campo `subcodigo` más abajo) — de TODAS las piezas, tengan o
+        // no fórmula asignada todavía. Se agrupa por `codigo_produccion_id`
+        // (la pieza no tiene codartint cargado).
+        const porCodigo = new Map();
         lista.forEach((m) => {
           const sub = String(m.subcodigo ?? "").trim();
-          if (!sub) return;
-          const codigo = normalizarCodigo(m.codartint);
-          if (!porArticulo.has(codigo)) porArticulo.set(codigo, new Set());
-          porArticulo.get(codigo).add(sub);
+          if (!sub || m.codigo_produccion_id == null) return;
+          const codigoId = Number(m.codigo_produccion_id);
+          if (!porCodigo.has(codigoId)) porCodigo.set(codigoId, new Set());
+          porCodigo.get(codigoId).add(sub);
         });
-        setSubcodigosPorArticulo(
-          new Map([...porArticulo].map(([k, v]) => [k, [...v].sort()])),
+        setSubcodigosPorCodigoProduccion(
+          new Map([...porCodigo].map(([k, v]) => [k, [...v].sort()])),
         );
       })
       .catch((e) => console.error("Error cargando modulos-domus:", e));
     // Vínculos artículo↔código de producción (ver articulo_produccion en el
     // backend): se traen todos de una y se agrupan acá por codartint, mismo
-    // criterio que subcodigosPorArticulo de arriba.
+    // criterio que subcodigosPorCodigoProduccion de arriba.
     authFetch(`${API}/articulo-produccion`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1323,24 +1327,26 @@ export default function Produccion({ authFetch, token, onInicio }) {
         />
       ),
     })),
-    // Variante puntual del codartint (ej. "02BAJO10MDF" para el codartint
-    // "02BAJO10"): determina qué piezas de modulos-domus se usan al armar
-    // el CSV de fórmulas (ver handleDescargarCSV). El datalist sugiere las
-    // variantes ya cargadas para ese codartint en Módulos Domus, pero el
+    // Variante puntual del código de producción (ej. "02BAJO10MDF"):
+    // determina qué piezas de modulos-domus se usan al armar el CSV de
+    // fórmulas (ver handleDescargarCSV). El datalist sugiere las variantes
+    // ya cargadas para ese codigo_produccion_id en Módulos Domus, pero el
     // campo admite escribir una nueva libremente.
     {
       key: "subcodigo",
       label: "Subcódigo",
       render: (v, row) => {
         const opciones =
-          subcodigosPorArticulo.get(normalizarCodigo(row.codartint)) ?? [];
+          row.codigo_produccion_id != null
+            ? subcodigosPorCodigoProduccion.get(Number(row.codigo_produccion_id)) ?? []
+            : [];
         const listId = `subcodigos-${row.id}`;
         return (
           <>
             <input
               type="text"
               value={row.subcodigo ?? ""}
-              placeholder={row.codartint ? "Sin variante" : "Sin artículo"}
+              placeholder={row.codigo_produccion_id ? "Sin variante" : "Sin código"}
               list={listId}
               onClick={(e) => e.stopPropagation()}
               onChange={(e) =>
@@ -1762,11 +1768,13 @@ export default function Produccion({ authFetch, token, onInicio }) {
         <DetalleProduccion
           row={rows.find((r) => r.id === detalle.id) ?? detalle}
           melaminas={melaminas}
-          subcodigosDisponibles={
-            subcodigosPorArticulo.get(
-              normalizarCodigo((rows.find((r) => r.id === detalle.id) ?? detalle).codartint),
-            ) ?? []
-          }
+          subcodigosDisponibles={(() => {
+            const codigoId = (rows.find((r) => r.id === detalle.id) ?? detalle)
+              .codigo_produccion_id;
+            return codigoId != null
+              ? subcodigosPorCodigoProduccion.get(Number(codigoId)) ?? []
+              : [];
+          })()}
           codigosProduccionDisponibles={
             codigosPorArticulo.get(
               normalizarCodigo((rows.find((r) => r.id === detalle.id) ?? detalle).codartint),
