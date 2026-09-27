@@ -756,7 +756,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
     setRows((prev) =>
       prev.map((r) =>
         r.id === row.id
-          ? { ...r, codigo_produccion_id: nuevoId, modulo: codigoTexto }
+          ? { ...r, codigo_produccion_id: nuevoId, modulo: codigoTexto, subcodigo: null }
           : r,
       ),
     );
@@ -766,7 +766,9 @@ export default function Produccion({ authFetch, token, onInicio }) {
       const res = await authFetch(`${API}/produccion/${row.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo_produccion_id: nuevoId }),
+        // El subcódigo pertenece al código anterior: se borra al cambiar de
+        // código para que el campo ofrezca las variantes del código nuevo.
+        body: JSON.stringify({ codigo_produccion_id: nuevoId, subcodigo: null }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (e) {
@@ -1057,7 +1059,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
       let filaParaCSV = row;
       if (String(seleccionado) !== String(row.codigo_produccion_id ?? "")) {
         await handleCodigoProduccionChange(row, seleccionado);
-        filaParaCSV = { ...row, codigo_produccion_id: Number(seleccionado) };
+        filaParaCSV = { ...row, codigo_produccion_id: Number(seleccionado), subcodigo: null };
       }
       setSelectorCodigoCSV(null);
       continuarHaciaSubcodigoOEjecutar(filaParaCSV);
