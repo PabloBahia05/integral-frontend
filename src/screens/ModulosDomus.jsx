@@ -876,6 +876,24 @@ export default function ModulosDomus({ authFetch, token }) {
       const piezasOriginales = await resPiezas.json().catch(() => null);
       if (!resPiezas.ok) throw new Error(piezasOriginales?.error || `HTTP ${resPiezas.status}`);
 
+      const cantidadEncontrada = Array.isArray(piezasOriginales) ? piezasOriginales.length : 0;
+      console.log(
+        `[duplicar-código] ${duplicarCodigoOrigen.codigo} (id=${duplicarCodigoOrigen.id}): ` +
+          `${cantidadEncontrada} piezas encontradas para copiar`,
+        piezasOriginales,
+      );
+
+      // Si el catálogo dice que el código tiene piezas pero acá no llegó
+      // ninguna, algo falla en la lectura — avisar en vez de "duplicar"
+      // en silencio un código vacío.
+      if (cantidadEncontrada === 0 && Number(duplicarCodigoOrigen.cant_piezas || 0) > 0) {
+        throw new Error(
+          `El código original figura con ${duplicarCodigoOrigen.cant_piezas} piezas, pero ` +
+            `/modulos-domus/por-codigo-produccion/${duplicarCodigoOrigen.id} no devolvió ninguna. ` +
+            `Revisá la consola del navegador (F12) para más detalle.`,
+        );
+      }
+
       // 3. Duplicar cada pieza colgándola del nuevo código — mismo criterio
       //    de limpieza de campos que ya usa handleDuplicarPieza (saca id y
       //    los campos derivados/join de fórmula, que se resuelven solos
@@ -897,9 +915,14 @@ export default function ModulosDomus({ authFetch, token }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...resto, codigo_produccion_id: nuevoId }),
         });
+        const bodyPieza = await resPieza.json().catch(() => null);
+        console.log(
+          `[duplicar-código] pieza id=${pieza.id} (${pieza.titulo ?? "sin título"}) → ` +
+            `${resPieza.ok ? "OK" : "ERROR"} (status ${resPieza.status})`,
+          bodyPieza,
+        );
         if (!resPieza.ok) {
-          const body = await resPieza.json().catch(() => null);
-          throw new Error(body?.error || `HTTP ${resPieza.status} al duplicar una pieza`);
+          throw new Error(bodyPieza?.error || `HTTP ${resPieza.status} al duplicar la pieza "${pieza.titulo ?? pieza.id}"`);
         }
       }
 
