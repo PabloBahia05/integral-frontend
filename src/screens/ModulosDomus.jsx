@@ -1189,6 +1189,58 @@ export default function ModulosDomus({ authFetch, token }) {
     ...new Set(formulas.map(familiaDe).filter(Boolean)),
   ].sort((a, b) => a.localeCompare(b, "es"));
 
+  // Borra TODAS las piezas de un subcódigo (el grupo entero, no una por
+  // una) — para los que quedan huérfanos tras duplicar un código y ya no
+  // hacen falta.
+  const [eliminandoSubcodigo, setEliminandoSubcodigo] = useState(null);
+  const [errorEliminarSubcodigo, setErrorEliminarSubcodigo] = useState(null);
+  const handleEliminarSubcodigo = async (subcodigo) => {
+    if (!panelCodigo) return;
+    const piezasDelGrupo = piezas.filter(
+      (p) => String(p.subcodigo ?? "").trim() === subcodigo,
+    );
+    if (piezasDelGrupo.length === 0) return;
+    if (
+      !window.confirm(
+        `Esto borra el subcódigo "${subcodigo}" completo: ${piezasDelGrupo.length} pieza(s). No se puede deshacer. ¿Continuar?`,
+      )
+    ) {
+      return;
+    }
+    setEliminandoSubcodigo(subcodigo);
+    setErrorEliminarSubcodigo(null);
+    try {
+      for (const p of piezasDelGrupo) {
+        const res = await authFetch(`${API}/modulos-domus/${p.id}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      }
+      setPiezas((prev) =>
+        prev.filter((p) => String(p.subcodigo ?? "").trim() !== subcodigo),
+      );
+      setCodigosProduccion((prev) =>
+        prev.map((c) =>
+          c.id === panelCodigo.id
+            ? {
+                ...c,
+                cant_piezas: Math.max(
+                  0,
+                  Number(c.cant_piezas ?? 0) - piezasDelGrupo.length,
+                ),
+              }
+            : c,
+        ),
+      );
+      if (panelSubcodigo === subcodigo) volverASubcodigos();
+    } catch (e) {
+      console.error("Error borrando subcódigo:", e);
+      setErrorEliminarSubcodigo(e.message || "No se pudo borrar el subcódigo.");
+    } finally {
+      setEliminandoSubcodigo(null);
+    }
+  };
+
   // Duplica TODAS las piezas de un subcódigo existente hacia uno nuevo —
   // para variantes que comparten casi todo entre sí (ej. una puerta
   // derecha vs. izquierda) sin tener que recrear cada pieza a mano.
@@ -2719,6 +2771,26 @@ export default function ModulosDomus({ authFetch, token }) {
                             >
                               {duplicandoSubcodigo === subcodigo ? "⏳" : "⧉"}
                             </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEliminarSubcodigo(subcodigo);
+                              }}
+                              disabled={eliminandoSubcodigo === subcodigo}
+                              title={`Borrar subcódigo ${subcodigo} y todas sus piezas`}
+                              style={{
+                                padding: "10px 12px",
+                                border: "none",
+                                borderLeft: "1.5px solid #b8d6ef",
+                                background: "#fff",
+                                color: "#c0392b",
+                                cursor: eliminandoSubcodigo === subcodigo ? "wait" : "pointer",
+                                fontSize: 14,
+                                opacity: eliminandoSubcodigo === subcodigo ? 0.4 : 1,
+                              }}
+                            >
+                              {eliminandoSubcodigo === subcodigo ? "⏳" : "🗑"}
+                            </button>
                           </div>
                         ))}
                       <button
@@ -2746,6 +2818,12 @@ export default function ModulosDomus({ authFetch, token }) {
                     {errorDuplicarSubcodigo && (
                       <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
                         ⚠ {errorDuplicarSubcodigo}
+                      </p>
+                    )}
+
+                    {errorEliminarSubcodigo && (
+                      <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
+                        ⚠ {errorEliminarSubcodigo}
                       </p>
                     )}
 
