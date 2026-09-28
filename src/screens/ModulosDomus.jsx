@@ -1031,7 +1031,7 @@ export default function ModulosDomus({ authFetch, token }) {
     setNuevoSubcodigoInput("");
     fetchPiezas(row.id);
     fetchVinculosDelCodigo(row.id);
-    fetchFormulas();
+    fetchFormulas(true);
   };
 
   const cerrarPanel = () => {
@@ -1121,8 +1121,12 @@ export default function ModulosDomus({ authFetch, token }) {
     return (f?.descripcion ?? "").toLowerCase().includes("fondo");
   };
 
-  const fetchFormulas = () => {
-    if (formulasCargadas) return;
+  // `forzar === true` ignora el caché y vuelve a pedir el catálogo: sin eso,
+  // una fórmula modificada en Fórmulas de Producción no se reflejaba acá
+  // hasta recargar la página (los textos de Alto/Ancho/Profundidad salen de
+  // este catálogo, no de las piezas).
+  const fetchFormulas = (forzar) => {
+    if (formulasCargadas && forzar !== true) return;
     authFetch(`${API}/formulas-produccion`)
       .then((r) => r.json())
       .then((data) => {
@@ -2973,6 +2977,25 @@ export default function ModulosDomus({ authFetch, token }) {
                         </option>
                       ))}
                     </select>
+                    <button
+                      onClick={() => {
+                        fetchFormulas(true);
+                        if (panelCodigo) fetchPiezas(panelCodigo.id);
+                      }}
+                      title="Volver a cargar las fórmulas y las piezas desde el servidor"
+                      style={{
+                        border: "1.5px solid #b8d6ef",
+                        background: "#fff",
+                        color: "#0a3a5c",
+                        borderRadius: 4,
+                        padding: "4px 10px",
+                        fontSize: 12,
+                        fontFamily: "'Space Mono',monospace",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ↻ Actualizar fórmulas
+                    </button>
                     {filtroFamiliaFormula && (
                       <button
                         onClick={() => setFiltroFamiliaFormula("")}
