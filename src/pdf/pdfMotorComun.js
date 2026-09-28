@@ -382,6 +382,14 @@ export function descargarPDF({ pageHTML, nombreArchivo, imagenesFinal, setGenera
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",
+      // html2canvas toma por defecto el scroll actual de la ventana
+      // (pageXOffset/pageYOffset) y lo suma al recorte. Si en esa PC la
+      // pantalla de la app tiene scroll horizontal (ventana angosta,
+      // zoom, tabla ancha), el PDF sale corrido a la derecha y cortado.
+      // El contenido se renderiza en un contenedor fijo, así que el
+      // scroll de la ventana no debe influir: se fuerza a 0.
+      scrollX: 0,
+      scrollY: 0,
     },
     jsPDF: {
       unit: "mm",
