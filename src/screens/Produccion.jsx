@@ -293,6 +293,24 @@ function DetalleProduccion({
           })(),
         )}
 
+        {fila(
+          "Art. vinculado",
+          <input
+            type="text"
+            value={row.codartint ?? ""}
+            placeholder="Ej: KITMP000"
+            onChange={(e) =>
+              onTextoCampoChange(row.id, "codartint", e.target.value)
+            }
+            onBlur={() => onTextoCampoBlur(row, "codartint")}
+            maxLength={50}
+            style={estiloInputModal(
+              guardandoCampo === `${row.id}-codartint`,
+              errorCampo === `${row.id}-codartint`,
+            )}
+          />,
+        )}
+
         {["ancho", "profundidad", "alto"].map((campoMedida) => {
           const key = `${row.id}-${campoMedida}`;
           return fila(
@@ -1395,6 +1413,36 @@ export default function Produccion({ authFetch, token, onInicio }) {
           </select>
         );
       },
+    },
+    // Artículo vinculado (codartint): junto con ancho/alto, es lo que pide
+    // el panel provisorio del CSV cuando el backend responde 422 (ver
+    // ejecutarDescargaCSV). No tenía columna propia en la tabla, así que no
+    // había forma de ver ni cargar este dato salvo que fallara el CSV -
+    // se agrega acá, editado igual que OP/Subcódigo (texto libre, se guarda
+    // al salir del campo, vía el mismo PUT /produccion/:id genérico). Al
+    // cargarlo acá también dispara el useEffect de auto-asignación de
+    // código de producción (ver más arriba) si el artículo tiene un único
+    // código vinculado con fórmula.
+    {
+      key: "codartint",
+      label: "Art. vinculado",
+      render: (v, row) => (
+        <input
+          type="text"
+          value={row.codartint ?? ""}
+          placeholder="Ej: KITMP000"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) =>
+            handleTextoCampoChange(row.id, "codartint", e.target.value)
+          }
+          onBlur={() => handleTextoCampoBlur(row, "codartint")}
+          maxLength={50}
+          style={{
+            ...estiloInput(row, "codartint", guardandoCampo, errorCampo),
+            maxWidth: "130px",
+          }}
+        />
+      ),
     },
     // Medidas del módulo (mm), usadas también para calcular las fórmulas
     // del CSV de producción (ver handleDescargarCSV/panelCSV más abajo).
