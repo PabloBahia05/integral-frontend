@@ -633,12 +633,15 @@ export default function ModulosDomus({ authFetch, token }) {
       );
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        if (res.status === 409 && data?.detail) {
+        if (res.status === 409) {
           setErrorEliminarCodigoId({
             id: codigo.id,
-            mensaje: data.detail,
-            enUso: data.enUso,
-            conPiezas: data.conPiezas,
+            mensaje:
+              data?.detail ||
+              data?.error ||
+              "El código todavía tiene artículos vinculados o piezas cargadas.",
+            enUso: data?.enUso,
+            conPiezas: data?.conPiezas,
           });
           return;
         }
