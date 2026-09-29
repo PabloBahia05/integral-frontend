@@ -25,9 +25,9 @@ const API = "https://integral-backend-production.up.railway.app";
 //     de `articulos` (GET /productos) o se escriben a mano si es un ítem nuevo
 //  5. Elimina un ítem                     → DELETE /confirmados/:id
 //     (NO borra la fila de producción: solo la desvincula)
-//  6. Elimina una revisión completa       → DELETE /confirmados/:numeropres/:revision
-//     (borra de `confirmados` todos los ítems de esa revisión; tampoco
-//     borra filas de producción)
+//  6. Quita una revisión de Confirmados   → DELETE /confirmados/:numeropres/:revision
+//     (borra sus ítems de `confirmados` y la deja como NO confirmada; los
+//     ítems del presupuesto y las filas de producción no se borran)
 //
 // `onInicio` (opcional): función que lleva a la pantalla de inicio. Si el
 // padre no la pasa, el botón "Inicio" navega a la raíz del sitio ("/").
@@ -597,7 +597,7 @@ export default function Confirmados({ authFetch, token, onInicio }) {
             e.stopPropagation();
             setRevAEliminar(row);
           }}
-          title="Eliminar revisión confirmada"
+          title="Quitar de Confirmados"
           style={{
             border: "1px solid #f0a0a0",
             background: "#fdf0f0",
@@ -1082,15 +1082,16 @@ export default function Confirmados({ authFetch, token, onInicio }) {
       {revAEliminar && (
         <ConfirmDelete
           item={revAEliminar}
-          title="¿Eliminar esta revisión confirmada?"
+          title="¿Quitar esta revisión de Confirmados?"
           message={
             <>
-              Vas a eliminar de Confirmados <strong>todos los ítems</strong> del presupuesto{" "}
+              Vas a quitar de Confirmados el presupuesto{" "}
               <strong>{fmtNumPres(revAEliminar.numeropres)}</strong> revisión{" "}
               <strong>{revAEliminar.revision}</strong>
-              {revAEliminar.nombre ? <> ({revAEliminar.nombre})</> : null}. Las filas de
-              Producción vinculadas <strong>no se borran</strong>. Esta acción no se puede
-              deshacer.
+              {revAEliminar.nombre ? <> ({revAEliminar.nombre})</> : null}. Se borra su
+              copia confirmada y la revisión <strong>vuelve a quedar sin confirmar</strong>{" "}
+              (el presupuesto en sí no se borra). Las filas de Producción{" "}
+              <strong>no se borran</strong>: quedan desvinculadas.
             </>
           }
           onConfirm={handleDeleteRevision}
