@@ -658,6 +658,14 @@ export default function PresupuestoNuevo({
   const [candidatoViaNombre, setCandidatoViaNombre] = useState(false);
   const [candidatoNombreVal, setCandidatoNombreVal] = useState("");
   const [candidatoTelVal, setCandidatoTelVal] = useState("");
+
+  // Cliente que NO existe en la base: en vez de darlo de alta solo, se pide
+  // confirmación. `nuevoClientePendiente` = { nombre, tel } mientras el modal
+  // está abierto; `nuevoClienteRechazadoKey` recuerda el "nombre|tel" que el
+  // usuario ya dijo que no cargue, para no volver a preguntar hasta que
+  // cambie alguno de los dos campos.
+  const [nuevoClientePendiente, setNuevoClientePendiente] = useState(null);
+  const [nuevoClienteRechazadoKey, setNuevoClienteRechazadoKey] = useState(null);
   const [localidad, setLocalidad] = useState("Bahía Blanca");
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [leyenda, setLeyenda] = useState("");
@@ -2206,6 +2214,8 @@ export default function PresupuestoNuevo({
     setDomicilio("");
     setDomicilioFiscal("");
     setClienteAutoResuelto(null);
+    setNuevoClientePendiente(null);
+    setNuevoClienteRechazadoKey(null);
     setImagenesFinal([]);
     setMetaPresupuesto(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2222,7 +2232,8 @@ export default function PresupuestoNuevo({
   //   4) Si encontró cliente por teléfono pero el nombre no coincide con
   //      ninguna de sus 3 casillas, agrega el nombre a la primera casilla
   //      vacía de nombre (nombre1 → nombre2). No pisa el campo "nombre" principal.
-  //   5) Si no encuentra nada por ninguno de los dos, da de alta el cliente solo.
+  //   5) Si no encuentra nada por ninguno de los dos, pide confirmación al
+  //      usuario antes de dar de alta el cliente nuevo.
   //
   // ⚠️ Asunciones sobre el backend (ajustar si no coinciden con tu API real):
   //   - GET /clientes/buscar-nombre?q=   ya busca también en nombre1 y nombre2.
@@ -2233,10 +2244,12 @@ export default function PresupuestoNuevo({
     if (cargandoPresupuestoRef.current) return; // no autoresolver mientras se está cargando un presupuesto existente
     if (codcliente) return; // ya está vinculado a un cliente (elegido o ya resuelto)
     if (candidatoCliente) return; // ya hay un candidato esperando confirmación del usuario
+    if (nuevoClientePendiente) return; // ya se está pidiendo confirmar el alta de un cliente nuevo
 
     const nombreVal = cliente.trim();
     const telVal = telefonoSearch.trim();
     if (!nombreVal || !telVal) return; // esperamos nombre Y teléfono
+    if (nuevoClienteRechazadoKey === `${nombreVal}|${telVal}`) return; // el usuario ya dijo que no lo cargue
 
     const timer = setTimeout(async () => {
       setResolviendoCliente(true);
@@ -2296,25 +2309,9 @@ export default function PresupuestoNuevo({
           setCandidatoNombreVal(nombreVal);
           setCandidatoTelVal(telVal);
         } else {
-          // No existe ni por nombre ni por teléfono → alta automática
-          const rNuevo = await authFetch(`${API}/clientes`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ nombre: nombreVal, telefono1: telVal }),
-          });
-          const dNuevo = await rNuevo.json();
-          if (rNuevo.ok) {
-            setCodcliente(
-              dNuevo.codcliente ?? dNuevo.CODCLIENTE ?? dNuevo.id ?? null,
-            );
-            setTelefono1(telVal);
-            setClienteAutoResuelto("nuevo");
-          } else {
-            console.error(
-              "[autoresolverCliente] no se pudo crear el cliente:",
-              dNuevo,
-            );
-          }
+          // No existe ni por nombre ni por teléfono → NO se da de alta solo:
+          // se abre un modal para que el usuario confirme.
+          setNuevoClientePendiente({ nombre: nombreVal, tel: telVal });
         }
       } finally {
         setResolviendoCliente(false);
@@ -2322,7 +2319,15 @@ export default function PresupuestoNuevo({
     }, 900); // esperamos a que el usuario termine de tipear ambos campos
 
     return () => clearTimeout(timer);
-  }, [cliente, telefonoSearch, codcliente, candidatoCliente, numeroPres]);
+  }, [
+    cliente,
+    telefonoSearch,
+    codcliente,
+    candidatoCliente,
+    numeroPres,
+    nuevoClientePendiente,
+    nuevoClienteRechazadoKey,
+  ]);
 
   // Actualiza en el cliente encontrado el primer campo vacío de una lista dada
   const completarCasillaVaciaCliente = async (encontrado, campos, valor) => {
@@ -2452,6 +2457,48 @@ export default function PresupuestoNuevo({
       setResolviendoCliente(false);
       cerrarModalCandidatoCliente();
     }
+  };
+
+  // El usuario confirmó dar de alta el cliente nuevo
+  const confirmarAltaClienteNuevo = async () => {
+    if (!nuevoClientePendiente) return;
+    const { nombre: nombreVal, tel: telVal } = nuevoClientePendiente;
+    setResolviendoCliente(true);
+    try {
+      const rNuevo = await authFetch(`${API}/clientes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: nombreVal, telefono1: telVal }),
+      });
+      const dNuevo = await rNuevo.json().catch(() => null);
+      if (rNuevo.ok) {
+        setCodcliente(
+          dNuevo.codcliente ?? dNuevo.CODCLIENTE ?? dNuevo.id ?? null,
+        );
+        setTelefono1(telVal);
+        setClienteAutoResuelto("nuevo");
+        setNuevoClientePendiente(null);
+      } else {
+        console.error("[autoresolverCliente] no se pudo crear el cliente:", dNuevo);
+        setNuevoClienteRechazadoKey(`${nombreVal}|${telVal}`);
+        setNuevoClientePendiente(null);
+        setError("No se pudo crear el cliente nuevo. Intentá de nuevo.");
+      }
+    } finally {
+      setResolviendoCliente(false);
+    }
+  };
+
+  // El usuario NO quiere guardar el cliente nuevo: se cierra el modal y no
+  // se vuelve a preguntar por este mismo nombre+teléfono.
+  const cancelarAltaClienteNuevo = () => {
+    if (resolviendoCliente) return;
+    if (nuevoClientePendiente) {
+      setNuevoClienteRechazadoKey(
+        `${nuevoClientePendiente.nombre}|${nuevoClientePendiente.tel}`,
+      );
+    }
+    setNuevoClientePendiente(null);
   };
 
   const setLinea = (idx, field, val) => {
@@ -2962,6 +3009,81 @@ export default function PresupuestoNuevo({
                   }}
                 >
                   Listo
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Confirmación: guardar cliente NUEVO (no existe en la base) ── */}
+        {nuevoClientePendiente && (
+          <>
+            <div className="pn-popover-backdrop" onClick={cancelarAltaClienteNuevo} />
+            <div
+              style={{
+                position: "fixed",
+                top: "8%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: "min(440px, 92vw)",
+                background: "#fff",
+                borderRadius: 10,
+                boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
+                padding: 18,
+                zIndex: 1100,
+              }}
+            >
+              <strong style={{ fontSize: 15 }}>Cliente nuevo</strong>
+              <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>
+                No encontramos este cliente en la base. ¿Querés guardarlo como
+                cliente nuevo?
+              </div>
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: 12,
+                  borderRadius: 6,
+                  background: "#f7f7f7",
+                  border: "1px solid #ddd",
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                }}
+              >
+                <div>
+                  <strong>Nombre:</strong> {nuevoClientePendiente.nombre}
+                </div>
+                <div>
+                  <strong>Teléfono:</strong> {nuevoClientePendiente.tel}
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  marginTop: 16,
+                  justifyContent: "flex-end",
+                }}
+              >
+                <button
+                  className="pn-tool-btn"
+                  onClick={cancelarAltaClienteNuevo}
+                  disabled={resolviendoCliente}
+                  style={{ minWidth: 130 }}
+                >
+                  No guardar
+                </button>
+                <button
+                  className="pn-tool-btn"
+                  onClick={confirmarAltaClienteNuevo}
+                  disabled={resolviendoCliente}
+                  style={{
+                    fontWeight: 700,
+                    background: "#e6f7ff",
+                    borderColor: "#1890ff",
+                    minWidth: 130,
+                  }}
+                >
+                  {resolviendoCliente ? "Guardando…" : "Guardar cliente"}
                 </button>
               </div>
             </div>
