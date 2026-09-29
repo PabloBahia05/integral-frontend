@@ -10,7 +10,15 @@ import VistaPrevia from "./VistaPrevia";
  * Qué rota:
  *   - PAN=LPX / PAN=LPY (ancho/alto del panel).
  *   - Taladros verticales (cara superior): @ BV y @ BG -> campos X (2) e Y (3).
- *       En @ BV con repetición tipo 1 también rota el vector (campos 9 y 10).
+ *       Cada taladro se mide desde su esquina de referencia (CRN, campo 1):
+ *         1 = arriba-izq. · 2 = abajo-izq. (origen) · 3 = abajo-der. · 4 = arriba-der.
+ *       con X/Y hacia adentro del panel desde esa esquina (así los muestra
+ *       BiesseWorks). Se convierte todo a coordenadas absolutas, se rota, y
+ *       se escribe con CRN = 2 (X/Y absolutos desde abajo-izquierda).
+ *       Repeticiones de @ BV (RTY 0 = en X con paso DX, 1 = vector DX/DY;
+ *       cantidad NRP, campo 14): se abren en taladros individuales (uno por
+ *       repetición, NRP = 1), porque al girar 90°/270° la repetición cambia
+ *       de eje y así el resultado no depende del código de RTY para "en Y".
  *   - Taladros laterales (canto): @ BH -> cambia el LADO (campo 0) y la
  *       coordenada a lo largo del canto (campo 2). El campo 3 (altura dentro
  *       del espesor) no cambia.
@@ -148,8 +156,92 @@ function puntoEnBorde(lado, s, W, H) {
   return [s, H]; // T
 }
 
+// Esquina de referencia (CRN) del taladro: campo 1, viene entre comillas ("4").
+// Devuelve 1..4 o null si no se puede interpretar.
+function leerCRN(campo) {
+  const n = parseInt(String(campo ?? "").replace(/"/g, "").trim(), 10);
+  return n >= 1 && n <= 4 ? n : null;
+}
+
+// (x,y) medidos desde la esquina `crn` -> coordenadas absolutas del panel
+// (origen abajo-izquierda, Y hacia arriba).
+//   1 = arriba-izq. · 2 = abajo-izq. · 3 = abajo-der. · 4 = arriba-der.
+function aAbsoluto(crn, x, y, W, H) {
+  if (crn === 1) return [x, H - y];
+  if (crn === 3) return [W - x, y];
+  if (crn === 4) return [W - x, H - y];
+  return [x, y]; // 2
+}
+
+// Vector (dx,dy) expresado en el marco de la esquina -> marco absoluto.
+function vectorAAbsoluto(crn, dx, dy) {
+  if (crn === 1) return [dx, -dy];
+  if (crn === 3) return [-dx, dy];
+  if (crn === 4) return [-dx, -dy];
+  return [dx, dy]; // 2
+}
+
+// Cambia el ID (4º campo de la cabecera) sumándole `i`, para que los
+// taladros en que se abre una repetición no compartan ID.
+function cabeceraConId(cabecera, i) {
+  if (!i) return cabecera;
+  return cabecera.replace(
+    /^(.*?,\s*"[^"]*",\s*"[^"]*",\s*)(\d+)(.*)$/,
+    (_, a, id, b) => `${a}${Number(id) + i}${b}`,
+  );
+}
+
+// Lee un @ BV / @ BG y devuelve TODAS sus posiciones absolutas (el taladro
+// más cada repetición). null si X/Y no se pueden interpretar.
+//   BV: RTY = campo 8 (0 = repite en X con paso DX, 1 = con vector DX/DY),
+//       DX = campo 9, DY = campo 10, NRP (cantidad total) = campo 14.
+function leerTaladroVertical(op, panel) {
+  const { campos } = op;
+  const { W, H } = panel;
+  const avisos = [];
+  const x = evaluar(campos[2], panel);
+  const y = evaluar(campos[3], panel);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+  let crn = leerCRN(campos[1]);
+  const crnValido = crn !== null;
+  if (!crnValido) {
+    avisos.push(
+      `@ ${op.tipo} con esquina (CRN) no interpretable (${campos[1]}): se asumió 2 (abajo-izquierda).`,
+    );
+    crn = 2;
+  }
+
+  const [ax, ay] = aAbsoluto(crn, x, y, W, H);
+  const puntos = [[ax, ay]];
+  let repite = false;
+
+  if (op.tipo === "BV") {
+    const rty = evaluar(campos[8], panel);
+    if (rty === 0 || rty === 1) {
+      repite = true;
+      const dx = evaluar(campos[9], panel);
+      const dy = rty === 1 ? evaluar(campos[10], panel) : 0;
+      const nrp = evaluar(campos[14], panel);
+      if (Number.isFinite(dx) && Number.isFinite(dy) && Number.isInteger(nrp) && nrp >= 1) {
+        const [vx, vy] = vectorAAbsoluto(crn, dx, dy);
+        for (let i = 1; i < nrp; i++) puntos.push([ax + vx * i, ay + vy * i]);
+      } else {
+        avisos.push(
+          "@ BV con repetición no interpretable (paso o cantidad): se rotó el primer taladro solamente.",
+        );
+      }
+    } else if (rty !== -1) {
+      avisos.push(
+        `@ BV con repetición tipo ${campos[8]} no contemplada: se rotó el primer taladro solamente.`,
+      );
+    }
+  }
+  return { puntos, avisos, crnValido, repite };
+}
+
 function rotarOperacion(op, ctx) {
-  const { angulo, panel, transformarPunto, rotarVector } = ctx;
+  const { angulo, panel, transformarPunto, saltoLinea } = ctx;
   const { campos } = op;
   const nuevos = [...campos];
   const avisos = [];
@@ -176,6 +268,12 @@ function rotarOperacion(op, ctx) {
         "@ BH con repetición: se rotó el primer taladro pero no la repetición.",
       );
     }
+    const crnBH = leerCRN(campos[1]);
+    if (crnBH !== null && crnBH !== 2) {
+      avisos.push(
+        `@ BH con esquina (CRN) ${crnBH}: la rotación de laterales no considera la esquina, revisá el resultado en Biesse.`,
+      );
+    }
     const [ex, ey] = puntoEnBorde(lado, s, panel.W, panel.H);
     const [nx, ny] = transformarPunto(ex, ey);
     const nuevoLado = MAPA_LADO[angulo][lado];
@@ -185,40 +283,32 @@ function rotarOperacion(op, ctx) {
     return final("lateral");
   }
 
-  // BV / BG: cara superior
-  const x = evaluar(campos[2], panel);
-  const y = evaluar(campos[3], panel);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+  // BV / BG: cara superior. Se pasa a coordenadas absolutas (según CRN),
+  // se rota, y se escribe con CRN = 2. Cada repetición sale como un
+  // taladro propio (NRP = 1).
+  const lect = leerTaladroVertical(op, panel);
+  if (!lect) {
     avisos.push(
       `@ ${op.tipo} con X/Y no interpretables (${campos[2]}, ${campos[3]}): no se rotó.`,
     );
     return sinCambios();
   }
-  const [nx, ny] = transformarPunto(x, y);
-  nuevos[2] = formatearNumero(nx);
-  nuevos[3] = formatearNumero(ny);
-
-  if (op.tipo === "BV") {
-    const rty = evaluar(campos[8], panel);
-    if (rty === 1) {
-      const dx = evaluar(campos[9], panel);
-      const dy = evaluar(campos[10], panel);
-      if (Number.isFinite(dx) && Number.isFinite(dy)) {
-        const [ndx, ndy] = rotarVector(dx, dy);
-        nuevos[9] = formatearNumero(ndx);
-        nuevos[10] = formatearNumero(ndy);
-      } else {
-        avisos.push(
-          "@ BV con repetición no interpretable: se rotó el primer taladro solamente.",
-        );
-      }
-    } else if (rty !== -1 && rty !== 0) {
-      avisos.push(
-        `@ BV con repetición tipo ${campos[8]} no contemplada: se rotó el primer taladro solamente.`,
-      );
-    }
-  }
-  return final("vertical");
+  avisos.push(...lect.avisos);
+  const lineas = lect.puntos.map(([ax, ay], i) => {
+    const [nx, ny] = transformarPunto(ax, ay);
+    const n = [...campos];
+    if (lect.crnValido) n[1] = '"2"';
+    n[2] = formatearNumero(nx);
+    n[3] = formatearNumero(ny);
+    if (op.tipo === "BV" && lect.repite && n[14] !== undefined) n[14] = "1";
+    return `${cabeceraConId(op.cabecera, i)} : ${n.join(", ")}`;
+  });
+  return {
+    linea: lineas.join(saltoLinea),
+    tipo: "vertical",
+    cantidad: lineas.length,
+    avisos,
+  };
 }
 
 function rotarBPP(contenidoOriginal, angulo) {
@@ -241,12 +331,7 @@ function rotarBPP(contenidoOriginal, angulo) {
     if (angulo === 270) return [H - y, x];
     return [W - x, H - y]; // 180
   };
-  const rotarVector = (dx, dy) => {
-    if (angulo === 90) return [dy, -dx];
-    if (angulo === 270) return [-dy, dx];
-    return [-dx, -dy]; // 180
-  };
-  const ctx = { angulo, panel, transformarPunto, rotarVector };
+  const ctx = { angulo, panel, transformarPunto, saltoLinea };
 
   let verticales = 0;
   let laterales = 0;
@@ -271,7 +356,7 @@ function rotarBPP(contenidoOriginal, angulo) {
       const r = rotarOperacion(op, ctx);
       if (op.activa) {
         r.avisos.forEach((a) => avisos.add(a));
-        if (r.tipo === "vertical") verticales++;
+        if (r.tipo === "vertical") verticales += r.cantidad ?? 1;
         if (r.tipo === "lateral") laterales++;
       }
       return r.linea;
@@ -343,18 +428,11 @@ function extraerFormasBPP(contenido) {
       continue;
     }
 
-    const x = evaluar(campos[2], panel);
-    const y = evaluar(campos[3], panel);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    formas.push({ t: "circle", cx: x, cy: y, r, relleno: true });
-    nV++;
-    if (op.tipo === "BV" && evaluar(campos[8], panel) === 1) {
-      const dx = evaluar(campos[9], panel);
-      const dy = evaluar(campos[10], panel);
-      if (Number.isFinite(dx) && Number.isFinite(dy)) {
-        formas.push({ t: "line", x1: x, y1: y, x2: x + dx, y2: y + dy });
-        formas.push({ t: "circle", cx: x + dx, cy: y + dy, r, relleno: true });
-      }
+    const lect = leerTaladroVertical(op, panel);
+    if (!lect) continue;
+    for (const [px, py] of lect.puntos) {
+      formas.push({ t: "circle", cx: px, cy: py, r, relleno: true });
+      nV++;
     }
   }
   return {
