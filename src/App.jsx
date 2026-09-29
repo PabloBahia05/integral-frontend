@@ -32,6 +32,7 @@ import SketchUp from "./screens/SketchUp";
 import Anviz from "./screens/Anviz";
 import FichadasAnviz from "./screens/FichadasAnviz";
 import FlujoFondos from "./screens/FlujoFondos";
+import Herramientas from "./screens/Herramientas";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState, useRef } from "react";
@@ -70,6 +71,7 @@ const SCREENS = {
   "visor-dwg": { label: "VISOR 3D MÓDULOS", icon: "📐" },
   sketchup: { label: "SKETCHUP", icon: "🧊" },
   "flujo-fondos": { label: "FLUJO DE FONDOS", icon: "💵" },
+  herramientas: { label: "HERRAMIENTAS", icon: "🛠️" },
   chat: { label: "CHAT", icon: "💬" },
 };
 
@@ -93,6 +95,7 @@ const PANTALLAS_MENU = [
   { id: "materiales-melamina", label: "MATERIALES MELAMINA", icon: "🎨", color: "#c2185b", ubicacionDefault: "principal" },
   { id: "visor-dwg", label: "VISOR 3D MÓDULOS", icon: "📐", color: "#00838f", ubicacionDefault: "lateral" },
   { id: "sketchup", label: "SKETCHUP", icon: "🧊", color: "#ff8c42", ubicacionDefault: "principal" },
+  { id: "herramientas", label: "HERRAMIENTAS", icon: "🛠️", color: "#607d8b", ubicacionDefault: "principal" },
   { id: "chat", label: "CHAT", icon: "💬", color: "#25d366", ubicacionDefault: "principal" },
   { id: "presupuesto-mamparas", label: "PRESUPUESTO MAMPARAS", icon: "🪟", color: "#4895ef", ubicacionDefault: "lateral" },
   { id: "presupuesto-muebles", label: "PRESUPUESTO MUEBLES", icon: "🪵", color: "#a0785a", ubicacionDefault: "lateral" },
@@ -1485,6 +1488,9 @@ function App() {
               <FlujoFondos token={token} authFetch={authFetch} onBack={() => setScreen(null)} />
             )}
 
+            {/* ── Herramientas (Rotar BPP / DXF) ── */}
+            {screen === "herramientas" && <Herramientas onBack={() => setScreen(null)} />}
+
             {/* ── Facturas ── */}
             {screen === "facturas" && <Facturas proveedores={proveedores} token={token} />}
 
@@ -1589,6 +1595,7 @@ function App() {
         {puedo("visor-dwg", "ver") && <p onClick={() => { setScreen("visor-dwg"); setSidebarOpen(false); }}>📐 Visor 3D Módulos</p>}
         {puedo("asistencia", "ver") && <p onClick={() => { setScreen("asistencia"); setSidebarOpen(false); }}>⏰ Asistencia</p>}
         {puedo("fichadas", "ver") && <p onClick={() => { setScreen("fichadas"); setSidebarOpen(false); }}>🕒 Control de Fichadas</p>}
+        {puedo("herramientas", "ver") && <p onClick={() => { setScreen("herramientas"); setSidebarOpen(false); }}>🛠️ Herramientas</p>}
         <p onClick={logout} style={{ color: "#cc3333" }}>🚪 Cerrar sesión</p>
       </div>
 
