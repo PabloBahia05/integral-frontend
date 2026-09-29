@@ -25,6 +25,9 @@ const API = "https://integral-backend-production.up.railway.app";
 //     de `articulos` (GET /productos) o se escriben a mano si es un ítem nuevo
 //  5. Elimina un ítem                     → DELETE /confirmados/:id
 //     (NO borra la fila de producción: solo la desvincula)
+//  6. Elimina una revisión completa       → DELETE /confirmados/:numeropres/:revision
+//     (borra de `confirmados` todos los ítems de esa revisión; tampoco
+//     borra filas de producción)
 //
 // `onInicio` (opcional): función que lleva a la pantalla de inicio. Si el
 // padre no la pasa, el botón "Inicio" navega a la raíz del sitio ("/").
@@ -275,6 +278,10 @@ export default function Confirmados({ authFetch, token, onInicio }) {
   const [aEliminar, setAEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
 
+  // Baja de una revisión completa (fila de la lista principal)
+  const [revAEliminar, setRevAEliminar] = useState(null);
+  const [eliminandoRev, setEliminandoRev] = useState(false);
+
   // Alta de un ítem nuevo en la obra abierta
   const NUEVO_VACIO = {
     nombreart: "",
@@ -497,6 +504,31 @@ export default function Confirmados({ authFetch, token, onInicio }) {
     }
   };
 
+  // ── Baja de una revisión completa ──────────────────────────────────
+
+  const handleDeleteRevision = async () => {
+    if (!revAEliminar) return;
+    setEliminandoRev(true);
+    try {
+      const res = await authFetch(
+        `${API}/confirmados/${encodeURIComponent(revAEliminar.numeropres)}/${encodeURIComponent(revAEliminar.revision)}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+      setRevisiones((prev) => prev.filter((r) => r.id !== revAEliminar.id));
+      if (abierta?.id === revAEliminar.id) cerrarPanel();
+      setRevAEliminar(null);
+    } catch (e) {
+      console.error("Error borrando revisión de confirmados:", e);
+      alert(`No se pudo borrar la revisión: ${e.message}`);
+    } finally {
+      setEliminandoRev(false);
+    }
+  };
+
   // ── Filtro de la lista ─────────────────────────────────────────────
 
   const q = search.trim().toLowerCase();
@@ -555,6 +587,31 @@ export default function Confirmados({ authFetch, token, onInicio }) {
     { key: "direccion", label: "Dirección", render: (v) => v ?? "—" },
     { key: "fecha", label: "Fecha", render: (v) => fmtFecha(v) },
     { key: "total1", label: "Total", render: (v) => fmtMonto(v) },
+    {
+      key: "eliminar",
+      label: "",
+      render: (v, row) => (
+        <button
+          // stopPropagation: si no, el clic también abriría el panel de la fila
+          onClick={(e) => {
+            e.stopPropagation();
+            setRevAEliminar(row);
+          }}
+          title="Eliminar revisión confirmada"
+          style={{
+            border: "1px solid #f0a0a0",
+            background: "#fdf0f0",
+            color: "#c0392b",
+            borderRadius: 4,
+            padding: "3px 8px",
+            cursor: "pointer",
+            fontSize: 12,
+          }}
+        >
+          🗑
+        </button>
+      ),
+    },
   ];
 
   const columnasItems = [
@@ -1019,6 +1076,25 @@ export default function Confirmados({ authFetch, token, onInicio }) {
           }
           onConfirm={handleDelete}
           onClose={() => !eliminando && setAEliminar(null)}
+        />
+      )}
+
+      {revAEliminar && (
+        <ConfirmDelete
+          item={revAEliminar}
+          title="¿Eliminar esta revisión confirmada?"
+          message={
+            <>
+              Vas a eliminar de Confirmados <strong>todos los ítems</strong> del presupuesto{" "}
+              <strong>{fmtNumPres(revAEliminar.numeropres)}</strong> revisión{" "}
+              <strong>{revAEliminar.revision}</strong>
+              {revAEliminar.nombre ? <> ({revAEliminar.nombre})</> : null}. Las filas de
+              Producción vinculadas <strong>no se borran</strong>. Esta acción no se puede
+              deshacer.
+            </>
+          }
+          onConfirm={handleDeleteRevision}
+          onClose={() => !eliminandoRev && setRevAEliminar(null)}
         />
       )}
     </>
