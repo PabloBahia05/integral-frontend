@@ -2060,6 +2060,65 @@ export default function ModulosDomus({ authFetch, token }) {
         Hacé clic en un código para ver y cargar sus piezas.
       </p>
 
+      {errorEliminarCodigoId &&
+        (() => {
+          const cErr = codigosProduccion.find((c) => c.id === errorEliminarCodigoId.id);
+          if (!cErr) return null;
+          const ocupado = eliminandoCodigoId === cErr.id;
+          return (
+            <div
+              style={{
+                margin: "0 0 12px",
+                fontSize: 12,
+                color: "#c0392b",
+                background: "#fdecea",
+                padding: "10px 12px",
+                borderRadius: 6,
+                fontFamily: "'Space Mono',monospace",
+              }}
+            >
+              <p style={{ margin: "0 0 8px" }}>
+                ⚠ No se pudo eliminar <strong>{cErr.codigo}</strong>: {errorEliminarCodigoId.mensaje}
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => handleEliminarCodigo(cErr, true)}
+                  disabled={ocupado}
+                  style={{
+                    border: "1.5px solid #c0392b",
+                    background: "#fff",
+                    color: "#c0392b",
+                    cursor: ocupado ? "default" : "pointer",
+                    fontSize: 11,
+                    fontFamily: "'Space Mono', monospace",
+                    fontWeight: 700,
+                    borderRadius: 4,
+                    padding: "3px 8px",
+                  }}
+                >
+                  {ocupado ? "⏳" : "Forzar borrado"}
+                </button>
+                <button
+                  onClick={() => setErrorEliminarCodigoId(null)}
+                  style={{
+                    border: "1.5px solid #b8d6ef",
+                    background: "#fff",
+                    color: "#4a8ab5",
+                    cursor: "pointer",
+                    fontSize: 11,
+                    fontFamily: "'Space Mono', monospace",
+                    fontWeight: 700,
+                    borderRadius: 4,
+                    padding: "3px 8px",
+                  }}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
       {loadingCodigos ? (
         <p style={{ padding: "24px", color: "#4a8ab5", fontFamily: "'Space Mono',monospace" }}>
           ⏳ Cargando códigos de producción...
