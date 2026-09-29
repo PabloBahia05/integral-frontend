@@ -26,6 +26,16 @@ const CAMPOS = [
   { campo: "canto4", label: "Canto4", maxLength: 150 },
 ];
 
+// Descuento (en mm) que aplica cada canto sobre la pieza. Numéricos
+// (DECIMAL(6,2) NULL), por eso van aparte de CAMPOS: el buscador filtra
+// solo por texto y el guardado los normaliza a número.
+const CAMPOS_DESC = [
+  { campo: "desc_canto1", label: "Desc. Canto1" },
+  { campo: "desc_canto2", label: "Desc. Canto2" },
+  { campo: "desc_canto3", label: "Desc. Canto3" },
+  { campo: "desc_canto4", label: "Desc. Canto4" },
+];
+
 export default function MaterialesMelamina({ authFetch }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -86,10 +96,19 @@ export default function MaterialesMelamina({ authFetch }) {
     setGuardandoCampo(key);
     setErrorCampo(null);
     try {
+      let valor = row[campo] === "" ? null : row[campo];
+      if (CAMPOS_DESC.some((c) => c.campo === campo)) {
+        // acepta coma decimal ("1,5") y vacío (→ NULL); rechaza negativos/no numéricos
+        const txt = String(row[campo] ?? "").trim().replace(",", ".");
+        valor = txt === "" ? null : Number(txt);
+        if (valor !== null && (Number.isNaN(valor) || valor < 0)) {
+          throw new Error("Valor inválido");
+        }
+      }
       const res = await authFetch(`${API}/materiales-melamina/${row.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [campo]: row[campo] === "" ? null : row[campo] }),
+        body: JSON.stringify({ [campo]: valor }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (e) {
@@ -210,6 +229,23 @@ export default function MaterialesMelamina({ authFetch }) {
         ),
       };
     }),
+    ...CAMPOS_DESC.map(({ campo, label }) => ({
+      key: campo,
+      label,
+      render: (v, row) => (
+        <input
+          type="text"
+          inputMode="decimal"
+          value={row[campo] ?? ""}
+          placeholder="0"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => handleCampoChange(row.id, campo, e.target.value)}
+          onBlur={() => handleCampoBlur(row, campo)}
+          maxLength={8}
+          style={{ ...estiloInput(row.id, campo), maxWidth: "80px", textAlign: "right" }}
+        />
+      ),
+    })),
     {
       // Veta: de solo lectura acá — el valor real vive en `articulos.veta`
       // (0/1, campo "¿tiene veta?"), no en esta tabla. Se resuelve por
@@ -257,7 +293,7 @@ export default function MaterialesMelamina({ authFetch }) {
       <ScreenHeader
         icon="🎨"
         title="Materiales Melamina"
-        subtitle="Catálogo de combinaciones material / melamina / cantos"
+        subtitle="Catálogo de combinaciones material / melamina / cantos y descuento por canto"
       />
 
       <StatCards
