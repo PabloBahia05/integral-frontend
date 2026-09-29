@@ -946,6 +946,138 @@ export default function ModulosDomus({ authFetch, token }) {
     }
   };
 
+  // ── Mover / copiar un código como SUBCÓDIGO de otro código ───────────
+  //
+  // Toma TODAS las piezas del código seleccionado y las cuelga de otro
+  // código de destino, bajo un subcódigo (por defecto, el nombre del
+  // código de origen). Dos modos:
+  //   · copiar: crea copias en el destino, el origen queda intacto.
+  //   · mover:  reasigna las piezas existentes (PUT) al destino; el origen
+  //             queda sin piezas (no se borra solo ni se tocan sus
+  //             vínculos con artículos).
+  // Como hay un solo nivel de subcódigo, si el origen ya tenía variantes,
+  // cada una pasa a llamarse "<subcódigo nuevo>-<variante>"; las piezas sin
+  // variante pasan a "<subcódigo nuevo>".
+
+  const [subDeOrigen, setSubDeOrigen] = useState(null);
+  const [subDeDestinoId, setSubDeDestinoId] = useState("");
+  const [subDeNombre, setSubDeNombre] = useState("");
+  const [subDeModo, setSubDeModo] = useState("copiar");
+  const [subDeEjecutando, setSubDeEjecutando] = useState(false);
+  const [subDeError, setSubDeError] = useState(null);
+
+  const abrirSubDe = (codigo) => {
+    setSubDeOrigen(codigo);
+    setSubDeDestinoId("");
+    setSubDeNombre(codigo.codigo ?? "");
+    setSubDeModo("copiar");
+    setSubDeError(null);
+  };
+
+  const cerrarSubDe = () => {
+    if (subDeEjecutando) return;
+    setSubDeOrigen(null);
+    setSubDeError(null);
+  };
+
+  const handleSubDe = async () => {
+    const nombre = subDeNombre.trim();
+    if (!subDeOrigen || !subDeDestinoId || !nombre) return;
+    const destino = codigosProduccion.find((c) => String(c.id) === String(subDeDestinoId));
+    if (!destino) return;
+    if (
+      subDeModo === "mover" &&
+      !window.confirm(
+        `Vas a MOVER todas las piezas de ${subDeOrigen.codigo} a ${destino.codigo} (subcódigo "${nombre}"). ${subDeOrigen.codigo} se queda sin piezas. ¿Continuar?`,
+      )
+    ) {
+      return;
+    }
+    setSubDeEjecutando(true);
+    setSubDeError(null);
+    try {
+      // 1. Piezas del código de origen.
+      const resO = await authFetch(`${API}/modulos-domus/por-codigo-produccion/${subDeOrigen.id}`);
+      const piezasO = await resO.json().catch(() => null);
+      if (!resO.ok) throw new Error(piezasO?.error || `HTTP ${resO.status}`);
+      const lista = Array.isArray(piezasO) ? piezasO : [];
+      if (lista.length === 0) throw new Error(`${subDeOrigen.codigo} no tiene piezas para ${subDeModo}.`);
+
+      // 2. Subcódigo final de cada pieza.
+      const nuevoSub = (p) => {
+        const v = String(p.subcodigo ?? "").trim();
+        return v ? `${nombre}-${v}` : nombre;
+      };
+
+      // 3. Que no choque con subcódigos que el destino ya tiene.
+      const resD = await authFetch(`${API}/modulos-domus/por-codigo-produccion/${destino.id}`);
+      const piezasD = await resD.json().catch(() => null);
+      if (!resD.ok) throw new Error(piezasD?.error || `HTTP ${resD.status}`);
+      const existentes = new Set(
+        (Array.isArray(piezasD) ? piezasD : []).map((p) => String(p.subcodigo ?? "").trim()),
+      );
+      const choques = [...new Set(lista.map(nuevoSub))].filter((s) => existentes.has(s));
+      if (choques.length > 0) {
+        throw new Error(
+          `${destino.codigo} ya tiene el subcódigo ${choques.map((s) => `"${s}"`).join(", ")}. Elegí otro nombre.`,
+        );
+      }
+
+      // 4. Copiar (POST) o mover (PUT).
+      for (const pieza of lista) {
+        let res;
+        if (subDeModo === "mover") {
+          res = await authFetch(`${API}/modulos-domus/${pieza.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ codigo_produccion_id: destino.id, subcodigo: nuevoSub(pieza) }),
+          });
+        } else {
+          const {
+            id: _id,
+            codform: _cf,
+            formulax_descripcion: _fxd,
+            formulay_descripcion: _fyd,
+            formulax_formula: _fxf,
+            formulax_formula2: _fxf2,
+            formulax_formula3: _fxf3,
+            formulay_formula: _fyf,
+            ...resto
+          } = pieza;
+          res = await authFetch(`${API}/modulos-domus`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...resto,
+              codigo_produccion_id: destino.id,
+              subcodigo: nuevoSub(pieza),
+            }),
+          });
+        }
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          throw new Error(body?.error || `HTTP ${res.status} en la pieza "${pieza.titulo ?? pieza.id}"`);
+        }
+      }
+
+      // 5. Actualizar contadores de la grilla.
+      setCodigosProduccion((prev) =>
+        prev.map((c) => {
+          if (c.id === destino.id) return { ...c, cant_piezas: Number(c.cant_piezas ?? 0) + lista.length };
+          if (subDeModo === "mover" && c.id === subDeOrigen.id) return { ...c, cant_piezas: 0 };
+          return c;
+        }),
+      );
+      setSubDeOrigen(null);
+      fetchCodigosProduccion();
+    } catch (e) {
+      console.error("Error moviendo/copiando código como subcódigo:", e);
+      setSubDeError(e.message || "No se pudo completar la operación.");
+    } finally {
+      setSubDeEjecutando(false);
+    }
+  };
+
   // ── Panel de un código de producción (sus piezas) ────────────────────
 
   // Código abierto en el panel: { id, codigo, descripcion } o null.
@@ -1879,6 +2011,30 @@ export default function ModulosDomus({ authFetch, token }) {
         >
           🔗 Relaciones
         </button>
+        <button
+          onClick={() => seleccionado && abrirSubDe(seleccionado)}
+          disabled={!seleccionado}
+          title={
+            seleccionado
+              ? `Mover o copiar ${seleccionado.codigo} como subcódigo de otro código`
+              : "Seleccioná un código de la grilla primero"
+          }
+          style={{
+            padding: "8px 14px",
+            borderRadius: 6,
+            border: "1.5px solid #b8d6ef",
+            background: "#fff",
+            color: "#0a3a5c",
+            cursor: seleccionado ? "pointer" : "not-allowed",
+            opacity: seleccionado ? 1 : 0.5,
+            fontFamily: "'Space Mono', monospace",
+            fontSize: 12,
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+          }}
+        >
+          ↪ Como subcódigo de…
+        </button>
         {sinCodigo.length > 0 && (
           <button
             onClick={abrirSinCodigo}
@@ -2165,6 +2321,134 @@ export default function ModulosDomus({ authFetch, token }) {
                 }}
               >
                 {duplicandoCodigo ? "Duplicando…" : "Duplicar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {subDeOrigen && (
+        <div
+          onClick={cerrarSubDe}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "90%",
+              maxWidth: 420,
+              background: "#fff",
+              borderRadius: 10,
+              padding: "20px 22px",
+              fontFamily: "'Space Mono', monospace",
+              color: "#0a3a5c",
+            }}
+          >
+            <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>Usar como subcódigo de otro código</h3>
+            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#4a8ab5" }}>
+              Las piezas de <strong>{subDeOrigen.codigo}</strong> pasan a colgar de otro código,
+              dentro de un subcódigo.
+            </p>
+
+            <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>Código de destino</label>
+            <select
+              value={subDeDestinoId}
+              onChange={(e) => setSubDeDestinoId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", fontSize: 13, fontFamily: "'Space Mono',monospace", border: "1.5px solid #b8d6ef", borderRadius: 4, marginBottom: 12 }}
+            >
+              <option value="">— Elegí un código —</option>
+              {codigosProduccion
+                .filter((c) => c.id !== subDeOrigen.id)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.codigo}
+                    {c.descripcion ? ` — ${c.descripcion}` : ""}
+                  </option>
+                ))}
+            </select>
+
+            <label style={{ fontSize: 11, display: "block", marginBottom: 4 }}>Nombre del subcódigo</label>
+            <input
+              type="text"
+              value={subDeNombre}
+              onChange={(e) => setSubDeNombre(e.target.value)}
+              maxLength={50}
+              style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", fontSize: 13, fontFamily: "'Space Mono',monospace", border: "1.5px solid #b8d6ef", borderRadius: 4, marginBottom: 12 }}
+            />
+
+            <div style={{ display: "flex", gap: 16, fontSize: 12, marginBottom: 12 }}>
+              <label style={{ cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  checked={subDeModo === "copiar"}
+                  onChange={() => setSubDeModo("copiar")}
+                />{" "}
+                Copiar (el original queda)
+              </label>
+              <label style={{ cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  checked={subDeModo === "mover"}
+                  onChange={() => setSubDeModo("mover")}
+                />{" "}
+                Mover
+              </label>
+            </div>
+
+            {subDeModo === "mover" && (
+              <p style={{ margin: "0 0 12px", fontSize: 11, color: "#b9770e" }}>
+                Al mover, {subDeOrigen.codigo} queda sin piezas (no se borra ni se tocan sus
+                artículos vinculados).
+              </p>
+            )}
+
+            {subDeError && (
+              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>{subDeError}</p>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                onClick={cerrarSubDe}
+                disabled={subDeEjecutando}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "1.5px solid #b8d6ef",
+                  background: "#fff",
+                  color: "#4a8ab5",
+                  cursor: "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSubDe}
+                disabled={subDeEjecutando || !subDeDestinoId || !subDeNombre.trim()}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 4,
+                  border: "none",
+                  background: "#1a7a44",
+                  color: "#fff",
+                  cursor: subDeEjecutando ? "wait" : "pointer",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  opacity: subDeEjecutando || !subDeDestinoId || !subDeNombre.trim() ? 0.6 : 1,
+                }}
+              >
+                {subDeEjecutando ? "Procesando…" : subDeModo === "mover" ? "Mover" : "Copiar"}
               </button>
             </div>
           </div>
