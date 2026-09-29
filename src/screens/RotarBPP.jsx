@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
+import VistaPrevia from "./VistaPrevia";
 
 /**
  * RotarBPP
@@ -107,46 +108,95 @@ function rotarBPP(contenidoOriginal, angulo) {
   };
 }
 
+// Extrae del texto de un .bpp el panel y los taladros (@ BG) para dibujarlos.
+// Se usa tanto con el original como con el rotado, así la vista previa
+// refleja exactamente lo que hay en cada archivo.
+function extraerFormasBPP(contenido) {
+  const mx = contenido.match(/PAN=LPX\|([\d.]+)/);
+  const my = contenido.match(/PAN=LPY\|([\d.]+)/);
+  if (!mx || !my) return { formas: [], detalle: "" };
+  const W = parseFloat(mx[1]);
+  const H = parseFloat(my[1]);
+  const radio = Math.max(3, Math.max(W, H) * 0.004);
+  const formas = [{ t: "rect", x: 0, y: 0, w: W, h: H }];
+  let n = 0;
+  for (const linea of contenido.split(/\r?\n/)) {
+    if (linea.startsWith("@ BG,") && linea.includes(" : ")) {
+      const campos = linea.slice(linea.indexOf(" : ") + 3).split(", ");
+      const x = parseFloat(campos[2]);
+      const y = parseFloat(campos[3]);
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        formas.push({ t: "circle", cx: x, cy: y, r: radio, relleno: true });
+        n++;
+      }
+    }
+  }
+  return { formas, detalle: `Panel ${W}×${H} mm · ${n} taladro(s)` };
+}
+
 export default function RotarBPP({ onVolver }) {
   const [archivo, setArchivo] = useState(null);
   const [angulo, setAngulo] = useState(90);
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
   const [resultado, setResultado] = useState(null);
+  const [contenidoOriginal, setContenidoOriginal] = useState("");
   const inputRef = useRef(null);
 
-  const handleArchivo = (e) => {
+  // Rotación en vivo (para la vista previa y para la descarga).
+  const rotado = useMemo(() => {
+    if (!contenidoOriginal) return null;
+    try {
+      return { ...rotarBPP(contenidoOriginal, angulo), error: null };
+    } catch (err) {
+      return { error: err.message || "No se pudo rotar el archivo." };
+    }
+  }, [contenidoOriginal, angulo]);
+
+  const prevOriginal = useMemo(
+    () => (contenidoOriginal ? extraerFormasBPP(contenidoOriginal) : null),
+    [contenidoOriginal],
+  );
+  const prevRotado = useMemo(
+    () => (rotado && !rotado.error ? extraerFormasBPP(rotado.contenido) : null),
+    [rotado],
+  );
+
+  const handleArchivo = async (e) => {
     const f = e.target.files?.[0];
     setError("");
     setResultado(null);
+    setContenidoOriginal("");
     if (f && !f.name.toLowerCase().endsWith(".bpp")) {
       setError("El archivo debe tener extensión .bpp");
       setArchivo(null);
       return;
     }
     setArchivo(f || null);
+    if (f) {
+      try {
+        setContenidoOriginal(decodificarLatin1(await f.arrayBuffer()));
+      } catch (err) {
+        setError("No se pudo leer el archivo.");
+      }
+    }
   };
 
-  const handleRotarYDescargar = async () => {
-    if (!archivo) {
+  const handleRotarYDescargar = () => {
+    if (!archivo || !rotado) {
       setError("Elegí un archivo .bpp primero.");
+      return;
+    }
+    if (rotado.error) {
+      setError(rotado.error);
       return;
     }
     setProcesando(true);
     setError("");
-    setResultado(null);
     try {
-      const buffer = await archivo.arrayBuffer();
-      const contenidoOriginal = decodificarLatin1(buffer);
-      const { contenido, taladrosRotados, panelOriginal, panelNuevo } = rotarBPP(
-        contenidoOriginal,
-        angulo,
-      );
-
-      const bytesSalida = codificarLatin1(contenido);
-      const blob = new Blob([bytesSalida], { type: "application/octet-stream" });
+      const { contenido, taladrosRotados, panelOriginal, panelNuevo } = rotado;
+      const blob = new Blob([codificarLatin1(contenido)], { type: "application/octet-stream" });
       const url = URL.createObjectURL(blob);
-
       const nombreBase = archivo.name.replace(/\.bpp$/i, "");
       const a = document.createElement("a");
       a.href = url;
@@ -155,10 +205,9 @@ export default function RotarBPP({ onVolver }) {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-
       setResultado({ taladrosRotados, panelOriginal, panelNuevo });
     } catch (err) {
-      setError(err.message || "No se pudo rotar el archivo.");
+      setError(err.message || "No se pudo generar el archivo.");
     } finally {
       setProcesando(false);
     }
@@ -180,7 +229,7 @@ export default function RotarBPP({ onVolver }) {
         ‹ Volver
       </button>
 
-      <div style={{ maxWidth: "420px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "980px", margin: "0 auto" }}>
         <h2 style={{ color: "#0a3a5c", marginBottom: "20px" }}>Rotar archivo BPP</h2>
 
         <div style={{ marginBottom: "16px" }}>
@@ -194,11 +243,11 @@ export default function RotarBPP({ onVolver }) {
           <label style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "#333" }}>
             Ángulo de rotación
           </label>
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ display: "flex", gap: "8px", maxWidth: "420px" }}>
             {ANGULOS.map((a) => (
               <button
                 key={a}
-                onClick={() => setAngulo(a)}
+                onClick={() => { setAngulo(a); setResultado(null); }}
                 style={{
                   flex: 1,
                   padding: "8px 0",
@@ -216,7 +265,9 @@ export default function RotarBPP({ onVolver }) {
           </div>
         </div>
 
-        {error && <div style={{ marginBottom: "14px", color: "#c0392b", fontSize: "13px" }}>{error}</div>}
+        {(error || rotado?.error) && (
+          <div style={{ marginBottom: "14px", color: "#c0392b", fontSize: "13px" }}>{error || rotado.error}</div>
+        )}
 
         {resultado && (
           <div style={{ marginBottom: "14px", fontSize: "12.5px", color: "#2e7d32" }}>
@@ -226,16 +277,35 @@ export default function RotarBPP({ onVolver }) {
           </div>
         )}
 
+        {prevOriginal && (
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "18px" }}>
+            <VistaPrevia
+              titulo="Original"
+              detalle={prevOriginal.detalle}
+              formas={prevOriginal.formas}
+              origen={{ x: 0, y: 0 }}
+              colorTitulo="#5f7f96"
+            />
+            <VistaPrevia
+              titulo={`Generado (${angulo}° horario)`}
+              detalle={prevRotado?.detalle}
+              formas={prevRotado?.formas}
+              origen={{ x: 0, y: 0 }}
+              colorTitulo="#0a3a5c"
+            />
+          </div>
+        )}
+
         <button
           onClick={handleRotarYDescargar}
-          disabled={!archivo || procesando}
+          disabled={!archivo || procesando || !rotado || !!rotado.error}
           style={{
             padding: "10px 18px",
             borderRadius: "6px",
             border: "none",
-            background: !archivo || procesando ? "#9db8c9" : "#0a3a5c",
+            background: !archivo || procesando || !rotado || rotado.error ? "#9db8c9" : "#0a3a5c",
             color: "#fff",
-            cursor: !archivo || procesando ? "not-allowed" : "pointer",
+            cursor: !archivo || procesando || !rotado || rotado.error ? "not-allowed" : "pointer",
             fontSize: "13px",
             fontWeight: "bold",
           }}

@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
+import VistaPrevia from "./VistaPrevia";
 
 /**
  * RotarDXF
@@ -170,38 +171,149 @@ function rotarDXF(texto, angulo) {
   };
 }
 
+// Extrae de un DXF las formas dibujables (sección ENTITIES) para la vista
+// previa. Se usa con el original y con el rotado. Limitaciones: los bulges
+// de las polilíneas se dibujan como tramos rectos, y los INSERT se marcan
+// con una cruz (no se dibuja el contenido del bloque).
+function extraerFormasDXF(texto) {
+  const { registros } = parseDXF(texto);
+  const entidades = [];
+  let seccion = null;
+  let actual = null;
+  for (const r of registros) {
+    if (r.code === 0) {
+      const v = r.value.trim();
+      if (v === "SECTION") { seccion = "PENDIENTE"; actual = null; continue; }
+      if (v === "ENDSEC") { seccion = null; actual = null; continue; }
+      if (seccion === "ENTITIES") {
+        actual = { tipo: v, datos: [] };
+        entidades.push(actual);
+      }
+      continue;
+    }
+    if (r.code === 2 && seccion === "PENDIENTE") { seccion = r.value.trim(); continue; }
+    if (seccion === "ENTITIES" && actual) actual.datos.push(r);
+  }
+
+  const num = (datos, code) => {
+    const d = datos.find((x) => x.code === code);
+    const n = d ? parseFloat(d.value) : NaN;
+    return Number.isFinite(n) ? n : null;
+  };
+  const txt = (datos, code) => {
+    const d = datos.find((x) => x.code === code);
+    return d ? d.value : "";
+  };
+  const vertices = (datos) => {
+    const pts = [];
+    for (let i = 0; i < datos.length; i++) {
+      if (datos[i].code === 10 && datos[i + 1] && datos[i + 1].code === 20) {
+        const x = parseFloat(datos[i].value);
+        const y = parseFloat(datos[i + 1].value);
+        if (Number.isFinite(x) && Number.isFinite(y)) pts.push([x, y]);
+      }
+    }
+    return pts;
+  };
+
+  const formas = [];
+  let polilinea = null;
+  for (const e of entidades) {
+    const d = e.datos;
+    if (e.tipo === "LINE") {
+      const x1 = num(d, 10), y1 = num(d, 20), x2 = num(d, 11), y2 = num(d, 21);
+      if ([x1, y1, x2, y2].every((v) => v !== null)) formas.push({ t: "line", x1, y1, x2, y2 });
+    } else if (e.tipo === "CIRCLE") {
+      const cx = num(d, 10), cy = num(d, 20), r = num(d, 40);
+      if ([cx, cy, r].every((v) => v !== null)) formas.push({ t: "circle", cx, cy, r });
+    } else if (e.tipo === "ARC") {
+      const cx = num(d, 10), cy = num(d, 20), r = num(d, 40), a0 = num(d, 50), a1 = num(d, 51);
+      if ([cx, cy, r, a0, a1].every((v) => v !== null)) formas.push({ t: "arc", cx, cy, r, a0, a1 });
+    } else if (e.tipo === "LWPOLYLINE") {
+      const pts = vertices(d);
+      const cerrada = ((num(d, 70) || 0) & 1) === 1;
+      if (pts.length > 1) formas.push({ t: "poly", pts, cerrada });
+    } else if (e.tipo === "POLYLINE") {
+      polilinea = { t: "poly", pts: [], cerrada: ((num(d, 70) || 0) & 1) === 1 };
+    } else if (e.tipo === "VERTEX" && polilinea) {
+      const x = num(d, 10), y = num(d, 20);
+      if (x !== null && y !== null) polilinea.pts.push([x, y]);
+    } else if (e.tipo === "SEQEND" && polilinea) {
+      if (polilinea.pts.length > 1) formas.push(polilinea);
+      polilinea = null;
+    } else if (e.tipo === "TEXT") {
+      const x = num(d, 10), y = num(d, 20), h = num(d, 40);
+      const t = txt(d, 1);
+      if (x !== null && y !== null && t) formas.push({ t: "text", x, y, h: h || 10, txt: t, rot: num(d, 50) || 0 });
+    } else if (e.tipo === "POINT" || e.tipo === "INSERT") {
+      const x = num(d, 10), y = num(d, 20);
+      if (x !== null && y !== null) formas.push({ t: "cross", x, y });
+    }
+  }
+  return formas;
+}
+
 export default function RotarDXF({ onVolver }) {
   const [archivo, setArchivo] = useState(null);
   const [angulo, setAngulo] = useState(90);
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
   const [resultado, setResultado] = useState(null);
+  const [textoOriginal, setTextoOriginal] = useState("");
   const inputRef = useRef(null);
 
-  const handleArchivo = (e) => {
+  // Rotación en vivo (para la vista previa y para la descarga).
+  const rotado = useMemo(() => {
+    if (!textoOriginal) return null;
+    try {
+      return { ...rotarDXF(textoOriginal, angulo), error: null };
+    } catch (err) {
+      return { error: err.message || "No se pudo rotar el archivo." };
+    }
+  }, [textoOriginal, angulo]);
+
+  const formasOriginal = useMemo(
+    () => (textoOriginal ? extraerFormasDXF(textoOriginal) : null),
+    [textoOriginal],
+  );
+  const formasRotado = useMemo(
+    () => (rotado && !rotado.error ? extraerFormasDXF(rotado.contenido) : null),
+    [rotado],
+  );
+
+  const handleArchivo = async (e) => {
     const f = e.target.files?.[0];
     setError("");
     setResultado(null);
+    setTextoOriginal("");
     if (f && !f.name.toLowerCase().endsWith(".dxf")) {
       setError("El archivo debe tener extensión .dxf");
       setArchivo(null);
       return;
     }
     setArchivo(f || null);
+    if (f) {
+      try {
+        setTextoOriginal(await f.text());
+      } catch (err) {
+        setError("No se pudo leer el archivo.");
+      }
+    }
   };
 
-  const handleRotarYDescargar = async () => {
-    if (!archivo) {
+  const handleRotarYDescargar = () => {
+    if (!archivo || !rotado) {
       setError("Elegí un archivo .dxf primero.");
+      return;
+    }
+    if (rotado.error) {
+      setError(rotado.error);
       return;
     }
     setProcesando(true);
     setError("");
-    setResultado(null);
     try {
-      const texto = await archivo.text();
-      const { contenido, puntosRotados, tiposNoRotados } = rotarDXF(texto, angulo);
-
+      const { contenido, puntosRotados, tiposNoRotados } = rotado;
       const blob = new Blob([contenido], { type: "application/dxf" });
       const url = URL.createObjectURL(blob);
       const nombreBase = archivo.name.replace(/\.dxf$/i, "");
@@ -212,10 +324,9 @@ export default function RotarDXF({ onVolver }) {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-
       setResultado({ puntosRotados, tiposNoRotados });
     } catch (err) {
-      setError(err.message || "No se pudo rotar el archivo.");
+      setError(err.message || "No se pudo generar el archivo.");
     } finally {
       setProcesando(false);
     }
@@ -230,9 +341,9 @@ export default function RotarDXF({ onVolver }) {
         ‹ Volver
       </button>
 
-      <div style={{ maxWidth: "460px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "980px", margin: "0 auto" }}>
         <h2 style={{ color: "#0a3a5c", marginBottom: "8px" }}>Rotar archivo CAD (DXF)</h2>
-        <p style={{ fontSize: "12px", color: "#666", marginTop: 0, marginBottom: "20px" }}>
+        <p style={{ fontSize: "12px", color: "#666", marginTop: 0, marginBottom: "20px", maxWidth: "460px" }}>
           Rota líneas, círculos, arcos, polilíneas, textos e inserciones de bloque. No rota cotas
           (DIMENSION), MTEXT, hatch ni splines — si el archivo tiene alguna, se avisa después.
         </p>
@@ -248,11 +359,11 @@ export default function RotarDXF({ onVolver }) {
           <label style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "#333" }}>
             Ángulo de rotación
           </label>
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ display: "flex", gap: "8px", maxWidth: "460px" }}>
             {ANGULOS.map((a) => (
               <button
                 key={a}
-                onClick={() => setAngulo(a)}
+                onClick={() => { setAngulo(a); setResultado(null); }}
                 style={{
                   flex: 1,
                   padding: "8px 0",
@@ -270,7 +381,9 @@ export default function RotarDXF({ onVolver }) {
           </div>
         </div>
 
-        {error && <div style={{ marginBottom: "14px", color: "#c0392b", fontSize: "13px" }}>{error}</div>}
+        {(error || rotado?.error) && (
+          <div style={{ marginBottom: "14px", color: "#c0392b", fontSize: "13px" }}>{error || rotado.error}</div>
+        )}
 
         {resultado && (
           <div style={{ marginBottom: "14px", fontSize: "12.5px" }}>
@@ -286,16 +399,39 @@ export default function RotarDXF({ onVolver }) {
           </div>
         )}
 
+        {formasOriginal && (
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "18px" }}>
+            <VistaPrevia
+              titulo="Original"
+              detalle={`${formasOriginal.length} entidad(es) dibujada(s)`}
+              formas={formasOriginal}
+              colorTitulo="#5f7f96"
+            />
+            <VistaPrevia
+              titulo={`Generado (${angulo}° horario)`}
+              detalle={formasRotado ? `${formasRotado.length} entidad(es) dibujada(s)` : ""}
+              formas={formasRotado}
+              colorTitulo="#0a3a5c"
+            />
+          </div>
+        )}
+        {formasOriginal && (
+          <div style={{ fontSize: "11.5px", color: "#777", marginBottom: "16px" }}>
+            Vista previa aproximada: las polilíneas con curvas se dibujan rectas y los bloques (INSERT) se
+            marcan con una cruz.
+          </div>
+        )}
+
         <button
           onClick={handleRotarYDescargar}
-          disabled={!archivo || procesando}
+          disabled={!archivo || procesando || !rotado || !!rotado.error}
           style={{
             padding: "10px 18px",
             borderRadius: "6px",
             border: "none",
-            background: !archivo || procesando ? "#9db8c9" : "#0a3a5c",
+            background: !archivo || procesando || !rotado || rotado.error ? "#9db8c9" : "#0a3a5c",
             color: "#fff",
-            cursor: !archivo || procesando ? "not-allowed" : "pointer",
+            cursor: !archivo || procesando || !rotado || rotado.error ? "not-allowed" : "pointer",
             fontSize: "13px",
             fontWeight: "bold",
           }}
