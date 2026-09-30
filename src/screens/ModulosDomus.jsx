@@ -1582,6 +1582,8 @@ export default function ModulosDomus({ authFetch, token }) {
           formulax: String(piezaFormula ?? "").trim() || null,
           formulay: String(piezaFormula ?? "").trim() || null,
           titulo: piezaTitulo.trim() || null,
+          // Cantidad por defecto de una pieza nueva; después se edita en la grilla.
+          cantidad: 1,
         }),
       });
       if (!res.ok) {
