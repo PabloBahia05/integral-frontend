@@ -125,6 +125,193 @@ async function apiFetch(path, token) {
   return res.json();
 }
 
+
+// ─── Helpers del gráfico semanal ─────────────────────────────────────────────
+const DIAS_CORTO = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+function sumarDias(iso, n) {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function lunesDe(iso) {
+  const d = new Date(iso + "T00:00:00Z");
+  const diff = (d.getUTCDay() + 6) % 7; // lunes = 0
+  d.setUTCDate(d.getUTCDate() - diff);
+  return d.toISOString().slice(0, 10);
+}
+function isoADisplay(iso) {
+  const [y, m, d] = iso.split("-");
+  return `${d}-${m}-${y}`;
+}
+function horaDecimal(ts) {
+  const d = parseMysqlTs(ts);
+  return d ? d.getUTCHours() + d.getUTCMinutes() / 60 : null;
+}
+function fmtDuracion(horas) {
+  const totalMin = Math.round(horas * 60);
+  return `${Math.floor(totalMin / 60)}h ${pad(totalMin % 60)}m`;
+}
+function fmtHoraDec(h) {
+  const totalMin = Math.round(h * 60);
+  return `${pad(Math.floor(totalMin / 60))}:${pad(totalMin % 60)}`;
+}
+
+// Arma, por empleado → por fecha, los tramos trabajados (pares entrada→salida).
+// Cada tramo se clasifica en "mañana" o "tarde" según la hora de entrada (corte 12:30).
+// Una entrada sin salida queda como tramo "abierto".
+function armarSemana(fichadas) {
+  const porEmp = {};
+  [...fichadas]
+    .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)))
+    .forEach((f) => {
+      const uid = f.user_id;
+      if (!porEmp[uid]) porEmp[uid] = { user_id: uid, nombre: f.nombre_completo?.trim() || "", dias: {} };
+      if (!porEmp[uid].nombre && f.nombre_completo) porEmp[uid].nombre = f.nombre_completo.trim();
+      const fecha = String(f.timestamp).slice(0, 10);
+      (porEmp[uid].dias[fecha] ||= []).push(f);
+    });
+
+  return Object.values(porEmp).map((emp) => {
+    const dias = {};
+    let totalHoras = 0;
+    for (const [fecha, fichs] of Object.entries(emp.dias)) {
+      const tramos = [];
+      for (let i = 0; i < fichs.length; i++) {
+        if (fichs[i].direccion !== "entrada") continue;
+        const ini = horaDecimal(fichs[i].timestamp);
+        const sal = fichs[i + 1]?.direccion === "salida" ? fichs[i + 1] : null;
+        if (ini == null) continue;
+        if (sal) {
+          const fin = horaDecimal(sal.timestamp);
+          if (fin != null && fin > ini) tramos.push({ ini, fin, abierto: false });
+          i++;
+        } else {
+          tramos.push({ ini, fin: null, abierto: true });
+        }
+      }
+      const manana = tramos.filter((t) => t.ini < 12.5);
+      const tarde  = tramos.filter((t) => t.ini >= 12.5);
+      const horas  = tramos.reduce((a, t) => a + (t.fin != null ? t.fin - t.ini : 0), 0);
+      totalHoras += horas;
+      dias[fecha] = { manana, tarde, horas };
+    }
+    return { user_id: emp.user_id, nombre: emp.nombre, dias, totalHoras };
+  });
+}
+
+// ─── Gráfico semanal de barras verticales (mañana arriba / tarde abajo) ──────
+function GraficoOperario({ nombre, dias, totalHoras, fechas, hMin, hMax, hoyIso }) {
+  const ALTO = 340;
+  const rango = hMax - hMin;
+  const y = (h) => ((h - hMin) / rango) * ALTO;
+  const ahora = (() => { const d = new Date(); return d.getHours() + d.getMinutes() / 60; })();
+  const ticks = [];
+  for (let h = hMin; h <= hMax; h++) ticks.push(h);
+
+  const barra = (t, color, key, esHoy) => {
+    const fin = t.abierto ? (esHoy && ahora > t.ini ? Math.min(ahora, hMax) : t.ini + 0.25) : t.fin;
+    const alto = Math.max(4, y(fin) - y(t.ini));
+    const durHoras = t.abierto ? null : t.fin - t.ini;
+    return (
+      <div
+        key={key}
+        title={t.abierto
+          ? `Entrada ${fmtHoraDec(t.ini)} — sin salida`
+          : `${fmtHoraDec(t.ini)} a ${fmtHoraDec(t.fin)} · ${fmtDuracion(durHoras)}`}
+        style={{
+          position: "absolute", left: 6, right: 6, top: y(t.ini), height: alto,
+          background: t.abierto ? "transparent" : color,
+          border: t.abierto ? `2px dashed ${color}` : "none",
+          borderRadius: 6, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", overflow: "hidden",
+          fontSize: 11, fontWeight: 700, color: "#0f172a", boxSizing: "border-box",
+        }}
+      >
+        {t.abierto
+          ? <span style={{ color, fontSize: 10 }}>{esHoy ? "en curso" : "sin salida"}</span>
+          : alto >= 34 && <>
+              <span>{fmtDuracion(durHoras)}</span>
+              {alto >= 58 && <span style={{ fontWeight: 500, fontSize: 10, opacity: 0.8 }}>{fmtHoraDec(t.ini)}–{fmtHoraDec(t.fin)}</span>}
+            </>}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{
+      background: "#1e293b", border: "1px solid #334155",
+      borderRadius: 12, padding: "16px 20px", marginBottom: 20,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{
+            width: 32, height: 32, borderRadius: "50%", background: "#312e81", color: "#a5b4fc",
+            display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14,
+          }}>{nombre.charAt(0).toUpperCase()}</span>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>{nombre}</span>
+        </div>
+        <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15, color: totalHoras > 0 ? "#a5b4fc" : "#475569" }}>
+          Semana: {totalHoras > 0 ? fmtDuracion(totalHoras) : "—"}
+        </span>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, overflowX: "auto" }}>
+        {/* Eje de horas */}
+        <div style={{ position: "relative", width: 38, height: ALTO, marginTop: 24, flexShrink: 0 }}>
+          {ticks.map((h) => (
+            <span key={h} style={{
+              position: "absolute", right: 4, top: y(h) - 7,
+              fontSize: 10, color: "#64748b", fontFamily: "monospace",
+            }}>{pad(h)}:00</span>
+          ))}
+        </div>
+
+        {/* Columnas por día */}
+        {fechas.map((fecha, i) => {
+          const dia = dias[fecha];
+          const esHoy = fecha === hoyIso;
+          return (
+            <div key={fecha} style={{ flex: 1, minWidth: 74, display: "flex", flexDirection: "column" }}>
+              <div style={{
+                height: 24, textAlign: "center", fontSize: 12, fontWeight: 600,
+                color: esHoy ? "#a5b4fc" : "#94a3b8",
+              }}>
+                {DIAS_CORTO[i]} <span style={{ fontWeight: 400, color: "#475569" }}>{fecha.slice(8, 10)}/{fecha.slice(5, 7)}</span>
+              </div>
+              <div style={{
+                position: "relative", height: ALTO, background: esHoy ? "#1a2540" : "#0f172a",
+                borderRadius: 8, border: "1px solid #334155",
+              }}>
+                {ticks.map((h) => (
+                  <div key={h} style={{
+                    position: "absolute", left: 0, right: 0, top: y(h),
+                    borderTop: "1px solid #1e293b", pointerEvents: "none",
+                  }} />
+                ))}
+                {dia?.manana.map((t, k) => barra(t, "#fbbf24", `m${k}`, esHoy))}
+                {dia?.tarde.map((t, k) => barra(t, "#818cf8", `t${k}`, esHoy))}
+                {!dia && (
+                  <span style={{
+                    position: "absolute", top: "50%", left: 0, right: 0, textAlign: "center",
+                    fontSize: 11, color: "#334155",
+                  }}>—</span>
+                )}
+              </div>
+              <div style={{
+                textAlign: "center", marginTop: 6, fontSize: 12, fontFamily: "monospace",
+                fontWeight: 700, color: dia?.horas > 0 ? "#e2e8f0" : "#475569",
+              }}>
+                {dia?.horas > 0 ? fmtDuracion(dia.horas) : "—"}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Anviz({ onBack }) {
   const { usuario, token, authFetch } = useAuth();
@@ -800,6 +987,61 @@ export default function Anviz({ onBack }) {
     }
   }
 
+  // ── Gráfico semanal ────────────────────────────────────────────────────────
+  const [grafLunes, setGrafLunes]       = useState(() => lunesDe(hoy()));
+  const [grafUser, setGrafUser]         = useState("");
+  const [grafFichadas, setGrafFichadas] = useState([]);
+  const [grafCargando, setGrafCargando] = useState(false);
+  const [grafError, setGrafError]       = useState(null);
+
+  const cargarGrafico = useCallback(async () => {
+    setGrafCargando(true);
+    setGrafError(null);
+    try {
+      const params = new URLSearchParams({
+        limit: 2000,
+        fecha_desde: grafLunes,
+        fecha_hasta: sumarDias(grafLunes, 6),
+      });
+      if (grafUser) params.set("user_id", grafUser);
+      const data = await apiFetch(`/fichadas?${params}`, token);
+      setGrafFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
+    } catch (e) {
+      setGrafError(e.message);
+    } finally {
+      setGrafCargando(false);
+    }
+  }, [grafLunes, grafUser]);
+
+  useEffect(() => {
+    if (vista === "grafico") cargarGrafico();
+  }, [vista, cargarGrafico]);
+
+  const grafSemana = (() => {
+    const emps = armarSemana(grafFichadas).map((e) => {
+      if (e.nombre) return e;
+      const u = usuarios.find((x) => String(x.id) === String(e.user_id));
+      return { ...e, nombre: u ? `${u.apellido} ${u.nombre}`.trim() : `Usuario ${e.user_id}` };
+    }).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    // Lun–Vie siempre; Sáb/Dom solo si alguien fichó esos días
+    const fechas = [0, 1, 2, 3, 4].map((n) => sumarDias(grafLunes, n));
+    [5, 6].forEach((n) => {
+      const f = sumarDias(grafLunes, n);
+      if (emps.some((e) => e.dias[f])) fechas.push(f);
+    });
+
+    // Escala horaria común para poder comparar operarios entre sí
+    let hMin = 7, hMax = 19;
+    emps.forEach((e) => Object.values(e.dias).forEach((d) =>
+      [...d.manana, ...d.tarde].forEach((t) => {
+        hMin = Math.min(hMin, Math.floor(t.ini));
+        if (t.fin != null) hMax = Math.max(hMax, Math.ceil(t.fin));
+      })
+    ));
+    return { emps, fechas, hMin, hMax };
+  })();
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div style={s.page}>
@@ -1308,6 +1550,11 @@ export default function Anviz({ onBack }) {
               <span style={s.inicioLabel}>Historial</span>
               <span style={s.inicioDesc}>Horas acumuladas por empleado</span>
             </div>
+            <div style={{ ...s.inicioCard, order: 1 }} onClick={() => setVista("grafico")}>
+              <span style={s.inicioIcon}>📈</span>
+              <span style={s.inicioLabel}>Gráfico semanal</span>
+              <span style={s.inicioDesc}>Horas por día, mañana y tarde</span>
+            </div>
             <div style={{ ...s.inicioCard, order: 2 }} onClick={() => abrirVacaciones()}>
               <span style={s.inicioIcon}>🏖️</span>
               <span style={s.inicioLabel}>Vacaciones y Horas</span>
@@ -1755,6 +2002,89 @@ export default function Anviz({ onBack }) {
               </table>
             )}
           </div>
+        </>
+      )}
+
+      {/* ── Vista Gráfico semanal ───────────────────────────────────────── */}
+      {vista === "grafico" && (
+        <>
+          <div style={s.header}>
+            <div style={s.headerLeft}>
+              <button style={s.btnVolver} onClick={() => setVista("inicio")}>← Volver</button>
+              <div style={s.iconBox}><IconReloj /></div>
+              <div>
+                <h1 style={s.titulo}>Gráfico semanal</h1>
+                <span style={s.subtitulo}>Horas por día · mañana arriba, tarde abajo</span>
+              </div>
+            </div>
+            <div style={s.headerRight}>
+              <AgenteBadge agente={agente} />
+            </div>
+          </div>
+
+          <div style={s.filtrosWrap}>
+            <div style={{ ...s.filtroFila, marginBottom: 0 }}>
+              <button style={s.btnNav} onClick={() => setGrafLunes(l => sumarDias(l, -7))}>← Anterior</button>
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Semana del</label>
+                <DateInput value={grafLunes}
+                  onChange={v => setGrafLunes(lunesDe(v))} style={s.input} />
+              </div>
+              <button style={s.btnNav} onClick={() => setGrafLunes(l => sumarDias(l, 7))}>Siguiente →</button>
+              <button style={s.btnNav} onClick={() => setGrafLunes(lunesDe(hoy()))}>Esta semana</button>
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Empleado</label>
+                <select
+                  value={grafUser}
+                  onChange={e => setGrafUser(e.target.value)}
+                  style={s.input}
+                >
+                  <option value="">Todos</option>
+                  {usuarios.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.apellido} {u.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 18, marginTop: 14, fontSize: 12, color: "#94a3b8", flexWrap: "wrap" }}>
+              <span><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 3, background: "#fbbf24", verticalAlign: "middle", marginRight: 6 }} />Mañana</span>
+              <span><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 3, background: "#818cf8", verticalAlign: "middle", marginRight: 6 }} />Tarde</span>
+              <span style={{ color: "#475569" }}>
+                {isoADisplay(grafLunes)} al {isoADisplay(sumarDias(grafLunes, 6))}
+              </span>
+            </div>
+          </div>
+
+          {grafError && <div style={{ ...s.errorBanner, borderRadius: 8, marginBottom: 16 }}>⚠️ {grafError}</div>}
+
+          {grafCargando ? (
+            <div style={s.estado}>
+              <div style={s.spinner} />
+              <span style={{ color: "#64748b", fontSize: 14 }}>Armando gráfico...</span>
+            </div>
+          ) : grafSemana.emps.length === 0 ? (
+            <div style={s.estado}>
+              <span style={{ fontSize: 36 }}>📭</span>
+              <span style={{ color: "#64748b", fontSize: 14, marginTop: 8 }}>
+                Sin fichadas en la semana seleccionada
+              </span>
+            </div>
+          ) : (
+            grafSemana.emps.map(emp => (
+              <GraficoOperario
+                key={emp.user_id}
+                nombre={emp.nombre}
+                dias={emp.dias}
+                totalHoras={emp.totalHoras}
+                fechas={grafSemana.fechas}
+                hMin={grafSemana.hMin}
+                hMax={grafSemana.hMax}
+                hoyIso={grafSemana.fechas.includes(hoy()) ? hoy() : null}
+              />
+            ))
+          )}
         </>
       )}
 
