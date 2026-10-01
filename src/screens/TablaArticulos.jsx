@@ -46,6 +46,167 @@ const nombresAccesoriosNoFreno = (accesorios, accesoriosDisponibles) =>
 // ajuste de precios, y la tabla de ítems agrupados por sección con
 // subtotales y el total general.
 // Todo el estado sigue viviendo en PresupuestoNuevo.jsx (el padre).
+// ─── Vista de solo lectura de una mampara guardada ───────────────────────────
+// Muestra los mismos datos que se ven al guardar la mampara en la pestaña
+// Mampara (modelo, medidas, artículos asociados, colocación y total), leídos
+// directamente del registro de /presupuestos-mamparas/:presmv. No edita nada.
+const fmtPesoMampara = (n) =>
+  "$" + Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 0 });
+
+function VistaMamparaModal({ data, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Las claves pueden venir en minúscula (BD) o mayúscula: se unifican.
+  const p = Object.fromEntries(
+    Object.entries(data || {}).map(([k, v]) => [k.toUpperCase(), v]),
+  );
+
+  const nro = p.PRESM ?? p.NUMERO ?? p.ID;
+  const nroTxt = nro != null ? String(nro).padStart(5, "0") : "—";
+  const fecha = p.FECHA ? String(p.FECHA).slice(0, 10).split("-").reverse().join("-") : null;
+
+  const asociados = [];
+  for (let n = 1; n <= 10; n++) {
+    const art = p[`ART${n}`];
+    if (!art) continue;
+    asociados.push({
+      n,
+      art,
+      valor: Number(p[`VALOR${n}`]) || 0,
+      margen: p[`MARGEN${n}`],
+    });
+  }
+  const subtotal = asociados.reduce((a, x) => a + x.valor, 0);
+  const colocacion = Number(p.COLOCACION) || 0;
+  const total = p.PRECIO != null && p.PRECIO !== "" ? Number(p.PRECIO) : subtotal + colocacion;
+
+  const campo = (label, valor) => (
+    <div style={{ flex: "1 1 120px", minWidth: 100 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#4a8ab5", textTransform: "uppercase", marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ background: "#f4f8fb", border: "1px solid #d0dde8", borderRadius: 6, padding: "8px 12px", fontSize: 14, color: "#0f2944", fontWeight: 600 }}>
+        {valor !== null && valor !== undefined && valor !== "" ? valor : "—"}
+      </div>
+    </div>
+  );
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(15,41,68,0.55)", zIndex: 1000,
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff", borderRadius: 10, width: "100%", maxWidth: 560, maxHeight: "90vh",
+          overflowY: "auto", padding: "26px 30px", boxShadow: "0 8px 30px rgba(15,41,68,0.25)",
+          fontFamily: "'Space Mono',monospace",
+        }}
+      >
+        {/* Encabezado */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, paddingBottom: 16, marginBottom: 18, borderBottom: "1.5px solid #e0eaf2" }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f2944", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              🪟 Presupuesto Mamparas
+            </div>
+            {p.NOMBRE && <div style={{ fontSize: 12, color: "#4a6a80", marginTop: 4 }}>{p.NOMBRE}</div>}
+            {fecha && <div style={{ fontSize: 11, color: "#6a8aa0", marginTop: 2 }}>Guardada el {fecha}</div>}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: "#2d7fc1", background: "#eaf3fb", border: "1.5px solid #b8d6ef", borderRadius: 6, padding: "3px 14px" }}>
+              N° {nroTxt}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#2d7fc1", background: "#eaf3fb", border: "1px solid #b8d6ef", borderRadius: 4, padding: "1px 8px" }}>
+              Rev. {Number(p.REVISION ?? 0)}
+            </span>
+          </div>
+        </div>
+
+        {/* Datos */}
+        <div style={{ marginBottom: 14 }}>{campo("Modelo", p.MODELO)}</div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+          {campo("Cantidad", p.CANTIDAD)}
+          {campo("Ancho (cm)", p.ANCHO)}
+          {campo("Alto (cm)", p.ALTO)}
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
+          {campo("Vidrio", p.VIDRIO)}
+          {campo("Colocación ($)", colocacion > 0 ? fmtPesoMampara(colocacion) : "0")}
+        </div>
+
+        {/* Artículos asociados */}
+        <div style={{ border: "1.5px solid #d0dde8", borderRadius: 8, overflow: "hidden", marginBottom: 18 }}>
+          <div style={{ background: "#0f2944", padding: "9px 14px", fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: "#a8c4d8", textTransform: "uppercase" }}>
+            🔗 Artículos asociados
+          </div>
+          {asociados.length === 0 ? (
+            <div style={{ padding: "14px 16px", textAlign: "center", color: "#9ab0c0", fontSize: 12, fontStyle: "italic" }}>
+              Sin artículos asociados guardados
+            </div>
+          ) : (
+            asociados.map((a, i) => (
+              <div
+                key={a.n}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+                  padding: "10px 14px", fontSize: 13, color: "#0f2944",
+                  borderBottom: i < asociados.length - 1 ? "1px solid #e8f0f7" : "none",
+                  background: i % 2 ? "#f7fafd" : "#fff",
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, overflowWrap: "anywhere" }}>{a.art}</div>
+                  {a.margen != null && a.margen !== "" && (
+                    <div style={{ fontSize: 10, color: "#6a8aa0", marginTop: 2 }}>Margen: {a.margen}</div>
+                  )}
+                </div>
+                <div style={{ fontWeight: 700, color: a.valor > 0 ? "#2d7fc1" : "#9ab0c0", whiteSpace: "nowrap" }}>
+                  {a.valor > 0 ? fmtPesoMampara(a.valor) : "—"}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desglose y total */}
+        <div style={{ background: "#f4f8fb", borderRadius: 8, overflow: "hidden", marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "11px 16px", fontSize: 13, color: "#4a6a80", borderBottom: "1px solid #e0eaf2" }}>
+            <span>Subtotal artículos</span>
+            <span>{fmtPesoMampara(subtotal)}</span>
+          </div>
+          {colocacion > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "11px 16px", fontSize: 13, color: "#4a6a80", borderBottom: "1px solid #e0eaf2" }}>
+              <span>Colocación</span>
+              <span>{fmtPesoMampara(colocacion)}</span>
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px", background: "#0f2944", color: "#fff" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.14em" }}>TOTAL</span>
+            <span style={{ fontSize: 20, fontWeight: 700 }}>{fmtPesoMampara(total)}</span>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            onClick={onClose}
+            style={{ padding: "10px 22px", borderRadius: 6, border: "none", background: "#0f2944", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TablaArticulos({
   // Resumen cliente
   cliente,
@@ -190,6 +351,9 @@ export default function TablaArticulos({
   // toggle manual hecho mientras se sigue trabajando sobre el mismo.
   const [mostrarColor, setMostrarColor] = useState(!!confirmado);
   const [mostrarManija, setMostrarManija] = useState(!!confirmado);
+  // Vista de solo lectura de una mampara guardada (botón 👁 en la fila)
+  const [mamparaVista, setMamparaVista] = useState(null);
+  const [mamparaVistaCargando, setMamparaVistaCargando] = useState(null); // presmv en carga
   useEffect(() => {
     setMostrarColor(!!confirmado);
     setMostrarManija(!!confirmado);
@@ -1598,6 +1762,38 @@ export default function TablaArticulos({
                           {item.seccion === "Mampara" && item.presmv != null && (
                             <button
                               onClick={async () => {
+                                setMamparaVistaCargando(item.presmv);
+                                try {
+                                  const res = await authFetch(
+                                    `${API}/presupuestos-mamparas/${item.presmv}`,
+                                  );
+                                  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                                  const data = await res.json();
+                                  setMamparaVista(Array.isArray(data) ? data[0] : data);
+                                } catch {
+                                  alert("No se pudo cargar la mampara");
+                                } finally {
+                                  setMamparaVistaCargando(null);
+                                }
+                              }}
+                              disabled={mamparaVistaCargando === item.presmv}
+                              title="Ver datos de la mampara"
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: 14,
+                                color: "#2277bb",
+                                marginRight: 4,
+                                opacity: mamparaVistaCargando === item.presmv ? 0.5 : 1,
+                              }}
+                            >
+                              {mamparaVistaCargando === item.presmv ? "⏳" : "👁"}
+                            </button>
+                          )}
+                          {item.seccion === "Mampara" && item.presmv != null && (
+                            <button
+                              onClick={async () => {
                                 try {
                                   const res = await authFetch(
                                     `${API}/presupuestos-mamparas/${item.presmv}`,
@@ -1771,6 +1967,9 @@ export default function TablaArticulos({
           </tbody>
         </table>
         </>
+      )}
+      {mamparaVista && (
+        <VistaMamparaModal data={mamparaVista} onClose={() => setMamparaVista(null)} />
       )}
     </div>
   );
