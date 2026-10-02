@@ -152,36 +152,65 @@ export const franjaManijaHTML = (infoManija) =>
     ? `<span class="franja-manija">Manija: ${infoManija.nombre}</span>`
     : "";
 
-// Foto de la mampara: no se persiste en el ítem del presupuesto, así que se
-// busca en vivo en la tabla `articulos` (mismo endpoint que usa
-// PresupuestoMamparas.jsx para el panel de foto) justo antes de armar el
-// PDF, matcheando por el nombre del modelo guardado en item.descripcion.
-// Devuelve { [modelo]: urlFoto }, vacío si no hay ítems de Mampara o si
-// falla el fetch (no corta la generación del PDF).
-export async function obtenerFotosMamparaPorModelo(presupuestoItems, authFetch) {
-  const fotosMamparaPorModelo = {};
-  const hayItemMampara = presupuestoItems.some(
-    (it) => it.seccion === "Mampara" && it.descripcion,
-  );
-  if (hayItemMampara && typeof authFetch === "function") {
-    try {
-      const resFotos = await authFetch(
-        "https://integral-backend-production.up.railway.app/productos/mamparas",
-      );
-      const catalogo = await resFotos.json();
-      if (Array.isArray(catalogo)) {
-        catalogo.forEach((a) => {
-          if (a.articulo && a.artfoto && a.artfoto !== "null") {
-            fotosMamparaPorModelo[a.articulo] = a.artfoto;
-          }
-        });
+// Foto del modelo (Mampara y Puerta): no se persiste en el ítem del
+// presupuesto, así que se busca en vivo en la tabla `articulos` (mismo
+// endpoint que usan PresupuestoMamparas.jsx / PresupuestoPuertas.jsx para
+// el panel de foto) justo antes de armar el PDF. Devuelve
+// { Mampara: { [clave]: urlFoto }, Puerta: { [clave]: urlFoto } }, donde
+// cada foto queda indexada por el nombre del modelo (articulo) Y por su
+// código (codartint), para poder matchear con lo que haya guardado el ítem.
+// Si no hay ítems de ese tipo, o si falla el fetch, queda vacío (no corta la
+// generación del PDF).
+const ENDPOINTS_FOTO_MODELO = {
+  Mampara: "https://integral-backend-production.up.railway.app/productos/mamparas",
+  Puerta: "https://integral-backend-production.up.railway.app/productos/puertas",
+};
+
+export async function obtenerFotosModelos(presupuestoItems, authFetch) {
+  const resultado = { Mampara: {}, Puerta: {} };
+  if (typeof authFetch !== "function") return resultado;
+
+  await Promise.all(
+    Object.keys(ENDPOINTS_FOTO_MODELO).map(async (seccion) => {
+      const hayItem = presupuestoItems.some((it) => it.seccion === seccion);
+      if (!hayItem) return;
+      try {
+        const res = await authFetch(ENDPOINTS_FOTO_MODELO[seccion]);
+        const catalogo = await res.json();
+        if (Array.isArray(catalogo)) {
+          catalogo.forEach((a) => {
+            if (!a.artfoto || a.artfoto === "null") return;
+            if (a.articulo) resultado[seccion][a.articulo] = a.artfoto;
+            if (a.codartint) resultado[seccion][a.codartint] = a.artfoto;
+          });
+        }
+      } catch (err) {
+        console.error(`No se pudo obtener la foto de ${seccion} para el PDF:`, err);
       }
-    } catch (err) {
-      console.error("No se pudo obtener la foto de la mampara para el PDF:", err);
-    }
-  }
-  return fotosMamparaPorModelo;
+    }),
+  );
+  return resultado;
 }
+
+// Compatibilidad: pdfConfirmado.js todavía puede estar llamando a esta
+// función (solo mamparas). Devuelve el mismo { [modelo]: urlFoto } de antes.
+export async function obtenerFotosMamparaPorModelo(presupuestoItems, authFetch) {
+  const fotos = await obtenerFotosModelos(presupuestoItems, authFetch);
+  return fotos.Mampara;
+}
+
+// HTML de la foto del modelo para un ítem de Mampara o Puerta (""
+// para cualquier otra sección o si no se encontró foto). Prueba matchear
+// por descripcion (como ya hacía Mampara), por nombreart y por código.
+export const fotoModeloHTML = (item, fotosModelos) => {
+  const fotosSeccion = fotosModelos?.[item.seccion];
+  if (!fotosSeccion) return "";
+  const clave = [item.descripcion, item.nombreart, item.codartint, item.codigo].find(
+    (k) => k && fotosSeccion[k],
+  );
+  if (!clave) return "";
+  return `<div class="mampara-foto"><img src="${fotosSeccion[clave]}" style="max-width:220px; max-height:220px; display:block; margin-top:6px; border:1px solid #ddd; border-radius:4px;" /></div>`;
+};
 
 export const formatearFecha = (fecha) =>
   fecha

@@ -13,7 +13,8 @@ import {
   agruparEnFilas,
   filaFotosHTML,
   formatPeso,
-  obtenerFotosMamparaPorModelo,
+  obtenerFotosModelos,
+  fotoModeloHTML,
   formatearFecha,
   calcularNro,
   calcularNombreArchivo,
@@ -84,10 +85,7 @@ export async function generarPresupuestoPDF({
   setGenerandoPDF,
   authFetch,
 }) {
-  const fotosMamparaPorModelo = await obtenerFotosMamparaPorModelo(
-    presupuestoItems,
-    authFetch,
-  );
+  const fotosModelos = await obtenerFotosModelos(presupuestoItems, authFetch);
 
   const mapaMelaminasPorCodigo = mapaMelaminas(melaminas);
   const mapaManijasPorCodigo = mapaManijas(manijas);
@@ -159,12 +157,9 @@ export async function generarPresupuestoPDF({
             querDescripcion && item.descripcion && item.descripcion !== item.nombreart
               ? `<div class="item-desc">${item.descripcion}</div>`
               : "";
-          // Foto de la mampara (tabla `articulos`, columna artfoto),
-          // buscada por modelo al principio de esta función.
-          const fotoMamparaHTML =
-            item.seccion === "Mampara" && fotosMamparaPorModelo[item.descripcion]
-              ? `<div class="mampara-foto"><img src="${fotosMamparaPorModelo[item.descripcion]}" style="max-width:220px; max-height:220px; display:block; margin-top:6px; border:1px solid #ddd; border-radius:4px;" /></div>`
-              : "";
+          // Foto del modelo para Mampara y Puerta (tabla `articulos`,
+          // columna artfoto), buscada al principio de esta función.
+          const fotoModeloItemHTML = fotoModeloHTML(item, fotosModelos);
           // Accesorios tildados en el ítem (hasta 3, ya resueltos a nombre
           // en PresupuestoNuevo.jsx — item.accesorios es un array de
           // strings, igual que se muestra en pantalla). Se listan debajo
@@ -194,7 +189,7 @@ export async function generarPresupuestoPDF({
           return `
       <tr>
         <td class="cant">${item.cantidad ?? 1}</td>
-        <td>${item.nombreart ?? ""}${medida}${descripcionHTML}${accesoriosHTML}${fotoMamparaHTML}</td>
+        <td>${item.nombreart ?? ""}${medida}${descripcionHTML}${accesoriosHTML}${fotoModeloItemHTML}</td>
         ${mostrarCosto ? `<td class="right">${item.costo != null ? formatPeso(item.costo) : "—"}</td>` : ""}
         ${celdasPrecio}
       </tr>`;
