@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import DataTable from "../Component/DataTable";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
@@ -253,6 +254,207 @@ function ArticuloCombo({
         </div>
       )}
     </div>
+  );
+}
+
+// ── Selector de color / material con búsqueda ─────────────────────────────
+//
+// Reemplaza al <select> de colores de melamina: se escribe y la lista se
+// filtra por palabras (sin importar el orden, mayúsculas ni tildes: "nogal
+// lincoln" encuentra "M.E.18 H1714 ST19 Nogal Lincoln"). Enter (o Tab, si ya
+// se escribió algo) elige la opción resaltada, que al tipear es siempre la
+// primera coincidencia. Si lo escrito no coincide con nada y se sale del
+// campo, vuelve al valor anterior (solo se pueden elegir colores del
+// catálogo); para dejarlo vacío está la opción "— Sin color".
+//
+// La lista se dibuja en un portal con position: fixed porque en la tabla de
+// ítems el contenedor tiene scroll (overflow) y recortaría una lista
+// absoluta. Va definido a nivel módulo por la misma razón que ArticuloCombo
+// (si no, el input perdería el foco en cada tecla).
+
+const normalizar = (v) =>
+  String(v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+function ColorCombo({ value, opciones, onElegir, estiloInput, ariaLabel = "Color" }) {
+  const [abierto, setAbierto] = useState(false);
+  const [borrador, setBorrador] = useState(null); // null = no se está tipeando
+  const [activo, setActivo] = useState(-1);
+  const [pos, setPos] = useState(null);
+  const inputRef = useRef(null);
+  const listaRef = useRef(null);
+
+  const t = normalizar(borrador ?? "").trim();
+
+  const indice = useMemo(
+    () => opciones.map((c) => ({ c, hay: normalizar(`${c.articulo} ${c.codartint ?? ""}`) })),
+    [opciones],
+  );
+
+  const lista = useMemo(() => {
+    if (!t) return [{ vacio: true }, ...opciones.slice(0, MAX_OPCIONES).map((c) => ({ c }))];
+    const palabras = t.split(/\s+/);
+    const res = [];
+    for (const x of indice) {
+      if (palabras.every((p) => x.hay.includes(p))) {
+        res.push({ c: x.c });
+        if (res.length >= MAX_OPCIONES) break;
+      }
+    }
+    return res;
+  }, [t, opciones, indice]);
+
+  const calcularPos = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const arriba = window.innerHeight - r.bottom < 260 && r.top > 260;
+    setPos({
+      left: r.left,
+      width: r.width,
+      ...(arriba
+        ? { bottom: window.innerHeight - r.top + 2 }
+        : { top: r.bottom + 2 }),
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!abierto) return;
+    calcularPos();
+    window.addEventListener("scroll", calcularPos, true);
+    window.addEventListener("resize", calcularPos);
+    return () => {
+      window.removeEventListener("scroll", calcularPos, true);
+      window.removeEventListener("resize", calcularPos);
+    };
+  }, [abierto]);
+
+  useEffect(() => {
+    if (activo < 0) return;
+    listaRef.current?.children[activo]?.scrollIntoView({ block: "nearest" });
+  }, [activo]);
+
+  const elegir = (x) => {
+    onElegir(x.vacio ? "" : x.c.articulo);
+    setBorrador(null);
+    setAbierto(false);
+    setActivo(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setAbierto(true);
+      setActivo((i) => Math.min(i + 1, lista.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActivo((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      if (abierto && activo >= 0 && lista[activo]) {
+        e.preventDefault();
+        elegir(lista[activo]);
+      } else {
+        setAbierto(false);
+      }
+    } else if (e.key === "Tab") {
+      // Tab también elige si se escribió algo y hay una coincidencia resaltada
+      if (abierto && t && activo >= 0 && lista[activo]) elegir(lista[activo]);
+    } else if (e.key === "Escape") {
+      if (abierto) {
+        e.stopPropagation();
+        setAbierto(false);
+        setBorrador(null);
+      }
+    }
+  };
+
+  const filaBase = {
+    padding: "6px 10px",
+    fontSize: 12,
+    fontFamily: FUENTE,
+    cursor: "pointer",
+    color: "#0a3a5c",
+  };
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="text"
+        role="combobox"
+        aria-expanded={abierto}
+        aria-label={ariaLabel}
+        autoComplete="off"
+        placeholder="— Escribí para buscar"
+        value={borrador ?? value ?? ""}
+        onChange={(e) => {
+          setBorrador(e.target.value);
+          setAbierto(true);
+          setActivo(0); // la primera coincidencia queda lista para Enter
+        }}
+        onFocus={(e) => {
+          e.target.select(); // la primera tecla reemplaza el valor actual
+          setAbierto(true);
+          setActivo(-1);
+        }}
+        onBlur={() => {
+          setAbierto(false);
+          setBorrador(null);
+        }}
+        onKeyDown={handleKeyDown}
+        style={estiloInput}
+      />
+
+      {abierto &&
+        pos &&
+        createPortal(
+          <div
+            ref={listaRef}
+            style={{
+              position: "fixed",
+              top: pos.top,
+              bottom: pos.bottom,
+              left: pos.left,
+              zIndex: 1300,
+              width: `max(${pos.width}px, 340px)`,
+              maxWidth: "min(480px, 90vw)",
+              maxHeight: 240,
+              overflowY: "auto",
+              background: "#fff",
+              border: "1.5px solid #b8d6ef",
+              borderRadius: 4,
+              boxShadow: "0 4px 14px rgba(10,58,92,0.18)",
+            }}
+          >
+            {lista.length === 0 && (
+              <div style={{ ...filaBase, cursor: "default", color: "#8aabb8" }}>
+                Ningún color coincide con «{borrador}».
+              </div>
+            )}
+            {lista.map((x, i) => (
+              <div
+                key={x.vacio ? "vacio" : `${x.c.codartint}-${i}`}
+                // onMouseDown (no onClick) para elegir antes de que el input pierda el foco
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  elegir(x);
+                }}
+                onMouseEnter={() => setActivo(i)}
+                style={{
+                  ...filaBase,
+                  background: i === activo ? "#eaf3fb" : "#fff",
+                  color: x.vacio ? "#8aabb8" : "#0a3a5c",
+                }}
+              >
+                {x.vacio ? "— Sin color" : x.c.articulo}
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 
@@ -638,29 +840,17 @@ export default function Confirmados({ authFetch, token, onInicio }) {
     {
       key: "color",
       label: "Color",
-      render: (v, row) => {
-        const actual = row.color ?? "";
-        const enLista = coloresMelamina.some((c) => c.articulo === actual);
-        return (
-          <select
-            value={actual}
-            onChange={(e) => {
-              const valor = e.target.value;
-              handleCampoChange(row.id, "color", valor);
-              handleCampoBlur({ ...row, color: valor }, "color");
-            }}
-            style={estiloInput(row.id, "color", "180px")}
-          >
-            <option value="">—</option>
-            {actual && !enLista && <option value={actual}>{actual}</option>}
-            {coloresMelamina.map((c) => (
-              <option key={c.codartint} value={c.articulo}>
-                {c.articulo}
-              </option>
-            ))}
-          </select>
-        );
-      },
+      render: (v, row) => (
+        <ColorCombo
+          value={row.color ?? ""}
+          opciones={coloresMelamina}
+          estiloInput={estiloInput(row.id, "color", "180px")}
+          onElegir={(valor) => {
+            handleCampoChange(row.id, "color", valor);
+            handleCampoBlur({ ...row, color: valor }, "color");
+          }}
+        />
+      ),
     },
     { key: "ancho", label: "Ancho", render: (v, row) => inputNumero(row, "ancho") },
     { key: "alto", label: "Alto", render: (v, row) => inputNumero(row, "alto") },
@@ -966,21 +1156,17 @@ export default function Confirmados({ authFetch, token, onInicio }) {
                         style={{ ...estiloInput("nuevo", "grupo", "100%"), display: "block", marginTop: 2 }}
                       />
                     </label>
-                    <label style={{ fontSize: 11, color: "#5a86ab" }}>
-                      Color
-                      <select
-                        value={nuevo.color}
-                        onChange={(e) => setNuevo((n) => ({ ...n, color: e.target.value }))}
-                        style={{ ...estiloInput("nuevo", "color", "100%"), display: "block", marginTop: 2 }}
-                      >
-                        <option value="">—</option>
-                        {coloresMelamina.map((c) => (
-                          <option key={c.codartint} value={c.articulo}>
-                            {c.articulo}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <div style={{ fontSize: 11, color: "#5a86ab" }}>
+                      <span>Color</span>
+                      <div style={{ marginTop: 2 }}>
+                        <ColorCombo
+                          value={nuevo.color}
+                          opciones={coloresMelamina}
+                          estiloInput={{ ...estiloInput("nuevo", "color", "100%"), display: "block" }}
+                          onElegir={(valor) => setNuevo((n) => ({ ...n, color: valor }))}
+                        />
+                      </div>
+                    </div>
                     {[
                       ["ancho", "Ancho"],
                       ["alto", "Alto"],
