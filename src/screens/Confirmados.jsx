@@ -288,6 +288,17 @@ function ColorCombo({ value, opciones, onElegir, estiloInput, ariaLabel = "Color
 
   const t = normalizar(borrador ?? "").trim();
 
+  // Lo guardado es un codartint; se muestra el nombre. Si no coincide con
+  // ningún codartint se busca por nombre (datos viejos) y, si tampoco, se
+  // muestra el valor tal cual.
+  const etiqueta = useMemo(() => {
+    const v = String(value ?? "");
+    if (!v) return "";
+    const m =
+      opciones.find((c) => c.codartint === v) ?? opciones.find((c) => c.articulo === v);
+    return m ? m.articulo : v;
+  }, [value, opciones]);
+
   const indice = useMemo(
     () => opciones.map((c) => ({ c, hay: normalizar(`${c.articulo} ${c.codartint ?? ""}`) })),
     [opciones],
@@ -337,7 +348,7 @@ function ColorCombo({ value, opciones, onElegir, estiloInput, ariaLabel = "Color
   }, [activo]);
 
   const elegir = (x) => {
-    onElegir(x.vacio ? "" : x.c.articulo);
+    onElegir(x.vacio ? "" : x.c.codartint);
     setBorrador(null);
     setAbierto(false);
     setActivo(-1);
@@ -388,7 +399,7 @@ function ColorCombo({ value, opciones, onElegir, estiloInput, ariaLabel = "Color
         aria-label={ariaLabel}
         autoComplete="off"
         placeholder="— Escribí para buscar"
-        value={borrador ?? value ?? ""}
+        value={borrador ?? etiqueta}
         onChange={(e) => {
           setBorrador(e.target.value);
           setAbierto(true);
