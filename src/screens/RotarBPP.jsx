@@ -21,7 +21,9 @@ import VistaPrevia from "./VistaPrevia";
  *       de eje y así el resultado no depende del código de RTY para "en Y".
  *   - Taladros laterales (canto): @ BH -> cambia el LADO (campo 0) y la
  *       coordenada a lo largo del canto (campo 2). El campo 3 (altura dentro
- *       del espesor) no cambia.
+ *       del espesor) no cambia. Repeticiones (RTY 0 = en X, paso DX = campo 9,
+ *       cantidad NRP = campo 14): se rota cada agujero y la tanda se
+ *       reescribe desde el extremo de menor posición con DX positivo.
  *   - Las mismas operaciones comentadas (líneas que empiezan con "' ") se
  *       rotan igual, para que sigan siendo válidas si se descomentan.
  *
@@ -240,6 +242,20 @@ function leerTaladroVertical(op, panel) {
   return { puntos, avisos, crnValido, repite };
 }
 
+// Posiciones (a lo largo del canto) de un @ BH: el taladro más cada
+// repetición. BH: RTY = campo 8 (0 = repite en X con paso DX), DX = campo 9,
+// NRP (cantidad total) = campo 14. Si no se puede leer la repetición,
+// devuelve solo el primer taladro.
+function posicionesLateral(campos, panel, s0) {
+  const rty = evaluar(campos[8], panel);
+  const dx = evaluar(campos[9], panel);
+  const nrp = evaluar(campos[14], panel);
+  if (rty === 0 && Number.isFinite(dx) && Number.isInteger(nrp) && nrp >= 2) {
+    return { pos: Array.from({ length: nrp }, (_, i) => s0 + dx * i), dx };
+  }
+  return { pos: [s0], dx: NaN };
+}
+
 function rotarOperacion(op, ctx) {
   const { angulo, panel, transformarPunto, saltoLinea } = ctx;
   const { campos } = op;
@@ -274,13 +290,22 @@ function rotarOperacion(op, ctx) {
         `@ BH con esquina (CRN) ${crnBH}: la rotación de laterales no considera la esquina, revisá el resultado en Biesse.`,
       );
     }
-    const [ex, ey] = puntoEnBorde(lado, s, panel.W, panel.H);
-    const [nx, ny] = transformarPunto(ex, ey);
     const nuevoLado = MAPA_LADO[angulo][lado];
-    const ns = nuevoLado === "L" || nuevoLado === "R" ? ny : nx;
+    const { pos, dx } = posicionesLateral(campos, panel, s);
+    // Cada agujero se rota por separado; la tanda se reescribe desde el
+    // extremo de menor posición, con paso DX positivo.
+    const nuevasPos = pos.map((sp) => {
+      const [ex, ey] = puntoEnBorde(lado, sp, panel.W, panel.H);
+      const [nx, ny] = transformarPunto(ex, ey);
+      return nuevoLado === "L" || nuevoLado === "R" ? ny : nx;
+    });
+    const ns = Math.min(...nuevasPos);
     nuevos[0] = String(NUM_LADO[nuevoLado]);
     nuevos[2] = formatearNumero(ns);
-    return final("lateral");
+    if (pos.length > 1 && (dx < 0 || nuevasPos[0] !== ns)) {
+      nuevos[9] = formatearNumero(Math.abs(dx));
+    }
+    return { ...final("lateral"), cantidad: pos.length };
   }
 
   // BV / BG: cara superior. Se pasa a coordenadas absolutas (según CRN),
@@ -357,7 +382,7 @@ function rotarBPP(contenidoOriginal, angulo) {
       if (op.activa) {
         r.avisos.forEach((a) => avisos.add(a));
         if (r.tipo === "vertical") verticales += r.cantidad ?? 1;
-        if (r.tipo === "lateral") laterales++;
+        if (r.tipo === "lateral") laterales += r.cantidad ?? 1;
       }
       return r.linea;
     }
@@ -409,22 +434,24 @@ function extraerFormasBPP(contenido) {
       const prof = evaluar(campos[5], panel);
       const largo = Number.isFinite(prof) ? prof : radioMin * 4;
       const rr = Number.isFinite(dia) ? dia / 2 : radioMin;
-      const [ex, ey] = puntoEnBorde(lado, s, W, H);
       const dir = { L: [1, 0], R: [-1, 0], B: [0, 1], T: [0, -1] }[lado];
       const perp = [Math.abs(dir[1]), Math.abs(dir[0])];
-      const p1 = [ex + perp[0] * rr, ey + perp[1] * rr];
-      const p2 = [ex - perp[0] * rr, ey - perp[1] * rr];
-      const p3 = [p2[0] + dir[0] * largo, p2[1] + dir[1] * largo];
-      const p4 = [p1[0] + dir[0] * largo, p1[1] + dir[1] * largo];
-      formas.push({ t: "poly", pts: [p1, p2, p3, p4], cerrada: true });
-      formas.push({
-        t: "circle",
-        cx: ex,
-        cy: ey,
-        r: Math.max(rr * 0.6, radioMin * 0.6),
-        relleno: true,
-      });
-      nL++;
+      for (const sp of posicionesLateral(campos, panel, s).pos) {
+        const [ex, ey] = puntoEnBorde(lado, sp, W, H);
+        const p1 = [ex + perp[0] * rr, ey + perp[1] * rr];
+        const p2 = [ex - perp[0] * rr, ey - perp[1] * rr];
+        const p3 = [p2[0] + dir[0] * largo, p2[1] + dir[1] * largo];
+        const p4 = [p1[0] + dir[0] * largo, p1[1] + dir[1] * largo];
+        formas.push({ t: "poly", pts: [p1, p2, p3, p4], cerrada: true });
+        formas.push({
+          t: "circle",
+          cx: ex,
+          cy: ey,
+          r: Math.max(rr * 0.6, radioMin * 0.6),
+          relleno: true,
+        });
+        nL++;
+      }
       continue;
     }
 
