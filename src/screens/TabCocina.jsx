@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ImportarSketchUp from "./ImportarSketchUp.jsx";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -114,6 +115,8 @@ export default function TabCocina({
   const [cocinaSearch, setCocinaSearch] = useState("");
   const [cocinaSearchFocus, setCocinaSearchFocus] = useState(false);
   const [articulosFamilia, setArticulosFamilia] = useState([]);
+  // Modal "Importar proyecto de SketchUp" (ver ImportarSketchUp.jsx)
+  const [mostrarImportarSketchUp, setMostrarImportarSketchUp] = useState(false);
 
   // ── Fetch artículos cuando cambia la familia activa ───────
   // GENERAL: los artículos sin familia puntual ya vienen incluidos por el
@@ -297,19 +300,35 @@ export default function TabCocina({
   if (!cocinaFamilia) {
     return (
       <div>
-        {hayItemsCocina && (
-          <div
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 20,
+            padding: "12px 16px",
+            background: "#f5f9fc",
+            border: "1px solid #c8dae8",
+            borderRadius: 3,
+          }}
+        >
+          <button
+            onClick={() => setMostrarImportarSketchUp(true)}
+            title="Carga el .json exportado desde SketchUp (Extensiones → Integral → Exportar proyecto a JSON) y agrega los muebles a Bajomesada / Alacena."
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 20,
-              padding: "12px 16px",
-              background: "#f5f9fc",
-              border: "1px solid #c8dae8",
-              borderRadius: 3,
+              padding: "7px 18px",
+              background: "#0a5c3a",
+              color: "#fff",
+              border: "none",
+              borderRadius: 2,
+              fontFamily: "'Space Mono',monospace",
+              fontSize: 12,
+              cursor: "pointer",
             }}
           >
+            📥 Importar de SketchUp
+          </button>
+          {hayItemsCocina && (
             <button
               onClick={() => aplicarFrenoATodosCocina?.()}
               title="Le pega el accesorio de freno que corresponda (puerta o cajonera) a cada ítem de Bajomesada y Alacena, según su nombre. No afecta a Placard."
@@ -326,7 +345,17 @@ export default function TabCocina({
             >
               🛑 Aplicar freno a toda la Cocina
             </button>
-          </div>
+          )}
+        </div>
+        {mostrarImportarSketchUp && (
+          <ImportarSketchUp
+            authFetch={authFetch}
+            lineasActivas={lineasActivas}
+            aplicarPorcentaje={aplicarPorcentaje}
+            recalcFila={recalcFila}
+            setCocinaItems={setCocinaItems}
+            onClose={() => setMostrarImportarSketchUp(false)}
+          />
         )}
         <div
           style={{
