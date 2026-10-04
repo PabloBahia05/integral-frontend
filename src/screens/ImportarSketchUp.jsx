@@ -71,6 +71,28 @@ const autoElegir = (lista, texto) => {
   return "";
 };
 
+// ── Identificación automática del mueble por código ─────────────────────
+// El nombre del componente en SketchUp (ej. "BAJO80") es el código del
+// artículo SIN el prefijo de línea; en Integral cada línea tiene su propio
+// codartint ("1BAJO80", "4BAJO80", "14BAJO80"...). Un artículo coincide si
+// alguno de sus códigos por línea es [dígitos opcionales] + código.
+const codigoNorm = (s) =>
+  String(s ?? "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+
+const codigosDe = (a) =>
+  [...Object.values(a?.codartintPorLinea ?? {}), a?.codartint, a?.CODARTINT]
+    .filter((c) => c != null && c !== "")
+    .map(codigoNorm);
+
+const coincideCodigo = (a, nombre) => {
+  const n = codigoNorm(nombre);
+  if (!n) return false;
+  const re = new RegExp(`^\\d*${n}$`);
+  return codigosDe(a).some((c) => re.test(c));
+};
+
 const estiloBoton = (principal) => ({
   padding: "7px 18px",
   background: principal ? "#0a3a5c" : "#fff",
@@ -292,6 +314,39 @@ export default function ImportarSketchUp({
     return catalogo[familia]?.find((a) => normalizar(a.articulo) === n) ?? null;
   };
 
+  // Busca el artículo de Integral que corresponde a un mueble de SketchUp:
+  // primero por código (con el prefijo de cada línea), después por nombre
+  // exacto del artículo. Si hay 0 o varios candidatos distintos devuelve
+  // null (que lo elija el usuario — no se adivina).
+  const resolverMueble = (m) => {
+    const unico = (hits) => {
+      if (hits.length === 1) return hits[0];
+      if (hits.length > 1 && new Set(hits.map((h) => h.art.articulo)).size === 1) {
+        // El mismo artículo viene en las dos familias: desempata el nombre.
+        const quiereAlacena = /^ALA/i.test(String(m.nombre ?? ""));
+        const preferida = quiereAlacena ? "alacenas" : "bajomesadas";
+        return hits.find((h) => h.familia === preferida) ?? hits[0];
+      }
+      return null;
+    };
+    const porCodigo = FAMILIAS.flatMap((f) =>
+      catalogo[f.clave]
+        .filter((a) => coincideCodigo(a, m.nombre))
+        .map((art) => ({ familia: f.clave, art })),
+    );
+    const r1 = unico(porCodigo);
+    if (r1) return r1;
+    const n = normalizar(m.nombre);
+    if (!n) return null;
+    return unico(
+      FAMILIAS.flatMap((f) =>
+        catalogo[f.clave]
+          .filter((a) => normalizar(a.articulo) === n)
+          .map((art) => ({ familia: f.clave, art })),
+      ),
+    );
+  };
+
   // ── Armar las filas de la tabla cuando hay archivo y catálogos ──
   useEffect(() => {
     if (!proyecto || !listo) return;
@@ -301,7 +356,10 @@ export default function ImportarSketchUp({
     setFilas(
       proyecto.muebles.map((m, i) => {
         const eqM = eq("mueble", m.nombre);
-        const art = eqM ? buscarArticulo(eqM.familia, eqM.articulo) : null;
+        const artEq = eqM ? buscarArticulo(eqM.familia, eqM.articulo) : null;
+        const sel = artEq
+          ? { familia: eqM.familia, art: artEq }
+          : resolverMueble(m);
 
         const colorValor = m.color?.valor ?? "";
         const eqC = colorValor ? eq("color", colorValor) : null;
@@ -321,7 +379,7 @@ export default function ImportarSketchUp({
         return {
           idx: i,
           m,
-          sel: art ? { familia: eqM.familia, art } : null,
+          sel,
           color,
           manija,
           recordar: true,
@@ -379,7 +437,14 @@ export default function ImportarSketchUp({
       }));
       const precioBaseUsar = preciosBase[0]?.precioBase ?? "";
       const precioUsar = precios[0]?.precio ?? "";
-      const lineaActiva = lineasActivas[0]?.linea;
+      // Código y medidas de la línea del mueble (LINEA de SketchUp) si está
+      // entre las activas; si no, la primera activa como en el buscador.
+      const lineaMueble = String(f.m.linea?.valor ?? "");
+      const lineaActiva = lineasActivas.some(
+        (l) => String(l.linea) === lineaMueble,
+      )
+        ? lineaMueble
+        : lineasActivas[0]?.linea;
 
       if (precioBaseUsar === "" || precioBaseUsar == null) {
         sinPrecio.push(p.articulo);
