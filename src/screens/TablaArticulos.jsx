@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
 import Totales from "./Totales";
+import {
+  cantidadAccesorio,
+  cantidadAccesorioAuto,
+} from "../Hooks/useCocinaPlacard";
 
 // Secciones cuyos ítems llevan medidas de ancho/alto.
 const TIENE_MEDIDAS = ["Mampara", "Puerta", "Vanitory"];
@@ -262,6 +266,9 @@ export default function TablaArticulos({
   // Manija: lista de opciones (mismo shape que melaminas), mismo mecanismo.
   manijas,
   setPresupuestoItems,
+  // Cantidad manual de un accesorio (ítems de Cocina/Placard): ver
+  // setCantAccesorioItem en useCocinaPlacard.js.
+  setCantAccesorioItem,
   // Confirmado: si la revisión actual ya fue confirmada (ver PresupuestoNuevo.jsx).
   // Determina el valor predeterminado de mostrarColor/mostrarManija.
   confirmado,
@@ -1287,7 +1294,119 @@ export default function TablaArticulos({
                               </span>
                             )}
                           </div>
+                          {/* Cocina/Placard: cada accesorio con su cantidad total
+                              editable (incluye el de freno). Vacío o igual a la
+                              automática = vuelve a automático. */}
+                          {setCantAccesorioItem &&
+                            /^(cocina|placard)-/.test(String(item.id)) &&
+                            (item.accesorios ?? []).length > 0 && (
+                              <div style={{ marginTop: 3 }}>
+                                {(item.accesorios ?? []).map((nombre) => {
+                                  const art = accesoriosDisponibles?.find(
+                                    (a) => a.articulo === String(nombre),
+                                  );
+                                  if (!art) return null;
+                                  const auto = cantidadAccesorioAuto(item, art);
+                                  const efectiva = cantidadAccesorio(item, art);
+                                  const esManual =
+                                    item.cantAccManual?.[art.articulo] !=
+                                    null;
+                                  const confirmar = (raw) => {
+                                    const n = parseFloat(raw);
+                                    const sinCambio =
+                                      raw === "" ||
+                                      !Number.isFinite(n) ||
+                                      Math.abs(n - auto) < 0.001;
+                                    setCantAccesorioItem(
+                                      item.id,
+                                      art.articulo,
+                                      sinCambio ? "" : n,
+                                    );
+                                  };
+                                  return (
+                                    <div
+                                      key={nombre}
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                        fontSize: 10,
+                                        color: "#6699bb",
+                                        marginTop: 2,
+                                      }}
+                                    >
+                                      <span
+                                        title={nombre}
+                                        style={{
+                                          whiteSpace: "nowrap",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          maxWidth: 170,
+                                        }}
+                                      >
+                                        🔧 {nombre}
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        defaultValue={efectiva}
+                                        key={`${item.id}-${nombre}-${efectiva}`}
+                                        onBlur={(e) => confirmar(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter")
+                                            e.currentTarget.blur();
+                                        }}
+                                        title={`Cantidad total de este accesorio (automática: ${auto}). Vacío = automática.`}
+                                        style={{
+                                          width: 52,
+                                          padding: "1px 3px",
+                                          fontFamily: "'Space Mono',monospace",
+                                          fontSize: 10,
+                                          border: "1px solid #7aaac8",
+                                          borderRadius: 2,
+                                          background: esManual
+                                            ? "#ffe58a"
+                                            : "#fff",
+                                          color: "#0a3a5c",
+                                        }}
+                                      />
+                                      {esManual && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setCantAccesorioItem(
+                                              item.id,
+                                              art.articulo,
+                                              "",
+                                            )
+                                          }
+                                          title={`Volver a la cantidad automática (${auto})`}
+                                          style={{
+                                            border: "none",
+                                            background: "transparent",
+                                            cursor: "pointer",
+                                            fontSize: 11,
+                                            color: "#0a6cbc",
+                                            padding: 0,
+                                          }}
+                                        >
+                                          ↺
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           {(() => {
+                            // Cocina/Placard ya listan sus accesorios arriba
+                            // (con cantidad editable); acá quedan los demás.
+                            if (
+                              setCantAccesorioItem &&
+                              /^(cocina|placard)-/.test(String(item.id))
+                            )
+                              return null;
                             const otros = nombresAccesoriosNoFreno(
                               item.accesorios,
                               accesoriosDisponibles,

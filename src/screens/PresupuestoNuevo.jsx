@@ -17,7 +17,10 @@ import TablaArticulos from "./TablaArticulos";
 import PlacardSection from "./PlacardSection";
 import Observaciones from "./Observaciones";
 import EncabezadoSection from "./EncabezadoSection";
-import useCocinaPlacard from "../Hooks/useCocinaPlacard";
+import useCocinaPlacard, {
+  cantidadAccesorio,
+  manualDesdeGuardado,
+} from "../Hooks/useCocinaPlacard";
 import { generarPresupuestoPDF } from "../pdf/pdfPresupuesto";
 import { generarConfirmadoPDF } from "../pdf/pdfConfirmado";
 // Ajustá esta ruta a donde termines poniendo wordPresupuesto.js / wordMotorComun.js
@@ -1484,6 +1487,7 @@ export default function PresupuestoNuevo({
     toggleAccesorioItem,
     toggleAccesorioEnArray,
     confirmarAccesoriosItem,
+    setCantAccesorioItem,
   } = useCocinaPlacard({
     authFetch,
     tab,
@@ -2021,6 +2025,34 @@ export default function PresupuestoNuevo({
               )?.articulo,
           )
           .filter(Boolean);
+        // cantacc/cantacc1/cantacc2 guardados, alineados con su codartint.
+        // Sirven para reconstruir las cantidades cargadas a mano (cantAccManual)
+        // cuando difieren de la cuenta automática; ver manualDesdeGuardado en
+        // useCocinaPlacard.js. Se guardan crudos en _cantaccGuardadas por si
+        // accesoriosDisponibles todavía no cargó: el efecto de resolución
+        // tardía del hook los vuelve a resolver.
+        const cantaccGuardadas = [
+          {
+            cod: it.accesorio ?? it.ACCESORIO ?? null,
+            cant: it.cantacc ?? it.CANTACC ?? null,
+          },
+          {
+            cod: it.accesorio1 ?? it.ACCESORIO1 ?? null,
+            cant: it.cantacc1 ?? it.CANTACC1 ?? null,
+          },
+          {
+            cod: it.accesorio2 ?? it.ACCESORIO2 ?? null,
+            cant: it.cantacc2 ?? it.CANTACC2 ?? null,
+          },
+        ].filter(({ cod }) => cod != null && cod !== "");
+        const cantAccManualInicial = manualDesdeGuardado(
+          {
+            area: parseFloat(it.area ?? it.AREA) || null,
+            cantidad: parseFloat(it.cantidad ?? it.CANTIDAD) || 1,
+            _cantaccGuardadas: cantaccGuardadas,
+          },
+          accesoriosDisponibles,
+        );
         const fila = {
           articulo,
           nombreart,
@@ -2055,6 +2087,8 @@ export default function PresupuestoNuevo({
             it.accesorio2 ?? it.ACCESORIO2 ?? null,
           ].filter((cod) => cod != null && cod !== ""),
           accesorios: accesoriosResueltosInicial,
+          _cantaccGuardadas: cantaccGuardadas,
+          cantAccManual: cantAccManualInicial,
           // _accesoriosSinResolver se marca SOLO si el fetch de
           // accesoriosDisponibles falló de verdad (accesoriosFetchError) —
           // no por cuántos códigos matchearon acá. Si el catálogo cargó
@@ -2633,23 +2667,27 @@ export default function PresupuestoNuevo({
           // cantidad física, usada para producción/compras).
           ...(() => {
             const nombres = (it.accesorios ?? []).slice(0, 3);
-            const areaItem = parseFloat(it.area) || null;
-            const cantidadItem = parseFloat(it.cantidad) || 1;
-            const cantAccTotal =
-              areaItem != null ? areaItem * cantidadItem : null;
-            const cods = nombres.map((nombre) => {
-              const art = accesoriosDisponibles.find(
-                (a) => a.articulo === nombre,
-              );
-              return art?.codartint ?? null;
-            });
+            const arts = nombres.map(
+              (nombre) =>
+                accesoriosDisponibles.find((a) => a.articulo === nombre) ??
+                null,
+            );
+            const cods = arts.map((art) => art?.codartint ?? null);
+            // Cantidad física total de cada accesorio: la cargada a mano
+            // (it.cantAccManual) si existe, y si no la automática (ver
+            // cantidadAccesorio en useCocinaPlacard.js: área × cantidad, o
+            // 1 × cantidad para accesorios con linea=1). Cada accesorio
+            // tiene SU cantidad (antes los tres compartían la misma).
+            const cants = arts.map((art) =>
+              art ? cantidadAccesorio(it, art) : null,
+            );
             return {
               accesorio: cods[0] ?? null,
-              cantacc: cods[0] != null ? cantAccTotal : null,
+              cantacc: cods[0] != null ? cants[0] : null,
               accesorio1: cods[1] ?? null,
-              cantacc1: cods[1] != null ? cantAccTotal : null,
+              cantacc1: cods[1] != null ? cants[1] : null,
               accesorio2: cods[2] ?? null,
-              cantacc2: cods[2] != null ? cantAccTotal : null,
+              cantacc2: cods[2] != null ? cants[2] : null,
             };
           })(),
           // Vinculación vanitory
@@ -4468,6 +4506,7 @@ export default function PresupuestoNuevo({
               melaminas={melaminasDB}
               manijas={manijasDB}
               setPresupuestoItems={setPresupuestoItems}
+              setCantAccesorioItem={setCantAccesorioItem}
               confirmado={confirmado}
             />
           )}
