@@ -68,6 +68,57 @@ const LINEA_FIJA_PLACARD = "15";
 // nombres sin cambios: cargarPresupuesto, aplicarAjuste, revertirAjuste, el
 // render de las solapas, etc.)
 
+// ── Cantidad de accesorios ───────────────────────────────────────────
+// Cantidad física TOTAL de un accesorio en un ítem (la que va a cantacc,
+// cantacc1, cantacc2 al guardar, y la que se usa para sumar el precio):
+//  - accesorio con linea=1 en SQL → 1 por unidad del ítem
+//  - resto → área del ítem por unidad (ej. bisagras por puerta)
+// multiplicado por la cantidad del ítem.
+const redondear2 = (n) => Math.round(n * 100) / 100;
+
+export const cantidadAccesorioAuto = (fila, art) => {
+  const lineaAcc = Number(art?.linea ?? art?.LINEA ?? 0);
+  const area = lineaAcc === 1 ? 1 : parseFloat(fila?.area) || 1;
+  const cantidad = parseFloat(fila?.cantidad) || 1;
+  return redondear2(area * cantidad);
+};
+
+// Cantidad efectiva: la cargada a mano (fila.cantAccManual[nombre]) si
+// existe, y si no la automática.
+export const cantidadAccesorio = (fila, art) => {
+  const manual = parseFloat(fila?.cantAccManual?.[art?.articulo]);
+  return Number.isFinite(manual) && manual >= 0
+    ? redondear2(manual)
+    : cantidadAccesorioAuto(fila, art);
+};
+
+// Reconstruye cantAccManual al abrir un presupuesto guardado: compara el
+// cantacc guardado de cada accesorio (fila._cantaccGuardadas) con lo que
+// saldría en automático. Si no coincide, fue una cantidad manual. También
+// se compara contra el cálculo viejo (área × cantidad, sin distinguir
+// linea=1) para no marcar como manuales los presupuestos guardados antes
+// de este cambio.
+export const manualDesdeGuardado = (fila, accesoriosDisponibles) => {
+  const manual = {};
+  (fila?._cantaccGuardadas ?? []).forEach(({ cod, cant }) => {
+    const guardada = parseFloat(cant);
+    if (!Number.isFinite(guardada)) return;
+    const art = (accesoriosDisponibles ?? []).find(
+      (a) => String(a.codartint) === String(cod),
+    );
+    if (!art) return;
+    const auto = cantidadAccesorioAuto(fila, art);
+    const areaFila = parseFloat(fila?.area);
+    const legacy = areaFila
+      ? redondear2(areaFila * (parseFloat(fila?.cantidad) || 1))
+      : null;
+    const igual = (x) => x != null && Math.abs(guardada - x) < 0.001;
+    if (igual(auto) || igual(legacy)) return;
+    manual[art.articulo] = guardada;
+  });
+  return manual;
+};
+
 export default function useCocinaPlacard({
   authFetch,
   tab,
@@ -364,14 +415,19 @@ export default function useCocinaPlacard({
     // las líneas. Se recalcula siempre desde cero (no es acumulativo) así
     // que confirmar el popover de accesorios varias veces no duplica el
     // cargo.
+    // ACTUALIZADO: `precio` es el precio de UNA unidad del ítem (el subtotal
+    // lo multiplica por la cantidad aparte), así que el cargo de accesorios
+    // que se le suma tiene que ser por unidad: cantidad TOTAL del accesorio
+    // (automática o manual, ver cantidadAccesorio) ÷ cantidad del ítem.
+    // Antes se sumaba p × área × cantidad a ese precio unitario y después se
+    // volvía a multiplicar por cantidad en el subtotal (cantidad al cuadrado
+    // cuando cantidad > 1).
+    const cantidadItemAcc = parseFloat(fila.cantidad) || 1;
     const totalAccesorios = (fila.accesorios ?? []).reduce((acc, nombre) => {
       const art = accesoriosDisponibles.find((a) => a.articulo === nombre);
       const p = parseFloat(art?.precio);
       if (isNaN(p)) return acc;
-      const lineaAcc = Number(art?.linea ?? art?.LINEA ?? 0);
-      const area = lineaAcc === 1 ? 1 : parseFloat(fila.area) || 1;
-      const cantidad = parseFloat(fila.cantidad) || 1;
-      return acc + p * area * cantidad;
+      return acc + (p * cantidadAccesorio(fila, art)) / cantidadItemAcc;
     }, 0);
     const conAccesorios = (precio) => {
       if (!totalAccesorios) return precio;
@@ -582,6 +638,7 @@ export default function useCocinaPlacard({
           return recalcFila({
             ...f,
             accesorios: nombres,
+            cantAccManual: manualDesdeGuardado(f, accesoriosDisponibles),
             _accesoriosSinResolver: accesoriosFetchError,
           });
         });
@@ -644,10 +701,38 @@ export default function useCocinaPlacard({
         // "area || 1" y sumaba el precio de un solo accesorio en vez de la
         // cantidad real (ej. 2 bisagras en una puerta simple).
         const fila = f.area != null ? f : { ...f, area: areaResuelta ?? f.area };
-        return recalcFila({
-          ...fila,
-          accesorios: toggleAccesorioEnArray(fila.accesorios, nombreAccesorio),
-        });
+        const accesorios = toggleAccesorioEnArray(fila.accesorios, nombreAccesorio);
+        const cantAccManual = { ...(fila.cantAccManual ?? {}) };
+        if (!accesorios.includes(nombreAccesorio)) delete cantAccManual[nombreAccesorio];
+        return recalcFila({ ...fila, accesorios, cantAccManual });
+      }),
+    });
+    if (tipo === "cocina") setCocinaItems(actualizar);
+    else setPlacardItems(actualizar);
+  };
+
+  // Fija (o quita) la cantidad MANUAL de un accesorio de un ítem ya cargado.
+  // `id` es el de presupuestoItems ("cocina-{familia}-{idx}" /
+  // "placard-{familia}-{idx}"). `valor` vacío/inválido = volver a la
+  // cantidad automática. Recalcula el precio en el mismo paso.
+  const setCantAccesorioItem = (id, nombreAccesorio, valor) => {
+    const m = /^(cocina|placard)-(.+)-(\d+)$/.exec(id ?? "");
+    if (!m) return;
+    const tipo = m[1];
+    const familia = m[2];
+    const idx = Number(m[3]);
+    const actualizar = (prev) => ({
+      ...prev,
+      [familia]: (prev[familia] ?? []).map((f, i) => {
+        if (i !== idx) return f;
+        const manual = { ...(f.cantAccManual ?? {}) };
+        const n = parseFloat(valor);
+        if (valor === "" || valor == null || !Number.isFinite(n) || n < 0) {
+          delete manual[nombreAccesorio];
+        } else {
+          manual[nombreAccesorio] = n;
+        }
+        return recalcFila({ ...f, cantAccManual: manual });
       }),
     });
     if (tipo === "cocina") setCocinaItems(actualizar);
@@ -949,6 +1034,7 @@ export default function useCocinaPlacard({
           porcentaje3: f.porcentaje3 ?? null,
           area: f.area ?? null,
           accesorios: f.accesorios ?? [],
+          cantAccManual: f.cantAccManual ?? {},
           grupo: f.grupo && f.grupo.trim() ? f.grupo.trim() : null,
           color: f.color ?? null,
           // ancho/alto/profundidad/codartint: se completan en placardFila
@@ -1239,5 +1325,6 @@ export default function useCocinaPlacard({
     toggleAccesorioItem,
     toggleAccesorioEnArray,
     confirmarAccesoriosItem,
+    setCantAccesorioItem,
   };
 }
