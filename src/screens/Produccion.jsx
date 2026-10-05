@@ -86,6 +86,77 @@ function useIsMobile(breakpoint = 640) {
 // no con clases + @media: cada estilo de acá abajo ya es el valor final
 // para el dispositivo actual, sin depender de que ninguna cascada CSS
 // externa lo pise ni de que el navegador respete el media query.
+// ── Selector de subcódigo (variante) ─────────────────────────────────────
+// Antes era un <input list=datalist>: el navegador filtra las sugerencias por
+// lo que ya está escrito, así que con un subcódigo cargado solo aparecía ESE
+// y no se podía cambiar a otra variante sin borrar el texto. Ahora, si el
+// código tiene variantes, es un <select> con todas (siempre) + "Sin variante"
+// + "Otra (escribir)…" para cargar una nueva a mano. Sin variantes cargadas
+// queda el campo de texto libre de siempre.
+//   onElegir(valor)  → guarda directo el valor elegido (puede ser "").
+//   onEscribir(valor)/onTerminar() → modo texto libre (cambio y blur).
+const SUBCODIGO_OTRA = "__otra__";
+function SubcodigoSelector({
+  valor,
+  opciones,
+  placeholder,
+  style,
+  onElegir,
+  onEscribir,
+  onTerminar,
+}) {
+  const [escribiendo, setEscribiendo] = useState(false);
+
+  if (opciones.length === 0 || escribiendo) {
+    return (
+      <input
+        type="text"
+        value={valor}
+        placeholder={placeholder}
+        autoFocus={escribiendo}
+        onFocus={(e) => escribiendo && e.target.select()}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => onEscribir(e.target.value)}
+        onBlur={() => {
+          setEscribiendo(false);
+          onTerminar();
+        }}
+        maxLength={50}
+        style={style}
+      />
+    );
+  }
+
+  // Si el valor actual no está entre las variantes cargadas (escrito a mano),
+  // se agrega igual para que el select lo muestre.
+  const lista = valor && !opciones.includes(valor) ? [...opciones, valor] : opciones;
+
+  return (
+    <select
+      value={valor}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        const v = e.target.value;
+        if (v === SUBCODIGO_OTRA) {
+          setEscribiendo(true);
+          return;
+        }
+        // El error ya se marca en el campo (errorCampo) dentro del guardado.
+        Promise.resolve(onElegir(v)).catch(() => {});
+      }}
+      style={style}
+    >
+      <option value="">Sin variante</option>
+      {lista.map((sub) => (
+        <option key={sub} value={sub}>
+          {sub}
+        </option>
+      ))}
+      <option value={SUBCODIGO_OTRA}>✏️ Otra (escribir)…</option>
+    </select>
+  );
+}
+
 function DetalleProduccion({
   row,
   melaminas,
@@ -98,6 +169,7 @@ function DetalleProduccion({
   onColorChange,
   onTextoCampoChange,
   onTextoCampoBlur,
+  onSubcodigoGuardar,
   onEtapaChange,
   guardandoId,
   errorGuardadoId,
@@ -334,30 +406,18 @@ function DetalleProduccion({
 
         {fila(
           "Subcódigo",
-          <>
-            <input
-              type="text"
-              value={row.subcodigo ?? ""}
-              placeholder={row.codartint ? "Sin variante" : "Sin artículo"}
-              list={`subcodigos-detalle-${row.id}`}
-              onChange={(e) =>
-                onTextoCampoChange(row.id, "subcodigo", e.target.value)
-              }
-              onBlur={() => onTextoCampoBlur(row, "subcodigo")}
-              maxLength={50}
-              style={estiloInputModal(
-                guardandoCampo === `${row.id}-subcodigo`,
-                errorCampo === `${row.id}-subcodigo`,
-              )}
-            />
-            {subcodigosDisponibles.length > 0 && (
-              <datalist id={`subcodigos-detalle-${row.id}`}>
-                {subcodigosDisponibles.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
+          <SubcodigoSelector
+            valor={row.subcodigo ?? ""}
+            opciones={subcodigosDisponibles}
+            placeholder={row.codartint ? "Sin variante" : "Sin artículo"}
+            onElegir={(v) => onSubcodigoGuardar(row, v)}
+            onEscribir={(v) => onTextoCampoChange(row.id, "subcodigo", v)}
+            onTerminar={() => onTextoCampoBlur(row, "subcodigo")}
+            style={estiloInputModal(
+              guardandoCampo === `${row.id}-subcodigo`,
+              errorCampo === `${row.id}-subcodigo`,
             )}
-          </>,
+          />,
         )}
 
         {fila(
@@ -1482,33 +1542,19 @@ export default function Produccion({ authFetch, token, onInicio }) {
           row.codigo_produccion_id != null
             ? subcodigosPorCodigoProduccion.get(Number(row.codigo_produccion_id)) ?? []
             : [];
-        const listId = `subcodigos-${row.id}`;
         return (
-          <>
-            <input
-              type="text"
-              value={row.subcodigo ?? ""}
-              placeholder={row.codigo_produccion_id ? "Sin variante" : "Sin código"}
-              list={listId}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) =>
-                handleTextoCampoChange(row.id, "subcodigo", e.target.value)
-              }
-              onBlur={() => handleTextoCampoBlur(row, "subcodigo")}
-              maxLength={50}
-              style={{
-                ...estiloInput(row, "subcodigo", guardandoCampo, errorCampo),
-                maxWidth: "150px",
-              }}
-            />
-            {opciones.length > 0 && (
-              <datalist id={listId}>
-                {opciones.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-            )}
-          </>
+          <SubcodigoSelector
+            valor={row.subcodigo ?? ""}
+            opciones={opciones}
+            placeholder={row.codigo_produccion_id ? "Sin variante" : "Sin código"}
+            onElegir={(val) => handleSubcodigoGuardar(row, val)}
+            onEscribir={(val) => handleTextoCampoChange(row.id, "subcodigo", val)}
+            onTerminar={() => handleTextoCampoBlur(row, "subcodigo")}
+            style={{
+              ...estiloInput(row, "subcodigo", guardandoCampo, errorCampo),
+              maxWidth: "150px",
+            }}
+          />
         );
       },
     },
@@ -1925,6 +1971,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
           onColorChange={handleColorChange}
           onTextoCampoChange={handleTextoCampoChange}
           onTextoCampoBlur={handleTextoCampoBlur}
+          onSubcodigoGuardar={handleSubcodigoGuardar}
           onEtapaChange={handleEtapaChange}
           guardandoId={guardandoId}
           errorGuardadoId={errorGuardadoId}
