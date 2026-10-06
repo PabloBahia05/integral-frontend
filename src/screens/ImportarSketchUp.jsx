@@ -10,10 +10,21 @@ const API = "https://integral-backend-production.up.railway.app";
 // en Cocina (Bajomesadas / Alacenas), con el mismo formato de fila que usa el
 // buscador de TabCocina — después se edita como cualquier otro ítem.
 //
-// Cada mueble de SketchUp (ej. "4B30") hay que vincularlo a un artículo de
-// Integral. Esa vinculación (y la de COLOR y MANIJA) se elige una vez acá y se
-// guarda en sketchup_equivalencias (ver sketchup_routes.js), así que la
-// próxima vez viene resuelta sola.
+// Cada mueble de SketchUp (ej. "BAJO2P") hay que vincularlo a un artículo de
+// Integral. Se resuelve en este orden:
+//   1. Equivalencia guardada para ese nombre + medidas (sketchup_equivalencias,
+//      ver sketchup_routes.js).
+//   2. Código de producción: el nombre del mueble se busca como `codigo` en
+//      codigos_produccion; los artículos vinculados en articulo_produccion
+//      son los candidatos, y se elige el que coincide con las medidas
+//      nominales del componente (a = ancho, b = alto, c = profundidad, en cm;
+//      ver exportar_integral.rb). Solo se asigna solo si coincide UN artículo.
+//   3. Equivalencia guardada solo por nombre (formato viejo).
+//   4. Si el nombre no es un código de producción: por código de artículo
+//      (con prefijo de línea) o por nombre exacto, como antes.
+// Si nada resuelve, o hay dudas, la fila queda sin artículo y se elige a mano
+// (no se adivina). Lo elegido a mano se guarda (COLOR y MANIJA también), así
+// que la próxima vez viene resuelto solo.
 //
 // Qué NO se importa todavía: granito, zócalo, mano, ni los componentes sueltos
 // (listados en "otros" del JSON). Se muestran como aviso.
@@ -91,6 +102,82 @@ const coincideCodigo = (a, nombre) => {
   if (!n) return false;
   const re = new RegExp(`^\\d*${n}$`);
   return codigosDe(a).some((c) => re.test(c));
+};
+
+// ── Medidas ─────────────────────────────────────────────────────────────
+// Las medidas nominales del mueble son los atributos a/b/c del componente
+// (ancho, alto, profundidad; ver ATRIBUTOS_MEDIDA en exportar_integral.rb) y
+// se comparan con ancho/alto/profundidad del artículo (cm) para la LINEA del
+// mueble. Se prueban con factor 1 y con 2.54 por si el JSON trae a/b/c en
+// pulgadas (los atributos dinámicos guardan el valor interno sin convertir).
+const TOL_CM = 0.15;
+const FACTORES_MEDIDA = [1, 2.54];
+const DIMS = ["ancho", "alto", "profundidad"];
+
+const aMedida = (v) => {
+  const n = parseFloat(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+const medidasNominales = (m) => {
+  const ancho = aMedida(m?.a);
+  const alto = aMedida(m?.b);
+  const profundidad = aMedida(m?.c);
+  return ancho != null && alto != null && profundidad != null
+    ? { ancho, alto, profundidad }
+    : null;
+};
+
+const medidasArticulo = (art, linea) => {
+  const l = String(linea ?? "");
+  return {
+    ancho: aMedida(art?.anchoPorLinea?.[l] ?? art?.ancho ?? art?.ANCHO),
+    alto: aMedida(art?.altoPorLinea?.[l] ?? art?.alto ?? art?.ALTO),
+    profundidad: aMedida(
+      art?.profundidadPorLinea?.[l] ?? art?.profundidad ?? art?.PROFUNDIDAD,
+    ),
+  };
+};
+
+// "si": todas las medidas que el artículo tiene cargadas coinciden;
+// "no": alguna difiere; "sin_datos": el artículo no tiene medidas cargadas.
+const evaluarMedidas = (art, linea, med) => {
+  const delArt = medidasArticulo(art, linea);
+  let comparadas = 0;
+  for (const k of DIMS) {
+    if (delArt[k] == null) continue;
+    if (Math.abs(delArt[k] - med[k]) > TOL_CM) return "no";
+    comparadas++;
+  }
+  return comparadas === 0 ? "sin_datos" : "si";
+};
+
+const r2 = (n) => Math.round(n * 100) / 100;
+
+// Clave de la equivalencia guardada: nombre + medidas nominales, porque el
+// mismo nombre de SketchUp (BAJO2P) puede ser artículos distintos según la
+// medida. Sin medidas en el JSON queda solo el nombre.
+const claveMueble = (m) => {
+  const med = medidasNominales(m);
+  const nombre = String(m?.nombre ?? "");
+  return med
+    ? `${nombre}|${r2(med.ancho)}x${r2(med.alto)}x${r2(med.profundidad)}`
+    : nombre;
+};
+
+const textoMedidas = (med) =>
+  med ? `${r2(med.ancho)}×${r2(med.alto)}×${r2(med.profundidad)}` : "";
+
+// hits: [{ familia, art }]. Un solo candidato (o el mismo artículo en las dos
+// familias, que desempata por el nombre) → ese; si no, null.
+const elegirUnico = (hits, m) => {
+  if (hits.length === 1) return hits[0];
+  if (hits.length > 1 && new Set(hits.map((h) => h.art.articulo)).size === 1) {
+    const quiereAlacena = /^ALA/i.test(String(m.nombre ?? ""));
+    const preferida = quiereAlacena ? "alacenas" : "bajomesadas";
+    return hits.find((h) => h.familia === preferida) ?? hits[0];
+  }
+  return null;
 };
 
 const estiloBoton = (principal) => ({
@@ -248,6 +335,7 @@ export default function ImportarSketchUp({
   const [catalogo, setCatalogo] = useState({ bajomesadas: [], alacenas: [] });
   const [melaminas, setMelaminas] = useState([]);
   const [manijas, setManijas] = useState([]);
+  const [vinculos, setVinculos] = useState([]);
 
   const [proyecto, setProyecto] = useState(null);
   const [filas, setFilas] = useState([]);
@@ -268,9 +356,11 @@ export default function ImportarSketchUp({
       pedir(`${API}/articulos/por-familia?familia=Alacena`),
       pedir(`${API}/productos/melaminas`),
       pedir(`${API}/productos/manijas`),
-    ]).then(([eq, baj, ala, mel, man]) => {
+      pedir(`${API}/sketchup/codigos-produccion`),
+    ]).then(([eq, baj, ala, mel, man, vinc]) => {
       if (!vivo) return;
       setEquivalencias(aArray(eq));
+      setVinculos(aArray(vinc));
       setCatalogo({ bajomesadas: aArray(baj), alacenas: aArray(ala) });
       setMelaminas(aArray(mel));
       setManijas(aArray(man));
@@ -314,37 +404,79 @@ export default function ImportarSketchUp({
     return catalogo[familia]?.find((a) => normalizar(a.articulo) === n) ?? null;
   };
 
-  // Busca el artículo de Integral que corresponde a un mueble de SketchUp:
-  // primero por código (con el prefijo de cada línea), después por nombre
-  // exacto del artículo. Si hay 0 o varios candidatos distintos devuelve
-  // null (que lo elija el usuario — no se adivina).
+  // Busca el artículo de Integral que corresponde a un mueble de SketchUp
+  // cuando su nombre NO es un código de producción: primero por código (con
+  // el prefijo de cada línea), después por nombre exacto del artículo. Si hay
+  // 0 o varios candidatos distintos devuelve null (que lo elija el usuario —
+  // no se adivina).
   const resolverMueble = (m) => {
-    const unico = (hits) => {
-      if (hits.length === 1) return hits[0];
-      if (hits.length > 1 && new Set(hits.map((h) => h.art.articulo)).size === 1) {
-        // El mismo artículo viene en las dos familias: desempata el nombre.
-        const quiereAlacena = /^ALA/i.test(String(m.nombre ?? ""));
-        const preferida = quiereAlacena ? "alacenas" : "bajomesadas";
-        return hits.find((h) => h.familia === preferida) ?? hits[0];
-      }
-      return null;
-    };
     const porCodigo = FAMILIAS.flatMap((f) =>
       catalogo[f.clave]
         .filter((a) => coincideCodigo(a, m.nombre))
         .map((art) => ({ familia: f.clave, art })),
     );
-    const r1 = unico(porCodigo);
+    const r1 = elegirUnico(porCodigo, m);
     if (r1) return r1;
     const n = normalizar(m.nombre);
     if (!n) return null;
-    return unico(
+    return elegirUnico(
       FAMILIAS.flatMap((f) =>
         catalogo[f.clave]
           .filter((a) => normalizar(a.articulo) === n)
           .map((art) => ({ familia: f.clave, art })),
       ),
+      m,
     );
+  };
+
+  // Resuelve por código de producción + medidas. Devuelve null si el nombre
+  // del mueble no es un código de producción con artículos vinculados; si
+  // lo es, devuelve { codigo, candidatos, sel, ambiguo }. `sel` es null si
+  // ningún artículo coincide con las medidas, o si coinciden varios.
+  const resolverPorProduccion = (m) => {
+    const n = codigoNorm(m.nombre);
+    if (!n) return null;
+    const links = vinculos.filter((v) => codigoNorm(v.codigo) === n);
+    if (links.length === 0) return null;
+    const codigo = links[0].codigo;
+    const cods = new Set(links.map((v) => codigoNorm(v.codartint)));
+    const candidatos = FAMILIAS.flatMap((f) =>
+      catalogo[f.clave]
+        .filter((a) => codigosDe(a).some((c) => cods.has(c)))
+        .map((art) => ({ familia: f.clave, art })),
+    );
+    const base = { codigo, candidatos: candidatos.length, sel: null, ambiguo: false };
+    if (candidatos.length === 0) return base;
+
+    const linea = m.linea?.valor;
+    const nominales = medidasNominales(m);
+
+    if (nominales) {
+      for (const factor of FACTORES_MEDIDA) {
+        const med = {
+          ancho: nominales.ancho * factor,
+          alto: nominales.alto * factor,
+          profundidad: nominales.profundidad * factor,
+        };
+        const hits = candidatos.filter(
+          (c) => evaluarMedidas(c.art, linea, med) === "si",
+        );
+        if (hits.length > 0) {
+          const sel = elegirUnico(hits, m);
+          return { ...base, sel, ambiguo: !sel };
+        }
+      }
+    }
+
+    // Un único artículo vinculado y sin medidas para contrastar (el JSON no
+    // las trae o el artículo no las tiene cargadas): se toma ese.
+    if (candidatos.length === 1) {
+      const sinVerificar =
+        !nominales ||
+        evaluarMedidas(candidatos[0].art, linea, nominales) === "sin_datos";
+      if (sinVerificar) return { ...base, sel: candidatos[0] };
+    }
+    return base;
   };
 
   // ── Armar las filas de la tabla cuando hay archivo y catálogos ──
@@ -355,11 +487,41 @@ export default function ImportarSketchUp({
 
     setFilas(
       proyecto.muebles.map((m, i) => {
-        const eqM = eq("mueble", m.nombre);
-        const artEq = eqM ? buscarArticulo(eqM.familia, eqM.articulo) : null;
-        const sel = artEq
-          ? { familia: eqM.familia, art: artEq }
-          : resolverMueble(m);
+        const artDe = (e) => (e ? buscarArticulo(e.familia, e.articulo) : null);
+        const selDe = (e) => {
+          const art = artDe(e);
+          return art ? { familia: e.familia, art } : null;
+        };
+        const med = medidasNominales(m);
+
+        let sel = selDe(eq("mueble", claveMueble(m)));
+        let via = sel ? "equivalencia" : null;
+        let aviso = "";
+        let prodCodigo = "";
+
+        if (!sel) {
+          const prod = resolverPorProduccion(m);
+          if (prod?.sel) {
+            sel = prod.sel;
+            via = "produccion";
+            prodCodigo = prod.codigo;
+          } else {
+            // Equivalencia vieja (solo por nombre): la eligió una persona.
+            sel = selDe(eq("mueble", m.nombre));
+            if (sel) via = "equivalencia";
+            else if (!prod) {
+              // El nombre no es un código de producción: como antes.
+              sel = resolverMueble(m);
+              if (sel) via = "codigo";
+            } else if (prod.candidatos === 0) {
+              aviso = `El código de producción ${prod.codigo} no tiene artículos vinculados de Bajomesada/Alacena.`;
+            } else if (prod.ambiguo) {
+              aviso = `Varios artículos del código ${prod.codigo} coinciden con ${textoMedidas(med)} cm: elegí uno.`;
+            } else {
+              aviso = `${prod.candidatos} artículo(s) del código ${prod.codigo}, ninguno con medidas ${med ? `${textoMedidas(med)} cm` : "(el JSON no trae a/b/c)"}: elegí uno.`;
+            }
+          }
+        }
 
         const colorValor = m.color?.valor ?? "";
         const eqC = colorValor ? eq("color", colorValor) : null;
@@ -380,6 +542,9 @@ export default function ImportarSketchUp({
           idx: i,
           m,
           sel,
+          via,
+          aviso,
+          prodCodigo,
           color,
           manija,
           recordar: true,
@@ -490,12 +655,17 @@ export default function ImportarSketchUp({
     importables
       .filter((f) => f.recordar)
       .forEach((f) => {
-        aGuardar.push({
-          tipo: "mueble",
-          clave: f.m.nombre,
-          articulo: f.sel.art.articulo,
-          familia: f.sel.familia,
-        });
+        // Lo resuelto por código de producción + medidas no se guarda como
+        // equivalencia: si después se corrigen los vínculos o las medidas,
+        // una equivalencia vieja pisaría el resultado correcto.
+        if (f.via !== "produccion") {
+          aGuardar.push({
+            tipo: "mueble",
+            clave: claveMueble(f.m),
+            articulo: f.sel.art.articulo,
+            familia: f.sel.familia,
+          });
+        }
         if (f.m.color?.valor && f.color) {
           aGuardar.push({
             tipo: "color",
@@ -703,6 +873,14 @@ export default function ImportarSketchUp({
                           {f.m.linea?.etiqueta || "—"} · {f.m.lenx_cm}×
                           {f.m.leny_cm}×{f.m.lenz_cm} cm
                         </div>
+                        {medidasNominales(f.m) && (
+                          <div
+                            style={{ fontSize: 10, color: "#6699bb" }}
+                            title="Medidas nominales (a × b × c: ancho × alto × profundidad) del JSON; son las que se comparan con el artículo."
+                          >
+                            Nominal: {textoMedidas(medidasNominales(f.m))}
+                          </div>
+                        )}
                       </td>
                       <td style={td}>{f.m.cantidad}</td>
                       <td style={td}>
@@ -713,12 +891,28 @@ export default function ImportarSketchUp({
                           onElegir={(id) => {
                             const [familia, ...resto] = id.split("|");
                             const art = buscarArticulo(familia, resto.join("|"));
-                            if (art) actualizarFila(f.idx, { sel: { familia, art } });
+                            if (art)
+                              actualizarFila(f.idx, {
+                                sel: { familia, art },
+                                via: "manual",
+                                aviso: "",
+                              });
                           }}
                         />
                         {f.sel && (
                           <div style={{ fontSize: 10, color: "#6699bb", marginTop: 2 }}>
                             {f.sel.familia === "alacenas" ? "Alacena" : "Bajomesada"}
+                            {f.via === "produccion" && (
+                              <span style={{ color: "#2a7a43" }}>
+                                {" "}
+                                · ✔ código de producción {f.prodCodigo} + medidas
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {!f.sel && f.aviso && (
+                          <div style={{ fontSize: 10, color: "#a06000", marginTop: 2 }}>
+                            {f.aviso}
                           </div>
                         )}
                       </td>
