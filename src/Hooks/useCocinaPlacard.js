@@ -130,6 +130,7 @@ export default function useCocinaPlacard({
   ajusteScope,
   ajusteValor,
   ajusteModo,
+  ajusteTick = 0,
   calcularAjuste,
   cargandoPresupuestoRef,
   setPresupuestoItems,
@@ -1005,7 +1006,7 @@ export default function useCocinaPlacard({
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listaPrecio, listasDB, ajusteAplicado, ajusteValor, ajusteModo, ajusteScope]);
+  }, [listaPrecio, listasDB, ajusteAplicado, ajusteValor, ajusteModo, ajusteScope, ajusteTick]);
 
   // Sincronizar cocina y placard con la tabla de presupuesto
   useEffect(() => {
