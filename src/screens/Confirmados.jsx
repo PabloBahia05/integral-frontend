@@ -696,6 +696,43 @@ export default function Confirmados({ authFetch, token, onInicio }) {
     }
   };
 
+  // ── Duplicar un ítem ───────────────────────────────────────────────
+  // Reusa el mismo POST /confirmados que "Nuevo ítem", con los datos de la
+  // fila elegida: así el backend lo trata igual que un alta (obra + Producción).
+
+  const [duplicandoId, setDuplicandoId] = useState(null);
+
+  const duplicarItem = async (row) => {
+    if (duplicandoId != null) return;
+    setDuplicandoId(row.id);
+    try {
+      const res = await authFetch(`${API}/confirmados`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombreart: row.nombreart ?? "",
+          codartint: row.codartint ?? "",
+          grupo: row.grupo ?? "",
+          color: row.color ?? "",
+          ancho: row.ancho ?? "",
+          alto: row.alto ?? "",
+          profundidad: row.profundidad ?? "",
+          cantidad: row.cantidad ?? "1",
+          numeropres: abierta.numeropres,
+          revision: abierta.revision,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      fetchItems(abierta.numeropres, abierta.revision);
+    } catch (e) {
+      console.error("Error duplicando ítem:", e);
+      alert(`No se pudo duplicar el ítem: ${e.message}`);
+    } finally {
+      setDuplicandoId(null);
+    }
+  };
+
   // ── Baja de un ítem ────────────────────────────────────────────────
 
   const handleDelete = async () => {
@@ -879,21 +916,40 @@ export default function Confirmados({ authFetch, token, onInicio }) {
       key: "eliminar",
       label: "",
       render: (v, row) => (
-        <button
-          onClick={() => setAEliminar(row)}
-          title="Eliminar ítem"
-          style={{
-            border: "1px solid #f0a0a0",
-            background: "#fdf0f0",
-            color: "#c0392b",
-            borderRadius: 4,
-            padding: "3px 8px",
-            cursor: "pointer",
-            fontSize: 12,
-          }}
-        >
-          🗑
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={() => duplicarItem(row)}
+            disabled={duplicandoId != null}
+            title="Duplicar ítem"
+            style={{
+              border: "1px solid #a0c4f0",
+              background: "#f0f6fd",
+              color: "#1a5fa8",
+              borderRadius: 4,
+              padding: "3px 8px",
+              cursor: duplicandoId != null ? "default" : "pointer",
+              opacity: duplicandoId === row.id ? 0.5 : 1,
+              fontSize: 12,
+            }}
+          >
+            ⧉
+          </button>
+          <button
+            onClick={() => setAEliminar(row)}
+            title="Eliminar ítem"
+            style={{
+              border: "1px solid #f0a0a0",
+              background: "#fdf0f0",
+              color: "#c0392b",
+              borderRadius: 4,
+              padding: "3px 8px",
+              cursor: "pointer",
+              fontSize: 12,
+            }}
+          >
+            🗑
+          </button>
+        </div>
       ),
     },
   ];
