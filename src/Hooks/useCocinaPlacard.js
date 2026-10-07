@@ -376,7 +376,7 @@ export default function useCocinaPlacard({
 
   // Recalcula una fila aplicando el porcentaje de la lista activa
   // + el porcentaje extra propio del ítem (si lo tiene), compuestos.
-  const recalcFila = (fila) => {
+  const recalcFilaSinLog = (fila) => {
     const PCT_POR_IDX = ["porcentaje1", "porcentaje2", "porcentaje3"];
     const conExtra = (precioConLista, pctExtra) => {
       if (pctExtra == null || pctExtra === "") return precioConLista;
@@ -468,6 +468,35 @@ export default function useCocinaPlacard({
     return fila;
   };
 
+  // ══ DIAGNÓSTICO TEMPORAL (P00075 Rev. 2: precios que cambian solos) ══
+  // Envuelve recalcFila: avisa en consola cada vez que un recálculo CAMBIA
+  // el precio de una fila (más de 1 centavo). Sacar cuando se cierre el caso.
+  const recalcFila = (fila) => {
+    const nueva = recalcFilaSinLog(fila);
+    try {
+      const antes = parseFloat(fila?.precio);
+      const despues = parseFloat(nueva?.precio);
+      if (
+        Number.isFinite(antes) &&
+        Number.isFinite(despues) &&
+        Math.abs(antes - despues) > 0.01
+      ) {
+        console.warn(
+          `[DIAG recalc] t=${Math.round(performance.now())}ms "${fila?.articulo}" ` +
+            `${antes} -> ${despues} | base=${fila?.precioBase} pct1=${fila?.porcentaje1} ` +
+            `lista%=${aplicarPorcentaje("100")} listaPrecio="${listaPrecio}" ` +
+            `ajusteAplicado=${ajusteAplicado} scope=${ajusteScope} ` +
+            `accesorios=${JSON.stringify(fila?.accesorios ?? [])}`,
+        );
+      }
+    } catch {
+      /* diagnóstico: nunca debe romper el cálculo */
+    }
+    return nueva;
+  };
+  const diagOrigen = (nombre) =>
+    console.warn(`[DIAG origen] t=${Math.round(performance.now())}ms ${nombre}`);
+
   // ── Freno ────────────────────────────────────────────────
   // "Aplicar freno" NO es un cargo $/m² aparte: es pegarle a cada ítem el
   // accesorio "autofreno" que le corresponde según su tipo (bisagra si es
@@ -515,6 +544,7 @@ export default function useCocinaPlacard({
   // mitad de precio en cualquier ítem con área > 1 (ej. cajoneras de 2
   // cajones) cuya fila todavía no tenía `area` seteada.
   const aplicarFrenoATodosCocina = () => {
+    diagOrigen("aplicarFrenoATodosCocina");
     construirMapaArticulosCompleto().then((mapaArticulos) => {
       setCocinaItems((prev) => {
         const next = {};
@@ -529,6 +559,7 @@ export default function useCocinaPlacard({
   };
 
   const aplicarFrenoATodosPlacard = () => {
+    diagOrigen("aplicarFrenoATodosPlacard");
     construirMapaArticulosCompleto().then((mapaArticulos) => {
       setPlacardItems((prev) => {
         const next = {};
@@ -546,6 +577,7 @@ export default function useCocinaPlacard({
   // índice, misma lógica que "aplicar a todos" pero puntual — mismo
   // motivo para pasar por el mapa combinado (ver comentario arriba).
   const setFrenoItemCocina = (familia, idx) => {
+    diagOrigen(`setFrenoItemCocina ${familia}[${idx}]`);
     construirMapaArticulosCompleto().then((mapaArticulos) => {
       setCocinaItems((prev) => ({
         ...prev,
@@ -559,6 +591,7 @@ export default function useCocinaPlacard({
   };
 
   const setFrenoItemPlacard = (familia, idx) => {
+    diagOrigen(`setFrenoItemPlacard ${familia}[${idx}]`);
     construirMapaArticulosCompleto().then((mapaArticulos) => {
       setPlacardItems((prev) => ({
         ...prev,
@@ -866,6 +899,7 @@ export default function useCocinaPlacard({
   };
 
   const handleActualizar = () => {
+    diagOrigen("handleActualizar");
     const hayCocina = Object.values(cocinaItemsRef.current).some((filas) => filas?.length);
     const hayPlacard = Object.values(placardItemsRef.current).some((filas) => filas?.length);
 
@@ -991,6 +1025,7 @@ export default function useCocinaPlacard({
     // aplicarAjuste/revertirAjuste mutando esa fila directamente. Si
     // recalculáramos acá igual, pisaríamos ese ajuste puntual.
     if (ajusteAplicado && ajusteScope !== "todos") return;
+    diagOrigen("efecto recalculo por lista/ajuste");
     setCocinaItems((prev) => {
       const next = {};
       for (const [familia, filas] of Object.entries(prev)) {
@@ -1148,6 +1183,7 @@ export default function useCocinaPlacard({
       ...familiasConItems(placardItemsRef.current, familiaMapPlacard),
     ]);
     if (familiasBDNecesarias.size === 0) return;
+    diagOrigen("efecto alinear lineasActivas");
 
     Promise.all(
       [...familiasBDNecesarias].map((familiaBD) =>
