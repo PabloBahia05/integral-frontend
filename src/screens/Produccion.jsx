@@ -726,6 +726,11 @@ export default function Produccion({ authFetch, token, onInicio }) {
   // su cola es simplemente todo lo que sigue en NO.
   const [filtroEtapa, setFiltroEtapa] = useState(null);
 
+  // Filtro por grupo (select al lado de los botones de etapa). "" = todos
+  // los grupos. SIN_GRUPO filtra los ítems que no tienen grupo cargado.
+  // Se combina con el filtro de etapa y con el buscador.
+  const [filtroGrupo, setFiltroGrupo] = useState("");
+
   // ── Fetch ──────────────────────────────────────────────────────────────
 
   const [errorCarga, setErrorCarga] = useState(null);
@@ -1261,10 +1266,37 @@ export default function Produccion({ authFetch, token, onInicio }) {
     return true;
   };
 
+  // Grupos distintos presentes en `rows` (para las opciones del select).
+  // Se comparan recortados para que "A " y "A" no aparezcan como dos grupos.
+  const SIN_GRUPO = "__sin_grupo__";
+  const grupoDe = (r) => String(r.grupo ?? "").trim();
+  const gruposDisponibles = [
+    ...new Set(rows.map(grupoDe).filter((g) => g !== "")),
+  ].sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+  const haySinGrupo = rows.some((r) => grupoDe(r) === "");
+
+  // Si el grupo elegido ya no existe (ej: se recargó la lista y desapareció),
+  // se ignora el filtro en vez de dejar la tabla vacía sin explicación.
+  const grupoActivo =
+    filtroGrupo === SIN_GRUPO
+      ? haySinGrupo
+        ? SIN_GRUPO
+        : ""
+      : gruposDisponibles.includes(filtroGrupo)
+        ? filtroGrupo
+        : "";
+
+  const cumpleGrupo = (r) => {
+    if (!grupoActivo) return true;
+    if (grupoActivo === SIN_GRUPO) return grupoDe(r) === "";
+    return grupoDe(r) === grupoActivo;
+  };
+
   const q = search.toLowerCase();
   const filtered = rows.filter(
     (r) =>
       cumpleEtapa(r) &&
+      cumpleGrupo(r) &&
       ((r.codpro ?? "").toLowerCase().includes(q) ||
         (r.cliente_nombre ?? "").toLowerCase().includes(q) ||
         String(r.numeropres ?? "").includes(q) ||
@@ -1284,11 +1316,16 @@ export default function Produccion({ authFetch, token, onInicio }) {
   // Cantidades para los badges de los 3 botones de etapa (siempre contadas
   // sobre `rows` completo, no sobre `filtered`, para que el número no
   // cambie según qué botón esté activo).
-  const countDomus = rows.filter((r) => (r.DOMUS ?? "NO") !== "SI").length;
-  const countPerforado = rows.filter(
+  // Sí respetan el grupo elegido (así el número del botón coincide con lo
+  // que se ve al apretarlo), pero no el buscador ni la etapa activa.
+  const rowsDelGrupo = rows.filter(cumpleGrupo);
+  const countDomus = rowsDelGrupo.filter(
+    (r) => (r.DOMUS ?? "NO") !== "SI",
+  ).length;
+  const countPerforado = rowsDelGrupo.filter(
     (r) => r.DOMUS === "SI" && (r.PERFORADO ?? "NO") !== "SI",
   ).length;
-  const countArmado = rows.filter(
+  const countArmado = rowsDelGrupo.filter(
     (r) =>
       r.DOMUS === "SI" && r.PERFORADO === "SI" && (r.ARMADO ?? "NO") !== "SI",
   ).length;
@@ -1878,6 +1915,52 @@ export default function Produccion({ authFetch, token, onInicio }) {
             </button>
           );
         })}
+
+        <select
+          value={grupoActivo}
+          onChange={(e) => setFiltroGrupo(e.target.value)}
+          title="Filtrar por grupo"
+          style={{
+            padding: "6px 10px",
+            fontSize: isMobile ? "16px" : "12px",
+            fontWeight: 700,
+            fontFamily: "'Space Mono', monospace",
+            borderRadius: "4px",
+            border: `1.5px solid ${grupoActivo ? "#0a3a5c" : "#b8d6ef"}`,
+            background: grupoActivo ? "#0a3a5c" : "#fff",
+            color: grupoActivo ? "#fff" : "#0a3a5c",
+            cursor: "pointer",
+            maxWidth: isMobile ? "100%" : "260px",
+          }}
+        >
+          <option value="">Grupo: todos</option>
+          {gruposDisponibles.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+          {haySinGrupo && <option value={SIN_GRUPO}>Sin grupo</option>}
+        </select>
+        {grupoActivo && (
+          <button
+            type="button"
+            onClick={() => setFiltroGrupo("")}
+            title="Quitar filtro de grupo"
+            style={{
+              padding: "6px 10px",
+              fontSize: "12px",
+              fontWeight: 700,
+              fontFamily: "'Space Mono', monospace",
+              borderRadius: "4px",
+              border: "1.5px solid #b8d6ef",
+              background: "#fff",
+              color: "#4a8ab5",
+              cursor: "pointer",
+            }}
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1919,8 +2002,9 @@ export default function Produccion({ authFetch, token, onInicio }) {
             fontFamily: "'Space Mono',monospace",
           }}
         >
-          No hay ítems en producción todavía. Se cargan solos al confirmar un
-          presupuesto.
+          {rows.length > 0
+            ? "Ningún ítem coincide con los filtros aplicados."
+            : "No hay ítems en producción todavía. Se cargan solos al confirmar un presupuesto."}
         </p>
       ) : (
         <DataTable
