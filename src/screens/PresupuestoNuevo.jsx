@@ -1405,6 +1405,9 @@ export default function PresupuestoNuevo({
   const [ajusteScope, setAjusteScope] = useState("todos");
   const [preciosOriginales, setPreciosOriginales] = useState({}); // { [id]: { precio, precios } }
   const [ajusteAplicado, setAjusteAplicado] = useState(false);
+  // Se incrementa para forzar el recálculo de Cocina/Placard cuando "Todos"
+  // cambia porcentaje1/2/3 pero ajusteValor/ajusteAplicado quedan igual.
+  const [ajusteTick, setAjusteTick] = useState(0);
 
   // NOTA: presupuestoItems para las filas de cocina/placard se REGENERA
   // automáticamente a partir de cocinaItems/placardItems (ver el useEffect
@@ -1499,6 +1502,7 @@ export default function PresupuestoNuevo({
     ajusteScope,
     ajusteValor,
     ajusteModo,
+    ajusteTick,
     calcularAjuste,
     cargandoPresupuestoRef,
     setPresupuestoItems,
@@ -1642,6 +1646,29 @@ export default function PresupuestoNuevo({
       }),
     );
 
+    // Scope "todos": el ajuste general reemplaza a cualquier % por ítem que
+    // haya quedado de un ajuste por grupo anterior (ese % queda compuesto en
+    // porcentaje1/2/3 y se multiplicaba ENCIMA del ajuste general, por eso
+    // "Todos" no lograba sacar un +3% puesto antes por grupo).
+    if (ajusteScope === "todos") {
+      const limpiarPct = (f) => ({
+        ...f,
+        porcentaje1: null,
+        porcentaje2: null,
+        porcentaje3: null,
+      });
+      const limpiarObj = (prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          next[familia] = filas.map(limpiarPct);
+        }
+        return next;
+      };
+      setCocinaItems(limpiarObj);
+      setPlacardItems(limpiarObj);
+      setAjusteTick((t) => t + 1);
+    }
+
     setAjusteAplicado(true);
   };
 
@@ -1709,6 +1736,40 @@ export default function PresupuestoNuevo({
         };
       }),
     );
+
+    // Scope "todos": aplicarAjuste limpió porcentaje1/2/3 de Cocina/Placard,
+    // así que hay que devolverlos a como estaban antes del primer "Aplicar".
+    if (ajusteScope === "todos") {
+      const restaurarPct = (id, f) => {
+        const orig = preciosOriginales[id];
+        if (orig == null) return f;
+        return {
+          ...f,
+          porcentaje1: orig.porcentaje1 ?? null,
+          porcentaje2: orig.porcentaje2 ?? null,
+          porcentaje3: orig.porcentaje3 ?? null,
+        };
+      };
+      setCocinaItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          next[familia] = filas.map((f, i) =>
+            restaurarPct(`cocina-${familia}-${i}`, f),
+          );
+        }
+        return next;
+      });
+      setPlacardItems((prev) => {
+        const next = {};
+        for (const [familia, filas] of Object.entries(prev)) {
+          next[familia] = filas.map((f, i) =>
+            restaurarPct(`placard-${familia}-${i}`, f),
+          );
+        }
+        return next;
+      });
+      setAjusteTick((t) => t + 1);
+    }
 
     setAjusteAplicado(false);
     setAjusteValor("");
