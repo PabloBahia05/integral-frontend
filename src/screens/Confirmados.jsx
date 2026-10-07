@@ -702,6 +702,29 @@ export default function Confirmados({ authFetch, token, onInicio }) {
 
   const [duplicandoId, setDuplicandoId] = useState(null);
 
+  const [reenviando, setReenviando] = useState(false);
+
+  const reenviarAProduccion = async () => {
+    if (reenviando || !abierta) return;
+    setReenviando(true);
+    try {
+      const res = await authFetch(
+        `${API}/confirmados/reenviar-produccion/${abierta.numeropres}/${abierta.revision}`,
+        { method: "POST" },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      alert(
+        `Producción actualizada: ${data.insertados ?? 0} ítem(s) nuevo(s), ${data.actualizados ?? 0} actualizado(s).`,
+      );
+    } catch (e) {
+      console.error("Error reenviando a producción:", e);
+      alert(`No se pudo reenviar a Producción: ${e.message}`);
+    } finally {
+      setReenviando(false);
+    }
+  };
+
   const vacioANull = (v) =>
     v === undefined || v === null || String(v).trim() === "" ? null : v;
 
@@ -1172,6 +1195,26 @@ export default function Confirmados({ authFetch, token, onInicio }) {
                 }}
               >
                 {mostrarNuevo ? "− Cerrar" : "＋ Nuevo ítem"}
+              </button>
+              <button
+                onClick={reenviarAProduccion}
+                disabled={reenviando}
+                title="Crea en Producción los ítems de esta obra que todavía no estén"
+                style={{
+                  marginLeft: 8,
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontFamily: FUENTE,
+                  fontWeight: 700,
+                  border: "1.5px solid #0a3a5c",
+                  borderRadius: 4,
+                  background: "#fff",
+                  color: "#0a3a5c",
+                  cursor: reenviando ? "default" : "pointer",
+                  opacity: reenviando ? 0.5 : 1,
+                }}
+              >
+                {reenviando ? "Enviando…" : "↻ Reenviar a Producción"}
               </button>
 
               {mostrarNuevo && (
