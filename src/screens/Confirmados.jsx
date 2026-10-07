@@ -702,6 +702,9 @@ export default function Confirmados({ authFetch, token, onInicio }) {
 
   const [duplicandoId, setDuplicandoId] = useState(null);
 
+  const vacioANull = (v) =>
+    v === undefined || v === null || String(v).trim() === "" ? null : v;
+
   const duplicarItem = async (row) => {
     if (duplicandoId != null) return;
     setDuplicandoId(row.id);
@@ -714,9 +717,10 @@ export default function Confirmados({ authFetch, token, onInicio }) {
           codartint: row.codartint ?? "",
           grupo: row.grupo ?? "",
           color: row.color ?? "",
-          ancho: row.ancho ?? "",
-          alto: row.alto ?? "",
-          profundidad: row.profundidad ?? "",
+          // Medidas vacías van como null: MySQL rechaza '' en columnas DECIMAL
+          ancho: vacioANull(row.ancho),
+          alto: vacioANull(row.alto),
+          profundidad: vacioANull(row.profundidad),
           cantidad: row.cantidad ?? "1",
           numeropres: abierta.numeropres,
           revision: abierta.revision,
