@@ -76,6 +76,25 @@ function useIsMobile(breakpoint = 640) {
   return isMobile;
 }
 
+// ── Buscador con debounce ─────────────────────────────────────────────────
+//
+// El texto que se tipea vive acá (estado local), no en Produccion: así cada
+// tecla solo re-renderiza este componente chiquito y el input responde al
+// instante. Recién cuando se deja de tipear `delay` ms se le avisa a
+// Produccion (onSearch), que ahí sí filtra y re-renderiza la tabla UNA vez
+// en vez de una por tecla (eso era lo que disparaba el aviso de INP).
+function ActionBarConBusqueda({ search, onSearch, delay = 250, ...props }) {
+  const [valor, setValor] = useState(search ?? "");
+
+  useEffect(() => {
+    if (valor === search) return;
+    const t = setTimeout(() => onSearch(valor), delay);
+    return () => clearTimeout(t);
+  }, [valor, search, onSearch, delay]);
+
+  return <ActionBar {...props} search={valor} onSearch={setValor} />;
+}
+
 // ── Modal de detalle (se abre al clickear el código) ───────────────────────
 //
 // Solo muestra datos que ya vienen en la fila de `produccion` (no pega a
@@ -1964,7 +1983,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <ActionBar
+        <ActionBarConBusqueda
           selected={selected}
           onNew={null}
           onEdit={selected ? () => setDetalle(selected) : null}
