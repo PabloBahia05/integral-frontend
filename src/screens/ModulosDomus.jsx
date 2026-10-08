@@ -1947,6 +1947,28 @@ export default function ModulosDomus({ authFetch, token }) {
       },
     },
     {
+      // Veta rotada: vacío/NO = Alto y Ancho como están; SÍ = en el CSV se
+      // invierten Alto y Ancho de esta pieza. Se guarda 1/0 en
+      // modulos-domus.veta_rotada.
+      key: "veta_rotada",
+      label: "Veta rotada",
+      render: (v, row) => (
+        <select
+          value={Number(row.veta_rotada) === 1 ? "1" : "0"}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            const valor = Number(e.target.value);
+            handlePiezaCampoChange(row.id, "veta_rotada", valor);
+            guardarPiezaCampo(row.id, "veta_rotada", valor);
+          }}
+          style={estiloInput(row.id, "veta_rotada", "70px")}
+        >
+          <option value="0">NO</option>
+          <option value="1">SÍ</option>
+        </select>
+      ),
+    },
+    {
       key: "_borrar",
       label: "",
       render: (v, row) => (
