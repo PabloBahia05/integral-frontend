@@ -16,13 +16,8 @@ const normalizarArticulo = (s) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
-// Arma un Map keyed por nombre normalizado a partir de una lista de
-// artículos de la BD (cada uno con .articulo).
-const armarMapaArticulosNormalizado = (lista) =>
-  new Map(lista.map((a) => [normalizarArticulo(a.articulo), a]));
-
-// Busca un artículo en un mapa armado con armarMapaArticulosNormalizado,
-// normalizando también la clave de búsqueda.
+// Busca un artículo en un mapa keyed por nombre normalizado (ver
+// construirMapaArticulosCompleto), normalizando también la clave de búsqueda.
 const buscarArticuloNormalizado = (mapa, nombre) =>
   mapa.get(normalizarArticulo(nombre));
 
@@ -1137,16 +1132,6 @@ export default function useCocinaPlacard({
     lineasActivasClaveRef.current = clave;
     if (lineasActivas.length === 0) return;
 
-    const familiaMapCocina = { bajomesadas: "Bajomesada", alacenas: "Alacena" };
-    const familiaMapPlacard = {
-      bajomesadas: "Bajomesada",
-      alacenas: "Alacena",
-      placard: "PLACARD",
-      frente: "FRENTE DE PLACARD",
-      auxiliares: "Auxiliares",
-      accesorios: "Accesorios",
-    };
-
     // Alinea preciosBase de una fila con lineasActivas, completando solo
     // las líneas que le falten (no toca las que ya tenía).
     // esPlacard: si el artículo no tiene precio cargado para la línea activa,
@@ -1154,65 +1139,74 @@ export default function useCocinaPlacard({
     // "" — que es lo que producía precio $0 al activar una línea nueva.
     const alinearPreciosBaseConLineas = (fila, mapaArticulos, esPlacard) => {
       const actuales = fila.preciosBase ?? [];
+      // Una entrada con precioBase vacío (""/null) cuenta como faltante: se
+      // vuelve a buscar. Antes se daba por "completa" y quedaba en $0 para
+      // siempre aunque el artículo sí tuviera precio en esa línea.
+      const tienePrecio = (pb) =>
+        pb && pb.precioBase != null && pb.precioBase !== "";
       const tieneTodas = lineasActivas.every((l) =>
-        actuales.some((pb) => pb.linea === l.linea),
+        actuales.some((pb) => pb.linea === l.linea && tienePrecio(pb)),
       );
       if (tieneTodas) return fila;
 
       const art = buscarArticuloNormalizado(mapaArticulos, fila.nombreart || fila.articulo);
       const combinado = lineasActivas.map((l) => {
         const existente = actuales.find((pb) => pb.linea === l.linea);
-        if (existente) return existente;
+        if (tienePrecio(existente)) return existente;
         let precioBase = art?.precios?.[String(l.linea)] ?? "";
         if (esPlacard && (precioBase == null || precioBase === "")) {
           const p15 = art?.precios?.[LINEA_FIJA_PLACARD];
           precioBase = p15 != null && p15 !== "" ? p15 : "";
+        }
+        if (precioBase == null || precioBase === "") {
+          // DIAGNÓSTICO: distingue "el artículo no se encontró por nombre"
+          // de "se encontró pero no tiene precio en esa línea".
+          console.warn(
+            `[DIAG linea sin precio] "${fila.nombreart || fila.articulo}" ` +
+              `linea=${l.linea} artEncontrado=${!!art} ` +
+              `lineasConPrecio=${Object.keys(art?.precios ?? {}).join(",")}`,
+          );
         }
         return { linea: l.linea, precioBase };
       });
       return recalcFila({ ...fila, preciosBase: combinado });
     };
 
-    const familiasConItems = (itemsObj, familiaMap) =>
-      Object.entries(itemsObj)
-        .filter(([, filas]) => filas?.length)
-        .map(([familia]) => familiaMap[familia] ?? familia);
-
-    const familiasBDNecesarias = new Set([
-      ...familiasConItems(cocinaItemsRef.current, familiaMapCocina),
-      ...familiasConItems(placardItemsRef.current, familiaMapPlacard),
-    ]);
-    if (familiasBDNecesarias.size === 0) return;
+    // Se pide el mapa de TODAS las familias de la BD (igual que handleActualizar
+    // y las funciones de freno) en vez de adivinar la familia BD a partir de
+    // la clave interna (bajomesadas -> "Bajomesada", alacenas -> "Alacena").
+    // Ítems como Cajonera Ollera, Mueble para Cava o Zócalo se guardan bajo
+    // esas claves internas pero pueden pertenecer a otra familia en la BD,
+    // y con el mapa de una sola familia nunca se encontraban -> precio $0.
+    const hayItems = (itemsObj) =>
+      Object.values(itemsObj).some((filas) => filas?.length);
+    if (!hayItems(cocinaItemsRef.current) && !hayItems(placardItemsRef.current)) {
+      return;
+    }
     diagOrigen("efecto alinear lineasActivas");
 
-    Promise.all(
-      [...familiasBDNecesarias].map((familiaBD) =>
-        authFetch(`${API}/articulos/por-familia?familia=${encodeURIComponent(familiaBD)}`)
-          .then((r) => r.json())
-          .then((data) => [familiaBD, Array.isArray(data) ? data : []])
-          .catch(() => [familiaBD, []]),
-      ),
-    ).then((resultados) => {
-      const mapaPorFamiliaBD = new Map(resultados);
-      const mapaArticulosDe = (familiaInterna, familiaMap) => {
-        const familiaBD = familiaMap[familiaInterna] ?? familiaInterna;
-        const lista = mapaPorFamiliaBD.get(familiaBD) ?? [];
-        return armarMapaArticulosNormalizado(lista);
-      };
-
+    construirMapaArticulosCompleto().then((mapaArticulos) => {
+      if (mapaArticulos.size === 0) {
+        // El fetch falló (o no trajo nada): liberar la clave para que el
+        // próximo render reintente, en vez de quedar en $0 para siempre.
+        lineasActivasClaveRef.current = "";
+        return;
+      }
       setCocinaItems((prev) => {
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
-          const mapa = mapaArticulosDe(familia, familiaMapCocina);
-          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa, false));
+          next[familia] = filas.map((f) =>
+            alinearPreciosBaseConLineas(f, mapaArticulos, false),
+          );
         }
         return next;
       });
       setPlacardItems((prev) => {
         const next = {};
         for (const [familia, filas] of Object.entries(prev)) {
-          const mapa = mapaArticulosDe(familia, familiaMapPlacard);
-          next[familia] = filas.map((f) => alinearPreciosBaseConLineas(f, mapa, true));
+          next[familia] = filas.map((f) =>
+            alinearPreciosBaseConLineas(f, mapaArticulos, true),
+          );
         }
         return next;
       });
