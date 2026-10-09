@@ -207,11 +207,13 @@ function dibujarEncabezado(doc, datos) {
     doc.text(String(ciudad), CONFIG.ciudad.x, CONFIG.ciudad.y);
   }
 
-  // Desactivado hasta confirmar en qué casillero va "obra" (ver TODO en
-  // CONFIG.obra).
-  // if (datos.obra != null) {
-  //   doc.text(String(datos.obra), CONFIG.obra.x, CONFIG.obra.y);
-  // }
+  // El N° de presupuesto (numeropres) se imprime en el casillero "N° Orden
+  // de Compra N°" (coordenadas CONFIG.obra, ya calibradas). Acepta
+  // numeropres, y como respaldo `obra`.
+  const numeropres = datos.numeropres ?? datos.obra;
+  if (numeropres != null && numeropres !== "") {
+    doc.text(String(numeropres), CONFIG.obra.x, CONFIG.obra.y);
+  }
 }
 
 /**
@@ -222,7 +224,7 @@ function dibujarEncabezado(doc, datos) {
  *   domicilio: "WHITCOMB 2337",   // también se acepta direccion / calle
  *   telefono: "0291-4123456",     // también se acepta tel
  *   ciudad: "BAHIA BLANCA",       // también se acepta localidad
- *   obra: 41,                    // ver TODO en CONFIG.obra: no se imprime aún
+ *   numeropres: 41,              // se imprime en "N° Orden de Compra N°"
  *   items: filas de la tabla PRODUCCION (se normalizan con
  *          itemDesdeProduccion: cantidad, codigo_produccion|modulo, grupo,
  *          nombreart, ancho, alto, profundidad),
@@ -238,6 +240,26 @@ function dibujarEncabezado(doc, datos) {
  * una hoja distinta del talonario.
  */
 export function generarPdfRemitoOficial(datos) {
+  // Diagnóstico: el PDF solo imprime lo que recibe. Si falta algo, avisa
+  // en consola qué faltó y qué claves llegaron realmente.
+  const faltan = [];
+  if (!datos.cliente) faltan.push("cliente");
+  if (!(datos.domicilio ?? datos.direccion ?? datos.calle)) faltan.push("domicilio");
+  if (!(datos.ciudad ?? datos.localidad)) faltan.push("ciudad/localidad");
+  if (!(datos.telefono ?? datos.tel)) faltan.push("telefono");
+  if (!(datos.numeropres ?? datos.obra)) faltan.push("numeropres");
+  if (!datos.items || datos.items.length === 0) faltan.push("items");
+  if (faltan.length) {
+    console.warn(
+      "[remito-oficial] datos incompletos, no se imprimirá:",
+      faltan.join(", "),
+      "| claves recibidas:",
+      Object.keys(datos),
+      "| claves del 1er ítem:",
+      datos.items?.[0] ? Object.keys(datos.items[0]) : "(sin ítems)",
+    );
+  }
+
   const doc = new jsPDF({ unit: "mm", format: CONFIG.pageSize });
   doc.setFont("helvetica", "normal");
 
