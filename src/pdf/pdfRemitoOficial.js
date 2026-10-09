@@ -48,10 +48,12 @@ const CONFIG = {
   cliente: { x: 36, y: 84.8 }, // "Señor (es):"
   domicilio: { x: 27.6, y: 93.2 }, // "Calle:"
   ciudad: { x: 134.1, y: 93.2 }, // "Localidad:"
-  // El talonario no tiene casillero de teléfono: va en el mismo renglón de
-  // "Calle:", al final (el punteado llega hasta x=115). anchoMax = espacio
-  // disponible hasta ahí.
-  telefono: { x: 90, y: 93.2, anchoMax: 24 },
+  // El talonario no tiene casillero de teléfono: va al PIE de la hoja,
+  // debajo de la tabla de ítems (la última fila termina en y≈239).
+  // OJO: x/y son ESTIMADOS, calibrar con una impresión de prueba.
+  telefono: { x: 30, y: 250, anchoMax: 70 },
+  // El renglón punteado de "Calle:" llega hasta x=115.
+  finCalle: 115,
 
   // TODO: confirmar en qué casillero va "obra" (este formulario no tiene
   // un campo impreso que diga "Obra"). Candidatos: "N° Orden de Compra N°"
@@ -181,15 +183,12 @@ function dibujarEncabezado(doc, datos) {
     doc.text(String(datos.cliente), CONFIG.cliente.x, CONFIG.cliente.y);
   }
   if (domicilio) {
-    const finCalle = telefono
-      ? CONFIG.telefono.x - 2
-      : CONFIG.telefono.x + CONFIG.telefono.anchoMax;
     textoAjustado(
       doc,
       String(domicilio),
       CONFIG.domicilio.x,
       CONFIG.domicilio.y,
-      finCalle - CONFIG.domicilio.x,
+      CONFIG.finCalle - CONFIG.domicilio.x,
       CONFIG.fontSize,
     );
   }
