@@ -1289,6 +1289,21 @@ export default function PresupuestoNuevo({
       return Math.round(bOrig * (1 + val / 100) * 100) / 100;
     };
 
+    // Modo "valor" (precio tipeado a mano): el precio final de Cocina/
+    // Placard NO se guarda tal cual — al reabrir, recalcFila lo vuelve a
+    // derivar de base1/2/3 × %lista × porcentaje1/2/3. Si solo cambiamos
+    // `precio`, esa derivación pisa el valor manual (por eso el cambio se
+    // perdía al salir de la pantalla; el % sí sobrevivía porque se guarda
+    // en porcentajeN). Solución: guardar el precio manual como NUEVA base
+    // (sin %lista, que se vuelve a aplicar al derivar) y limpiar el % del
+    // ítem, así recalcFila reproduce exactamente el precio tipeado.
+    const baseDesdePrecioFinal = (precioFinal) => {
+      const f = 1 + (listaPorcentaje || 0) / 100;
+      const n = parseFloat(precioFinal) || 0;
+      return String(f ? Math.round((n / f) * 10000) / 10000 : n);
+    };
+    const esValor = presItemModo === "valor";
+
     // Si el ítem viene de Cocina o Placard, escribimos el cambio en el
     // estado fuente (cocinaItems/placardItems) para que el % quede
     // asociado al ítem real: sobrevive a "Actualizar"/cambio de lista y
@@ -1311,36 +1326,51 @@ export default function PresupuestoNuevo({
           // siempre desde el precio original, no desde el último ajustado.
           const baseOriginal = fila.precioBase ?? fila.precio;
           const nuevo = calcNuevo(fila.precio, baseOriginal);
+          const nuevaBase = esValor
+            ? baseDesdePrecioFinal(nuevo)
+            : baseOriginal;
           nuevaFila = {
             ...fila,
             precio: String(nuevo),
-            precioBase:
-              presItemModo === "porcentaje" ? baseOriginal : fila.precioBase,
-            porcentaje1: presItemModo === "porcentaje" ? val : fila.porcentaje1,
+            precioBase: nuevaBase,
+            porcentaje1: esValor ? null : val,
+            ...(esValor && fila.preciosBase?.length
+              ? {
+                  preciosBase: fila.preciosBase.map((pb, i) =>
+                    i === 0 ? { ...pb, precioBase: nuevaBase } : pb,
+                  ),
+                }
+              : {}),
           };
         } else {
           const precios = (fila.precios ?? []).map((p, li) => {
             if (li !== lineaIdx) return p;
             const baseOriginalLinea = p.precioBase ?? p.precio;
+            const nuevoP = calcNuevo(p.precio, baseOriginalLinea);
             return {
               ...p,
-              precio: String(calcNuevo(p.precio, baseOriginalLinea)),
-              precioBase:
-                presItemModo === "porcentaje"
-                  ? baseOriginalLinea
-                  : p.precioBase,
+              precio: String(nuevoP),
+              precioBase: esValor
+                ? baseDesdePrecioFinal(nuevoP)
+                : baseOriginalLinea,
             };
           });
           const nuevoPrecio = precios[0]?.precio ?? fila.precio;
           const slot = PCT_POR_IDX[lineaIdx];
-          const extra = slot
-            ? {
-                [slot]: presItemModo === "porcentaje" ? val : fila[slot],
-              }
-            : {};
+          const extra = slot ? { [slot]: esValor ? null : val } : {};
           nuevaFila = {
             ...fila,
             precios,
+            // El guardado lee base1/2/3 de preciosBase (si existe) antes
+            // que de precios[].precioBase: mantenerlos sincronizados.
+            ...(esValor
+              ? {
+                  preciosBase: precios.map((p) => ({
+                    linea: p.linea,
+                    precioBase: p.precioBase,
+                  })),
+                }
+              : {}),
             precio: String(nuevoPrecio),
             ...extra,
           };
@@ -1371,6 +1401,10 @@ export default function PresupuestoNuevo({
           return {
             ...it,
             precio: nuevo,
+            // Al guardar, valor1 tiene prioridad sobre `precio` (ver
+            // payload de items): si quedaba el valor viejo, se guardaba
+            // el precio anterior.
+            valor1: nuevo,
             precioBase:
               presItemModo === "porcentaje" ? baseOriginal : it.precioBase,
             subtotal: nuevo * (parseFloat(it.cantidad) || 1),
