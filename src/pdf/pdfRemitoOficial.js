@@ -83,6 +83,46 @@ function fmtMedidas(it) {
   return partes.length ? partes.join(" X ") : "";
 }
 
+// Los ítems del remito salen de filas de la tabla PRODUCCION. Esta función
+// las normaliza al formato que usa el PDF ({cantidad, grupo, codart,
+// nombreart, ancho, alto, profundidad}). Acepta varios nombres posibles de
+// columna (el primero que exista gana), así no depende de un alias fijo en
+// el SELECT. Si alguna columna real se llama distinto, agregarla acá.
+const pick = (r, ...keys) => {
+  for (const k of keys) {
+    if (r[k] !== undefined && r[k] !== null && r[k] !== "") return r[k];
+  }
+  return undefined;
+};
+
+export function itemDesdeProduccion(r) {
+  return {
+    cantidad: pick(r, "cantidad", "cant", "cantidad_producida"),
+    // Código: el código de producción (codigos_produccion.codigo), o el
+    // texto legacy `modulo`, o el código de artículo como último recurso.
+    codart: pick(
+      r,
+      "codigo_produccion",
+      "codigo",
+      "modulo",
+      "codart",
+      "codartint",
+    ),
+    grupo: pick(r, "grupo", "grupo_nombre"),
+    nombreart: pick(
+      r,
+      "nombreart",
+      "nombre_articulo",
+      "nombre",
+      "descripcion",
+      "detalle",
+    ),
+    ancho: pick(r, "ancho"),
+    alto: pick(r, "alto"),
+    profundidad: pick(r, "profundidad", "prof"),
+  };
+}
+
 // Los strings "YYYY-MM-DD" (o ISO con hora) se leen por su parte de fecha.
 // new Date("2026-09-20") se interpreta en UTC y en Argentina (UTC-3)
 // getDate() devolvería 19.
@@ -183,7 +223,9 @@ function dibujarEncabezado(doc, datos) {
  *   telefono: "0291-4123456",     // también se acepta tel
  *   ciudad: "BAHIA BLANCA",       // también se acepta localidad
  *   obra: 41,                    // ver TODO en CONFIG.obra: no se imprime aún
- *   items: [{ cantidad, grupo, codart, nombreart, ancho, alto, profundidad }],
+ *   items: filas de la tabla PRODUCCION (se normalizan con
+ *          itemDesdeProduccion: cantidad, codigo_produccion|modulo, grupo,
+ *          nombreart, ancho, alto, profundidad),
  * }
  *
  * OJO: "grupo" y "codart" son los nombres de campo que se ven en el
@@ -211,7 +253,8 @@ export function generarPdfRemitoOficial(datos) {
     finDetalle,
   } = CONFIG.items;
 
-  const items = datos.items || [];
+  // Cada ítem es una fila de la tabla producción (ver itemDesdeProduccion).
+  const items = (datos.items || []).map(itemDesdeProduccion);
   const paginas = Math.max(1, Math.ceil(items.length / maxFilas));
 
   for (let p = 0; p < paginas; p++) {
