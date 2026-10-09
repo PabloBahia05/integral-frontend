@@ -245,23 +245,24 @@ export default function CuentaCorriente({
             String(o.revision) === String(row.revision),
         );
 
-        // Confirmado contra la respuesta real de
-        // /tabla-presupuestos/revisiones-confirmadas (21/09/2026): NO trae
-        // "ciudad" (se sacó de acá, no existe ese campo en el endpoint —
-        // si en algún momento se agrega, sumarlo devuelta). El teléfono
-        // viene como telefono1/telefono2 (no "telefono"), igual que en
-        // datosClienteRemito más abajo. "direccion" sí es el nombre
-        // correcto, pero OJO: hoy viene NULL para todos los clientes
-        // probados — no es un bug de este archivo, falta cargar ese dato
-        // en el origen (cliente/presupuesto) para que domicilio se
-        // imprima en el remito.
+        // Domicilio: se imprime `domrem` (domicilio de remito) y, si está
+        // vacío, el domicilio fiscal; la localidad sale de `localidad`.
+        // /tabla-presupuestos/revisiones-confirmadas tiene que devolver
+        // esos campos del cliente (domrem, domicilio_fiscal, localidad);
+        // si no llegan, pdfRemitoOficial avisa en consola cuáles faltan.
+        // El teléfono viene como telefono1/telefono2 (no "telefono") y se
+        // imprime al pie de la hoja.
         generarPdfRemitoOficial({
           fecha: hoyISO(),
           numeroRemito: null, // TODO: falta definir numeración del talonario oficial
           cliente: obraInfo?.nombre ?? selectedCliente?.nombre,
+          domrem: obraInfo?.domrem,
+          domicilio_fiscal:
+            obraInfo?.domicilio_fiscal ?? obraInfo?.["domicilio fiscal"],
           domicilio: obraInfo?.direccion,
+          localidad: obraInfo?.localidad,
           telefono: obraInfo?.telefono1 || obraInfo?.telefono2 || "",
-          obra: row.numeropres,
+          numeropres: row.numeropres,
           items,
         });
       })
