@@ -215,6 +215,28 @@ export default function TabCocina({
     return match ? (match.proveedor ?? match.PROVEEDOR ?? null) : null;
   };
 
+  // Arma preciosBase para un artículo del catálogo según las líneas activas.
+  // Si el artículo no trae precio para alguna línea (p.precios no la tiene o
+  // viene en 0), lo avisa en consola: ese ítem va a quedar en $0.
+  // TEMPORAL — diagnóstico.
+  const resolverPreciosBaseArticulo = (p) => {
+    const preciosBase = lineasActivas.map((l) => ({
+      linea: l.linea,
+      precioBase: p.precios?.[String(l.linea)] ?? "",
+    }));
+    const faltantes = preciosBase.filter((pb) => !(parseFloat(pb.precioBase) > 0));
+    if (faltantes.length > 0) {
+      console.warn("[DIAG alta sin precio]", {
+        familia: cocinaFamilia,
+        articulo: p.articulo,
+        nombreart: p.nombreart ?? p.NOMBREART ?? null,
+        lineasSinPrecio: faltantes.map((f) => f.linea),
+        lineasConPrecio: Object.keys(p.precios ?? {}),
+      });
+    }
+    return preciosBase;
+  };
+
   const resetFila = () => {
     // Conserva el grupo elegido para que el usuario pueda agregar varios
     // artículos seguidos al mismo grupo sin tener que retipearlo.
@@ -758,13 +780,7 @@ export default function TabCocina({
                               <div
                                 key={pi}
                                 onClick={() => {
-                                  const preciosBase = lineasActivas.map(
-                                    (l) => ({
-                                      linea: l.linea,
-                                      precioBase:
-                                        p.precios?.[String(l.linea)] ?? "",
-                                    }),
-                                  );
+                                  const preciosBase = resolverPreciosBaseArticulo(p);
                                   const precios = preciosBase.map((pb) => ({
                                     linea: pb.linea,
                                     precioBase: pb.precioBase,
@@ -1793,10 +1809,7 @@ export default function TabCocina({
                       <div
                         key={pi}
                         onClick={() => {
-                          const preciosBase = lineasActivas.map((l) => ({
-                            linea: l.linea,
-                            precioBase: p.precios?.[String(l.linea)] ?? "",
-                          }));
+                          const preciosBase = resolverPreciosBaseArticulo(p);
                           const precios = preciosBase.map((pb) => ({
                             linea: pb.linea,
                             precioBase: pb.precioBase,
