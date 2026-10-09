@@ -105,6 +105,46 @@ function ActionBarConBusqueda({ search, onSearch, delay = 250, ...props }) {
 // no con clases + @media: cada estilo de acá abajo ya es el valor final
 // para el dispositivo actual, sin depender de que ninguna cascada CSS
 // externa lo pise ni de que el navegador respete el media query.
+// ── Input de campo con buffer local ───────────────────────────────────────
+// Antes cada tecla hacía setRows en Produccion y se re-renderizaban las 220
+// filas (~230 ms por tecla → aviso "INP Issue"). Ahora lo que se tipea vive
+// en el estado local de ESTE input y recién al salir del campo (blur) se le
+// avisa al padre con onGuardar(valorNuevo), que actualiza rows y hace el PUT.
+//   - Si no cambió nada, no se guarda (evita un PUT y 2 renders de balde),
+//     salvo que `reintentar` sea true (el último guardado de ese campo falló).
+//   - onSalir() se llama SIEMPRE al salir del campo, haya o no cambios.
+function InputCampo({ valor, onGuardar, onSalir, reintentar = false, onFocus, ...props }) {
+  const [local, setLocal] = useState(valor ?? "");
+  const enfocado = useRef(false);
+  const inicial = useRef(valor ?? "");
+
+  // Si el valor cambia desde afuera (recarga, otro guardado) y no se está
+  // escribiendo acá, se actualiza el buffer.
+  useEffect(() => {
+    if (!enfocado.current) setLocal(valor ?? "");
+  }, [valor]);
+
+  return (
+    <input
+      {...props}
+      value={local}
+      onFocus={(e) => {
+        enfocado.current = true;
+        inicial.current = local;
+        if (onFocus) onFocus(e);
+      }}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => {
+        enfocado.current = false;
+        if (onSalir) onSalir();
+        if (local === inicial.current && !reintentar) return;
+        inicial.current = local;
+        onGuardar(local);
+      }}
+    />
+  );
+}
+
 // ── Selector de subcódigo (variante) ─────────────────────────────────────
 // Antes era un <input list=datalist>: el navegador filtra las sugerencias por
 // lo que ya está escrito, así que con un subcódigo cargado solo aparecía ESE
@@ -113,7 +153,8 @@ function ActionBarConBusqueda({ search, onSearch, delay = 250, ...props }) {
 // + "Otra (escribir)…" para cargar una nueva a mano. Sin variantes cargadas
 // queda el campo de texto libre de siempre.
 //   onElegir(valor)  → guarda directo el valor elegido (puede ser "").
-//   onEscribir(valor)/onTerminar() → modo texto libre (cambio y blur).
+//   onTerminar(valor) → modo texto libre: se llama al salir del campo, solo
+//   si el texto cambió, con el valor final.
 const SUBCODIGO_OTRA = "__otra__";
 function SubcodigoSelector({
   valor,
@@ -121,25 +162,21 @@ function SubcodigoSelector({
   placeholder,
   style,
   onElegir,
-  onEscribir,
   onTerminar,
 }) {
   const [escribiendo, setEscribiendo] = useState(false);
 
   if (opciones.length === 0 || escribiendo) {
     return (
-      <input
+      <InputCampo
         type="text"
-        value={valor}
+        valor={valor}
         placeholder={placeholder}
         autoFocus={escribiendo}
         onFocus={(e) => escribiendo && e.target.select()}
         onClick={(e) => e.stopPropagation()}
-        onChange={(e) => onEscribir(e.target.value)}
-        onBlur={() => {
-          setEscribiendo(false);
-          onTerminar();
-        }}
+        onGuardar={(v) => onTerminar(v)}
+        onSalir={() => setEscribiendo(false)}
         maxLength={50}
         style={style}
       />
@@ -186,7 +223,6 @@ function DetalleProduccion({
   onCodigoProduccionChange,
   onCrearYVincularCodigo,
   onColorChange,
-  onTextoCampoChange,
   onTextoCampoBlur,
   onSubcodigoGuardar,
   onEtapaChange,
@@ -386,14 +422,12 @@ function DetalleProduccion({
 
         {fila(
           "Art. vinculado",
-          <input
+          <InputCampo
             type="text"
-            value={row.codartint ?? ""}
+            valor={row.codartint ?? ""}
             placeholder="Ej: KITMP000"
-            onChange={(e) =>
-              onTextoCampoChange(row.id, "codartint", e.target.value)
-            }
-            onBlur={() => onTextoCampoBlur(row, "codartint")}
+            onGuardar={(val) => onTextoCampoBlur(row, "codartint", val)}
+            reintentar={errorCampo === `${row.id}-codartint`}
             maxLength={50}
             style={estiloInputModal(
               guardandoCampo === `${row.id}-codartint`,
@@ -406,15 +440,13 @@ function DetalleProduccion({
           const key = `${row.id}-${campoMedida}`;
           return fila(
             campoMedida.charAt(0).toUpperCase() + campoMedida.slice(1),
-            <input
+            <InputCampo
               type="number"
               step="0.1"
-              value={row[campoMedida] ?? ""}
+              valor={row[campoMedida] ?? ""}
               placeholder="—"
-              onChange={(e) =>
-                onTextoCampoChange(row.id, campoMedida, e.target.value)
-              }
-              onBlur={() => onTextoCampoBlur(row, campoMedida)}
+              onGuardar={(val) => onTextoCampoBlur(row, campoMedida, val)}
+              reintentar={errorCampo === key}
               style={estiloInputModal(
                 guardandoCampo === key,
                 errorCampo === key,
@@ -430,8 +462,7 @@ function DetalleProduccion({
             opciones={subcodigosDisponibles}
             placeholder={row.codartint ? "Sin variante" : "Sin artículo"}
             onElegir={(v) => onSubcodigoGuardar(row, v)}
-            onEscribir={(v) => onTextoCampoChange(row.id, "subcodigo", v)}
-            onTerminar={() => onTextoCampoBlur(row, "subcodigo")}
+            onTerminar={(v) => onTextoCampoBlur(row, "subcodigo", v)}
             style={estiloInputModal(
               guardandoCampo === `${row.id}-subcodigo`,
               errorCampo === `${row.id}-subcodigo`,
@@ -460,12 +491,12 @@ function DetalleProduccion({
 
         {fila(
           "OP",
-          <input
+          <InputCampo
             type="text"
-            value={row.OP ?? ""}
+            valor={row.OP ?? ""}
             placeholder="—"
-            onChange={(e) => onTextoCampoChange(row.id, "OP", e.target.value)}
-            onBlur={() => onTextoCampoBlur(row, "OP")}
+            onGuardar={(val) => onTextoCampoBlur(row, "OP", val)}
+            reintentar={errorCampo === `${row.id}-OP`}
             maxLength={10}
             style={estiloInputModal(
               guardandoCampo === `${row.id}-OP`,
@@ -517,14 +548,12 @@ function DetalleProduccion({
                   <option value="SI">SI</option>
                 </select>
                 {usuario && (
-                  <input
+                  <InputCampo
                     type="text"
-                    value={row[usuario] ?? ""}
+                    valor={row[usuario] ?? ""}
                     placeholder="Usuario"
-                    onChange={(e) =>
-                      onTextoCampoChange(row.id, usuario, e.target.value)
-                    }
-                    onBlur={() => onTextoCampoBlur(row, usuario)}
+                    onGuardar={(val) => onTextoCampoBlur(row, usuario, val)}
+                    reintentar={errorCampo === keyUsuario}
                     maxLength={50}
                     style={{
                       ...estiloInputModal(
@@ -1029,12 +1058,16 @@ export default function Produccion({ authFetch, token, onInicio }) {
   // el tipo DECIMAL de la columna en MySQL.
   const CAMPOS_NUMERICOS = ["ancho", "profundidad", "alto", "cantidad"];
 
-  const handleTextoCampoBlur = async (row, campo) => {
+  // `valorNuevo` (lo que devuelve InputCampo al salir del campo) se usa en vez
+  // de row[campo]: el buffer local ya no actualiza rows por tecla, así que
+  // `row` todavía tiene el valor viejo. También lo vuelca a rows.
+  const handleTextoCampoBlur = async (row, campo, valorNuevo) => {
     const key = `${row.id}-${campo}`;
+    if (valorNuevo !== undefined) handleTextoCampoChange(row.id, campo, valorNuevo);
     setGuardandoCampo(key);
     setErrorCampo(null);
     const esNumerico = CAMPOS_NUMERICOS.includes(campo);
-    const valorCrudo = row[campo];
+    const valorCrudo = valorNuevo !== undefined ? valorNuevo : row[campo];
     const valor = esNumerico
       ? valorCrudo === "" || valorCrudo === null || valorCrudo === undefined
         ? null
@@ -1459,16 +1492,14 @@ export default function Produccion({ authFetch, token, onInicio }) {
       key: "cantidad",
       label: "Cant.",
       render: (v, row) => (
-        <input
+        <InputCampo
           type="number"
           step="0.1"
-          value={row.cantidad ?? ""}
+          valor={row.cantidad ?? ""}
           placeholder="—"
           onClick={(e) => e.stopPropagation()}
-          onChange={(e) =>
-            handleTextoCampoChange(row.id, "cantidad", e.target.value)
-          }
-          onBlur={() => handleTextoCampoBlur(row, "cantidad")}
+          onGuardar={(val) => handleTextoCampoBlur(row, "cantidad", val)}
+          reintentar={errorCampo === `${row.id}-cantidad`}
           style={{
             ...estiloInput(row, "cantidad", guardandoCampo, errorCampo),
             maxWidth: "70px",
@@ -1543,15 +1574,13 @@ export default function Produccion({ authFetch, token, onInicio }) {
       key: "codartint",
       label: "Art. vinculado",
       render: (v, row) => (
-        <input
+        <InputCampo
           type="text"
-          value={row.codartint ?? ""}
+          valor={row.codartint ?? ""}
           placeholder="Ej: KITMP000"
           onClick={(e) => e.stopPropagation()}
-          onChange={(e) =>
-            handleTextoCampoChange(row.id, "codartint", e.target.value)
-          }
-          onBlur={() => handleTextoCampoBlur(row, "codartint")}
+          onGuardar={(val) => handleTextoCampoBlur(row, "codartint", val)}
+          reintentar={errorCampo === `${row.id}-codartint`}
           maxLength={50}
           style={{
             ...estiloInput(row, "codartint", guardandoCampo, errorCampo),
@@ -1568,16 +1597,14 @@ export default function Produccion({ authFetch, token, onInicio }) {
       key: campoMedida,
       label: campoMedida.charAt(0).toUpperCase() + campoMedida.slice(1),
       render: (v, row) => (
-        <input
+        <InputCampo
           type="number"
           step="0.1"
-          value={row[campoMedida] ?? ""}
+          valor={row[campoMedida] ?? ""}
           placeholder="—"
           onClick={(e) => e.stopPropagation()}
-          onChange={(e) =>
-            handleTextoCampoChange(row.id, campoMedida, e.target.value)
-          }
-          onBlur={() => handleTextoCampoBlur(row, campoMedida)}
+          onGuardar={(val) => handleTextoCampoBlur(row, campoMedida, val)}
+          reintentar={errorCampo === `${row.id}-${campoMedida}`}
           style={{
             ...estiloInput(row, campoMedida, guardandoCampo, errorCampo),
             maxWidth: "90px",
@@ -1604,8 +1631,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
             opciones={opciones}
             placeholder={row.codigo_produccion_id ? "Sin variante" : "Sin código"}
             onElegir={(val) => handleSubcodigoGuardar(row, val)}
-            onEscribir={(val) => handleTextoCampoChange(row.id, "subcodigo", val)}
-            onTerminar={() => handleTextoCampoBlur(row, "subcodigo")}
+            onTerminar={(val) => handleTextoCampoBlur(row, "subcodigo", val)}
             style={{
               ...estiloInput(row, "subcodigo", guardandoCampo, errorCampo),
               maxWidth: "150px",
@@ -1715,13 +1741,13 @@ export default function Produccion({ authFetch, token, onInicio }) {
     key: "OP",
     label: "OP",
     render: (v, row) => (
-      <input
+      <InputCampo
         type="text"
-        value={row.OP ?? ""}
+        valor={row.OP ?? ""}
         placeholder="—"
         onClick={(e) => e.stopPropagation()}
-        onChange={(e) => handleTextoCampoChange(row.id, "OP", e.target.value)}
-        onBlur={() => handleTextoCampoBlur(row, "OP")}
+        onGuardar={(val) => handleTextoCampoBlur(row, "OP", val)}
+        reintentar={errorCampo === `${row.id}-OP`}
         maxLength={10}
         style={estiloInput(row, "OP", guardandoCampo, errorCampo)}
       />
@@ -1761,15 +1787,13 @@ export default function Produccion({ authFetch, token, onInicio }) {
         key: usuario,
         label: `Usuario (${label})`,
         render: (v, row) => (
-          <input
+          <InputCampo
             type="text"
-            value={row[usuario] ?? ""}
+            valor={row[usuario] ?? ""}
             placeholder="—"
             onClick={(e) => e.stopPropagation()}
-            onChange={(e) =>
-              handleTextoCampoChange(row.id, usuario, e.target.value)
-            }
-            onBlur={() => handleTextoCampoBlur(row, usuario)}
+            onGuardar={(val) => handleTextoCampoBlur(row, usuario, val)}
+            reintentar={errorCampo === `${row.id}-${usuario}`}
             maxLength={50}
             style={estiloInput(row, usuario, guardandoCampo, errorCampo)}
           />
@@ -2072,7 +2096,6 @@ export default function Produccion({ authFetch, token, onInicio }) {
           onCodigoProduccionChange={handleCodigoProduccionChange}
           onCrearYVincularCodigo={handleCrearYVincularCodigo}
           onColorChange={handleColorChange}
-          onTextoCampoChange={handleTextoCampoChange}
           onTextoCampoBlur={handleTextoCampoBlur}
           onSubcodigoGuardar={handleSubcodigoGuardar}
           onEtapaChange={handleEtapaChange}
