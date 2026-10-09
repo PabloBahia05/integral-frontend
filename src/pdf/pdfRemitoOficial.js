@@ -92,10 +92,29 @@ function fmtMedidas(it) {
 // el SELECT. Si alguna columna real se llama distinto, agregarla acá.
 const pick = (r, ...keys) => {
   for (const k of keys) {
-    if (r[k] !== undefined && r[k] !== null && r[k] !== "") return r[k];
+    const v = r[k];
+    if (v === undefined || v === null) continue;
+    if (typeof v === "string" && v.trim() === "") continue;
+    return typeof v === "string" ? v.trim() : v;
   }
   return undefined;
 };
+
+// Datos del cliente (tabla clientes). Domicilio: se imprime `domrem`
+// (domicilio de remito) y, si está vacío, el domicilio fiscal.
+const domicilioDe = (d) =>
+  pick(
+    d,
+    "domrem",
+    "domicilio_fiscal",
+    "domicilio fiscal",
+    "domicilioFiscal",
+    "domicilio",
+    "direccion",
+    "calle",
+  );
+const localidadDe = (d) => pick(d, "localidad", "ciudad");
+const telefonoDe = (d) => pick(d, "telefono", "telefono1", "tel");
 
 export function itemDesdeProduccion(r) {
   return {
@@ -175,9 +194,9 @@ function dibujarEncabezado(doc, datos) {
 
   // Acepta los nombres alternativos con los que suelen venir los datos del
   // cliente (direccion/calle, localidad, tel).
-  const domicilio = datos.domicilio ?? datos.direccion ?? datos.calle;
-  const ciudad = datos.ciudad ?? datos.localidad;
-  const telefono = datos.telefono ?? datos.tel;
+  const domicilio = domicilioDe(datos);
+  const ciudad = localidadDe(datos);
+  const telefono = telefonoDe(datos);
 
   if (datos.cliente) {
     doc.text(String(datos.cliente), CONFIG.cliente.x, CONFIG.cliente.y);
@@ -220,9 +239,11 @@ function dibujarEncabezado(doc, datos) {
  *   fecha: "2026-09-15" | Date,
  *   numeroRemito: 3967 | null,   // ver nota en CONFIG.numero: no se imprime
  *   cliente: "UDUT RUBEN",
- *   domicilio: "WHITCOMB 2337",   // también se acepta direccion / calle
- *   telefono: "0291-4123456",     // también se acepta tel
- *   ciudad: "BAHIA BLANCA",       // también se acepta localidad
+ *   domrem: "WHITCOMB 2337",      // domicilio de remito (tabla clientes)
+ *   "domicilio fiscal": "...",    // se usa si domrem está vacío
+ *                                 // (también: domicilio_fiscal / domicilioFiscal)
+ *   telefono: "0291-4123456",     // también telefono1 / tel (va al pie)
+ *   localidad: "BAHIA BLANCA",    // también ciudad
  *   numeropres: 41,              // se imprime en "N° Orden de Compra N°"
  *   items: filas de la tabla PRODUCCION (se normalizan con
  *          itemDesdeProduccion: cantidad, codigo_produccion|modulo, grupo,
@@ -243,9 +264,9 @@ export function generarPdfRemitoOficial(datos) {
   // en consola qué faltó y qué claves llegaron realmente.
   const faltan = [];
   if (!datos.cliente) faltan.push("cliente");
-  if (!(datos.domicilio ?? datos.direccion ?? datos.calle)) faltan.push("domicilio");
-  if (!(datos.ciudad ?? datos.localidad)) faltan.push("ciudad/localidad");
-  if (!(datos.telefono ?? datos.tel)) faltan.push("telefono");
+  if (!domicilioDe(datos)) faltan.push("domicilio (domrem / domicilio fiscal)");
+  if (!localidadDe(datos)) faltan.push("localidad");
+  if (!telefonoDe(datos)) faltan.push("telefono");
   if (!(datos.numeropres ?? datos.obra)) faltan.push("numeropres");
   if (!datos.items || datos.items.length === 0) faltan.push("items");
   if (faltan.length) {
