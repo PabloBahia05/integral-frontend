@@ -2062,16 +2062,18 @@ export default function PresupuestoNuevo({
         const b1 = !isNaN(b1raw) ? b1raw : v1;
         const b2 = !isNaN(b2raw) ? b2raw : v2;
         const b3 = !isNaN(b3raw) ? b3raw : v3;
+        // Una entrada por cada línea activa, en orden, aunque su valor sea 0 o
+        // null. Antes se salteaban las líneas sin valor y las siguientes se
+        // corrían de posición (precios[1] pasaba a ser la línea 3, etc.).
+        const armarPrecioLinea = (linea, v, b) => ({
+          linea,
+          precioBase: b != null ? String(b) : "",
+          precio: v != null ? String(v) : "",
+        });
         const precios = [
-          ...(l1 && v1 != null
-            ? [{ linea: l1, precioBase: String(b1 ?? v1), precio: String(v1) }]
-            : []),
-          ...(l2 && v2 != null
-            ? [{ linea: l2, precioBase: String(b2 ?? v2), precio: String(v2) }]
-            : []),
-          ...(l3 && v3 != null
-            ? [{ linea: l3, precioBase: String(b3 ?? v3), precio: String(v3) }]
-            : []),
+          ...(l1 ? [armarPrecioLinea(l1, v1, b1)] : []),
+          ...(l2 ? [armarPrecioLinea(l2, v2, b2)] : []),
+          ...(l3 ? [armarPrecioLinea(l3, v3, b3)] : []),
         ];
         const codsAccesorioInicial = [
           it.accesorio ?? it.ACCESORIO ?? null,
