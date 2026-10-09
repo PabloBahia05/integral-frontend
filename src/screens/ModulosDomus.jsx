@@ -1385,25 +1385,39 @@ export default function ModulosDomus({ authFetch, token }) {
   // derecha vs. izquierda) sin tener que recrear cada pieza a mano.
   const [duplicandoSubcodigo, setDuplicandoSubcodigo] = useState(null);
   const [errorDuplicarSubcodigo, setErrorDuplicarSubcodigo] = useState(null);
-  const handleDuplicarSubcodigo = async (subcodigoOrigen) => {
+  // Duplicar subcódigo: el nombre nuevo se pide con un panel inline (antes era
+  // window.prompt/alert, que frenan todo el hilo mientras el cuadro está
+  // abierto y el navegador lo contaba como un bloqueo de varios segundos —
+  // el aviso "INP Issue"). `duplicarOrigen` = subcódigo que se está copiando
+  // (null = panel cerrado); `duplicarNombre` = lo que se escribe en el input.
+  const [duplicarOrigen, setDuplicarOrigen] = useState(null);
+  const [duplicarNombre, setDuplicarNombre] = useState("");
+  const abrirDuplicarSubcodigo = (subcodigoOrigen) => {
+    setDuplicarOrigen(subcodigoOrigen);
+    setDuplicarNombre("");
+    setErrorDuplicarSubcodigo(null);
+  };
+  const cancelarDuplicarSubcodigo = () => {
+    setDuplicarOrigen(null);
+    setDuplicarNombre("");
+  };
+  const handleDuplicarSubcodigo = async (subcodigoOrigen, nombreNuevo) => {
     if (!panelCodigo) return;
     const piezasOrigen = piezas.filter(
       (p) => String(p.subcodigo ?? "").trim() === subcodigoOrigen,
     );
     if (piezasOrigen.length === 0) return;
-    const nuevo = window
-      .prompt(
-        `Nuevo subcódigo (copia de ${subcodigoOrigen}, ${piezasOrigen.length} pieza(s)):`,
-        "",
-      )
-      ?.trim();
-    if (!nuevo) return;
+    const nuevo = String(nombreNuevo ?? "").trim();
+    if (!nuevo) {
+      setErrorDuplicarSubcodigo("Escribí el nombre del nuevo subcódigo.");
+      return;
+    }
     if (nuevo === subcodigoOrigen) {
-      window.alert("El nuevo subcódigo tiene que ser distinto del original.");
+      setErrorDuplicarSubcodigo("El nuevo subcódigo tiene que ser distinto del original.");
       return;
     }
     if (gruposPiezas.some(([s]) => s === nuevo)) {
-      window.alert(`Ya existe el subcódigo "${nuevo}" — elegí otro nombre.`);
+      setErrorDuplicarSubcodigo(`Ya existe el subcódigo "${nuevo}" — elegí otro nombre.`);
       return;
     }
     setDuplicandoSubcodigo(subcodigoOrigen);
@@ -1445,6 +1459,7 @@ export default function ModulosDomus({ authFetch, token }) {
             : c,
         ),
       );
+      cancelarDuplicarSubcodigo();
       abrirSubcodigo(nuevo);
     } catch (e) {
       console.error("Error duplicando subcódigo:", e);
@@ -3128,7 +3143,7 @@ export default function ModulosDomus({ authFetch, token }) {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDuplicarSubcodigo(subcodigo);
+                                abrirDuplicarSubcodigo(subcodigo);
                               }}
                               disabled={duplicandoSubcodigo === subcodigo}
                               title={`Duplicar subcódigo ${subcodigo} a uno nuevo`}
@@ -3188,6 +3203,86 @@ export default function ModulosDomus({ authFetch, token }) {
                         </span>
                       </button>
                     </div>
+
+                    {duplicarOrigen !== null && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                          gap: 8,
+                          margin: "0 0 12px",
+                          padding: "10px 12px",
+                          border: "1.5px solid #b8d6ef",
+                          borderRadius: 6,
+                          background: "#eaf3fb",
+                        }}
+                      >
+                        <span style={{ fontSize: 12, color: "#0a3a5c" }}>
+                          Duplicar <strong>{duplicarOrigen}</strong> como:
+                        </span>
+                        <input
+                          type="text"
+                          autoFocus
+                          value={duplicarNombre}
+                          onChange={(e) => setDuplicarNombre(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleDuplicarSubcodigo(duplicarOrigen, duplicarNombre);
+                            } else if (e.key === "Escape") {
+                              cancelarDuplicarSubcodigo();
+                            }
+                          }}
+                          placeholder="Nuevo subcódigo"
+                          maxLength={50}
+                          style={{
+                            padding: "6px 8px",
+                            fontSize: 12,
+                            fontFamily: "'Space Mono',monospace",
+                            border: "1.5px solid #b8d6ef",
+                            borderRadius: 4,
+                            color: "#0a3a5c",
+                            flex: 1,
+                            minWidth: 160,
+                            maxWidth: 260,
+                          }}
+                        />
+                        <button
+                          onClick={() => handleDuplicarSubcodigo(duplicarOrigen, duplicarNombre)}
+                          disabled={!duplicarNombre.trim() || duplicandoSubcodigo !== null}
+                          style={{
+                            padding: "8px 14px",
+                            borderRadius: 4,
+                            border: "none",
+                            background: "#0a3a5c",
+                            color: "#fff",
+                            cursor: duplicarNombre.trim() ? "pointer" : "default",
+                            fontFamily: "'Space Mono', monospace",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            opacity: duplicarNombre.trim() && duplicandoSubcodigo === null ? 1 : 0.5,
+                          }}
+                        >
+                          {duplicandoSubcodigo !== null ? "⏳ Duplicando..." : "Duplicar"}
+                        </button>
+                        <button
+                          onClick={cancelarDuplicarSubcodigo}
+                          disabled={duplicandoSubcodigo !== null}
+                          style={{
+                            padding: "8px 14px",
+                            borderRadius: 4,
+                            border: "1.5px solid #b8d6ef",
+                            background: "#fff",
+                            color: "#0a3a5c",
+                            cursor: "pointer",
+                            fontFamily: "'Space Mono', monospace",
+                            fontSize: 12,
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
 
                     {errorDuplicarSubcodigo && (
                       <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 12px" }}>
