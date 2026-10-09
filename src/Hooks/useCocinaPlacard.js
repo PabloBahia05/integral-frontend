@@ -27,6 +27,15 @@ const buscarArticuloNormalizado = (mapa, nombre) =>
 // se usa la línea 15 como respaldo — sin necesidad de activarla en Encabezado.
 const LINEA_FIJA_PLACARD = "15";
 
+// Busca el artículo de una fila en el mapa del catálogo. Prioriza la
+// DESCRIPCIÓN (fila.articulo), que es estable, y usa nombreart (columna
+// "Producto", que puede diferir) solo como respaldo. Para ítems de placard,
+// donde articulo es un texto compuesto que no existe en el catálogo, el
+// match cae al respaldo por nombreart como antes.
+const buscarArticuloDeFila = (mapa, fila) =>
+  (fila?.articulo ? buscarArticuloNormalizado(mapa, fila.articulo) : undefined) ??
+  (fila?.nombreart ? buscarArticuloNormalizado(mapa, fila.nombreart) : undefined);
+
 // ────────────────────────────────────────────────────────────────────────
 // useCocinaPlacard
 // ────────────────────────────────────────────────────────────────────────
@@ -803,7 +812,7 @@ export default function useCocinaPlacard({
   // No toca %item, %lista, ajuste general ni accesorios — eso lo vuelve a
   // aplicar recalcFila después, igual que siempre.
   const refrescarPreciosBaseFila = (fila, mapaArticulos) => {
-    const art = buscarArticuloNormalizado(mapaArticulos, fila.nombreart || fila.articulo);
+    const art = buscarArticuloDeFila(mapaArticulos, fila);
     if (!art) return fila; // artículo ya no existe / cambió de nombre en la BD: no tocar
 
     let nuevaFila = fila;
@@ -888,7 +897,7 @@ export default function useCocinaPlacard({
   // tenía área o si no hubo match.
   const resolverAreaConMapa = (fila, mapaArticulos) => {
     if (fila.area != null) return fila;
-    const art = buscarArticuloNormalizado(mapaArticulos, fila.nombreart || fila.articulo);
+    const art = buscarArticuloDeFila(mapaArticulos, fila);
     const area = art ? (art.area ?? art.AREA ?? null) : null;
     return area != null ? { ...fila, area } : fila;
   };
@@ -925,8 +934,8 @@ export default function useCocinaPlacard({
           // compuesto para mostrar en el presupuesto, ej. con ancho literal
           // "200" y cantidad de puertas) — ese texto casi nunca existe tal
           // cual en la tabla articulos.
-          const clave = f.nombreart || f.articulo;
-          const art = buscarArticuloNormalizado(mapaArticulos, clave);
+          const clave = f.articulo || f.nombreart;
+          const art = buscarArticuloDeFila(mapaArticulos, f);
           if (art) {
             console.log(`[Actualizar][${seccion}/${familia}] "${clave}" -> match EXACTO en BD:`, art);
             return;
@@ -1149,10 +1158,22 @@ export default function useCocinaPlacard({
       );
       if (tieneTodas) return fila;
 
-      const art = buscarArticuloNormalizado(mapaArticulos, fila.nombreart || fila.articulo);
-      const combinado = lineasActivas.map((l) => {
+      const art = buscarArticuloDeFila(mapaArticulos, fila);
+      const PCT_SLOTS = ["porcentaje1", "porcentaje2", "porcentaje3"];
+      // % propio del ítem (ej. -50% del zócalo): si una línea nueva no
+      // tiene el suyo, hereda el de la primera línea que sí lo tenga, así el
+      // precio de la línea nueva sale con el mismo % que el resto.
+      const pctHeredado = PCT_SLOTS.map((s) => fila[s]).find(
+        (v) => v != null && v !== "",
+      );
+      const pctNuevos = {};
+      const combinado = lineasActivas.map((l, li) => {
         const existente = actuales.find((pb) => pb.linea === l.linea);
         if (tienePrecio(existente)) return existente;
+        const slot = PCT_SLOTS[li];
+        if (slot && (fila[slot] == null || fila[slot] === "") && pctHeredado != null) {
+          pctNuevos[slot] = pctHeredado;
+        }
         let precioBase = art?.precios?.[String(l.linea)] ?? "";
         if (esPlacard && (precioBase == null || precioBase === "")) {
           const p15 = art?.precios?.[LINEA_FIJA_PLACARD];
@@ -1162,14 +1183,14 @@ export default function useCocinaPlacard({
           // DIAGNÓSTICO: distingue "el artículo no se encontró por nombre"
           // de "se encontró pero no tiene precio en esa línea".
           console.warn(
-            `[DIAG linea sin precio] "${fila.nombreart || fila.articulo}" ` +
+            `[DIAG linea sin precio] "${fila.articulo}" (nombreart="${fila.nombreart}") ` +
               `linea=${l.linea} artEncontrado=${!!art} ` +
               `lineasConPrecio=${Object.keys(art?.precios ?? {}).join(",")}`,
           );
         }
         return { linea: l.linea, precioBase };
       });
-      return recalcFila({ ...fila, preciosBase: combinado });
+      return recalcFila({ ...fila, ...pctNuevos, preciosBase: combinado });
     };
 
     // Se pide el mapa de TODAS las familias de la BD (igual que handleActualizar
