@@ -1,8 +1,9 @@
 // PlanoMamparas.jsx
 // Busca presupuestos de mamparas, permite cargar medidas de producción
 // y genera el plano (PDF) con el botón "Hacer plano".
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
+import ModelosPlano from "./ModelosPlano";
 
 const EMPTY = { ancho_prod: "", alto_prod: "", prof_prod: "" };
 
@@ -77,6 +78,23 @@ export default function PlanoMamparas({ authFetch, API }) {
   const [form, setForm] = useState(EMPTY);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState("plano");
+  const [requiere, setRequiere] = useState({}); // modelo -> lleva plano (0/1)
+
+  const cargarModelos = async () => {
+    try {
+      const r = await authFetch(`${API}/mamparas-modelo-plano`);
+      if (r.ok) {
+        const d = await r.json();
+        setRequiere(Object.fromEntries(d.map((m) => [m.modelo_nombre, m.requiere_plano])));
+      }
+    } catch {
+      /* si falla, la grilla igual funciona */
+    }
+  };
+  useEffect(() => {
+    cargarModelos();
+  }, [tab]);
 
   const buscar = async () => {
     setMsg("");
@@ -116,9 +134,27 @@ export default function PlanoMamparas({ authFetch, API }) {
     }
   };
 
+  const tabs = (
+    <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <button onClick={() => setTab("plano")} disabled={tab === "plano"}>Hacer plano</button>
+      <button onClick={() => setTab("modelos")} disabled={tab === "modelos"}>Modelos y planos</button>
+    </div>
+  );
+
+  if (tab === "modelos") {
+    return (
+      <div style={{ padding: 16 }}>
+        <h2>Planos de mamparas</h2>
+        {tabs}
+        <ModelosPlano authFetch={authFetch} API={API} />
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: 16 }}>
       <h2>Planos de mamparas</h2>
+      {tabs}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <input
@@ -133,7 +169,7 @@ export default function PlanoMamparas({ authFetch, API }) {
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
           <tr>
-            {["Pres.", "Mamp.", "Rev.", "Cliente", "Modelo", "Ancho", "Alto", "Ancho prod", "Alto prod", "Prof prod"].map((h) => (
+            {["Pres.", "Mamp.", "Rev.", "Cliente", "Modelo", "Ancho", "Alto", "Ancho prod", "Alto prod", "Prof prod", "Lleva plano"].map((h) => (
               <th key={h} style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>{h}</th>
             ))}
           </tr>
@@ -148,7 +184,7 @@ export default function PlanoMamparas({ authFetch, API }) {
               <td>{r.numeropres}</td><td>{r.presm}</td><td>{r.revision}</td>
               <td>{r.codcliente}</td><td>{r.modelo}</td>
               <td>{r.ancho}</td><td>{r.alto}</td>
-              <td>{r.ancho_prod ?? "-"}</td><td>{r.alto_prod ?? "-"}</td><td>{r.prof_prod ?? "-"}</td>
+              <td>{r.ancho_prod ?? "-"}</td><td>{r.alto_prod ?? "-"}</td><td>{r.prof_prod ?? "-"}</td><td>{requiere[r.modelo] ? "Sí" : "No"}</td>
             </tr>
           ))}
         </tbody>
@@ -167,12 +203,13 @@ export default function PlanoMamparas({ authFetch, API }) {
               />
             </label>
           ))}
-          <button onClick={hacerPlano} disabled={loading}>
+          <button onClick={hacerPlano} disabled={loading || !requiere[sel.modelo]}>
             {loading ? "Generando..." : "Hacer plano"}
           </button>
         </div>
       )}
 
+      {sel && !requiere[sel.modelo] && <p>Este modelo no lleva plano.</p>}
       {msg && <p>{msg}</p>}
     </div>
   );
