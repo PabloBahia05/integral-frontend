@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 const ESTADOS = {
   NO_LLEVA: { texto: "No lleva plano", bg: "#eceff1", color: "#546e7a" },
   CARGADO: { texto: "Plano cargado", bg: "#e8f5e9", color: "#2e7d32" },
-  FALTA_CARGAR: { texto: "Falta vincular plano", bg: "#fff3e0", color: "#e65100" },
+  FALTA_HERRAJE: { texto: "Falta elegir herraje", bg: "#fff3e0", color: "#e65100" },
+  FALTA_CARGAR: { texto: "Falta plano en el herraje", bg: "#fff3e0", color: "#e65100" },
 };
 
 const card = {
@@ -50,6 +51,40 @@ function Segmentado({ opciones, valor, onChange }) {
           {label}
         </button>
       ))}
+    </div>
+  );
+}
+
+// Selector con filtro: se escribe para filtrar y se elige el herraje de la lista
+function HerrajePicker({ valor, herrajes, onChange }) {
+  const etiqueta = (h) => `${h.codartprov} — ${h.articulo}`;
+  const actual = herrajes.find((h) => h.codartprov === valor);
+  const [texto, setTexto] = useState(actual ? etiqueta(actual) : "");
+
+  useEffect(() => {
+    setTexto(actual ? etiqueta(actual) : "");
+  }, [valor, herrajes.length]);
+
+  const cambiar = (v) => {
+    setTexto(v);
+    const h = herrajes.find((x) => x.codartprov && etiqueta(x) === v);
+    if (h) onChange(h.codartprov);
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+      <input
+        list="lista-herrajes-mampara"
+        value={texto}
+        onChange={(e) => cambiar(e.target.value)}
+        placeholder="Escribí para filtrar y elegí el herraje…"
+        style={{ width: 320, maxWidth: "100%" }}
+      />
+      {valor && (
+        <button title="Quitar herraje" onClick={() => onChange(null)} style={{ cursor: "pointer" }}>
+          ×
+        </button>
+      )}
     </div>
   );
 }
@@ -110,12 +145,17 @@ export default function ModelosPlano({ authFetch, API }) {
   };
 
   /* ---------- Paso 1: modelos ---------- */
-  const cuenta = (f) =>
-    modelos.filter((m) => (f === "TODOS" ? true : f === "LLEVAN" ? m.requiere_plano : m.estado === f)).length;
-
-  const modelosVis = modelos.filter((m) =>
-    filtroModelo === "TODOS" ? true : filtroModelo === "LLEVAN" ? m.requiere_plano : m.estado === filtroModelo,
-  );
+  const coincide = (m, f) =>
+    f === "TODOS"
+      ? true
+      : f === "LLEVAN"
+        ? m.requiere_plano
+        : f === "FALTA"
+          ? m.estado === "FALTA_HERRAJE" || m.estado === "FALTA_CARGAR"
+          : m.estado === f;
+  const cuenta = (f) => modelos.filter((m) => coincide(m, f)).length;
+  const modelosVis = modelos.filter((m) => coincide(m, filtroModelo));
+  const herrajesConCodigo = herrajes.filter((h) => h.codartprov);
 
   /* ---------- Paso 2: herrajes ---------- */
   const b = busca.trim().toLowerCase();
@@ -132,9 +172,9 @@ export default function ModelosPlano({ authFetch, API }) {
       <div style={{ ...card, background: "#e3f2fd", boxShadow: "none" }}>
         <b>Cómo funciona</b>
         <ol style={{ margin: "6px 0 0", paddingLeft: 20, fontSize: 14, lineHeight: 1.6 }}>
-          <li>Marcá qué <b>modelos</b> de mampara llevan plano.</li>
-          <li>Vinculá cada <b>herraje de mampara</b> con el plano que le corresponde.</li>
-          <li>Al hacer el plano de un presupuesto, se usa el plano del herraje que lleve.</li>
+          <li>Marcá qué <b>modelos</b> de mampara llevan plano y elegí su <b>herraje</b> (podés filtrar escribiendo).</li>
+          <li>En el paso 2, vinculá cada <b>herraje de mampara</b> con el plano que le corresponde.</li>
+          <li>Al hacer el plano de un presupuesto, se usa el plano del herraje de su modelo.</li>
         </ol>
       </div>
 
@@ -150,6 +190,12 @@ export default function ModelosPlano({ authFetch, API }) {
         </div>
       )}
 
+      <datalist id="lista-herrajes-mampara">
+        {herrajesConCodigo.map((h) => (
+          <option key={h.id} value={`${h.codartprov} — ${h.articulo}`} />
+        ))}
+      </datalist>
+
       {/* ---------- Paso 1 ---------- */}
       <div style={card}>
         <h3 style={{ marginTop: 0 }}>1. Modelos de mampara</h3>
@@ -162,7 +208,7 @@ export default function ModelosPlano({ authFetch, API }) {
               ["LLEVAN", `Llevan plano (${cuenta("LLEVAN")})`],
               ["NO_LLEVA", `No llevan (${cuenta("NO_LLEVA")})`],
               ["CARGADO", `Con plano cargado (${cuenta("CARGADO")})`],
-              ["FALTA_CARGAR", `Falta vincular (${cuenta("FALTA_CARGAR")})`],
+              ["FALTA", `Falta completar (${cuenta("FALTA")})`],
             ]}
           />
         </div>
@@ -197,10 +243,20 @@ export default function ModelosPlano({ authFetch, API }) {
                       </label>
                     </td>
                     <td style={td}>
-                      {m.codigo_proveedor ? (
+                      {m.requiere_plano ? (
                         <>
-                          <b>{m.codigo_proveedor}</b>
-                          <div style={{ fontSize: 12, color: "#666" }}>{m.plano_descripcion}</div>
+                          <HerrajePicker
+                            valor={m.herraje_codartprov}
+                            herrajes={herrajesConCodigo}
+                            onChange={(cod) => guardar(`/mamparas-modelo-plano/${m.id}`, { herraje_codartprov: cod })}
+                          />
+                          {m.herraje_codartprov && (
+                            <div style={{ fontSize: 12, marginTop: 3, color: m.plano_descripcion ? "#2e7d32" : "#e65100" }}>
+                              {m.plano_descripcion
+                                ? `Plano: ${m.plano_descripcion}`
+                                : "Este herraje no tiene plano: vinculalo en el paso 2"}
+                            </div>
+                          )}
                         </>
                       ) : (
                         "-"
