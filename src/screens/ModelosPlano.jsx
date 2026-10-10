@@ -72,7 +72,7 @@ export default function ModelosPlano({ authFetch, API }) {
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
           <tr>
-            {["Modelo", "Presupuestos", "¿Lleva plano?", "Plano", "Estado"].map((h) => (
+            {["Modelo", "Cód. proveedor", "Presupuestos", "¿Lleva plano?", "Plano", "Estado"].map((h) => (
               <th key={h} style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: 4 }}>
                 {h}
               </th>
@@ -85,6 +85,7 @@ export default function ModelosPlano({ authFetch, API }) {
             return (
               <tr key={m.id}>
                 <td style={{ padding: 4 }}>{m.modelo_nombre}</td>
+                <td>{m.codigo_proveedor || "-"}</td>
                 <td>{m.presupuestos}</td>
                 <td>
                   <input
@@ -118,7 +119,7 @@ export default function ModelosPlano({ authFetch, API }) {
           })}
           {!visibles.length && (
             <tr>
-              <td colSpan={5} style={{ padding: 8, color: "#888" }}>
+              <td colSpan={6} style={{ padding: 8, color: "#888" }}>
                 Sin modelos para este filtro
               </td>
             </tr>
