@@ -1,189 +1,321 @@
 // ModelosPlano.jsx
-// 1) Modelos de presupuestos_mamparas: cuáles llevan plano y si el plano está cargado.
-// 2) Herrajes de mampara (articulos.codartprov) usados en los presupuestos, y el plano vinculado a cada uno.
+// Paso 1: qué modelos de mampara llevan plano.
+// Paso 2: vincular cada herraje de mampara (familia HERRAJES MAMPARAS) con su plano.
 import { useEffect, useState } from "react";
 
 const ESTADOS = {
-  NO_LLEVA: { texto: "No lleva plano", color: "#9e9e9e" },
-  CARGADO: { texto: "Plano cargado", color: "#2e7d32" },
-  FALTA_CARGAR: { texto: "Falta cargar plano", color: "#e65100" },
+  NO_LLEVA: { texto: "No lleva plano", bg: "#eceff1", color: "#546e7a" },
+  CARGADO: { texto: "Plano cargado", bg: "#e8f5e9", color: "#2e7d32" },
+  FALTA_CARGAR: { texto: "Falta vincular plano", bg: "#fff3e0", color: "#e65100" },
 };
 
-const FILTROS = [
-  ["TODOS", "Todos"],
-  ["LLEVAN", "Llevan plano"],
-  ["NO_LLEVA", "No llevan"],
-  ["CARGADO", "Cargados"],
-  ["FALTA_CARGAR", "Faltan cargar"],
-];
+const card = {
+  background: "#fff",
+  color: "#222",
+  borderRadius: 10,
+  padding: 16,
+  marginBottom: 20,
+  boxShadow: "0 1px 3px rgba(0,0,0,.12)",
+};
+const th = { textAlign: "left", borderBottom: "2px solid #ddd", padding: "6px 8px", fontSize: 12, color: "#555" };
+const td = { padding: "8px", borderBottom: "1px solid #eee", verticalAlign: "middle" };
+const pill = (bg, color) => ({
+  display: "inline-block",
+  padding: "2px 10px",
+  borderRadius: 12,
+  background: bg,
+  color,
+  fontWeight: 600,
+  fontSize: 12,
+  whiteSpace: "nowrap",
+});
 
-const th = { textAlign: "left", borderBottom: "1px solid #ccc", padding: 4 };
+function Segmentado({ opciones, valor, onChange }) {
+  return (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {opciones.map(([k, label]) => (
+        <button
+          key={k}
+          onClick={() => onChange(k)}
+          style={{
+            padding: "4px 12px",
+            borderRadius: 14,
+            border: "1px solid #90a4ae",
+            background: valor === k ? "#1565c0" : "#fff",
+            color: valor === k ? "#fff" : "#37474f",
+            cursor: "pointer",
+            fontSize: 13,
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function ModelosPlano({ authFetch, API }) {
   const [modelos, setModelos] = useState([]);
   const [herrajes, setHerrajes] = useState([]);
   const [planos, setPlanos] = useState([]);
-  const [filtro, setFiltro] = useState("TODOS");
+  const [errores, setErrores] = useState([]);
+
+  const [filtroModelo, setFiltroModelo] = useState("TODOS");
+  const [filtroHerraje, setFiltroHerraje] = useState("TODOS");
+  const [articulo, setArticulo] = useState(""); // menú filtro: un artículo puntual
   const [busca, setBusca] = useState("");
-  const [soloVinc, setSoloVinc] = useState(false);
-  const [msg, setMsg] = useState("");
+
+  const pedir = async (ruta) => {
+    const r = await authFetch(`${API}${ruta}`);
+    if (!r.ok) {
+      let detalle = r.status;
+      try {
+        detalle = (await r.json()).error || r.status;
+      } catch {
+        /* sin cuerpo JSON */
+      }
+      throw new Error(`${ruta}: ${detalle}`);
+    }
+    return r.json();
+  };
 
   const cargar = async () => {
-    setMsg("");
-    try {
-      const [rm, rh, rp] = await Promise.all([
-        authFetch(`${API}/mamparas-modelo-plano`),
-        authFetch(`${API}/mamparas-herrajes`),
-        authFetch(`${API}/mamparas-planos`),
-      ]);
-      if (!rm.ok || !rh.ok || !rp.ok) throw new Error("Error al cargar datos");
-      setModelos(await rm.json());
-      setHerrajes(await rh.json());
-      setPlanos(await rp.json());
-    } catch (e) {
-      setMsg(e.message);
-    }
+    const [rm, rh, rp] = await Promise.allSettled([
+      pedir("/mamparas-modelo-plano"),
+      pedir("/mamparas-herrajes"),
+      pedir("/mamparas-planos"),
+    ]);
+    const errs = [];
+    if (rm.status === "fulfilled") setModelos(rm.value);
+    else errs.push(rm.reason.message);
+    if (rh.status === "fulfilled") setHerrajes(rh.value);
+    else errs.push(rh.reason.message);
+    if (rp.status === "fulfilled") setPlanos(rp.value);
+    else errs.push(rp.reason.message);
+    setErrores(errs);
   };
 
   useEffect(() => {
     cargar();
   }, []);
 
-  const toggleLleva = async (m, requiere_plano) => {
-    const r = await authFetch(`${API}/mamparas-modelo-plano/${m.id}`, {
+  const guardar = async (ruta, body) => {
+    const r = await authFetch(`${API}${ruta}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requiere_plano }),
+      body: JSON.stringify(body),
     });
-    if (!r.ok) setMsg("No se pudo guardar el cambio");
-    cargar();
+    if (!r.ok) setErrores([`No se pudo guardar (${ruta})`]);
+    else await cargar();
   };
 
-  const vincular = async (h, plano_clave) => {
-    const r = await authFetch(`${API}/mamparas-herrajes/${encodeURIComponent(h.codartprov)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plano_clave: plano_clave || null }),
-    });
-    if (!r.ok) setMsg("No se pudo vincular el plano");
-    cargar();
-  };
+  /* ---------- Paso 1: modelos ---------- */
+  const cuenta = (f) =>
+    modelos.filter((m) => (f === "TODOS" ? true : f === "LLEVAN" ? m.requiere_plano : m.estado === f)).length;
 
-  const modelosVis = modelos.filter((m) => {
-    if (filtro === "TODOS") return true;
-    if (filtro === "LLEVAN") return m.requiere_plano;
-    return m.estado === filtro;
-  });
+  const modelosVis = modelos.filter((m) =>
+    filtroModelo === "TODOS" ? true : filtroModelo === "LLEVAN" ? m.requiere_plano : m.estado === filtroModelo,
+  );
 
+  /* ---------- Paso 2: herrajes ---------- */
   const b = busca.trim().toLowerCase();
   const herrajesVis = herrajes.filter(
     (h) =>
-      (!soloVinc || h.plano_clave) &&
-      (!b || `${h.codartprov} ${h.articulo} ${h.modelos}`.toLowerCase().includes(b)),
+      (!articulo || String(h.id) === articulo) &&
+      (filtroHerraje === "TODOS" || (filtroHerraje === "CON" ? h.plano_clave : !h.plano_clave)) &&
+      (!b || `${h.codartprov} ${h.articulo} ${h.codartint}`.toLowerCase().includes(b)),
   );
 
   return (
     <div>
-      {/* ---------- Modelos ---------- */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-        {FILTROS.map(([k, label]) => (
-          <button key={k} onClick={() => setFiltro(k)} disabled={filtro === k}>
-            {label}
-          </button>
-        ))}
+      {/* Explicación corta */}
+      <div style={{ ...card, background: "#e3f2fd", boxShadow: "none" }}>
+        <b>Cómo funciona</b>
+        <ol style={{ margin: "6px 0 0", paddingLeft: 20, fontSize: 14, lineHeight: 1.6 }}>
+          <li>Marcá qué <b>modelos</b> de mampara llevan plano.</li>
+          <li>Vinculá cada <b>herraje de mampara</b> con el plano que le corresponde.</li>
+          <li>Al hacer el plano de un presupuesto, se usa el plano del herraje que lleve.</li>
+        </ol>
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead>
-          <tr>
-            {["Modelo", "Cód. proveedor", "Presupuestos", "¿Lleva plano?", "Plano", "Estado"].map((h) => (
-              <th key={h} style={th}>{h}</th>
+      {errores.length > 0 && (
+        <div style={{ ...card, background: "#ffebee", color: "#b71c1c" }}>
+          <b>No se pudo cargar todo:</b>
+          <ul style={{ margin: "4px 0" }}>
+            {errores.map((e) => (
+              <li key={e}>{e}</li>
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {modelosVis.map((m) => {
-            const est = ESTADOS[m.estado];
-            return (
-              <tr key={m.id}>
-                <td style={{ padding: 4 }}>{m.modelo_nombre}</td>
-                <td>{m.codigo_proveedor || "-"}</td>
-                <td>{m.presupuestos}</td>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={!!m.requiere_plano}
-                    onChange={(e) => toggleLleva(m, e.target.checked)}
-                  />
-                </td>
-                <td>{m.plano_descripcion || "-"}</td>
-                <td>
-                  <span style={{ color: est.color, fontWeight: 600 }}>{est.texto}</span>
-                </td>
+          </ul>
+          <button onClick={cargar}>Reintentar</button>
+        </div>
+      )}
+
+      {/* ---------- Paso 1 ---------- */}
+      <div style={card}>
+        <h3 style={{ marginTop: 0 }}>1. Modelos de mampara</h3>
+        <div style={{ marginBottom: 10 }}>
+          <Segmentado
+            valor={filtroModelo}
+            onChange={setFiltroModelo}
+            opciones={[
+              ["TODOS", `Todos (${cuenta("TODOS")})`],
+              ["LLEVAN", `Llevan plano (${cuenta("LLEVAN")})`],
+              ["NO_LLEVA", `No llevan (${cuenta("NO_LLEVA")})`],
+              ["CARGADO", `Con plano cargado (${cuenta("CARGADO")})`],
+              ["FALTA_CARGAR", `Falta vincular (${cuenta("FALTA_CARGAR")})`],
+            ]}
+          />
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+            <thead>
+              <tr>
+                <th style={th}>Modelo</th>
+                <th style={th}>Presupuestos</th>
+                <th style={th}>¿Lleva plano?</th>
+                <th style={th}>Herraje / plano</th>
+                <th style={th}>Estado</th>
               </tr>
-            );
-          })}
-          {!modelosVis.length && (
-            <tr>
-              <td colSpan={6} style={{ padding: 8, color: "#888" }}>Sin modelos para este filtro</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-
-      {/* ---------- Herrajes -> plano ---------- */}
-      <h3 style={{ marginTop: 28 }}>Herrajes de mampara y su plano</h3>
-      <p style={{ fontSize: 12, marginTop: 0 }}>
-        Código de proveedor (<code>codartprov</code>) de los herrajes usados en los presupuestos. El plano se
-        vincula a ese código; un modelo queda "cargado" cuando alguno de sus herrajes tiene plano.
-      </p>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
-        <input
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar código, artículo o modelo"
-          style={{ width: 280 }}
-        />
-        <label style={{ fontSize: 13 }}>
-          <input type="checkbox" checked={soloVinc} onChange={(e) => setSoloVinc(e.target.checked)} /> Solo con plano
-        </label>
+            </thead>
+            <tbody>
+              {modelosVis.map((m) => {
+                const est = ESTADOS[m.estado];
+                return (
+                  <tr key={m.id}>
+                    <td style={td}>{m.modelo_nombre}</td>
+                    <td style={td}>{m.presupuestos}</td>
+                    <td style={td}>
+                      <label style={{ cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={!!m.requiere_plano}
+                          onChange={(e) =>
+                            guardar(`/mamparas-modelo-plano/${m.id}`, { requiere_plano: e.target.checked })
+                          }
+                        />{" "}
+                        {m.requiere_plano ? "Sí" : "No"}
+                      </label>
+                    </td>
+                    <td style={td}>
+                      {m.codigo_proveedor ? (
+                        <>
+                          <b>{m.codigo_proveedor}</b>
+                          <div style={{ fontSize: 12, color: "#666" }}>{m.plano_descripcion}</div>
+                        </>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td style={td}>
+                      <span style={pill(est.bg, est.color)}>{est.texto}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!modelosVis.length && (
+                <tr>
+                  <td colSpan={5} style={{ ...td, color: "#888" }}>
+                    Sin modelos para este filtro
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead>
-          <tr>
-            {["Cód. proveedor", "Artículo", "Modelos que lo usan", "Presup.", "Plano vinculado"].map((h) => (
-              <th key={h} style={th}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {herrajesVis.map((h) => (
-            <tr key={h.codartprov}>
-              <td style={{ padding: 4, fontWeight: 600 }}>{h.codartprov}</td>
-              <td>{h.articulo}</td>
-              <td>{h.modelos}</td>
-              <td>{h.presupuestos}</td>
-              <td>
-                <select value={h.plano_clave || ""} onChange={(e) => vincular(h, e.target.value)}>
-                  <option value="">— sin plano —</option>
-                  {planos.map((p) => (
-                    <option key={p.clave} value={p.clave}>{p.descripcion}</option>
-                  ))}
-                </select>
-              </td>
-            </tr>
-          ))}
-          {!herrajesVis.length && (
-            <tr>
-              <td colSpan={5} style={{ padding: 8, color: "#888" }}>Sin herrajes para este filtro</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      {/* ---------- Paso 2 ---------- */}
+      <div style={card}>
+        <h3 style={{ marginTop: 0 }}>2. Herrajes de mampara y su plano</h3>
+        <p style={{ margin: "0 0 10px", fontSize: 13, color: "#555" }}>
+          Artículos de la familia <b>HERRAJES MAMPARAS</b>. Elegí en cada uno el plano que le corresponde.
+        </p>
 
-      {msg && <p>{msg}</p>}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+          <select value={articulo} onChange={(e) => setArticulo(e.target.value)} style={{ maxWidth: 320 }}>
+            <option value="">Todos los artículos ({herrajes.length})</option>
+            {herrajes.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.codartprov ? `${h.codartprov} — ` : ""}
+                {h.articulo}
+              </option>
+            ))}
+          </select>
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por código o nombre"
+            style={{ width: 220 }}
+          />
+          <Segmentado
+            valor={filtroHerraje}
+            onChange={setFiltroHerraje}
+            opciones={[
+              ["TODOS", "Todos"],
+              ["CON", "Con plano"],
+              ["SIN", "Sin plano"],
+            ]}
+          />
+        </div>
+
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+            <thead>
+              <tr>
+                <th style={th}>Cód. proveedor</th>
+                <th style={th}>Artículo</th>
+                <th style={th}>Plano vinculado</th>
+                <th style={th}>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {herrajesVis.map((h) => (
+                <tr key={h.id}>
+                  <td style={{ ...td, fontWeight: 600 }}>{h.codartprov || "-"}</td>
+                  <td style={td}>{h.articulo}</td>
+                  <td style={td}>
+                    {h.codartprov ? (
+                      <select
+                        value={h.plano_clave || ""}
+                        onChange={(e) =>
+                          guardar(`/mamparas-herrajes/${encodeURIComponent(h.codartprov)}`, {
+                            plano_clave: e.target.value || null,
+                          })
+                        }
+                      >
+                        <option value="">— sin plano —</option>
+                        {planos.map((p) => (
+                          <option key={p.clave} value={p.clave}>
+                            {p.descripcion}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span style={{ color: "#888", fontSize: 12 }}>Sin código de proveedor: no se puede vincular</span>
+                    )}
+                  </td>
+                  <td style={td}>
+                    {h.plano_clave ? (
+                      <span style={pill("#e8f5e9", "#2e7d32")}>Vinculado</span>
+                    ) : (
+                      <span style={pill("#eceff1", "#546e7a")}>Sin plano</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {!herrajesVis.length && (
+                <tr>
+                  <td colSpan={4} style={{ ...td, color: "#888" }}>
+                    {herrajes.length
+                      ? "Sin herrajes para este filtro"
+                      : "No hay artículos con familia HERRAJES MAMPARAS"}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
