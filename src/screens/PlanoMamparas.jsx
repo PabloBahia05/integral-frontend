@@ -8,66 +8,151 @@ import ModelosPlano from "./ModelosPlano";
 const EMPTY = { ancho_prod: "", alto_prod: "", prof_prod: "" };
 
 /* ---------- Dibujo del plano ---------- */
-function dibujarPlano({ mampara: m, herraje }) {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const W = 297, H = 210;
+const fmt = (n) => (Number.isInteger(n) ? String(n) : Number(n).toFixed(1));
 
-  doc.setFont("courier", "bold").setFontSize(14);
-  doc.text(`PLANO MAMPARA  P${m.numeropres}-M${m.presm}  REV ${m.revision ?? 0}`, 10, 12);
-  doc.setFont("courier", "normal").setFontSize(9);
+function dibujarPlano(d) {
+  const { mampara: m, herraje, plano, codigo, dim, piezas, perforaciones } = d;
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const pres = [m.numeropres, m.presm].filter(Boolean).join(" / ") || `ID ${m.id}`;
+
+  /* --- Encabezado --- */
+  doc.setFont("helvetica", "bold").setFontSize(14);
+  doc.text(`PLANO DE CORTE - ${plano.descripcion}`, 10, 12);
+  doc.setFont("helvetica", "normal").setFontSize(9);
   doc.text(
-    `Cliente: ${m.codcliente ?? "-"}   Modelo: ${m.modelo ?? "-"}   Cant: ${m.cantidad ?? 1}   ` +
-      `Vidrio: ${m.vidrio ?? "-"}   Colocacion: ${m.colocacion ?? "-"}`,
-    10, 18
+    `Presupuesto: ${pres}   Rev: ${m.revision ?? 0}   Cliente: ${m.codcliente || "-"}   Cant.: ${m.cantidad ?? 1}   Plano: ${codigo}`,
+    10, 18,
+  );
+  doc.text(`Modelo: ${m.modelo ?? "-"}`, 10, 23);
+  doc.text(
+    `Medidas de produccion: ancho ${fmt(dim.dimX)} x alto ${fmt(dim.dimY)}` +
+      (dim.prof ? ` x prof ${fmt(dim.prof)}` : "") +
+      " mm" +
+      (dim.unidadOrigen === "cm" ? "  (cargadas en cm, convertidas a mm)" : ""),
+    10, 28,
   );
 
-  // Área de dibujo (izquierda) — escala para que entre el rectángulo
-  const areaX = 25, areaY = 35, areaW = 170, areaH = 130;
-  const esc = Math.min(areaW / m.ancho_prod, areaH / m.alto_prod);
-  const w = m.ancho_prod * esc, h = m.alto_prod * esc;
-  const x0 = areaX + (areaW - w) / 2, y0 = areaY + (areaH - h) / 2;
-
-  doc.setLineWidth(0.6).rect(x0, y0, w, h);
-
-  // TODO modelo paramétrico: acá se dibujan paños/perforaciones evaluando
-  // las fórmulas del modelo con dimX = ancho_prod, dimY = alto_prod.
-  // Por ahora: guía central de paños si el modelo es de 2 hojas ("(/ dimX 2)").
-  doc.setLineDashPattern([2, 2], 0).setLineWidth(0.2);
-  doc.line(x0 + w / 2, y0, x0 + w / 2, y0 + h);
-  doc.setLineDashPattern([], 0);
-
-  // Cotas
-  doc.setFontSize(10).setLineWidth(0.3);
-  const cy = y0 + h + 8;
-  doc.line(x0, cy, x0 + w, cy);
-  doc.text(`${m.ancho_prod} mm`, x0 + w / 2, cy + 5, { align: "center" });
-  const cx = x0 - 8;
-  doc.line(cx, y0, cx, y0 + h);
-  doc.text(`${m.alto_prod} mm`, cx - 2, y0 + h / 2, { angle: 90, align: "center" });
-  if (m.prof_prod) {
-    doc.setFontSize(9).text(`Prof: ${m.prof_prod} mm`, x0 + w / 2, y0 - 4, { align: "center" });
+  /* --- Vista general (izquierda arriba) --- */
+  const fijo = piezas.find((p) => p.pieza === "FIJO");
+  const puerta = piezas.find((p) => p.pieza === "PUERTA");
+  // Recta 2F+2M: fijo-puerta-puerta-fijo. Esquina: cada lado es 1 fijo + 1 puerta (se repite en los 2 lados).
+  const secuencia =
+    plano.config === "RECTA" && plano.fijos >= 2 ? ["FIJO", "PUERTA", "PUERTA", "FIJO"] : ["FIJO", "PUERTA"];
+  const gx = 10, gy = 34, gw = 140, gh = 82;
+  const s1 = Math.min((gw - 16) / dim.dimX, (gh - 16) / dim.dimY);
+  const tw = dim.dimX * s1, th = dim.dimY * s1;
+  const ox = gx + 12 + (gw - 16 - tw) / 2, oy = gy + 2;
+  doc.setLineWidth(0.2).setDrawColor(150).rect(ox, oy, tw, th);
+  doc.setDrawColor(0).setLineWidth(0.4);
+  secuencia.forEach((tipo, i) => {
+    const pz = tipo === "FIJO" ? fijo : puerta;
+    if (!pz) return;
+    const pw = pz.ancho * s1, ph = pz.alto * s1;
+    const px = ox + (secuencia.length > 1 ? (i * (dim.dimX - pz.ancho) * s1) / (secuencia.length - 1) : 0);
+    const py = oy + th - ph;
+    doc.setFillColor(tipo === "FIJO" ? 232 : 205, tipo === "FIJO" ? 240 : 225, 250);
+    doc.rect(px, py, pw, ph, "FD");
+    doc.setFontSize(8).text(tipo === "FIJO" ? "Paño fijo" : "Puerta", px + pw / 2, py + ph / 2, { align: "center" });
+  });
+  doc.setLineWidth(0.2).setFontSize(8);
+  doc.line(ox, oy + th + 5, ox + tw, oy + th + 5);
+  doc.text(`Ancho total ${fmt(dim.dimX)}`, ox + tw / 2, oy + th + 9, { align: "center" });
+  doc.line(ox - 5, oy, ox - 5, oy + th);
+  doc.text(`Alto total ${fmt(dim.dimY)}`, ox - 7, oy + th / 2, { angle: 90, align: "center" });
+  if (plano.config === "ESQUINA") {
+    doc.setFontSize(7).text("Esquina: se repite en los 2 lados (ancho total medido de afuera a afuera)", gx, gy + gh - 1);
   }
 
-  // Herraje (derecha)
-  const hx = 205;
-  doc.setFont("courier", "bold").setFontSize(10).text("HERRAJE", hx, 38);
-  doc.setFont("courier", "normal").setFontSize(8);
-  let y = 45;
-  if (!herraje.length) doc.text("(sin herraje cargado)", hx, y);
-  herraje.forEach((hj) => {
-    const nombre = doc.splitTextToSize(String(hj.articulo), 60);
-    doc.text(nombre, hx, y);
-    doc.text(`Valor: ${hj.valor ?? "-"}`, hx, y + nombre.length * 3.5);
-    y += nombre.length * 3.5 + 6;
-    if (y > H - 15) { doc.addPage(); y = 20; }
+  /* --- Piezas de corte con agujeros (derecha) --- */
+  const ax = 158, aTop = 40, aW = 130, aH = plano.vidrio === "8MM" ? 150 : 140;
+  const aDibujar = piezas.filter((p) => p.pieza === "FIJO" || p.pieza === "PUERTA");
+  const maxAlto = Math.max(...aDibujar.map((p) => p.alto));
+  const gap = 12;
+  const sumAncho = aDibujar.reduce((a, p) => a + p.ancho, 0);
+  const s2 = Math.min(aH / maxAlto, (aW - gap * (aDibujar.length - 1)) / sumAncho);
+  const baseY = aTop + maxAlto * s2;
+  doc.setFont("helvetica", "bold").setFontSize(10).text("PIEZAS DE CORTE", ax, 33);
+  let cx = ax;
+  const posPieza = {};
+  aDibujar.forEach((p) => {
+    const pw = p.ancho * s2, ph = p.alto * s2, py = baseY - ph;
+    posPieza[p.pieza] = { x: cx, y: py, w: pw, h: ph };
+    doc.setFillColor(p.pieza === "FIJO" ? 232 : 205, p.pieza === "FIJO" ? 240 : 225, 250);
+    doc.setLineWidth(0.4).rect(cx, py, pw, ph, "FD");
+    doc.setFont("helvetica", "bold").setFontSize(8);
+    doc.text(`${p.nombre} x${p.cant}`, cx + pw / 2, py - 2, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.text(`${fmt(p.ancho)} x ${fmt(p.alto)}`, cx + pw / 2, baseY + 4, { align: "center" });
+    cx += pw + gap;
   });
 
-  doc.setFontSize(7).text(
-    `Medidas presupuesto: ${m.ancho} x ${m.alto}   |   Generado ${new Date().toLocaleDateString("es-AR")}`,
-    10, H - 6
+  // Agujeros (numerados) sobre cada pieza
+  perforaciones.forEach((pf, i) => {
+    const pos = posPieza[pf.pieza];
+    if (!pos) return;
+    const cxh = pos.x + pf.x * s2, cyh = pos.y + pos.h - pf.y * s2;
+    doc.setLineWidth(0.3).setDrawColor(200, 0, 0).setFillColor(255, 255, 255);
+    doc.circle(cxh, cyh, Math.max((pf.diametro / 2) * s2, 1), "FD");
+    doc.setDrawColor(0).setTextColor(200, 0, 0).setFontSize(7);
+    doc.text(String(i + 1), cxh + 2.2, cyh - 1.5);
+    doc.setTextColor(0);
+  });
+
+  // Perfil (laminado): tira inferior con sus agujeros
+  const perfil = piezas.find((p) => p.pieza === "PERFIL");
+  if (perfil) {
+    const base = posPieza.PUERTA || { x: ax };
+    const pw = perfil.ancho * s2, ph = Math.max(perfil.alto * s2, 3);
+    const py = baseY + 12;
+    doc.setLineWidth(0.4).setFillColor(240, 240, 240).rect(base.x, py, pw, ph, "FD");
+    doc.setFontSize(7).text(`Perfil ${fmt(perfil.ancho)} x ${fmt(perfil.alto)}`, base.x, py + ph + 4);
+    posPieza.PERFIL = { x: base.x, y: py, w: pw, h: ph };
+    perforaciones.forEach((pf, i) => {
+      if (pf.pieza !== "PERFIL") return;
+      const cxh = base.x + pf.x * s2, cyh = py + ph / 2;
+      doc.setDrawColor(200, 0, 0).setFillColor(255, 255, 255).circle(cxh, cyh, 0.9, "FD");
+      doc.setDrawColor(0).setTextColor(200, 0, 0).text(String(i + 1), cxh + 1.5, cyh - 1.5);
+      doc.setTextColor(0);
+    });
+  }
+
+  /* --- Listas (izquierda abajo) --- */
+  let y = 124;
+  const linea = (txt, bold = false, size = 8) => {
+    if (y > 200) { doc.addPage(); y = 15; }
+    doc.setFont("helvetica", bold ? "bold" : "normal").setFontSize(size);
+    const partes = doc.splitTextToSize(txt, 142);
+    doc.text(partes, 10, y);
+    y += partes.length * (size * 0.42) + 1.2;
+  };
+
+  linea("LISTA DE CORTE", true, 10);
+  piezas.forEach((p) => linea(`${p.nombre}: ${p.cant} u.  -  ${fmt(p.ancho)} x ${fmt(p.alto)} mm`));
+  y += 2;
+  linea("PERFORACIONES (medidas desde la esquina inferior izquierda)", true, 10);
+  perforaciones.forEach((pf, i) =>
+    linea(
+      `${i + 1}. ${pf.nombre} [${pf.pieza}]  Ø${fmt(pf.diametro)}  x=${fmt(pf.x)}  y=${fmt(pf.y)}` +
+        (pf.pieza !== "PERFIL" ? `  (${fmt(pf.dTope)} del tope, ${fmt(pf.dDer)} del lateral der.)` : ""),
+    ),
+  );
+  y += 2;
+  linea("HERRAJE", true, 10);
+  if (!herraje.length) linea("(sin herraje cargado)");
+  herraje.forEach((h) => linea(`${h.codartprov ? `${h.codartprov} - ` : ""}${h.articulo}`));
+  if (plano.nota) {
+    y += 2;
+    linea("NOTAS", true, 10);
+    linea(plano.nota, false, 7.5);
+  }
+
+  doc.setFont("helvetica", "normal").setFontSize(7);
+  doc.text(
+    `Medidas presupuesto: ${m.ancho ?? "-"} x ${m.alto ?? "-"}   |   Generado ${new Date().toLocaleDateString("es-AR")}`,
+    10, 206,
   );
 
-  doc.save(`PLANO-P${m.numeropres}-M${m.presm}-REV${m.revision ?? 0}.pdf`);
+  doc.save(`PLANO-${m.presm || m.numeropres || m.id}-REV${m.revision ?? 0}.pdf`);
 }
 
 /* ---------- Pantalla ---------- */
@@ -79,6 +164,7 @@ export default function PlanoMamparas({ authFetch, API }) {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("plano");
+  const [unidad, setUnidad] = useState("auto"); // unidad en que se cargan las medidas
   const [requiere, setRequiere] = useState({}); // modelo -> lleva plano (0/1)
 
   const cargarModelos = async () => {
@@ -120,12 +206,17 @@ export default function PlanoMamparas({ authFetch, API }) {
       const r = await authFetch(`${API}/mamparas-plano/${sel.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, unidad }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Error al generar plano");
+      if (!data.plano) {
+        setMsg(data.aviso || "No se encontró un plano para este modelo");
+        buscar();
+        return;
+      }
       dibujarPlano(data);
-      setMsg("Plano generado");
+      setMsg(`Plano generado (${data.codigo}, medidas en ${data.dim.unidadOrigen})`);
       buscar(); // refresca medidas guardadas
     } catch (e) {
       setMsg(e.message);
@@ -203,6 +294,14 @@ export default function PlanoMamparas({ authFetch, API }) {
               />
             </label>
           ))}
+          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+            Medidas en
+            <select value={unidad} onChange={(e) => setUnidad(e.target.value)}>
+              <option value="auto">Automático</option>
+              <option value="cm">Centímetros</option>
+              <option value="mm">Milímetros</option>
+            </select>
+          </label>
           <button onClick={hacerPlano} disabled={loading || !requiere[sel.modelo]}>
             {loading ? "Generando..." : "Hacer plano"}
           </button>
