@@ -33,6 +33,7 @@ import Anviz from "./screens/Anviz";
 import FichadasAnviz from "./screens/FichadasAnviz";
 import FlujoFondos from "./screens/FlujoFondos";
 import Herramientas from "./screens/Herramientas";
+import PlanoMamparas from "./screens/PlanoMamparas";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState, useRef } from "react";
@@ -47,6 +48,7 @@ const SCREENS = {
   "presupuesto-mamparas": { label: "PRESUPUESTO MAMPARAS", icon: "🪟" },
   "ver-tablas": { label: "VER TABLAS", icon: "🗃️" },
   "presupuestos-tabla": { label: "PRESUPUESTOS MAMPARAS", icon: "📋" },
+  "plano-mamparas": { label: "PLANO MAMPARAS", icon: "📐" },
   "presupuestos-vanitory-tabla": { label: "PRESUPUESTOS VANITORY", icon: "🛁" },
   "presupuesto-amoblamiento": { label: "PRESUPUESTO AMOBLAMIENTO", icon: "🪑" },
   "presupuesto-nuevo": { label: "PRESUPUESTO NUEVO", icon: "📝" },
@@ -100,6 +102,7 @@ const PANTALLAS_MENU = [
   { id: "presupuesto-mamparas", label: "PRESUPUESTO MAMPARAS", icon: "🪟", color: "#4895ef", ubicacionDefault: "lateral" },
   { id: "presupuesto-muebles", label: "PRESUPUESTO MUEBLES", icon: "🪵", color: "#a0785a", ubicacionDefault: "lateral" },
   { id: "presupuestos-tabla", label: "PRESUPUESTOS MAMPARAS", icon: "📋", color: "#4895ef", ubicacionDefault: "lateral" },
+  { id: "plano-mamparas", label: "PLANO MAMPARAS", icon: "📐", color: "#4895ef", ubicacionDefault: "lateral" },
   { id: "presupuestos-vanitory-tabla", label: "PRESUPUESTOS VANITORY", icon: "🛁", color: "#5390d9", ubicacionDefault: "lateral" },
   { id: "presupuesto-amoblamiento", label: "PRESUPUESTO AMOBLAMIENTO", icon: "🪑", color: "#a0785a", ubicacionDefault: "lateral" },
   { id: "lista-margenes", label: "LISTA DE MÁRGENES", icon: "📊", color: "#7209b7", ubicacionDefault: "lateral" },
@@ -1202,6 +1205,9 @@ function App() {
                 onSelectItem={(item) => console.log("Mampara:", item)}
                 onGuardado={fetchPresupuestosMamparas}
               />
+            )}
+            {screen === "plano-mamparas" && (
+              <PlanoMamparas authFetch={authFetch} API={API} />
             )}
             {screen === "presupuestos-tabla" && (
               <PresupuestosMamparasTabla
