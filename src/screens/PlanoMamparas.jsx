@@ -10,6 +10,18 @@ const EMPTY = { ancho_prod: "", alto_prod: "", prof_prod: "" };
 /* ---------- Dibujo del plano ---------- */
 const fmt = (n) => (Number.isInteger(n) ? String(n) : Number(n).toFixed(1));
 
+// Cotas de un agujero: lado de referencia horizontal (el más cercano) y vertical (tope si está a <=100, si no piso)
+function cotasDe(pf) {
+  const izq = pf.x <= pf.dDer;
+  const desdeTope = pf.dTope != null && pf.dTope <= 100;
+  return {
+    izq,
+    dx: izq ? pf.x : pf.dDer,
+    desdeTope,
+    dy: desdeTope ? pf.dTope : pf.y,
+  };
+}
+
 function dibujarPlano(d) {
   const { mampara: m, herraje, plano, codigo, dim, piezas, perforaciones } = d;
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -64,10 +76,10 @@ function dibujarPlano(d) {
   }
 
   /* --- Piezas de corte con agujeros (derecha) --- */
-  const ax = 158, aTop = 40, aW = 130, aH = plano.vidrio === "8MM" ? 150 : 140;
+  const ax = 160, aTop = 50, aW = 122, aH = plano.vidrio === "8MM" ? 138 : 128;
   const aDibujar = piezas.filter((p) => p.pieza === "FIJO" || p.pieza === "PUERTA");
   const maxAlto = Math.max(...aDibujar.map((p) => p.alto));
-  const gap = 12;
+  const gap = 16;
   const sumAncho = aDibujar.reduce((a, p) => a + p.ancho, 0);
   const s2 = Math.min(aH / maxAlto, (aW - gap * (aDibujar.length - 1)) / sumAncho);
   const baseY = aTop + maxAlto * s2;
@@ -80,22 +92,73 @@ function dibujarPlano(d) {
     doc.setFillColor(p.pieza === "FIJO" ? 232 : 205, p.pieza === "FIJO" ? 240 : 225, 250);
     doc.setLineWidth(0.4).rect(cx, py, pw, ph, "FD");
     doc.setFont("helvetica", "bold").setFontSize(8);
-    doc.text(`${p.nombre} x${p.cant}`, cx + pw / 2, py - 2, { align: "center" });
+    doc.text(`${p.nombre} x${p.cant}`, cx + pw / 2, py - 11, { align: "center" });
     doc.setFont("helvetica", "normal");
     doc.text(`${fmt(p.ancho)} x ${fmt(p.alto)}`, cx + pw / 2, baseY + 4, { align: "center" });
     cx += pw + gap;
   });
 
-  // Agujeros (numerados) sobre cada pieza
+  // Agujeros con cotas de posición (lateral y tope/piso) y diámetro
+  const cota = (x1, y1, x2, y2) => {
+    // línea de cota con marcas en los extremos
+    doc.setDrawColor(0, 90, 160).setLineWidth(0.2).line(x1, y1, x2, y2);
+    const horiz = Math.abs(y2 - y1) < 0.01;
+    if (horiz) {
+      doc.line(x1, y1 - 0.9, x1, y1 + 0.9);
+      doc.line(x2, y2 - 0.9, x2, y2 + 0.9);
+    } else {
+      doc.line(x1 - 0.9, y1, x1 + 0.9, y1);
+      doc.line(x2 - 0.9, y2, x2 + 0.9, y2);
+    }
+  };
+  const ext = (x1, y1, x2, y2) => {
+    doc.setDrawColor(130).setLineWidth(0.1).setLineDashPattern([0.8, 0.8], 0).line(x1, y1, x2, y2);
+    doc.setLineDashPattern([], 0);
+  };
+
   perforaciones.forEach((pf, i) => {
     const pos = posPieza[pf.pieza];
-    if (!pos) return;
-    const cxh = pos.x + pf.x * s2, cyh = pos.y + pos.h - pf.y * s2;
-    doc.setLineWidth(0.3).setDrawColor(200, 0, 0).setFillColor(255, 255, 255);
-    doc.circle(cxh, cyh, Math.max((pf.diametro / 2) * s2, 1), "FD");
-    doc.setDrawColor(0).setTextColor(200, 0, 0).setFontSize(7);
-    doc.text(String(i + 1), cxh + 2.2, cyh - 1.5);
-    doc.setTextColor(0);
+    if (!pos || pf.pieza === "PERFIL") return;
+    const hx = pos.x + pf.x * s2;
+    const hy = pos.y + pos.h - pf.y * s2;
+    const r = Math.max((pf.diametro / 2) * s2, 1);
+    const c = cotasDe(pf);
+
+    // agujero
+    doc.setLineWidth(0.3).setDrawColor(200, 0, 0).setFillColor(255, 255, 255).circle(hx, hy, r, "FD");
+    doc.setLineWidth(0.15).line(hx - r - 1, hy, hx + r + 1, hy).line(hx, hy - r - 1, hx, hy + r + 1); // cruz de centro
+
+    doc.setFont("helvetica", "normal").setFontSize(6.5).setTextColor(0, 90, 160);
+
+    // cota horizontal: del lateral de referencia al centro del agujero
+    const bordeX = c.izq ? pos.x : pos.x + pos.w;
+    let yl;
+    if (c.desdeTope) {
+      yl = pos.y - 5; // arriba de la pieza
+      ext(bordeX, pos.y, bordeX, yl - 1);
+      ext(hx, hy, hx, yl - 1);
+    } else {
+      yl = hy - r - 3.5; // sobre el agujero, dentro de la pieza
+      ext(hx, hy - r, hx, yl - 1);
+    }
+    cota(bordeX, yl, hx, yl);
+    doc.text(fmt(c.dx), (bordeX + hx) / 2, yl - 1.2, { align: "center" });
+
+    // cota vertical: del tope/piso de referencia al centro del agujero (por fuera de la pieza)
+    const bordeY = c.desdeTope ? pos.y : pos.y + pos.h;
+    const xl = c.izq ? pos.x - 5 : pos.x + pos.w + 5;
+    ext(c.izq ? pos.x : pos.x + pos.w, bordeY, xl + (c.izq ? -1 : 1), bordeY);
+    ext(hx, hy, xl + (c.izq ? -1 : 1), hy);
+    cota(xl, bordeY, xl, hy);
+    const ym = (bordeY + hy) / 2 + 0.8;
+    doc.text(fmt(c.dy), c.izq ? xl - 1.5 : xl + 1.5, ym, { align: c.izq ? "right" : "left" });
+
+    // diámetro
+    doc.setTextColor(200, 0, 0).setFont("helvetica", "bold");
+    doc.text(`Ø${fmt(pf.diametro)}`, hx, hy + r + 3.2, { align: "center" });
+    doc.setFont("helvetica", "normal").setTextColor(0).setDrawColor(0);
+    // número de referencia (coincide con la lista)
+    doc.setFontSize(6).setTextColor(200, 0, 0).text(String(i + 1), hx + r + 0.8, hy - r - 0.3).setTextColor(0);
   });
 
   // Perfil (laminado): tira inferior con sus agujeros
@@ -105,14 +168,23 @@ function dibujarPlano(d) {
     const pw = perfil.ancho * s2, ph = Math.max(perfil.alto * s2, 3);
     const py = baseY + 12;
     doc.setLineWidth(0.4).setFillColor(240, 240, 240).rect(base.x, py, pw, ph, "FD");
-    doc.setFontSize(7).text(`Perfil ${fmt(perfil.ancho)} x ${fmt(perfil.alto)}`, base.x, py + ph + 4);
+    doc.setFontSize(7).text(`Perfil ${fmt(perfil.ancho)} x ${fmt(perfil.alto)}`, base.x, py + ph + 8);
     posPieza.PERFIL = { x: base.x, y: py, w: pw, h: ph };
     perforaciones.forEach((pf, i) => {
       if (pf.pieza !== "PERFIL") return;
       const cxh = base.x + pf.x * s2, cyh = py + ph / 2;
-      doc.setDrawColor(200, 0, 0).setFillColor(255, 255, 255).circle(cxh, cyh, 0.9, "FD");
-      doc.setDrawColor(0).setTextColor(200, 0, 0).text(String(i + 1), cxh + 1.5, cyh - 1.5);
-      doc.setTextColor(0);
+      doc.setDrawColor(200, 0, 0).setLineWidth(0.3).setFillColor(255, 255, 255).circle(cxh, cyh, 0.9, "FD");
+      const izq = pf.x <= pf.dDer;
+      const bordeX = izq ? base.x : base.x + pw;
+      const yl = py - 3;
+      ext(bordeX, py, bordeX, yl - 1);
+      ext(cxh, cyh, cxh, yl - 1);
+      cota(bordeX, yl, cxh, yl);
+      doc.setFont("helvetica", "normal").setFontSize(6.5).setTextColor(0, 90, 160);
+      doc.text(fmt(izq ? pf.x : pf.dDer), (bordeX + cxh) / 2, yl - 1.2, { align: "center" });
+      doc.setTextColor(200, 0, 0).setFont("helvetica", "bold");
+      doc.text(`Ø${fmt(pf.diametro)}`, cxh, py + ph + 3.5, { align: "center" });
+      doc.setTextColor(0).setDrawColor(0).setFont("helvetica", "normal");
     });
   }
 
@@ -129,13 +201,14 @@ function dibujarPlano(d) {
   linea("LISTA DE CORTE", true, 10);
   piezas.forEach((p) => linea(`${p.nombre}: ${p.cant} u.  -  ${fmt(p.ancho)} x ${fmt(p.alto)} mm`));
   y += 2;
-  linea("PERFORACIONES (medidas desde la esquina inferior izquierda)", true, 10);
-  perforaciones.forEach((pf, i) =>
+  linea("PERFORACIONES (cotas)", true, 10);
+  perforaciones.forEach((pf, i) => {
+    const c = cotasDe(pf);
     linea(
-      `${i + 1}. ${pf.nombre} [${pf.pieza}]  Ø${fmt(pf.diametro)}  x=${fmt(pf.x)}  y=${fmt(pf.y)}` +
-        (pf.pieza !== "PERFIL" ? `  (${fmt(pf.dTope)} del tope, ${fmt(pf.dDer)} del lateral der.)` : ""),
-    ),
-  );
+      `${i + 1}. ${pf.nombre} [${pf.pieza}]  Ø${fmt(pf.diametro)}  -  a ${fmt(c.dx)} del lateral ${c.izq ? "izq." : "der."}` +
+        (pf.pieza !== "PERFIL" ? `  -  a ${fmt(c.dy)} del ${c.desdeTope ? "tope" : "piso"}` : ""),
+    );
+  });
   y += 2;
   linea("HERRAJE", true, 10);
   if (!herraje.length) linea("(sin herraje cargado)");
