@@ -77,6 +77,10 @@ const SCREENS = {
   chat: { label: "CHAT", icon: "💬" },
 };
 
+// Pantallas que se muestran en AMBOS menús (principal y lateral), sin importar
+// la ubicación configurada en el Gestor de Menú. Para sacarla de uno, quitarla de acá.
+const EN_AMBOS_MENUS = new Set(["plano-mamparas"]);
+
 // Pantallas administrables desde el Gestor de Menú (VerTablas → Permisos).
 // `ubicacionDefault` es dónde aparece la pantalla si el rol todavía no tiene
 // una configuración guardada en `orden_panel`. `id` se usa también como
@@ -352,7 +356,7 @@ function App() {
       (p) => ({ modulo: p.id, ubicacion: p.ubicacionDefault }),
     );
     return [...guardado, ...faltantes]
-      .filter((item) => item.ubicacion === ubicacion)
+      .filter((item) => item.ubicacion === ubicacion || EN_AMBOS_MENUS.has(item.modulo))
       .map((item) => PANTALLAS_MENU.find((p) => p.id === item.modulo))
       .filter(Boolean)
       .filter((p) => (SOLO_ADMIN.has(p.id) ? rol === "admin" : puedo(p.id, "ver")));
