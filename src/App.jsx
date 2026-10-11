@@ -1207,7 +1207,7 @@ function App() {
               />
             )}
             {screen === "plano-mamparas" && (
-              <PlanoMamparas authFetch={authFetch} API={API} />
+              <PlanoMamparas authFetch={authFetch} API={API} onBack={() => setScreen(null)} />
             )}
             {screen === "presupuestos-tabla" && (
               <PresupuestosMamparasTabla
