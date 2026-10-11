@@ -1,7 +1,7 @@
 // PlanoMamparas.jsx
 // Busca presupuestos de mamparas, permite cargar medidas de producción
 // y genera el plano (PDF) con el botón "Hacer plano".
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { jsPDF } from "jspdf";
 import ModelosPlano from "./ModelosPlano";
 
@@ -283,6 +283,8 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
   const [manijaBusca, setManijaBusca] = useState("");
   const [manijaTodos, setManijaTodos] = useState(false);
   const [manijaMsg, setManijaMsg] = useState("");
+  const [manijaPerfs, setManijaPerfs] = useState([]); // agujeros editables del manijón elegido (mm)
+  const [manijaPerfsMsg, setManijaPerfsMsg] = useState("");
   const [requiere, setRequiere] = useState({}); // modelo -> lleva plano (0/1)
 
   const cargarModelos = async () => {
@@ -329,6 +331,56 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     }
   };
 
+  // Al elegir un manijón se cargan sus agujeros guardados como valores iniciales (editables)
+  const elegirManija = async (codartint) => {
+    setManijaSel(codartint);
+    setManijaPerfs([]);
+    setManijaPerfsMsg("");
+    if (!codartint) return;
+    const mj = manijones.find((x) => x.codartint === codartint);
+    if (!mj?.codartprov) {
+      setManijaPerfsMsg("Este manijón no tiene código de proveedor: cargá los agujeros a mano.");
+      return;
+    }
+    try {
+      const r = await authFetch(`${API}/mamparas-manijon-perf/${encodeURIComponent(mj.codartprov)}`);
+      if (!r.ok) throw new Error("No se pudieron cargar los agujeros del manijón");
+      const rows = await r.json();
+      setManijaPerfs(
+        rows.map((p) => ({
+          diametro: String(Number(p.diametro)),
+          dx_borde: String(Number(p.dx_borde)),
+          lado: p.lado === "DER" ? "DER" : "IZQ",
+          y_piso: String(Number(p.y_piso)),
+        })),
+      );
+      if (!rows.length) setManijaPerfsMsg("Este manijón no tiene agujeros cargados: agregalos a mano.");
+    } catch (e) {
+      setManijaPerfsMsg(e.message);
+    }
+  };
+
+  const editarPerf = (i, campo, valor) =>
+    setManijaPerfs((ps) => ps.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)));
+
+  const num = (v) => parseFloat(String(v).replace(",", "."));
+
+  // Valida y manda el plano con los agujeros tal como quedaron en pantalla
+  const generarConManija = () => {
+    const perfs = manijaPerfs.map((p) => ({
+      diametro: num(p.diametro),
+      dx_borde: num(p.dx_borde),
+      lado: p.lado,
+      y_piso: num(p.y_piso),
+    }));
+    if (manijaSel && perfs.some((p) => !(p.diametro > 0) || !(p.dx_borde >= 0) || !(p.y_piso >= 0))) {
+      setManijaPerfsMsg("Revisá los agujeros: diámetro mayor a 0 y medidas válidas");
+      return;
+    }
+    setPidiendoManija(false);
+    hacerPlano(manijaSel, perfs);
+  };
+
   const abrirConsultaManija = () => {
     if (!sel) return;
     if (!(parseFloat(form.ancho_prod) > 0) || !(parseFloat(form.alto_prod) > 0)) {
@@ -336,20 +388,27 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
       return;
     }
     setManijaSel("");
+    setManijaPerfs([]);
+    setManijaPerfsMsg("");
     setManijaBusca("");
     setManijaTodos(false);
     cargarManijones(false);
     setPidiendoManija(true);
   };
 
-  const hacerPlano = async (manija_codartint = "") => {
+  const hacerPlano = async (manija_codartint = "", manija_perfs = null) => {
     if (!sel) return;
     setLoading(true); setMsg("");
     try {
       const r = await authFetch(`${API}/mamparas-plano/${sel.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, unidad, manija_codartint: manija_codartint || null }),
+        body: JSON.stringify({
+          ...form,
+          unidad,
+          manija_codartint: manija_codartint || null,
+          manija_perfs: manija_codartint && manija_perfs ? manija_perfs : undefined,
+        }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Error al generar plano");
@@ -474,7 +533,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", color: "#222", borderRadius: 8, padding: 20, width: 460, maxWidth: "92vw", boxShadow: "0 4px 18px rgba(0,0,0,.3)" }}
+            style={{ background: "#fff", color: "#222", borderRadius: 8, padding: 20, width: 520, maxWidth: "92vw", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 4px 18px rgba(0,0,0,.3)" }}
           >
             <h3 style={{ marginTop: 0 }}>¿Qué manijón querés aplicar?</h3>
             <p style={{ margin: "0 0 10px", fontSize: 13, color: "#555" }}>
@@ -501,7 +560,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
             <select
               size={8}
               value={manijaSel}
-              onChange={(e) => setManijaSel(e.target.value)}
+              onChange={(e) => elegirManija(e.target.value)}
               style={{ width: "100%", marginBottom: 6 }}
             >
               <option value="">— Sin manijón —</option>
@@ -522,13 +581,52 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
                 No hay artículos para mostrar. Probá tildando "Mostrar todos los herrajes".
               </p>
             )}
+            {manijaSel && (
+              <div style={{ margin: "8px 0 4px", fontSize: 12 }}>
+                <b>Agujeros del manijón</b> (mm, sobre la puerta){" "}
+                <span style={{ color: "#777" }}>— editables, valen solo para este plano</span>
+                {manijaPerfsMsg && <p style={{ color: "#b71c1c", margin: "4px 0" }}>{manijaPerfsMsg}</p>}
+                {manijaPerfs.length > 0 && (
+                  <div style={{ display: "grid", gridTemplateColumns: "60px 70px 70px 80px 24px", gap: 4, marginTop: 6, alignItems: "center", color: "#555" }}>
+                    <span>Ø</span>
+                    <span>Al borde</span>
+                    <span>Del lado</span>
+                    <span>Desde abajo</span>
+                    <span />
+                    {manijaPerfs.map((p, i) => (
+                      <Fragment key={i}>
+                        <input value={p.diametro} onChange={(e) => editarPerf(i, "diametro", e.target.value)} style={{ width: "100%", boxSizing: "border-box" }} />
+                        <input value={p.dx_borde} onChange={(e) => editarPerf(i, "dx_borde", e.target.value)} style={{ width: "100%", boxSizing: "border-box" }} />
+                        <select value={p.lado} onChange={(e) => editarPerf(i, "lado", e.target.value)}>
+                          <option value="IZQ">Izq.</option>
+                          <option value="DER">Der.</option>
+                        </select>
+                        <input value={p.y_piso} onChange={(e) => editarPerf(i, "y_piso", e.target.value)} style={{ width: "100%", boxSizing: "border-box" }} />
+                        <button
+                          title="Quitar agujero"
+                          onClick={() => setManijaPerfs((ps) => ps.filter((_, j) => j !== i))}
+                          style={{ padding: 0 }}
+                        >
+                          ×
+                        </button>
+                      </Fragment>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() =>
+                    setManijaPerfs((ps) => [...ps, { diametro: "12", dx_borde: "60", lado: "IZQ", y_piso: "1000" }])
+                  }
+                  style={{ marginTop: 6 }}
+                >
+                  + Agregar agujero
+                </button>
+              </div>
+            )}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
               <button onClick={() => setPidiendoManija(false)}>Cancelar</button>
               <button
-                onClick={() => {
-                  setPidiendoManija(false);
-                  hacerPlano(manijaSel);
-                }}
+                onClick={generarConManija}
                 style={{ background: "#0a3a5c", color: "#fff", border: "none", borderRadius: 4, padding: "6px 16px", cursor: "pointer" }}
               >
                 Generar plano
