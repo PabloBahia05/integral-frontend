@@ -229,7 +229,7 @@ function dibujarPlano(d) {
 }
 
 /* ---------- Pantalla ---------- */
-export default function PlanoMamparas({ authFetch, API }) {
+export default function PlanoMamparas({ authFetch, API, onBack }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState([]);
   const [sel, setSel] = useState(null);
@@ -308,6 +308,14 @@ export default function PlanoMamparas({ authFetch, API }) {
   if (tab === "modelos") {
     return (
       <div style={{ padding: 16 }}>
+        {onBack && (
+          <button
+            onClick={onBack}
+            style={{ marginBottom: 10, padding: "6px 16px", background: "#0a3a5c", color: "#fff", border: "none", borderRadius: 4, fontFamily: "'Space Mono', monospace", cursor: "pointer", fontSize: 13 }}
+          >
+            ← Volver
+          </button>
+        )}
         <h2>Planos de mamparas</h2>
         {tabs}
         <ModelosPlano authFetch={authFetch} API={API} />
@@ -317,6 +325,14 @@ export default function PlanoMamparas({ authFetch, API }) {
 
   return (
     <div style={{ padding: 16 }}>
+      {onBack && (
+        <button
+          onClick={onBack}
+          style={{ marginBottom: 10, padding: "6px 16px", background: "#0a3a5c", color: "#fff", border: "none", borderRadius: 4, fontFamily: "'Space Mono', monospace", cursor: "pointer", fontSize: 13 }}
+        >
+          ← Volver
+        </button>
+      )}
       <h2>Planos de mamparas</h2>
       {tabs}
 
@@ -334,7 +350,7 @@ export default function PlanoMamparas({ authFetch, API }) {
         <thead>
           <tr>
             {["Pres.", "Mamp.", "Rev.", "Cliente", "Modelo", "Ancho", "Alto", "Ancho prod", "Alto prod", "Prof prod", "Lleva plano"].map((h) => (
-              <th key={h} style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>{h}</th>
+              <th key={h} style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "4px 10px", whiteSpace: "nowrap" }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -345,10 +361,10 @@ export default function PlanoMamparas({ authFetch, API }) {
               onClick={() => elegir(r)}
               style={{ cursor: "pointer", background: sel?.id === r.id ? "#e3f2fd" : "transparent" }}
             >
-              <td>{r.numeropres}</td><td>{r.presm}</td><td>{r.revision}</td>
-              <td>{r.codcliente}</td><td>{r.modelo}</td>
-              <td>{r.ancho}</td><td>{r.alto}</td>
-              <td>{r.ancho_prod ?? "-"}</td><td>{r.alto_prod ?? "-"}</td><td>{r.prof_prod ?? "-"}</td><td>{requiere[r.modelo] ? "Sí" : "No"}</td>
+              <td style={{ padding: "4px 10px" }}>{r.numeropres}</td><td style={{ padding: "4px 10px" }}>{r.presm}</td><td style={{ padding: "4px 10px" }}>{r.revision}</td>
+              <td style={{ padding: "4px 10px" }}>{r.codcliente}</td><td style={{ padding: "4px 10px" }}>{r.modelo}</td>
+              <td style={{ padding: "4px 10px" }}>{r.ancho}</td><td style={{ padding: "4px 10px" }}>{r.alto}</td>
+              <td style={{ padding: "4px 10px" }}>{r.ancho_prod ?? "-"}</td><td style={{ padding: "4px 10px" }}>{r.alto_prod ?? "-"}</td><td style={{ padding: "4px 10px" }}>{r.prof_prod ?? "-"}</td><td style={{ padding: "4px 10px" }}>{requiere[r.modelo] ? "Sí" : "No"}</td>
             </tr>
           ))}
         </tbody>
