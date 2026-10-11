@@ -10,10 +10,10 @@ const EMPTY = { ancho_prod: "", alto_prod: "", prof_prod: "" };
 /* ---------- Dibujo del plano ---------- */
 const fmt = (n) => (Number.isInteger(n) ? String(n) : Number(n).toFixed(1));
 
-// Cotas de un agujero: lado de referencia horizontal (el más cercano) y vertical (tope si está a <=100, si no piso)
+// Cotas de un agujero: lado de referencia horizontal (el más cercano) y vertical (tope si está a <=200, si no piso)
 function cotasDe(pf) {
   const izq = pf.x <= pf.dDer;
-  const desdeTope = pf.dTope != null && pf.dTope <= 100;
+  const desdeTope = pf.dTope != null && pf.dTope <= 200;
   return {
     izq,
     dx: izq ? pf.x : pf.dDer,
@@ -35,7 +35,12 @@ function dibujarPlano(d) {
     `Presupuesto: ${pres}   Rev: ${m.revision ?? 0}   Cliente: ${m.codcliente || "-"}   Cant.: ${m.cantidad ?? 1}   Plano: ${codigo}`,
     10, 18,
   );
-  doc.text(`Modelo: ${m.modelo ?? "-"}`, 10, 23);
+  doc.text(
+    `Modelo: ${m.modelo ?? "-"}   |   Manijon: ${
+      d.manija ? `${d.manija.codartprov ? `${d.manija.codartprov} - ` : ""}${d.manija.articulo}` : "sin manijon"
+    }`,
+    10, 23,
+  );
   doc.text(
     `Medidas de produccion: ancho ${fmt(dim.dimX)} x alto ${fmt(dim.dimY)}` +
       (dim.prof ? ` x prof ${fmt(dim.prof)}` : "") +
@@ -50,13 +55,28 @@ function dibujarPlano(d) {
   // Recta 2F+2M: fijo-puerta-puerta-fijo. Esquina: cada lado es 1 fijo + 1 puerta (se repite en los 2 lados).
   const secuencia =
     plano.config === "RECTA" && plano.fijos >= 2 ? ["FIJO", "PUERTA", "PUERTA", "FIJO"] : ["FIJO", "PUERTA"];
+  const unaPieza = !fijo && !puerta;
+  const panos = piezas.filter((p) => p.pieza !== "PERFIL");
   const gx = 10, gy = 34, gw = 140, gh = 82;
-  const s1 = Math.min((gw - 16) / dim.dimX, (gh - 16) / dim.dimY);
+  const Wm = unaPieza ? Math.max(dim.dimX, ...panos.map((p) => p.ancho)) : dim.dimX;
+  const Hm = unaPieza ? Math.max(dim.dimY, ...panos.map((p) => p.alto)) : dim.dimY;
+  const s1 = Math.min((gw - 16) / Wm, (gh - 16) / Hm);
   const tw = dim.dimX * s1, th = dim.dimY * s1;
-  const ox = gx + 12 + (gw - 16 - tw) / 2, oy = gy + 2;
+  const ox = gx + 12 + (gw - 16 - tw) / 2, oy = gy + 2 + (unaPieza ? (Hm - dim.dimY) * s1 : 0);
   doc.setLineWidth(0.2).setDrawColor(150).rect(ox, oy, tw, th);
   doc.setDrawColor(0).setLineWidth(0.4);
-  secuencia.forEach((tipo, i) => {
+  if (unaPieza) {
+    // Vidrio único: se dibuja centrado sobre el vano, apoyado abajo (sobresale arriba y a los lados)
+    panos.forEach((pz) => {
+      const pw = pz.ancho * s1, ph = pz.alto * s1;
+      const px = ox + (tw - pw) / 2, py = oy + th - ph;
+      doc.setFillColor(205, 225, 250).setLineWidth(0.4).rect(px, py, pw, ph, "FD");
+      doc.setFontSize(8).text(`${pz.nombre} ${fmt(pz.ancho)} x ${fmt(pz.alto)}`, px + pw / 2, py + ph / 2, { align: "center" });
+    });
+    doc.setLineWidth(0.2).setDrawColor(150).setLineDashPattern([1.2, 1.2], 0).rect(ox, oy, tw, th);
+    doc.setLineDashPattern([], 0).setDrawColor(0);
+  }
+  (unaPieza ? [] : secuencia).forEach((tipo, i) => {
     const pz = tipo === "FIJO" ? fijo : puerta;
     if (!pz) return;
     const pw = pz.ancho * s1, ph = pz.alto * s1;
@@ -68,16 +88,16 @@ function dibujarPlano(d) {
   });
   doc.setLineWidth(0.2).setFontSize(8);
   doc.line(ox, oy + th + 5, ox + tw, oy + th + 5);
-  doc.text(`Ancho total ${fmt(dim.dimX)}`, ox + tw / 2, oy + th + 9, { align: "center" });
+  doc.text(`${unaPieza ? "Ancho del vano" : "Ancho total"} ${fmt(dim.dimX)}`, ox + tw / 2, oy + th + 9, { align: "center" });
   doc.line(ox - 5, oy, ox - 5, oy + th);
-  doc.text(`Alto total ${fmt(dim.dimY)}`, ox - 7, oy + th / 2, { angle: 90, align: "center" });
+  doc.text(`${unaPieza ? "Alto del vano" : "Alto total"} ${fmt(dim.dimY)}`, ox - 7, oy + th / 2, { angle: 90, align: "center" });
   if (plano.config === "ESQUINA") {
     doc.setFontSize(7).text("Esquina: se repite en los 2 lados (ancho total medido de afuera a afuera)", gx, gy + gh - 1);
   }
 
   /* --- Piezas de corte con agujeros (derecha) --- */
   const ax = 160, aTop = 50, aW = 122, aH = plano.vidrio === "8MM" ? 138 : 128;
-  const aDibujar = piezas.filter((p) => p.pieza === "FIJO" || p.pieza === "PUERTA");
+  const aDibujar = piezas.filter((p) => p.pieza !== "PERFIL");
   const maxAlto = Math.max(...aDibujar.map((p) => p.alto));
   const gap = 16;
   const sumAncho = aDibujar.reduce((a, p) => a + p.ancho, 0);
@@ -116,6 +136,8 @@ function dibujarPlano(d) {
     doc.setLineDashPattern([], 0);
   };
 
+  const usadosV = {};
+  const horizHechas = new Set();
   perforaciones.forEach((pf, i) => {
     const pos = posPieza[pf.pieza];
     if (!pos || pf.pieza === "PERFIL") return;
@@ -141,12 +163,19 @@ function dibujarPlano(d) {
       yl = hy - r - 3.5; // sobre el agujero, dentro de la pieza
       ext(hx, hy - r, hx, yl - 1);
     }
-    cota(bordeX, yl, hx, yl);
-    doc.text(fmt(c.dx), (bordeX + hx) / 2, yl - 1.2, { align: "center" });
+    const claveH = `${pf.pieza}-${c.izq}-${c.desdeTope}-${c.dx}`;
+    if (!horizHechas.has(claveH)) {
+      horizHechas.add(claveH);
+      cota(bordeX, yl, hx, yl);
+      doc.text(fmt(c.dx), (bordeX + hx) / 2, yl - 1.2, { align: "center" });
+    }
 
     // cota vertical: del tope/piso de referencia al centro del agujero (por fuera de la pieza)
     const bordeY = c.desdeTope ? pos.y : pos.y + pos.h;
-    const xl = c.izq ? pos.x - 5 : pos.x + pos.w + 5;
+    const claveV = `${pf.pieza}-${c.izq}-${c.desdeTope}`;
+    const k = usadosV[claveV] ?? 0;
+    usadosV[claveV] = k + 1;
+    const xl = c.izq ? pos.x - 5 - 5 * k : pos.x + pos.w + 5 + 5 * k;
     ext(c.izq ? pos.x : pos.x + pos.w, bordeY, xl + (c.izq ? -1 : 1), bordeY);
     ext(hx, hy, xl + (c.izq ? -1 : 1), hy);
     cota(xl, bordeY, xl, hy);
@@ -155,7 +184,15 @@ function dibujarPlano(d) {
 
     // diámetro
     doc.setTextColor(200, 0, 0).setFont("helvetica", "bold");
-    doc.text(`Ø${fmt(pf.diametro)}`, hx, hy + r + 3.2, { align: "center" });
+    // Si hay otro agujero justo debajo (misma vertical, muy cerca en el papel), el Ø va al costado
+    const hayDebajo = perforaciones.some(
+      (o) => o !== pf && o.pieza === pf.pieza && Math.abs(o.x - pf.x) < 1 && o.y < pf.y && (pf.y - o.y) * s2 < 7,
+    );
+    if (hayDebajo) {
+      doc.text(`Ø${fmt(pf.diametro)}`, hx + (c.izq ? 1 : -1) * (r + 1.2), hy + 1, { align: c.izq ? "left" : "right" });
+    } else {
+      doc.text(`Ø${fmt(pf.diametro)}`, hx, hy + r + 3.2, { align: "center" });
+    }
     doc.setFont("helvetica", "normal").setTextColor(0).setDrawColor(0);
     // número de referencia (coincide con la lista)
     doc.setFontSize(6).setTextColor(200, 0, 0).text(String(i + 1), hx + r + 0.8, hy - r - 0.3).setTextColor(0);
@@ -211,6 +248,7 @@ function dibujarPlano(d) {
   });
   y += 2;
   linea("HERRAJE", true, 10);
+  if (d.manija) linea(`MANIJON: ${d.manija.codartprov ? `${d.manija.codartprov} - ` : ""}${d.manija.articulo}`, true);
   if (!herraje.length) linea("(sin herraje cargado)");
   herraje.forEach((h) => linea(`${h.codartprov ? `${h.codartprov} - ` : ""}${h.articulo}`));
   if (plano.nota) {
@@ -238,6 +276,13 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("plano");
   const [unidad, setUnidad] = useState("auto"); // unidad en que se cargan las medidas
+  // Consulta del manijón antes de generar el plano
+  const [pidiendoManija, setPidiendoManija] = useState(false);
+  const [manijones, setManijones] = useState([]);
+  const [manijaSel, setManijaSel] = useState(""); // codartint ("" = sin manijón)
+  const [manijaBusca, setManijaBusca] = useState("");
+  const [manijaTodos, setManijaTodos] = useState(false);
+  const [manijaMsg, setManijaMsg] = useState("");
   const [requiere, setRequiere] = useState({}); // modelo -> lleva plano (0/1)
 
   const cargarModelos = async () => {
@@ -272,14 +317,39 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     });
   };
 
-  const hacerPlano = async () => {
+  const cargarManijones = async (todos) => {
+    setManijaMsg("");
+    try {
+      const r = await authFetch(`${API}/mamparas-manijones${todos ? "?todos=1" : ""}`);
+      if (!r.ok) throw new Error("No se pudo cargar la lista de manijones");
+      setManijones(await r.json());
+    } catch (e) {
+      setManijones([]);
+      setManijaMsg(e.message);
+    }
+  };
+
+  const abrirConsultaManija = () => {
+    if (!sel) return;
+    if (!(parseFloat(form.ancho_prod) > 0) || !(parseFloat(form.alto_prod) > 0)) {
+      setMsg("Cargá ancho prod y alto prod antes de hacer el plano");
+      return;
+    }
+    setManijaSel("");
+    setManijaBusca("");
+    setManijaTodos(false);
+    cargarManijones(false);
+    setPidiendoManija(true);
+  };
+
+  const hacerPlano = async (manija_codartint = "") => {
     if (!sel) return;
     setLoading(true); setMsg("");
     try {
       const r = await authFetch(`${API}/mamparas-plano/${sel.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, unidad }),
+        body: JSON.stringify({ ...form, unidad, manija_codartint: manija_codartint || null }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Error al generar plano");
@@ -391,12 +461,82 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
               <option value="mm">Milímetros</option>
             </select>
           </label>
-          <button onClick={hacerPlano} disabled={loading || !requiere[sel.modelo]}>
+          <button onClick={abrirConsultaManija} disabled={loading || !requiere[sel.modelo]}>
             {loading ? "Generando..." : "Hacer plano"}
           </button>
         </div>
       )}
 
+      {pidiendoManija && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setPidiendoManija(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", color: "#222", borderRadius: 8, padding: 20, width: 460, maxWidth: "92vw", boxShadow: "0 4px 18px rgba(0,0,0,.3)" }}
+          >
+            <h3 style={{ marginTop: 0 }}>¿Qué manijón querés aplicar?</h3>
+            <p style={{ margin: "0 0 10px", fontSize: 13, color: "#555" }}>
+              Plano de <b>{sel?.modelo}</b>. Elegí el manijón que va en esta mampara.
+            </p>
+            <input
+              value={manijaBusca}
+              onChange={(e) => setManijaBusca(e.target.value)}
+              placeholder="Filtrar por código o nombre"
+              style={{ width: "100%", boxSizing: "border-box", marginBottom: 6 }}
+              autoFocus
+            />
+            <label style={{ fontSize: 12, display: "block", marginBottom: 6 }}>
+              <input
+                type="checkbox"
+                checked={manijaTodos}
+                onChange={(e) => {
+                  setManijaTodos(e.target.checked);
+                  cargarManijones(e.target.checked);
+                }}
+              />{" "}
+              Mostrar todos los herrajes de mampara (no solo los que dicen "manijón")
+            </label>
+            <select
+              size={8}
+              value={manijaSel}
+              onChange={(e) => setManijaSel(e.target.value)}
+              style={{ width: "100%", marginBottom: 6 }}
+            >
+              <option value="">— Sin manijón —</option>
+              {manijones
+                .filter((mj) =>
+                  `${mj.codartprov ?? ""} ${mj.articulo}`.toLowerCase().includes(manijaBusca.trim().toLowerCase()),
+                )
+                .map((mj) => (
+                  <option key={mj.id} value={mj.codartint}>
+                    {mj.codartprov ? `${mj.codartprov} - ` : ""}
+                    {mj.articulo}
+                  </option>
+                ))}
+            </select>
+            {manijaMsg && <p style={{ color: "#b71c1c", fontSize: 12 }}>{manijaMsg}</p>}
+            {!manijaMsg && !manijones.length && (
+              <p style={{ fontSize: 12, color: "#888" }}>
+                No hay artículos para mostrar. Probá tildando "Mostrar todos los herrajes".
+              </p>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+              <button onClick={() => setPidiendoManija(false)}>Cancelar</button>
+              <button
+                onClick={() => {
+                  setPidiendoManija(false);
+                  hacerPlano(manijaSel);
+                }}
+                style={{ background: "#0a3a5c", color: "#fff", border: "none", borderRadius: 4, padding: "6px 16px", cursor: "pointer" }}
+              >
+                Generar plano
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {sel && !requiere[sel.modelo] && <p>Este modelo no lleva plano.</p>}
       {msg && <p>{msg}</p>}
     </div>
