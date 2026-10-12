@@ -60,7 +60,7 @@ function dibujarPlano(d) {
     `Presupuesto: ${pres}   Rev: ${m.revision ?? 0}   Cant.: ${m.cantidad ?? 1}   Plano: ${codigo}`,
     10, 16.5,
   );
-  const clienteTxt = [m.codcliente, m.cliente_nombre].filter(Boolean).join(" - ") || "-";
+  const clienteTxt = m.cliente_nombre || m.codcliente || "-"; // solo el nombre; el código es el último recurso si no hay nombre
   doc.setFont("helvetica", "bold").text(
     recortar(`Cliente: ${clienteTxt}   |   Tel.: ${m.cliente_telefono || "-"}`, 277),
     10, 20.5,
@@ -499,9 +499,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
         return;
       }
       dibujarPlano(aplicarLado(data, lado));
-      setMsg(
-        `Plano generado (${data.codigo}, medidas en ${data.dim.unidadOrigen}) - Cliente: ${data.mampara?.cliente_nombre ?? "sin nombre"} - Dir.: ${data.mampara?.cliente_direccion ?? "sin dirección"} [v3]`,
-      );
+      setMsg(`Plano generado (${data.codigo}, medidas en ${data.dim.unidadOrigen})`);
       buscar(); // refresca medidas guardadas
     } catch (e) {
       setMsg(e.message);
