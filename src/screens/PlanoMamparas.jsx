@@ -58,13 +58,15 @@ function dibujarPlano(d) {
   };
   doc.text(
     `Presupuesto: ${pres}   Rev: ${m.revision ?? 0}   Cant.: ${m.cantidad ?? 1}   Plano: ${codigo}`,
-    10, 17.5,
+    10, 16.5,
   );
   const clienteTxt = [m.codcliente, m.cliente_nombre].filter(Boolean).join(" - ") || "-";
   doc.setFont("helvetica", "bold").text(
-    recortar(`Cliente: ${clienteTxt}   |   Dir. remito: ${m.remito_direccion || "-"}`, 277),
-    10, 22,
+    recortar(`Cliente: ${clienteTxt}   |   Tel.: ${m.cliente_telefono || "-"}`, 277),
+    10, 20.5,
   );
+  const etiquetaDir = m.cliente_direccion_tipo === "FISCAL" ? "Dir. fiscal" : "Dir. remito";
+  doc.text(recortar(`${etiquetaDir}: ${m.cliente_direccion || "-"}`, 277), 10, 24.5);
   doc.setFont("helvetica", "normal");
   doc.text(
     `Modelo: ${m.modelo ?? "-"}${
@@ -72,14 +74,14 @@ function dibujarPlano(d) {
     }   |   Manijon: ${
       d.manija ? `${d.manija.codartprov ? `${d.manija.codartprov} - ` : ""}${d.manija.articulo}` : "sin manijon"
     }`,
-    10, 26.5,
+    10, 28.5,
   );
   doc.text(
     `Medidas de produccion: ancho ${fmt(dim.dimX)} x alto ${fmt(dim.dimY)}` +
       (dim.prof ? ` x prof ${fmt(dim.prof)}` : "") +
       " mm" +
       (dim.unidadOrigen === "cm" ? "  (cargadas en cm, convertidas a mm)" : ""),
-    10, 31,
+    10, 32.5,
   );
 
   /* --- Vista general (izquierda arriba) --- */
