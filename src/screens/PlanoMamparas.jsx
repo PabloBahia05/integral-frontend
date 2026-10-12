@@ -328,6 +328,14 @@ function dibujarPlano(d) {
 
   linea("LISTA DE CORTE", true, 10);
   piezas.forEach((p) => linea(`${p.nombre}: ${p.cant} u.  -  ${fmt(p.ancho)} x ${fmt(p.alto)} mm`));
+  if (d.luces) {
+    linea(
+      `Ancho total ${fmt(dim.dimX)} - ${d.luces.descuento} de luces (${d.luces.pared} pared-vidrio x2 + ${d.luces.vidrio} entre vidrios) ` +
+        `= ${fmt(d.luces.anchoUtil)}  ->  paño fijo ${fmt(d.luces.fijo)} + batiente ${fmt(d.luces.puerta)}`,
+      false,
+      7.5,
+    );
+  }
   y += 2;
   linea("PERFORACIONES (cotas)", true, 10);
   perforaciones.forEach((pf, i) => {
@@ -390,6 +398,11 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
   const [lado, setLado] = useState("DERECHA"); // mano de la puerta; la manija va del mismo lado
   const [franjas, setFranjas] = useState([]); // franjas del vidrio (solo modelos esmerilados), de abajo hacia arriba
   const [franjasMsg, setFranjasMsg] = useState("");
+  // Reparto del ancho entre paño fijo y batiente (planos como IM4006): se define uno y el otro es el resto
+  const [repartoInfo, setRepartoInfo] = useState(null); // { descuento, luz_pared, luz_vidrio } o null si el plano no lo usa
+  const [repPieza, setRepPieza] = useState("PUERTA"); // cuál de los dos se define: "FIJO" | "PUERTA" (batiente)
+  const [repAncho, setRepAncho] = useState("");
+  const [repMsg, setRepMsg] = useState("");
   const esEsmerilado = /esmerilado/i.test(String(sel?.modelo ?? ""));
   const [planoConfig, setPlanoConfig] = useState(null); // RECTA | ESQUINA | CORREDIZA (la corrediza no usa mano)
 
@@ -482,6 +495,18 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
 
   const num = (v) => parseFloat(String(v).replace(",", "."));
 
+  // Vista previa del reparto: mismo criterio de unidad que el backend (auto: alto < 400 se toma como cm)
+  const repartoDatos = (() => {
+    if (!repartoInfo) return null;
+    const factor = unidad === "cm" ? 10 : unidad === "mm" ? 1 : parseFloat(form.alto_prod) < 400 ? 10 : 1;
+    const total = parseFloat(form.ancho_prod) * factor;
+    if (!(total > 0)) return null;
+    const util = Math.round((total - repartoInfo.descuento) * 10) / 10;
+    const a = num(repAncho);
+    const otro = a > 0 ? Math.round((util - a) * 10) / 10 : null;
+    return { total, util, otro };
+  })();
+
   // Valida y manda el plano con los agujeros tal como quedaron en pantalla
   const generarConManija = () => {
     const perfs = manijaPerfs.map((p) => ({
@@ -517,8 +542,22 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
       }
     }
     setFranjasMsg("");
+    let repartoBody = null;
+    if (repartoInfo) {
+      const a = num(repAncho);
+      if (!(a > 0) || (repartoDatos && a >= repartoDatos.util)) {
+        setRepMsg(
+          repartoDatos
+            ? `Ingresá el ancho del ${repPieza === "FIJO" ? "paño fijo" : "batiente"} (mayor a 0 y menor a ${repartoDatos.util} mm)`
+            : "Ingresá el ancho del paño fijo o del batiente (mm)",
+        );
+        return;
+      }
+      repartoBody = { pieza: repPieza, ancho: a };
+    }
+    setRepMsg("");
     setPidiendoManija(false);
-    hacerPlano(manijaSel, perfs, sobre, franjasMm);
+    hacerPlano(manijaSel, perfs, sobre, franjasMm, repartoBody);
   };
 
   const abrirConsultaManija = () => {
@@ -535,6 +574,10 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     setSobrealto("");
     setPlanoConfig(null);
     setFranjasMsg("");
+    setRepartoInfo(null);
+    setRepPieza("PUERTA");
+    setRepAncho("");
+    setRepMsg("");
     // Modelo esmerilado: por defecto todo el vidrio esmerilado (1 franja sin medida = hasta arriba)
     setFranjas(/esmerilado/i.test(String(sel.modelo ?? "")) ? [{ medida: "", cond: "ESMERILADO" }] : []);
     // Si el plano del modelo usa sobrealto (ej. corrediza IM6001), trae el valor inicial para poder editarlo
@@ -542,6 +585,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((c) => {
         if (c) setPlanoConfig(c.config ?? null);
+        if (c?.reparto) setRepartoInfo(c.reparto);
         if (c && c.sobrealto_def != null) {
           setSobrealtoDef(c.sobrealto_def);
           setSobrealto(String(c.sobrealto_def));
@@ -554,7 +598,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     setPidiendoManija(true);
   };
 
-  const hacerPlano = async (manija_codartint = "", manija_perfs = null, sobrealtoMm = null, franjasMm = []) => {
+  const hacerPlano = async (manija_codartint = "", manija_perfs = null, sobrealtoMm = null, franjasMm = [], repartoBody = null) => {
     if (!sel) return;
     setLoading(true); setMsg("");
     try {
@@ -568,6 +612,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
           manija_codartint: manija_codartint || null,
           manija_perfs: manija_codartint && manija_perfs ? manija_perfs : undefined,
           sobrealto: sobrealtoMm ?? undefined,
+          reparto: repartoBody ?? undefined,
           lado,
         }),
       });
@@ -810,6 +855,41 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
                   {" "}
                   Alto del vidrio = alto del vano + este valor (por defecto {sobrealtoDef})
                 </span>
+              </div>
+            )}
+            {repartoInfo && (
+              <div style={{ margin: "12px 0 4px", fontSize: 12 }}>
+                <b style={{ fontSize: 13 }}>Reparto del ancho</b>{" "}
+                <span style={{ color: "#777" }}>
+                  — luces: {repartoInfo.luz_pared} mm entre pared y vidrio (x2) y {repartoInfo.luz_vidrio} mm entre vidrios
+                  = {repartoInfo.descuento} mm
+                </span>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+                  <span>Definir el ancho del</span>
+                  <select value={repPieza} onChange={(e) => setRepPieza(e.target.value)}>
+                    <option value="FIJO">Paño fijo</option>
+                    <option value="PUERTA">Batiente</option>
+                  </select>
+                  <input
+                    value={repAncho}
+                    onChange={(e) => setRepAncho(e.target.value)}
+                    placeholder="mm"
+                    style={{ width: 80 }}
+                  />
+                  <span>mm</span>
+                </div>
+                {repartoDatos && (
+                  <p style={{ margin: "4px 0 0", color: "#555" }}>
+                    Ancho total {repartoDatos.total} - {repartoInfo.descuento} = <b>{repartoDatos.util} mm</b> entre los dos vidrios
+                    {repartoDatos.otro != null && (
+                      <>
+                        {" "}→ el {repPieza === "FIJO" ? "batiente" : "paño fijo"} mide{" "}
+                        <b style={{ color: repartoDatos.otro > 0 ? "#222" : "#b71c1c" }}>{repartoDatos.otro} mm</b>
+                      </>
+                    )}
+                  </p>
+                )}
+                {repMsg && <p style={{ color: "#b71c1c", margin: "4px 0 0" }}>{repMsg}</p>}
               </div>
             )}
             {esEsmerilado && (
