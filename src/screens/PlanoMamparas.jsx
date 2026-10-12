@@ -285,6 +285,8 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
   const [manijaMsg, setManijaMsg] = useState("");
   const [manijaPerfs, setManijaPerfs] = useState([]); // agujeros editables del manijón elegido (mm)
   const [manijaPerfsMsg, setManijaPerfsMsg] = useState("");
+  const [sobrealtoDef, setSobrealtoDef] = useState(null); // null = el plano no usa sobrealto
+  const [sobrealto, setSobrealto] = useState(""); // mm que se suman al alto del vano (editable)
   const [requiere, setRequiere] = useState({}); // modelo -> lleva plano (0/1)
 
   const cargarModelos = async () => {
@@ -377,8 +379,16 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
       setManijaPerfsMsg("Revisá los agujeros: diámetro mayor a 0 y medidas válidas");
       return;
     }
+    let sobre = null;
+    if (sobrealtoDef != null) {
+      sobre = num(sobrealto);
+      if (!Number.isFinite(sobre)) {
+        setManijaMsg("Revisá el sobrealto del vidrio: tiene que ser un número (mm)");
+        return;
+      }
+    }
     setPidiendoManija(false);
-    hacerPlano(manijaSel, perfs);
+    hacerPlano(manijaSel, perfs, sobre);
   };
 
   const abrirConsultaManija = () => {
@@ -390,13 +400,25 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     setManijaSel("");
     setManijaPerfs([]);
     setManijaPerfsMsg("");
+    setSobrealtoDef(null);
+    setSobrealto("");
+    // Si el plano del modelo usa sobrealto (ej. corrediza IM6001), trae el valor inicial para poder editarlo
+    authFetch(`${API}/mamparas-plano/${sel.id}/config`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((c) => {
+        if (c && c.sobrealto_def != null) {
+          setSobrealtoDef(c.sobrealto_def);
+          setSobrealto(String(c.sobrealto_def));
+        }
+      })
+      .catch(() => {});
     setManijaBusca("");
     setManijaTodos(false);
     cargarManijones(false);
     setPidiendoManija(true);
   };
 
-  const hacerPlano = async (manija_codartint = "", manija_perfs = null) => {
+  const hacerPlano = async (manija_codartint = "", manija_perfs = null, sobrealtoMm = null) => {
     if (!sel) return;
     setLoading(true); setMsg("");
     try {
@@ -408,6 +430,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
           unidad,
           manija_codartint: manija_codartint || null,
           manija_perfs: manija_codartint && manija_perfs ? manija_perfs : undefined,
+          sobrealto: sobrealtoMm ?? undefined,
         }),
       });
       const data = await r.json();
@@ -621,6 +644,22 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
                 >
                   + Agregar agujero
                 </button>
+              </div>
+            )}
+            {sobrealtoDef != null && (
+              <div style={{ margin: "10px 0 4px", fontSize: 13 }}>
+                <label>
+                  <b>Sobrealto del vidrio (mm)</b>{" "}
+                  <input
+                    value={sobrealto}
+                    onChange={(e) => setSobrealto(e.target.value)}
+                    style={{ width: 70 }}
+                  />
+                </label>
+                <span style={{ color: "#777", fontSize: 12 }}>
+                  {" "}
+                  Alto del vidrio = alto del vano + este valor (por defecto {sobrealtoDef})
+                </span>
               </div>
             )}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
