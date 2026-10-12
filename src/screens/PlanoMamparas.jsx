@@ -499,7 +499,9 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
         return;
       }
       dibujarPlano(aplicarLado(data, lado));
-      setMsg(`Plano generado (${data.codigo}, medidas en ${data.dim.unidadOrigen})`);
+      setMsg(
+        `Plano generado (${data.codigo}, medidas en ${data.dim.unidadOrigen}) - Cliente: ${data.mampara?.cliente_nombre ?? "sin nombre"} - Dir.: ${data.mampara?.cliente_direccion ?? "sin dirección"} [v3]`,
+      );
       buscar(); // refresca medidas guardadas
     } catch (e) {
       setMsg(e.message);
