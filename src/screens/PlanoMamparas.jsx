@@ -41,10 +41,51 @@ function cotasDe(pf) {
   };
 }
 
+// Franjas del vidrio de abajo hacia arriba: [{ cond: "ESMERILADO" | "INCOLORO", medida: mm | null }]
+// medida null = hasta arriba (solo la última). Si las franjas no llegan al tope, lo que falta queda "SIN DEFINIR".
+function armarFranjas(franjas, alto) {
+  const out = [];
+  let y0 = 0;
+  (franjas || []).forEach((f) => {
+    if (y0 >= alto - 0.01) return;
+    const resto = alto - y0;
+    const h = f.medida == null ? resto : Math.min(f.medida, resto);
+    out.push({ cond: f.cond, h, y0 });
+    y0 += h;
+  });
+  if (out.length && y0 < alto - 0.01) out.push({ cond: "SIN DEFINIR", h: alto - y0, y0 });
+  return out;
+}
+
 function dibujarPlano(d) {
   const { mampara: m, herraje, plano, codigo, dim, piezas, perforaciones } = d;
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pres = [m.numeropres, m.presm].filter(Boolean).join(" / ") || `ID ${m.id}`;
+  const avisos = [];
+
+  // Dibuja las franjas (esmerilado / incoloro) sobre un vidrio. Devuelve false si no hay franjas cargadas.
+  const dibujarFranjas = (px, py, pw, ph, alto, base, conTexto) => {
+    const bandas = armarFranjas(d.franjas, alto);
+    if (!bandas.length) return false;
+    const k = ph / alto;
+    bandas.forEach((b) => {
+      const bh = b.h * k;
+      const by = py + ph - (b.y0 + b.h) * k;
+      const c = b.cond === "ESMERILADO" ? [226, 226, 230] : b.cond === "INCOLORO" ? base : [255, 255, 255];
+      doc.setFillColor(c[0], c[1], c[2]).setDrawColor(0).setLineWidth(0.2).rect(px, by, pw, bh, "FD");
+      if (!conTexto) return;
+      doc.setFont("helvetica", "normal").setFontSize(6.5).setTextColor(40);
+      if (bh >= 7) {
+        doc.text(b.cond, px + pw / 2, by + bh / 2 - 0.3, { align: "center" });
+        doc.text(fmt(b.h), px + pw / 2, by + bh / 2 + 3, { align: "center" });
+      } else if (bh >= 2.8) {
+        doc.text(`${b.cond}  ${fmt(b.h)}`, px + pw / 2, by + bh / 2 + 1, { align: "center" });
+      }
+      doc.setTextColor(0);
+    });
+    doc.setDrawColor(0).setLineWidth(0.4).rect(px, py, pw, ph); // contorno del vidrio
+    return true;
+  };
 
   /* --- Encabezado --- */
   doc.setFont("helvetica", "bold").setFontSize(14);
@@ -109,6 +150,7 @@ function dibujarPlano(d) {
       const pw = pz.ancho * s1, ph = pz.alto * s1;
       const px = ox + (tw - pw) / 2, py = oy + th - ph;
       doc.setFillColor(205, 225, 250).setLineWidth(0.4).rect(px, py, pw, ph, "FD");
+      dibujarFranjas(px, py, pw, ph, pz.alto, [205, 225, 250], false);
       doc.setFontSize(8).text(`${pz.nombre} ${fmt(pz.ancho)} x ${fmt(pz.alto)}`, px + pw / 2, py + ph / 2, { align: "center" });
     });
     doc.setLineWidth(0.2).setDrawColor(150).setLineDashPattern([1.2, 1.2], 0).rect(ox, oy, tw, th);
@@ -122,6 +164,7 @@ function dibujarPlano(d) {
     const py = oy + th - ph;
     doc.setFillColor(tipo === "FIJO" ? 232 : 205, tipo === "FIJO" ? 240 : 225, 250);
     doc.rect(px, py, pw, ph, "FD");
+    dibujarFranjas(px, py, pw, ph, pz.alto, tipo === "FIJO" ? [232, 240, 250] : [205, 225, 250], false);
     doc.setFontSize(8).text(tipo === "FIJO" ? "Paño fijo" : "Puerta", px + pw / 2, py + ph / 2, { align: "center" });
   });
   doc.setLineWidth(0.2).setFontSize(8);
@@ -138,6 +181,13 @@ function dibujarPlano(d) {
   const aDibujar = piezas.filter((p) => p.pieza !== "PERFIL");
   // Con puerta a la izquierda, la puerta se dibuja primero (a la izquierda), igual que en la vista general
   if (d.lado === "IZQUIERDA") aDibujar.sort((a, b) => (a.pieza === "PUERTA" ? 0 : 1) - (b.pieza === "PUERTA" ? 0 : 1));
+  if (d.franjas?.length && d.franjas[d.franjas.length - 1].medida != null) {
+    const suma = d.franjas.reduce((a, f) => a + f.medida, 0);
+    [...new Set(aDibujar.map((p) => p.alto))].forEach((alto) => {
+      if (suma > alto + 0.5) avisos.push(`Las franjas suman ${fmt(suma)} mm y el vidrio mide ${fmt(alto)} mm: se recortó lo que sobraba.`);
+      else if (suma < alto - 0.5) avisos.push(`Las franjas suman ${fmt(suma)} mm y el vidrio mide ${fmt(alto)} mm: lo que falta figura como SIN DEFINIR.`);
+    });
+  }
   const maxAlto = Math.max(...aDibujar.map((p) => p.alto));
   const gap = 16;
   const sumAncho = aDibujar.reduce((a, p) => a + p.ancho, 0);
@@ -151,6 +201,7 @@ function dibujarPlano(d) {
     posPieza[p.pieza] = { x: cx, y: py, w: pw, h: ph };
     doc.setFillColor(p.pieza === "FIJO" ? 232 : 205, p.pieza === "FIJO" ? 240 : 225, 250);
     doc.setLineWidth(0.4).rect(cx, py, pw, ph, "FD");
+    dibujarFranjas(cx, py, pw, ph, p.alto, p.pieza === "FIJO" ? [232, 240, 250] : [205, 225, 250], true);
     doc.setFont("helvetica", "bold").setFontSize(8);
     doc.text(`${p.nombre} x${p.cant}`, cx + pw / 2, py - 11, { align: "center" });
     doc.setFont("helvetica", "normal");
@@ -286,6 +337,13 @@ function dibujarPlano(d) {
         (pf.pieza !== "PERFIL" ? `  -  a ${fmt(c.dy)} del ${c.desdeTope ? "tope" : "piso"}` : ""),
     );
   });
+  if (d.franjas?.length && aDibujar.length) {
+    y += 2;
+    linea("FRANJAS DEL VIDRIO (de abajo hacia arriba)", true, 10);
+    armarFranjas(d.franjas, aDibujar[0].alto).forEach((b, i) =>
+      linea(`${i + 1}. ${b.cond}  -  ${fmt(b.h)} mm`),
+    );
+  }
   y += 2;
   linea("HERRAJE", true, 10);
   if (d.manija) linea(`MANIJON: ${d.manija.codartprov ? `${d.manija.codartprov} - ` : ""}${d.manija.articulo}`, true);
@@ -304,6 +362,7 @@ function dibujarPlano(d) {
   );
 
   doc.save(`PLANO-${m.presm || m.numeropres || m.id}-REV${m.revision ?? 0}.pdf`);
+  return avisos;
 }
 
 /* ---------- Pantalla ---------- */
@@ -329,6 +388,9 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
   const [sobrealto, setSobrealto] = useState(""); // mm que se suman al alto del vano (editable)
   const [requiere, setRequiere] = useState({}); // modelo -> lleva plano (0/1)
   const [lado, setLado] = useState("DERECHA"); // mano de la puerta; la manija va del mismo lado
+  const [franjas, setFranjas] = useState([]); // franjas del vidrio (solo modelos esmerilados), de abajo hacia arriba
+  const [franjasMsg, setFranjasMsg] = useState("");
+  const esEsmerilado = /esmerilado/i.test(String(sel?.modelo ?? ""));
   const [planoConfig, setPlanoConfig] = useState(null); // RECTA | ESQUINA | CORREDIZA (la corrediza no usa mano)
 
   const cargarModelos = async () => {
@@ -440,8 +502,23 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
         return;
       }
     }
+    let franjasMm = [];
+    if (esEsmerilado && franjas.length) {
+      franjasMm = franjas.map((f) => ({
+        cond: f.cond,
+        medida: String(f.medida).trim() === "" ? null : num(f.medida),
+      }));
+      const mal = franjasMm.some((f, i) =>
+        f.medida != null ? !(f.medida > 0) : i !== franjasMm.length - 1,
+      );
+      if (mal) {
+        setFranjasMsg("Revisá las franjas: las medidas deben ser mayores a 0 y solo la última puede quedar vacía (hasta arriba)");
+        return;
+      }
+    }
+    setFranjasMsg("");
     setPidiendoManija(false);
-    hacerPlano(manijaSel, perfs, sobre);
+    hacerPlano(manijaSel, perfs, sobre, franjasMm);
   };
 
   const abrirConsultaManija = () => {
@@ -457,6 +534,9 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     setSobrealtoDef(null);
     setSobrealto("");
     setPlanoConfig(null);
+    setFranjasMsg("");
+    // Modelo esmerilado: por defecto todo el vidrio esmerilado (1 franja sin medida = hasta arriba)
+    setFranjas(/esmerilado/i.test(String(sel.modelo ?? "")) ? [{ medida: "", cond: "ESMERILADO" }] : []);
     // Si el plano del modelo usa sobrealto (ej. corrediza IM6001), trae el valor inicial para poder editarlo
     authFetch(`${API}/mamparas-plano/${sel.id}/config?tipo=${sel.tipo ?? "mampara"}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -474,7 +554,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     setPidiendoManija(true);
   };
 
-  const hacerPlano = async (manija_codartint = "", manija_perfs = null, sobrealtoMm = null) => {
+  const hacerPlano = async (manija_codartint = "", manija_perfs = null, sobrealtoMm = null, franjasMm = []) => {
     if (!sel) return;
     setLoading(true); setMsg("");
     try {
@@ -498,8 +578,11 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
         buscar();
         return;
       }
-      dibujarPlano(aplicarLado(data, lado));
-      setMsg(`Plano generado (${data.codigo}, medidas en ${data.dim.unidadOrigen})`);
+      const avisos = dibujarPlano({ ...aplicarLado(data, lado), franjas: franjasMm });
+      setMsg(
+        `Plano generado (${data.codigo}, medidas en ${data.dim.unidadOrigen})` +
+          (avisos?.length ? ` - Atención: ${avisos.join(" ")}` : ""),
+      );
       buscar(); // refresca medidas guardadas
     } catch (e) {
       setMsg(e.message);
@@ -727,6 +810,58 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
                   {" "}
                   Alto del vidrio = alto del vano + este valor (por defecto {sobrealtoDef})
                 </span>
+              </div>
+            )}
+            {esEsmerilado && (
+              <div style={{ margin: "12px 0 4px", fontSize: 12 }}>
+                <b style={{ fontSize: 13 }}>Franjas del vidrio</b>{" "}
+                <span style={{ color: "#777" }}>— de abajo hacia arriba</span>
+                <div style={{ display: "grid", gridTemplateColumns: "28px 90px 130px 24px", gap: 4, marginTop: 6, alignItems: "center", color: "#555" }}>
+                  <span>N°</span>
+                  <span>Medida (mm)</span>
+                  <span>Condición</span>
+                  <span />
+                  {franjas.map((f, i) => (
+                    <Fragment key={i}>
+                      <span>{i + 1}</span>
+                      <input
+                        value={f.medida}
+                        placeholder={i === franjas.length - 1 ? "hasta arriba" : ""}
+                        onChange={(e) => setFranjas((fs) => fs.map((x, j) => (j === i ? { ...x, medida: e.target.value } : x)))}
+                        style={{ width: "100%", boxSizing: "border-box" }}
+                      />
+                      <select
+                        value={f.cond}
+                        onChange={(e) => setFranjas((fs) => fs.map((x, j) => (j === i ? { ...x, cond: e.target.value } : x)))}
+                      >
+                        <option value="ESMERILADO">Esmerilado</option>
+                        <option value="INCOLORO">Incoloro</option>
+                      </select>
+                      <button title="Quitar franja" onClick={() => setFranjas((fs) => fs.filter((_, j) => j !== i))} style={{ padding: 0 }}>
+                        ×
+                      </button>
+                    </Fragment>
+                  ))}
+                </div>
+                <button
+                  onClick={() =>
+                    setFranjas((fs) => {
+                      const ult = fs[fs.length - 1];
+                      return [...fs, { medida: "", cond: ult?.cond === "ESMERILADO" ? "INCOLORO" : "ESMERILADO" }];
+                    })
+                  }
+                  style={{ marginTop: 6 }}
+                >
+                  + Agregar franja
+                </button>
+                <span style={{ color: "#777", marginLeft: 8 }}>
+                  Suman {franjas.reduce((a, f) => a + (num(f.medida) || 0), 0)} mm
+                </span>
+                <p style={{ margin: "4px 0 0", color: "#777" }}>
+                  La última franja puede quedar sin medida (llega hasta arriba). Con una sola franja sin medida, el vidrio es todo de esa condición.
+                  Sin franjas, el plano se dibuja como siempre.
+                </p>
+                {franjasMsg && <p style={{ color: "#b71c1c", margin: "4px 0 0" }}>{franjasMsg}</p>}
               </div>
             )}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
