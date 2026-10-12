@@ -403,7 +403,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     setSobrealtoDef(null);
     setSobrealto("");
     // Si el plano del modelo usa sobrealto (ej. corrediza IM6001), trae el valor inicial para poder editarlo
-    authFetch(`${API}/mamparas-plano/${sel.id}/config`)
+    authFetch(`${API}/mamparas-plano/${sel.id}/config?tipo=${sel.tipo ?? "mampara"}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((c) => {
         if (c && c.sobrealto_def != null) {
@@ -428,6 +428,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
         body: JSON.stringify({
           ...form,
           unidad,
+          tipo: sel.tipo ?? "mampara",
           manija_codartint: manija_codartint || null,
           manija_perfs: manija_codartint && manija_perfs ? manija_perfs : undefined,
           sobrealto: sobrealtoMm ?? undefined,
@@ -501,7 +502,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
           <tr>
-            {["Pres.", "Mamp.", "Rev.", "Cliente", "Modelo", "Ancho", "Alto", "Ancho prod", "Alto prod", "Prof prod", "Lleva plano"].map((h) => (
+            {["Tipo", "Pres.", "Mamp.", "Rev.", "Cliente", "Modelo", "Ancho", "Alto", "Ancho prod", "Alto prod", "Prof prod", "Lleva plano"].map((h) => (
               <th key={h} style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "4px 10px", whiteSpace: "nowrap" }}>{h}</th>
             ))}
           </tr>
@@ -509,11 +510,11 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
         <tbody>
           {rows.map((r) => (
             <tr
-              key={r.id}
+              key={`${r.tipo}-${r.id}`}
               onClick={() => elegir(r)}
-              style={{ cursor: "pointer", background: sel?.id === r.id ? "#e3f2fd" : "transparent" }}
+              style={{ cursor: "pointer", background: sel?.id === r.id && sel?.tipo === r.tipo ? "#e3f2fd" : "transparent" }}
             >
-              <td style={{ padding: "4px 10px" }}>{r.numeropres}</td><td style={{ padding: "4px 10px" }}>{r.presm}</td><td style={{ padding: "4px 10px" }}>{r.revision}</td>
+              <td style={{ padding: "4px 10px" }}>{r.tipo === "puerta" ? "Puerta" : "Mampara"}</td><td style={{ padding: "4px 10px" }}>{r.numeropres}</td><td style={{ padding: "4px 10px" }}>{r.presm}</td><td style={{ padding: "4px 10px" }}>{r.revision}</td>
               <td style={{ padding: "4px 10px" }}>{r.codcliente}</td><td style={{ padding: "4px 10px" }}>{r.modelo}</td>
               <td style={{ padding: "4px 10px" }}>{r.ancho}</td><td style={{ padding: "4px 10px" }}>{r.alto}</td>
               <td style={{ padding: "4px 10px" }}>{r.ancho_prod ?? "-"}</td><td style={{ padding: "4px 10px" }}>{r.alto_prod ?? "-"}</td><td style={{ padding: "4px 10px" }}>{r.prof_prod ?? "-"}</td><td style={{ padding: "4px 10px" }}>{requiere[r.modelo] ? "Sí" : "No"}</td>
