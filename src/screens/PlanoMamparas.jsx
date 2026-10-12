@@ -10,6 +10,25 @@ const EMPTY = { ancho_prod: "", alto_prod: "", prof_prod: "" };
 /* ---------- Dibujo del plano ---------- */
 const fmt = (n) => (Number.isInteger(n) ? String(n) : Number(n).toFixed(1));
 
+/* ---------- Mano de la puerta (la manija va siempre del mismo lado que la puerta) ---------- */
+// Los agujeros guardados de cada manijón (mamparas-manijon-perf) se asumen cargados para puerta a la DERECHA.
+// Si en tu tabla están cargados para la izquierda, cambiá esta constante a "IZQUIERDA".
+const LADO_BASE_MANIJON = "DERECHA";
+
+// El "Agujero tirador" del vidrio 8mm viene del plano con la manija a la derecha (x = W - 50).
+// Con puerta a la izquierda se espeja: la distancia al lateral izq. pasa a ser la del der. y viceversa.
+function aplicarLado(data, lado) {
+  const l = lado === "IZQUIERDA" && data.plano?.config !== "CORREDIZA" ? "IZQUIERDA" : "DERECHA";
+  if (l === "DERECHA") return { ...data, lado: l };
+  return {
+    ...data,
+    lado: l,
+    perforaciones: data.perforaciones.map((pf) =>
+      /^agujero tirador$/i.test(String(pf.nombre ?? "").trim()) ? { ...pf, x: pf.dDer, dDer: pf.x } : pf,
+    ),
+  };
+}
+
 // Cotas de un agujero: lado de referencia horizontal (el más cercano) y vertical (tope si está a <=200, si no piso)
 function cotasDe(pf) {
   const izq = pf.x <= pf.dDer;
@@ -36,7 +55,9 @@ function dibujarPlano(d) {
     10, 18,
   );
   doc.text(
-    `Modelo: ${m.modelo ?? "-"}   |   Manijon: ${
+    `Modelo: ${m.modelo ?? "-"}${
+      d.lado && plano.config !== "CORREDIZA" ? `   |   Puerta y manija: ${d.lado}` : ""
+    }   |   Manijon: ${
       d.manija ? `${d.manija.codartprov ? `${d.manija.codartprov} - ` : ""}${d.manija.articulo}` : "sin manijon"
     }`,
     10, 23,
@@ -53,8 +74,11 @@ function dibujarPlano(d) {
   const fijo = piezas.find((p) => p.pieza === "FIJO");
   const puerta = piezas.find((p) => p.pieza === "PUERTA");
   // Recta 2F+2M: fijo-puerta-puerta-fijo. Esquina: cada lado es 1 fijo + 1 puerta (se repite en los 2 lados).
-  const secuencia =
+  // La de 2F+2M es simétrica (la mano no la cambia); fijo + puerta se invierte si la puerta va a la izquierda.
+  const secuenciaBase =
     plano.config === "RECTA" && plano.fijos >= 2 ? ["FIJO", "PUERTA", "PUERTA", "FIJO"] : ["FIJO", "PUERTA"];
+  const secuencia =
+    d.lado === "IZQUIERDA" && secuenciaBase.length === 2 ? [...secuenciaBase].reverse() : secuenciaBase;
   const unaPieza = !fijo && !puerta;
   const panos = piezas.filter((p) => p.pieza !== "PERFIL");
   const gx = 10, gy = 34, gw = 140, gh = 82;
@@ -98,6 +122,8 @@ function dibujarPlano(d) {
   /* --- Piezas de corte con agujeros (derecha) --- */
   const ax = 160, aTop = 50, aW = 122, aH = plano.vidrio === "8MM" ? 138 : 128;
   const aDibujar = piezas.filter((p) => p.pieza !== "PERFIL");
+  // Con puerta a la izquierda, la puerta se dibuja primero (a la izquierda), igual que en la vista general
+  if (d.lado === "IZQUIERDA") aDibujar.sort((a, b) => (a.pieza === "PUERTA" ? 0 : 1) - (b.pieza === "PUERTA" ? 0 : 1));
   const maxAlto = Math.max(...aDibujar.map((p) => p.alto));
   const gap = 16;
   const sumAncho = aDibujar.reduce((a, p) => a + p.ancho, 0);
@@ -288,6 +314,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
   const [sobrealtoDef, setSobrealtoDef] = useState(null); // null = el plano no usa sobrealto
   const [sobrealto, setSobrealto] = useState(""); // mm que se suman al alto del vano (editable)
   const [requiere, setRequiere] = useState({}); // modelo -> lleva plano (0/1)
+  const [lado, setLado] = useState("DERECHA"); // mano de la puerta; la manija va del mismo lado
 
   const cargarModelos = async () => {
     try {
@@ -349,17 +376,28 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
       if (!r.ok) throw new Error("No se pudieron cargar los agujeros del manijón");
       const rows = await r.json();
       setManijaPerfs(
-        rows.map((p) => ({
-          diametro: String(Number(p.diametro)),
-          dx_borde: String(Number(p.dx_borde)),
-          lado: p.lado === "DER" ? "DER" : "IZQ",
-          y_piso: String(Number(p.y_piso)),
-        })),
+        rows.map((p) => {
+          const base = p.lado === "DER" ? "DER" : "IZQ";
+          return {
+            diametro: String(Number(p.diametro)),
+            dx_borde: String(Number(p.dx_borde)),
+            // si la mano elegida no es la de carga, el agujero va en el lateral opuesto
+            lado: lado === LADO_BASE_MANIJON ? base : base === "DER" ? "IZQ" : "DER",
+            y_piso: String(Number(p.y_piso)),
+          };
+        }),
       );
       if (!rows.length) setManijaPerfsMsg("Este manijón no tiene agujeros cargados: agregalos a mano.");
     } catch (e) {
       setManijaPerfsMsg(e.message);
     }
+  };
+
+  // Cambiar la mano espeja los agujeros que ya están en pantalla (Izq. <-> Der.)
+  const cambiarLado = (nuevo) => {
+    if (nuevo === lado) return;
+    setLado(nuevo);
+    setManijaPerfs((ps) => ps.map((p) => ({ ...p, lado: p.lado === "IZQ" ? "DER" : "IZQ" })));
   };
 
   const editarPerf = (i, campo, valor) =>
@@ -400,6 +438,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     setManijaSel("");
     setManijaPerfs([]);
     setManijaPerfsMsg("");
+    setLado("DERECHA");
     setSobrealtoDef(null);
     setSobrealto("");
     // Si el plano del modelo usa sobrealto (ej. corrediza IM6001), trae el valor inicial para poder editarlo
@@ -432,6 +471,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
           manija_codartint: manija_codartint || null,
           manija_perfs: manija_codartint && manija_perfs ? manija_perfs : undefined,
           sobrealto: sobrealtoMm ?? undefined,
+          lado,
         }),
       });
       const data = await r.json();
@@ -441,7 +481,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
         buscar();
         return;
       }
-      dibujarPlano(data);
+      dibujarPlano(aplicarLado(data, lado));
       setMsg(`Plano generado (${data.codigo}, medidas en ${data.dim.unidadOrigen})`);
       buscar(); // refresca medidas guardadas
     } catch (e) {
@@ -563,6 +603,15 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
             <p style={{ margin: "0 0 10px", fontSize: 13, color: "#555" }}>
               Plano de <b>{sel?.modelo}</b>. Elegí el manijón que va en esta mampara.
             </p>
+            {sobrealtoDef == null && (
+              <label style={{ fontSize: 13, display: "block", marginBottom: 8 }}>
+                <b>Mano de la puerta</b>{" "}
+                <select value={lado} onChange={(e) => cambiarLado(e.target.value)}>
+                  <option value="DERECHA">Derecha (puerta y manija a la derecha)</option>
+                  <option value="IZQUIERDA">Izquierda (puerta y manija a la izquierda)</option>
+                </select>
+              </label>
+            )}
             <input
               value={manijaBusca}
               onChange={(e) => setManijaBusca(e.target.value)}
