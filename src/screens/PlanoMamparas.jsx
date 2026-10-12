@@ -50,24 +50,36 @@ function dibujarPlano(d) {
   doc.setFont("helvetica", "bold").setFontSize(14);
   doc.text(`PLANO DE CORTE - ${plano.descripcion}`, 10, 12);
   doc.setFont("helvetica", "normal").setFontSize(9);
+  const recortar = (txt, maxW) => {
+    let t = String(txt);
+    if (doc.getTextWidth(t) <= maxW) return t;
+    while (t.length > 1 && doc.getTextWidth(t + "...") > maxW) t = t.slice(0, -1);
+    return t + "...";
+  };
   doc.text(
-    `Presupuesto: ${pres}   Rev: ${m.revision ?? 0}   Cliente: ${m.codcliente || "-"}   Cant.: ${m.cantidad ?? 1}   Plano: ${codigo}`,
-    10, 18,
+    `Presupuesto: ${pres}   Rev: ${m.revision ?? 0}   Cant.: ${m.cantidad ?? 1}   Plano: ${codigo}`,
+    10, 17.5,
   );
+  const clienteTxt = [m.codcliente, m.cliente_nombre].filter(Boolean).join(" - ") || "-";
+  doc.setFont("helvetica", "bold").text(
+    recortar(`Cliente: ${clienteTxt}   |   Dir. remito: ${m.remito_direccion || "-"}`, 277),
+    10, 22,
+  );
+  doc.setFont("helvetica", "normal");
   doc.text(
     `Modelo: ${m.modelo ?? "-"}${
       d.lado && plano.config !== "CORREDIZA" ? `   |   Puerta y manija: ${d.lado}` : ""
     }   |   Manijon: ${
       d.manija ? `${d.manija.codartprov ? `${d.manija.codartprov} - ` : ""}${d.manija.articulo}` : "sin manijon"
     }`,
-    10, 23,
+    10, 26.5,
   );
   doc.text(
     `Medidas de produccion: ancho ${fmt(dim.dimX)} x alto ${fmt(dim.dimY)}` +
       (dim.prof ? ` x prof ${fmt(dim.prof)}` : "") +
       " mm" +
       (dim.unidadOrigen === "cm" ? "  (cargadas en cm, convertidas a mm)" : ""),
-    10, 28,
+    10, 31,
   );
 
   /* --- Vista general (izquierda arriba) --- */
@@ -315,6 +327,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
   const [sobrealto, setSobrealto] = useState(""); // mm que se suman al alto del vano (editable)
   const [requiere, setRequiere] = useState({}); // modelo -> lleva plano (0/1)
   const [lado, setLado] = useState("DERECHA"); // mano de la puerta; la manija va del mismo lado
+  const [planoConfig, setPlanoConfig] = useState(null); // RECTA | ESQUINA | CORREDIZA (la corrediza no usa mano)
 
   const cargarModelos = async () => {
     try {
@@ -441,10 +454,12 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     setLado("DERECHA");
     setSobrealtoDef(null);
     setSobrealto("");
+    setPlanoConfig(null);
     // Si el plano del modelo usa sobrealto (ej. corrediza IM6001), trae el valor inicial para poder editarlo
     authFetch(`${API}/mamparas-plano/${sel.id}/config?tipo=${sel.tipo ?? "mampara"}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((c) => {
+        if (c) setPlanoConfig(c.config ?? null);
         if (c && c.sobrealto_def != null) {
           setSobrealtoDef(c.sobrealto_def);
           setSobrealto(String(c.sobrealto_def));
@@ -603,7 +618,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
             <p style={{ margin: "0 0 10px", fontSize: 13, color: "#555" }}>
               Plano de <b>{sel?.modelo}</b>. Elegí el manijón que va en esta mampara.
             </p>
-            {sobrealtoDef == null && (
+            {planoConfig !== "CORREDIZA" && (
               <label style={{ fontSize: 13, display: "block", marginBottom: 8 }}>
                 <b>Mano de la puerta</b>{" "}
                 <select value={lado} onChange={(e) => cambiarLado(e.target.value)}>
