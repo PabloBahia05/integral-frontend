@@ -299,6 +299,10 @@ function dibujarPlano(d) {
     doc.setFillColor(255, 255, 255).lines(deltas, P[0][0], P[0][1], [1, 1], "F", true);
     doc.setDrawColor(0).setLineWidth(0.3).lines(deltas, P[0][0], P[0][1], [1, 1], "S", false);
     doc.setLineWidth(0.4).line(edgeX, P[0][1], edgeX, P[P.length - 1][1]); // el canto del vidrio sigue de corrido
+    // marca "A": remite al detalle ampliado de la escotadura (hoja 2)
+    const bx = edgeX + sgn * 12, by = pos.y + pos.h - yc * s2;
+    doc.setDrawColor(0).setLineWidth(0.25).circle(bx, by, 2.2, "S");
+    doc.setFont("helvetica", "bold").setFontSize(7).setTextColor(0).text("A", bx, by + 0.9, { align: "center" });
   });
 
   const usadosV = {};
@@ -442,6 +446,7 @@ function dibujarPlano(d) {
         (pf.pieza !== "PERFIL" ? `  -  a ${fmt(c.dy)} del ${c.desdeTope ? "tope" : "piso"}` : ""),
     );
   });
+  if (gruposBisagra.length) linea("A = escotadura de bisagra (41 x 62 con relieves R9): ver DETALLE A ampliado en la hoja 2.", false, 7.5);
   if (d.franjas?.length && aDibujar.length) {
     y += 2;
     linea("FRANJAS DEL VIDRIO (de abajo hacia arriba)", true, 10);
@@ -477,7 +482,7 @@ function dibujarPlano(d) {
     const K = 2, x0 = 85, yc = 112;
     const azul = () => doc.setTextColor(0, 90, 160).setFont("helvetica", "normal").setFontSize(9);
     doc.addPage();
-    doc.setFont("helvetica", "bold").setFontSize(12).setTextColor(0).text("DETALLE DE LA ESCOTADURA DE BISAGRA IM4006 (cotas en mm, escala 2:1)", 10, 14);
+    doc.setFont("helvetica", "bold").setFontSize(12).setTextColor(0).text("DETALLE A - ESCOTADURA DE BISAGRA IM4006 (cotas en mm, escala 2:1)", 10, 14);
     doc.setFont("helvetica", "normal").setFontSize(8).text(
       "Escotadura abierta al canto del vidrio. Se hace en el batiente y en el paño fijo, en el canto que mira al otro vidrio.", 10, 20);
     // vidrio y escotadura
@@ -528,6 +533,7 @@ function dibujarPlano(d) {
     if (inf) posTxt.push(`Bisagra inferior: centro a ${fmt(centro(inf))} mm del piso.`);
     posTxt.push("Posiciones medidas sobre el dibujo del fabricante: confirmar con el primer corte.");
     doc.text(doc.splitTextToSize(posTxt.join("\n"), 52), 10, 52);
+    if (doc.getNumberOfPages() > 2) doc.movePage(doc.getNumberOfPages(), 2); // el detalle va como hoja 2
   }
 
   doc.save(`PLANO-${m.presm || m.numeropres || m.id}-REV${m.revision ?? 0}.pdf`);
