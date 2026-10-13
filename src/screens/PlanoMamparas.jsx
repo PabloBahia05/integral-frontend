@@ -33,6 +33,31 @@ function aplicarLado(data, lado) {
 // se dibuja del lado de las bisagras. El plano trae las bisagras con el batiente en su canto izquierdo (x desde la
 // izquierda) y el fijo en su canto derecho; si el manijón queda a la izquierda se espejan y el fijo pasa a la derecha.
 const esBisagra = (pf) => /^bisagra/i.test(String(pf.nombre ?? "").trim());
+
+// Escotadura de la bisagra IM4006 (dibujo del fabricante): abierta al canto del vidrio, 41 de profundidad x 62 de alto,
+// con un relieve R9 (Ø18) en cada esquina del fondo. Los 2 agujeros de la bisagra del plano son los centros de esos relieves
+// (a 36 del canto, 56 entre sí). Devuelve el contorno desde el canto (arriba) hasta el canto (abajo):
+// x = profundidad desde el canto, y = altura relativa al centro de la escotadura (+ arriba).
+const ESCOTADURA = { prof: 41, alto: 62 };
+function contornoEscotadura(R, cx, sep) {
+  const { prof, alto } = ESCOTADURA;
+  const h = alto / 2, c = sep / 2, n = 24;
+  const pts = [{ x: 0, y: h }];
+  const aIni = Math.PI - Math.asin(Math.min(1, (h - c) / R)); // el relieve corta la línea superior
+  const aFin = -Math.acos(Math.max(-1, Math.min(1, (prof - cx) / R))); // y la pared del fondo
+  for (let i = 0; i <= n; i++) {
+    const a = aIni + ((aFin - aIni) * i) / n;
+    pts.push({ x: cx + R * Math.cos(a), y: c + R * Math.sin(a) });
+  }
+  const bIni = -aFin;
+  const bFin = -aIni;
+  for (let i = 0; i <= n; i++) {
+    const a = bIni + ((bFin - bIni) * i) / n;
+    pts.push({ x: cx + R * Math.cos(a), y: -c + R * Math.sin(a) });
+  }
+  pts.push({ x: 0, y: -h });
+  return pts;
+}
 function orientarBisagras(data) {
   if (!data.perforaciones.some(esBisagra)) return data;
   const manijon = data.perforaciones.filter((pf) => pf.pieza === "PUERTA" && /manij|tirador/i.test(String(pf.nombre ?? "")));
@@ -252,6 +277,30 @@ function dibujarPlano(d) {
     doc.setLineDashPattern([], 0);
   };
 
+  // Escotaduras de las bisagras: una por grupo sup./inf. de cada pieza (contorno del corte en el canto del vidrio)
+  const gruposBisagra = [];
+  perforaciones.filter(esBisagra).forEach((pf) => {
+    const sup = /sup\./i.test(pf.nombre);
+    let g = gruposBisagra.find((x) => x.pieza === pf.pieza && x.sup === sup);
+    if (!g) gruposBisagra.push((g = { pieza: pf.pieza, sup, pfs: [] }));
+    g.pfs.push(pf);
+  });
+  gruposBisagra.forEach((g) => {
+    const pos = posPieza[g.pieza];
+    if (!pos || g.pfs.length < 2) return;
+    const [a, b] = g.pfs;
+    const izq = a.x <= a.dDer;
+    const pts = contornoEscotadura(a.diametro / 2, izq ? a.x : a.dDer, Math.abs(a.y - b.y));
+    const yc = (a.y + b.y) / 2;
+    const sgn = izq ? 1 : -1;
+    const edgeX = izq ? pos.x : pos.x + pos.w;
+    const P = pts.map((p) => [edgeX + sgn * p.x * s2, pos.y + pos.h - (yc + p.y) * s2]);
+    const deltas = P.slice(1).map((p, i) => [p[0] - P[i][0], p[1] - P[i][1]]);
+    doc.setFillColor(255, 255, 255).lines(deltas, P[0][0], P[0][1], [1, 1], "F", true);
+    doc.setDrawColor(0).setLineWidth(0.3).lines(deltas, P[0][0], P[0][1], [1, 1], "S", false);
+    doc.setLineWidth(0.4).line(edgeX, P[0][1], edgeX, P[P.length - 1][1]); // el canto del vidrio sigue de corrido
+  });
+
   const usadosV = {};
   const horizHechas = new Set();
   perforaciones.forEach((pf, i) => {
@@ -416,6 +465,70 @@ function dibujarPlano(d) {
     `Medidas presupuesto: ${m.ancho ?? "-"} x ${m.alto ?? "-"}   |   Generado ${new Date().toLocaleDateString("es-AR")}`,
     10, 206,
   );
+
+  // Hoja de detalle de la escotadura de bisagra (escala 2:1), con las cotas del fabricante
+  if (gruposBisagra.length && gruposBisagra[0].pfs.length >= 2) {
+    const g0 = gruposBisagra[0];
+    const [a0, b0] = g0.pfs;
+    const R = a0.diametro / 2;
+    const sep = Math.abs(a0.y - b0.y);
+    const cxd = Math.min(a0.x, a0.dDer);
+    const { prof, alto: altoE } = ESCOTADURA;
+    const K = 2, x0 = 85, yc = 112;
+    const azul = () => doc.setTextColor(0, 90, 160).setFont("helvetica", "normal").setFontSize(9);
+    doc.addPage();
+    doc.setFont("helvetica", "bold").setFontSize(12).setTextColor(0).text("DETALLE DE LA ESCOTADURA DE BISAGRA IM4006 (cotas en mm, escala 2:1)", 10, 14);
+    doc.setFont("helvetica", "normal").setFontSize(8).text(
+      "Escotadura abierta al canto del vidrio. Se hace en el batiente y en el paño fijo, en el canto que mira al otro vidrio.", 10, 20);
+    // vidrio y escotadura
+    doc.setFillColor(205, 225, 250).setDrawColor(0).setLineWidth(0.4).rect(x0, yc - 42 * K, 90 * K, 84 * K, "FD");
+    const P = contornoEscotadura(R, cxd, sep).map((p) => [x0 + p.x * K, yc - p.y * K]);
+    const deltas = P.slice(1).map((p, i) => [p[0] - P[i][0], p[1] - P[i][1]]);
+    doc.setFillColor(255, 255, 255).lines(deltas, P[0][0], P[0][1], [1, 1], "F", true);
+    doc.setDrawColor(0).setLineWidth(0.4).lines(deltas, P[0][0], P[0][1], [1, 1], "S", false);
+    doc.setLineWidth(0.6).line(x0, yc - 42 * K, x0, P[0][1]).line(x0, P[P.length - 1][1], x0, yc + 42 * K);
+    // centros de los relieves
+    const yTop = yc - (sep / 2) * K, yBot = yc + (sep / 2) * K, xc = x0 + cxd * K;
+    doc.setDrawColor(200, 0, 0).setLineWidth(0.2);
+    [yTop, yBot].forEach((yy) => doc.line(xc - 2, yy, xc + 2, yy).line(xc, yy - 2, xc, yy + 2));
+    // 36: canto -> centro del relieve
+    const yl36 = (yc - 42 * K + (yTop - R * K)) / 2; // entre el borde superior del vidrio y el relieve
+    ext(x0, yc - (altoE / 2) * K, x0, yl36 - 1);
+    ext(xc, yTop, xc, yl36 - 1);
+    cota(x0, yl36, xc, yl36);
+    azul(); doc.text(fmt(cxd), (x0 + xc) / 2, yl36 - 1.5, { align: "center" });
+    // 41: profundidad
+    cota(x0, yc, x0 + prof * K, yc);
+    azul(); doc.text(fmt(prof), x0 + (prof * K) / 2, yc - 1.5, { align: "center" });
+    // 62: alto de la escotadura
+    const xv = x0 - 16;
+    ext(x0, yc - (altoE / 2) * K, xv - 1, yc - (altoE / 2) * K);
+    ext(x0, yc + (altoE / 2) * K, xv - 1, yc + (altoE / 2) * K);
+    cota(xv, yc - (altoE / 2) * K, xv, yc + (altoE / 2) * K);
+    azul(); doc.text(fmt(altoE), xv - 2, yc, { angle: 90, align: "center" });
+    // 56: entre centros
+    const xr = xc + R * K + 14;
+    ext(xc, yTop, xr + 1, yTop);
+    ext(xc, yBot, xr + 1, yBot);
+    cota(xr, yTop, xr, yBot);
+    azul(); doc.text(fmt(sep), xr + 3, yc, { angle: 90, align: "center" });
+    // R9
+    const ex = xc + (R * K + 9) * 0.707, ey = yTop - (R * K + 9) * 0.707;
+    doc.setDrawColor(0, 90, 160).setLineWidth(0.2).line(xc, yTop, ex, ey);
+    azul(); doc.text(`R${fmt(R)}`, ex + 1.5, ey - 0.5);
+    // posición en altura
+    const piezaRef = piezas.find((p) => p.pieza === g0.pieza);
+    const sup = gruposBisagra.find((g) => g.pieza === g0.pieza && g.sup);
+    const inf = gruposBisagra.find((g) => g.pieza === g0.pieza && !g.sup);
+    const centro = (g) => (g.pfs[0].y + g.pfs[1].y) / 2;
+    doc.setTextColor(0).setFont("helvetica", "bold").setFontSize(9).text("POSICION EN EL VIDRIO", 10, 46);
+    doc.setFont("helvetica", "normal").setFontSize(8);
+    const posTxt = [];
+    if (sup && piezaRef) posTxt.push(`Bisagra superior: centro a ${fmt(piezaRef.alto - centro(sup))} mm del tope.`);
+    if (inf) posTxt.push(`Bisagra inferior: centro a ${fmt(centro(inf))} mm del piso.`);
+    posTxt.push("Posiciones medidas sobre el dibujo del fabricante: confirmar con el primer corte.");
+    doc.text(doc.splitTextToSize(posTxt.join("\n"), 52), 10, 52);
+  }
 
   doc.save(`PLANO-${m.presm || m.numeropres || m.id}-REV${m.revision ?? 0}.pdf`);
   return avisos;
