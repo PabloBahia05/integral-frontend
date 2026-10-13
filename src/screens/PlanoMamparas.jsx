@@ -19,13 +19,33 @@ const LADO_BASE_MANIJON = "DERECHA";
 // Con puerta a la izquierda se espeja: la distancia al lateral izq. pasa a ser la del der. y viceversa.
 function aplicarLado(data, lado) {
   const l = lado === "IZQUIERDA" && data.plano?.config !== "CORREDIZA" ? "IZQUIERDA" : "DERECHA";
-  if (l === "DERECHA") return { ...data, lado: l };
-  return {
+  if (l === "DERECHA") return orientarBisagras({ ...data, lado: l });
+  return orientarBisagras({
     ...data,
     lado: l,
     perforaciones: data.perforaciones.map((pf) =>
       /^agujero tirador$/i.test(String(pf.nombre ?? "").trim()) ? { ...pf, x: pf.dDer, dDer: pf.x } : pf,
     ),
+  });
+}
+
+// Bisagras (planos paño fijo + batiente como IM4006): van en el canto del batiente OPUESTO al manijón y el paño fijo
+// se dibuja del lado de las bisagras. El plano trae las bisagras con el batiente en su canto izquierdo (x desde la
+// izquierda) y el fijo en su canto derecho; si el manijón queda a la izquierda se espejan y el fijo pasa a la derecha.
+const esBisagra = (pf) => /^bisagra/i.test(String(pf.nombre ?? "").trim());
+function orientarBisagras(data) {
+  if (!data.perforaciones.some(esBisagra)) return data;
+  const manijon = data.perforaciones.filter((pf) => pf.pieza === "PUERTA" && /manij|tirador/i.test(String(pf.nombre ?? "")));
+  const aLaIzq = manijon.filter((pf) => pf.x <= pf.dDer).length;
+  // Sin manijón elegido se toma la mano: derecha = manija a la derecha (bisagras y fijo a la izquierda)
+  const manijaIzq = manijon.length ? aLaIzq >= manijon.length - aLaIzq : data.lado === "IZQUIERDA";
+  const fijoIzq = !manijaIzq;
+  return {
+    ...data,
+    fijoIzq,
+    perforaciones: fijoIzq
+      ? data.perforaciones
+      : data.perforaciones.map((pf) => (esBisagra(pf) ? { ...pf, x: pf.dDer, dDer: pf.x } : pf)),
   };
 }
 
@@ -133,7 +153,9 @@ function dibujarPlano(d) {
   const secuenciaBase =
     plano.config === "RECTA" && plano.fijos >= 2 ? ["FIJO", "PUERTA", "PUERTA", "FIJO"] : ["FIJO", "PUERTA"];
   const secuencia =
-    d.lado === "IZQUIERDA" && secuenciaBase.length === 2 ? [...secuenciaBase].reverse() : secuenciaBase;
+    d.fijoIzq != null && secuenciaBase.length === 2
+      ? d.fijoIzq ? ["FIJO", "PUERTA"] : ["PUERTA", "FIJO"] // planos con bisagras: el fijo va del lado de las bisagras
+      : d.lado === "IZQUIERDA" && secuenciaBase.length === 2 ? [...secuenciaBase].reverse() : secuenciaBase;
   const unaPieza = !fijo && !puerta;
   const panos = piezas.filter((p) => p.pieza !== "PERFIL");
   const gx = 10, gy = 34, gw = 140, gh = 82;
@@ -180,7 +202,10 @@ function dibujarPlano(d) {
   const ax = 160, aTop = 50, aW = 122, aH = plano.vidrio === "8MM" ? 138 : 128;
   const aDibujar = piezas.filter((p) => p.pieza !== "PERFIL");
   // Con puerta a la izquierda, la puerta se dibuja primero (a la izquierda), igual que en la vista general
-  if (d.lado === "IZQUIERDA") aDibujar.sort((a, b) => (a.pieza === "PUERTA" ? 0 : 1) - (b.pieza === "PUERTA" ? 0 : 1));
+  if (d.fijoIzq != null) {
+    aDibujar.sort((a, b) => (a.pieza === "FIJO" ? 0 : 1) - (b.pieza === "FIJO" ? 0 : 1)); // fijo primero
+    if (!d.fijoIzq) aDibujar.reverse();
+  } else if (d.lado === "IZQUIERDA") aDibujar.sort((a, b) => (a.pieza === "PUERTA" ? 0 : 1) - (b.pieza === "PUERTA" ? 0 : 1));
   if (d.franjas?.length && d.franjas[d.franjas.length - 1].medida != null) {
     const suma = d.franjas.reduce((a, f) => a + f.medida, 0);
     [...new Set(aDibujar.map((p) => p.alto))].forEach((alto) => {
@@ -261,17 +286,40 @@ function dibujarPlano(d) {
       doc.text(fmt(c.dx), (bordeX + hx) / 2, yl - 1.2, { align: "center" });
     }
 
-    // cota vertical: del tope/piso de referencia al centro del agujero (por fuera de la pieza)
-    const bordeY = c.desdeTope ? pos.y : pos.y + pos.h;
-    const claveV = `${pf.pieza}-${c.izq}-${c.desdeTope}`;
-    const k = usadosV[claveV] ?? 0;
-    usadosV[claveV] = k + 1;
-    const xl = c.izq ? pos.x - 5 - 5 * k : pos.x + pos.w + 5 + 5 * k;
-    ext(c.izq ? pos.x : pos.x + pos.w, bordeY, xl + (c.izq ? -1 : 1), bordeY);
-    ext(hx, hy, xl + (c.izq ? -1 : 1), hy);
-    cota(xl, bordeY, xl, hy);
-    const ym = (bordeY + hy) / 2 + 0.8;
-    doc.text(fmt(c.dy), c.izq ? xl - 1.5 : xl + 1.5, ym, { align: c.izq ? "right" : "left" });
+    if (esBisagra(pf)) {
+      // Bisagras: una sola cota vertical por bisagra (al centro del par de agujeros), por el lado de afuera de la pieza
+      // (el canto de la bisagra mira al otro vidrio, donde no hay lugar). Las 2 bisagras: la de arriba desde el tope, la de abajo desde el piso.
+      const sup = /sup\./i.test(pf.nombre);
+      const par = perforaciones.filter((o) => o.pieza === pf.pieza && esBisagra(o) && /sup\./i.test(o.nombre) === sup);
+      if (par[0] === pf) {
+        const yc = par.reduce((a, o) => a + o.y, 0) / par.length;
+        const hyc = pos.y + pos.h - yc * s2;
+        const bordeYb = sup ? pos.y : pos.y + pos.h;
+        const valor = sup ? pos.h / s2 - yc : yc;
+        const izqAfuera = !c.izq;
+        const claveB = `${pf.pieza}-${izqAfuera}-${sup}`;
+        const kb = usadosV[claveB] ?? 0;
+        usadosV[claveB] = kb + 1;
+        const xb = izqAfuera ? pos.x - 5 - 5 * kb : pos.x + pos.w + 5 + 5 * kb;
+        const dir = izqAfuera ? -1 : 1;
+        ext(izqAfuera ? pos.x : pos.x + pos.w, bordeYb, xb + dir, bordeYb);
+        ext(izqAfuera ? pos.x : pos.x + pos.w, hyc, xb + dir, hyc);
+        cota(xb, bordeYb, xb, hyc);
+        doc.text(fmt(valor), xb + dir * 1.5, (bordeYb + hyc) / 2 + 0.8, { align: izqAfuera ? "right" : "left" });
+      }
+    } else {
+      // cota vertical: del tope/piso de referencia al centro del agujero (por fuera de la pieza)
+      const bordeY = c.desdeTope ? pos.y : pos.y + pos.h;
+      const claveV = `${pf.pieza}-${c.izq}-${c.desdeTope}`;
+      const k = usadosV[claveV] ?? 0;
+      usadosV[claveV] = k + 1;
+      const xl = c.izq ? pos.x - 5 - 5 * k : pos.x + pos.w + 5 + 5 * k;
+      ext(c.izq ? pos.x : pos.x + pos.w, bordeY, xl + (c.izq ? -1 : 1), bordeY);
+      ext(hx, hy, xl + (c.izq ? -1 : 1), hy);
+      cota(xl, bordeY, xl, hy);
+      const ym = (bordeY + hy) / 2 + 0.8;
+      doc.text(fmt(c.dy), c.izq ? xl - 1.5 : xl + 1.5, ym, { align: c.izq ? "right" : "left" });
+    }
 
     // diámetro
     doc.setTextColor(200, 0, 0).setFont("helvetica", "bold");
