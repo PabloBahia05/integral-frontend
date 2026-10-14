@@ -415,59 +415,78 @@ export function rotarBPP(contenidoOriginal, angulo) {
 
 // Extrae del texto de un .bpp el panel y los taladros (verticales y
 // laterales) para dibujarlos. Se usa con el original y con el rotado.
+//
+// Los verticales se dibujan sobre el panel. Los laterales se dibujan como en
+// la vista "Pieza" de BiesseWorks: el panel al centro y, alrededor, una tira
+// por cada canto (del ancho del espesor LPZ, separada del panel). Cada
+// taladro lateral es un punto dentro de la tira de su canto:
+//   - a lo largo de la tira: su posición sobre el canto (campo 2);
+//   - a lo ancho de la tira: su altura dentro del espesor (campo 3), medida
+//     desde el borde de la tira que mira al panel (= cara superior).
 function extraerFormasBPP(contenido) {
   const panel = leerPanel(contenido);
   if (!panel) return { formas: [], detalle: "" };
   const { W, H } = panel;
+  const Z = panel.Z > 0 ? panel.Z : 18;
+  const sep = Z * 1.5; // separación panel <-> tira
   const radioMin = Math.max(3, Math.max(W, H) * 0.004);
   const formas = [{ t: "rect", x: 0, y: 0, w: W, h: H }];
+  const laterales = [];
   let nV = 0;
-  let nL = 0;
 
   for (const linea of contenido.split(/\r?\n/)) {
     const op = parsearOperacion(linea);
     if (!op || !op.activa) continue;
     const { campos } = op;
     const dia = evaluar(campos[6], panel);
-    const r = Number.isFinite(dia) ? Math.max(dia / 2, radioMin) : radioMin;
 
     if (esTaladroLateral(op, panel)) {
       const lado = LADOS[evaluar(campos[0], panel)];
       const s = evaluar(campos[2], panel);
       if (!lado || !Number.isFinite(s)) continue;
-      const prof = evaluar(campos[5], panel);
-      const largo = Number.isFinite(prof) ? prof : radioMin * 4;
-      const rr = Number.isFinite(dia) ? dia / 2 : radioMin;
-      const [ex, ey] = puntoEnBorde(lado, s, W, H);
-      const dir = { L: [1, 0], R: [-1, 0], B: [0, 1], T: [0, -1] }[lado];
-      const perp = [Math.abs(dir[1]), Math.abs(dir[0])];
-      const p1 = [ex + perp[0] * rr, ey + perp[1] * rr];
-      const p2 = [ex - perp[0] * rr, ey - perp[1] * rr];
-      const p3 = [p2[0] + dir[0] * largo, p2[1] + dir[1] * largo];
-      const p4 = [p1[0] + dir[0] * largo, p1[1] + dir[1] * largo];
-      formas.push({ t: "poly", pts: [p1, p2, p3, p4], cerrada: true });
-      formas.push({
-        t: "circle",
-        cx: ex,
-        cy: ey,
-        r: Math.max(rr * 0.6, radioMin * 0.6),
-        relleno: true,
-      });
-      nL++;
+      let alto = evaluar(campos[3], panel);
+      if (!Number.isFinite(alto)) alto = Z / 2;
+      alto = Math.min(Math.max(alto, 0), Z);
+      const r = Math.min(
+        Number.isFinite(dia) ? Math.max(dia / 2, radioMin * 0.6) : radioMin,
+        Z * 0.45,
+      );
+      laterales.push({ lado, s, alto, r });
       continue;
     }
 
     if (esBGNoContemplado(op, panel)) continue;
     const lect = leerTaladroVertical(op, panel);
     if (!lect) continue;
+    const r = Number.isFinite(dia) ? Math.max(dia / 2, radioMin) : radioMin;
     for (const [px, py] of lect.puntos) {
       formas.push({ t: "circle", cx: px, cy: py, r, relleno: true });
       nV++;
     }
   }
+
+  if (laterales.length) {
+    // Tiras de los 4 cantos (como BiesseWorks, aunque algunas queden vacías).
+    formas.push({ t: "rect", x: -sep - Z, y: 0, w: Z, h: H }); // L (lado 1)
+    formas.push({ t: "rect", x: W + sep, y: 0, w: Z, h: H }); // R (lado 3)
+    formas.push({ t: "rect", x: 0, y: -sep - Z, w: W, h: Z }); // B (lado 2)
+    formas.push({ t: "rect", x: 0, y: H + sep, w: W, h: Z }); // T (lado 4)
+    for (const { lado, s, alto, r } of laterales) {
+      let cx, cy;
+      if (lado === "L") [cx, cy] = [-sep - alto, s];
+      else if (lado === "R") [cx, cy] = [W + sep + alto, s];
+      else if (lado === "B") [cx, cy] = [s, -sep - alto];
+      else [cx, cy] = [s, H + sep + alto];
+      formas.push({ t: "circle", cx, cy, r, relleno: true });
+    }
+  }
+
+  const nL = laterales.length;
   return {
     formas,
-    detalle: `Panel ${W}×${H} mm · ${nV} vertical(es) · ${nL} lateral(es)`,
+    detalle:
+      `Panel ${W}×${H} mm · ${nV} vertical(es) · ${nL} lateral(es)` +
+      (nL ? " · tiras = cantos (vista Pieza)" : ""),
   };
 }
 
