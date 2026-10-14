@@ -6,36 +6,106 @@ import { useState, useRef } from "react";
  * Convierte en lote los .dxf de una carpeta a .bpp (Biesse). Los .bpp quedan
  * en la MISMA carpeta, con el mismo nombre que el .dxf.
  *
- * Cómo arma cada .bpp:
- *   - Panel: el rectángulo envolvente (bounding box) del CONTORNO del DXF
- *     (LINE, LWPOLYLINE, POLYLINE y puntos extremos de ARC). Esa esquina
- *     inferior-izquierda pasa a ser el origen (0,0). LPX = ancho, LPY = alto.
- *   - Taladros: cada CIRCLE del DXF pasa a un @ BV (taladro vertical) con
- *     X/Y absolutos desde abajo-izquierda (CRN = 2) y diámetro = 2 × radio.
- *     Se puede limitar a una capa (layer) concreta.
- *   - Todo lo demás (cabecera, variables PAN=..., herramienta, profundidad,
- *     pie del archivo) sale de un .bpp MODELO que se elige una vez: se
- *     toman sus líneas y se reemplazan solamente LPX / LPY (y LPZ si se
- *     indica espesor) y las operaciones @ BV / @ BH / @ BG. La primera
- *     @ BV activa del modelo se usa como molde de cada taladro.
+ * Reglas (sacadas de los DXF/BPP reales de TV22; la capa del DXF ES el
+ * nombre de la herramienta del .bpp):
  *
- * Campos de @ BV que se modifican (mismos índices que usa RotarBPP):
- *   1 = CRN ("2") · 2 = X · 3 = Y · 6 = diámetro · 8 = RTY (-1, sin repetición)
- *   · 14 = NRP (1). El resto (profundidad, herramienta, etc.) queda como en
- *   el modelo. El ID de cada taladro (4º campo de la cabecera) se incrementa.
+ *   Capa de herramienta: TCHW<cara>B<n>D<cccc>[TTY0]
+ *     - <cccc> / 100 = profundidad (verticales) o altura dentro del espesor
+ *       (laterales). Ej.: D1200 -> 12 · D1250 -> 12.5 · D0900 -> 9.
+ *     - El nombre completo de la capa se escribe como herramienta del BG.
  *
- * Qué NO se convierte (se avisa por archivo): cualquier entidad del DXF que
- * no sea contorno ni CIRCLE (INSERT, TEXT, MTEXT, DIMENSION, SPLINE, etc.).
+ *   Panel (LPX/LPY): rectángulo envolvente del contorno, que es la
+ *     LWPOLYLINE más grande del DXF (capa TCHW0B8D1800 -> 18 mm, TCHW0B8D2500
+ *     -> 25 mm). Su esquina inferior-izquierda pasa a ser (0,0).
+ *     Espesor (LPZ): <cccc>/100 de la capa del contorno, o el valor que se
+ *     escriba en la pantalla.
  *
- * Requiere Chrome o Edge (File System Access API) para escribir en la carpeta.
- * Codificación de salida: Latin-1, igual que RotarBPP.
+ *   Verticales (cara 0): cada CIRCLE -> @ BG cara 0, X/Y desde abajo-izq.,
+ *     diámetro = 2 x radio, profundidad = código de su capa (salvo los
+ *     diámetros de PROFUNDIDAD_POR_DIAMETRO, que usan su valor fijo).
+ *
+ *   Laterales (caras 1 y 3): cada rectángulo (LWPOLYLINE de 4 puntos) pegado
+ *     al borde izquierdo (cara 1) o derecho (cara 3) -> @ BG con
+ *       diámetro = ancho del rectángulo (lado paralelo al borde),
+ *       profundidad = largo del rectángulo (hacia adentro del panel),
+ *       posición = centro del rectángulo a lo largo del borde (Y),
+ *       altura = código de su capa.
+ *     Rectángulos pegados al borde inferior/superior (caras 2/4) no se
+ *     convierten porque no hay un .bpp real para verificarlos: se avisa.
+ *
+ *   No se convierte (se avisa por archivo): círculos fuera del contorno,
+ *   círculos en capas que no son de herramienta, polilíneas que no son
+ *   contorno ni laterales, y cualquier otra entidad (INSERT, ARC, etc.).
+ *   Los TEXT se ignoran (son solo el rótulo de la pieza).
+ *
+ * La cabecera, las variables PAN=... y el pie del .bpp son los mismos de
+ * los .bpp reales (idénticos en los 7 archivos de TV22), salvo LPX/LPY/LPZ.
+ *
+ * Requiere Chrome o Edge (File System Access API) para escribir en la
+ * carpeta. Salida en Latin-1 con fin de línea CRLF, igual que Biesse.
  */
 
-const RE_OP = /^(@ |' )(BV|BH|BG),(.*?) : (.*)$/;
-const CLAVE_MODELO = "integral_dxf2bpp_modelo";
-const TIPOS_CONTORNO_O_AUX = new Set([
-  "LINE", "LWPOLYLINE", "POLYLINE", "VERTEX", "SEQEND", "ARC", "CIRCLE",
-]);
+// ---- Cabecera / pie del .bpp (idénticos en los .bpp reales) ----------------
+
+const BPP_CABECERA = [
+  "[HEADER]", "TYPE=BPP", "VER=150", "", "[DESCRIPTION]", "|", "", "[VARIABLES]",
+];
+
+const BPP_VARIABLES_RESTO = [
+  'PAN=ORLST|"5"||3|',
+  "PAN=SIMMETRY|1||1|",
+  "PAN=TLCHK|0||1|",
+  'PAN=TOOLING|""||3|',
+  'PAN=CUSTSTR|$B$KBsExportToNc.XncExtraPanelData$V""||3|',
+  "PAN=FCN|1.000000||2|",
+  "PAN=XCUT|0||4|",
+  "PAN=YCUT|0||4|",
+  "PAN=JIGTH|0||4|",
+  "PAN=CKOP|0||1|",
+  "PAN=UNIQUE|0||1|",
+  'PAN=MATERIAL|"wood"||3|',
+  'PAN=PUTLST|""||3|',
+  "PAN=OPPWKRS|0||1|",
+  "PAN=UNICLAMP|0||1|",
+  "PAN=CHKCOLL|0||1|",
+  "PAN=WTPIANI|0||1|",
+  "PAN=COLLTOOL|0||1|",
+  "PAN=CALCEDTH|0||1|",
+  "PAN=ENABLELABEL|0||1|",
+  "PAN=LOCKWASTE|0||1|",
+  "PAN=LOADEDGEOPT|0||1|",
+  "PAN=ITLTYPE|0||1|",
+  "PAN=RUNPAV|0||1|",
+  "PAN=FLIPEND|0||1|",
+  "",
+  "[PROGRAM]",
+  "",
+];
+
+const BPP_PIE = [
+  "", "[VBSCRIPT]", "", "[MACRODATA]", "", "[TDCODES]", "", "[PCF]", "",
+  "[TOOLING]", "", "[SUBPROGS]", "", "",
+];
+
+const ESPESOR_POR_DEFECTO = 18;
+
+// Profundidad fija por diámetro de taladro vertical (mm). Si el diámetro está
+// acá, se usa este valor en vez del código de la capa. Hoy: los de 15 mm van
+// a 14.5 (como en BASEI, LATD y FAJA1), aunque su capa diga D1250 (12.5).
+// Para que se guíe solo por la capa, dejá el objeto vacío: {}.
+const PROFUNDIDAD_POR_DIAMETRO = { 15: 14.5 };
+const SALTO = "\r\n";
+const TOL = 0.05; // mm, para decidir si algo está pegado al borde
+
+// Capa de herramienta: TCHW<cara>B<n>D<cccc>...
+const RE_CAPA_HERRAMIENTA = /^TCHW(\d)B\d+D(\d{4})/;
+
+function codigoDeCapa(capa) {
+  const m = RE_CAPA_HERRAMIENTA.exec(capa || "");
+  return m ? parseInt(m[2], 10) / 100 : null;
+}
+
+// ---- Utilidades -------------------------------------------------------------
 
 function decodificarLatin1(buffer) {
   return new TextDecoder("iso-8859-1").decode(buffer);
@@ -58,84 +128,13 @@ function formatearPanel(n) {
   return n.toFixed(6);
 }
 
-// Separa los campos por coma respetando las comillas.
-function dividirCampos(resto) {
-  const out = [];
-  let cur = "";
-  let enComillas = false;
-  for (const ch of resto) {
-    if (ch === '"') enComillas = !enComillas;
-    if (ch === "," && !enComillas) {
-      out.push(cur.trim());
-      cur = "";
-      continue;
-    }
-    cur += ch;
-  }
-  out.push(cur.trim());
-  return out;
-}
+// ---- Lectura del DXF --------------------------------------------------------
 
-// Cambia el ID (4º campo de la cabecera) sumándole `i`.
-function cabeceraConId(cabecera, i) {
-  if (!i) return cabecera;
-  return cabecera.replace(
-    /^(.*?,\s*"[^"]*",\s*"[^"]*",\s*)(\d+)(.*)$/,
-    (_, a, id, b) => `${a}${Number(id) + i}${b}`,
-  );
-}
-
-/* ------------------------------ Modelo .bpp ------------------------------ */
-
-// Analiza el .bpp modelo. Devuelve la cabecera/campos de la primera @ BV
-// activa, las líneas que no son operaciones y dónde insertar las nuevas.
-function analizarModelo(texto) {
-  const salto = texto.includes("\r\n") ? "\r\n" : "\n";
-  const lineas = texto.split(/\r?\n/);
-  if (!/PAN=LPX\|/.test(texto) || !/PAN=LPY\|/.test(texto)) {
-    throw new Error("El modelo no tiene PAN=LPX / PAN=LPY. ¿Es un .bpp de panel válido?");
-  }
-
-  const resto = [];
-  let posInsercion = -1;
-  let plantilla = null;
-  let opsDescartadas = 0;
-
-  for (const l of lineas) {
-    const esOp = l.startsWith("@ ") || /^' (BV|BH|BG),/.test(l);
-    if (!esOp) {
-      resto.push(l);
-      continue;
-    }
-    if (posInsercion < 0) posInsercion = resto.length;
-    const m = l.match(RE_OP);
-    if (!plantilla && m && m[1] === "@ " && m[2] === "BV") {
-      plantilla = { cabecera: `${m[1]}${m[2]},${m[3]}`, campos: dividirCampos(m[4]) };
-    } else {
-      opsDescartadas++;
-    }
-  }
-
-  if (!plantilla) {
-    throw new Error(
-      "El modelo no tiene ninguna operación @ BV activa (taladro vertical). Elegí un .bpp que tenga al menos un taladro vertical.",
-    );
-  }
-  if (plantilla.campos.length < 7) {
-    throw new Error("La @ BV del modelo tiene menos campos de los esperados; no se puede usar como molde.");
-  }
-  if (posInsercion < 0) posInsercion = resto.length;
-
-  return { salto, resto, posInsercion, plantilla, opsDescartadas };
-}
-
-/* --------------------------------- DXF ---------------------------------- */
-
-function leerDXF(texto, capa) {
+function leerDXF(texto) {
   const lineas = texto.split(/\r?\n/);
   const registros = [];
   for (let i = 0; i + 1 < lineas.length; i += 2) {
-    registros.push({ code: parseInt(lineas[i].trim(), 10), value: lineas[i + 1] });
+    registros.push({ code: parseInt(lineas[i].trim(), 10), value: lineas[i + 1].trim() });
   }
 
   const entidades = [];
@@ -143,16 +142,15 @@ function leerDXF(texto, capa) {
   let actual = null;
   for (const r of registros) {
     if (r.code === 0) {
-      const v = r.value.trim();
-      if (v === "SECTION") { seccion = "PENDIENTE"; actual = null; continue; }
-      if (v === "ENDSEC") { seccion = null; actual = null; continue; }
+      if (r.value === "SECTION") { seccion = "PENDIENTE"; actual = null; continue; }
+      if (r.value === "ENDSEC") { seccion = null; actual = null; continue; }
       if (seccion === "ENTITIES") {
-        actual = { tipo: v, datos: [] };
+        actual = { tipo: r.value, datos: [] };
         entidades.push(actual);
       }
       continue;
     }
-    if (r.code === 2 && seccion === "PENDIENTE") { seccion = r.value.trim(); continue; }
+    if (r.code === 2 && seccion === "PENDIENTE") { seccion = r.value; continue; }
     if (seccion === "ENTITIES" && actual) actual.datos.push(r);
   }
 
@@ -163,143 +161,197 @@ function leerDXF(texto, capa) {
   };
   const capaDe = (datos) => {
     const d = datos.find((x) => x.code === 8);
-    return d ? d.value.trim() : "";
+    return d ? d.value : "";
   };
 
-  const puntos = []; // puntos del contorno
+  const polilineas = [];
   const circulos = [];
   const ignorados = {};
-  const rad = (g) => (g * Math.PI) / 180;
 
   for (const e of entidades) {
     const d = e.datos;
-    if (e.tipo === "LINE") {
-      const x1 = num(d, 10), y1 = num(d, 20), x2 = num(d, 11), y2 = num(d, 21);
-      if (x1 !== null && y1 !== null) puntos.push([x1, y1]);
-      if (x2 !== null && y2 !== null) puntos.push([x2, y2]);
-    } else if (e.tipo === "LWPOLYLINE") {
+    if (e.tipo === "LWPOLYLINE") {
+      const pts = [];
       for (let i = 0; i < d.length; i++) {
         if (d[i].code === 10 && d[i + 1] && d[i + 1].code === 20) {
           const x = parseFloat(d[i].value);
           const y = parseFloat(d[i + 1].value);
-          if (Number.isFinite(x) && Number.isFinite(y)) puntos.push([x, y]);
+          if (Number.isFinite(x) && Number.isFinite(y)) pts.push([x, y]);
         }
       }
-    } else if (e.tipo === "VERTEX") {
-      const x = num(d, 10), y = num(d, 20);
-      if (x !== null && y !== null) puntos.push([x, y]);
-    } else if (e.tipo === "ARC") {
-      const cx = num(d, 10), cy = num(d, 20), r = num(d, 40), a0 = num(d, 50), a1 = num(d, 51);
-      if ([cx, cy, r, a0, a1].every((v) => v !== null)) {
-        puntos.push([cx + r * Math.cos(rad(a0)), cy + r * Math.sin(rad(a0))]);
-        puntos.push([cx + r * Math.cos(rad(a1)), cy + r * Math.sin(rad(a1))]);
+      if (pts.length) {
+        polilineas.push({ capa: capaDe(d), pts, cerrada: ((num(d, 70) || 0) & 1) === 1 });
       }
     } else if (e.tipo === "CIRCLE") {
       const cx = num(d, 10), cy = num(d, 20), r = num(d, 40);
       if (cx !== null && cy !== null && r !== null && r > 0) {
-        if (!capa || capaDe(d) === capa) circulos.push({ cx, cy, d: r * 2 });
+        circulos.push({ capa: capaDe(d), cx, cy, dia: r * 2 });
       }
-    } else if (!TIPOS_CONTORNO_O_AUX.has(e.tipo)) {
+    } else if (e.tipo !== "TEXT") {
       ignorados[e.tipo] = (ignorados[e.tipo] || 0) + 1;
     }
   }
 
-  return { puntos, circulos, ignorados };
+  return { polilineas, circulos, ignorados };
 }
 
-/* ------------------------------ Conversión ------------------------------ */
+// ---- Conversión -------------------------------------------------------------
 
-function generarBPP(modelo, dxf, espesor, capa) {
-  const { puntos, circulos, ignorados } = dxf;
-  if (!puntos.length) {
-    throw new Error("El DXF no tiene contorno del panel (LINE / LWPOLYLINE / POLYLINE / ARC).");
-  }
-  if (!circulos.length) {
-    throw new Error(
-      capa
-        ? `El DXF no tiene círculos (CIRCLE) en la capa "${capa}".`
-        : "El DXF no tiene círculos (CIRCLE) para convertir en taladros.",
-    );
-  }
-
+function bboxDe(pts) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const [x, y] of puntos) {
+  for (const [x, y] of pts) {
     if (x < minX) minX = x;
     if (x > maxX) maxX = x;
     if (y < minY) minY = y;
     if (y > maxY) maxY = y;
   }
+  return { minX, minY, maxX, maxY };
+}
+
+function lineaBG({ id, cara, x, y, prof, dia, herramienta, n }) {
+  const campos = [
+    cara, '"2"', formatearNumero(x), formatearNumero(y), 0,
+    formatearNumero(prof), formatearNumero(dia),
+    0, -1, 32, 32, 50, 0, 45, 0, '""', 1,
+    0, 0, 0, 0, 0, 0, 0, 0, 1,
+    0, 0, 0, 0, 0, -1, `"P${1000 + n}"`, 0, '""', '""',
+    0, 0, 0, 0, 0, '""', 0, 0, 0, 0, 0, '""', '""', `"${herramienta}"`, 0,
+  ];
+  return `@ BG, "", "", ${id}, "", 0 : ${campos.join(", ")}`;
+}
+
+function convertirDXF(dxf, espesorManual) {
+  const { polilineas, circulos, ignorados } = dxf;
+  if (!polilineas.length) {
+    throw new Error("El DXF no tiene contorno del panel (LWPOLYLINE).");
+  }
+
+  // Contorno = la polilínea de mayor área.
+  let contorno = null;
+  let mejor = -1;
+  for (const p of polilineas) {
+    const b = bboxDe(p.pts);
+    const area = (b.maxX - b.minX) * (b.maxY - b.minY);
+    if (area > mejor) { mejor = area; contorno = { ...p, b }; }
+  }
+  const { minX, minY, maxX, maxY } = contorno.b;
   const W = maxX - minX;
   const H = maxY - minY;
   if (W <= 0 || H <= 0) throw new Error("El contorno del DXF tiene ancho o alto igual a cero.");
 
   const avisos = [];
-  const tol = 0.01;
-  const dentro = circulos.filter(
-    (c) => c.cx >= minX - tol && c.cx <= maxX + tol && c.cy >= minY - tol && c.cy <= maxY + tol,
-  );
-  const fuera = circulos.length - dentro.length;
-  if (fuera > 0) avisos.push(`${fuera} círculo(s) quedaron fuera del contorno y no se convirtieron.`);
-  if (!dentro.length) throw new Error("Ningún círculo cae dentro del contorno del panel.");
+  const ops = [];
 
-  const tiposIgn = Object.entries(ignorados);
-  if (tiposIgn.length) {
+  let espesor = espesorManual;
+  if (!espesor) {
+    espesor = codigoDeCapa(contorno.capa) || ESPESOR_POR_DEFECTO;
+    if (!codigoDeCapa(contorno.capa)) {
+      avisos.push(
+        `La capa del contorno (${contorno.capa || "sin capa"}) no indica el espesor: se usó ${ESPESOR_POR_DEFECTO} mm.`,
+      );
+    }
+  }
+
+  // Laterales: rectángulos pegados a los bordes izquierdo / derecho.
+  let polisSueltas = 0;
+  let ladosNoSoportados = 0;
+  const laterales = [];
+  for (const p of polilineas) {
+    if (p === contorno || p.pts === contorno.pts) continue;
+    const b = bboxDe(p.pts);
+    const a0 = b.minX - minX, a1 = b.maxX - minX;
+    const b0 = b.minY - minY, b1 = b.maxY - minY;
+    const esRect = p.cerrada && p.pts.length === 4;
+    const pegadoIzq = Math.abs(a0) < TOL;
+    const pegadoDer = Math.abs(a1 - W) < TOL;
+    const pegadoInf = Math.abs(b0) < TOL;
+    const pegadoSup = Math.abs(b1 - H) < TOL;
+    if (!esRect || !(pegadoIzq || pegadoDer || pegadoInf || pegadoSup)) {
+      polisSueltas++;
+      continue;
+    }
+    if ((pegadoIzq || pegadoDer) && !(pegadoInf || pegadoSup)) {
+      const alturaZ = codigoDeCapa(p.capa);
+      if (alturaZ === null) {
+        avisos.push(`Un lateral está en la capa "${p.capa}", que no es de herramienta: no se convirtió.`);
+        continue;
+      }
+      laterales.push({
+        cara: pegadoIzq ? 1 : 3,
+        x: (b0 + b1) / 2, // posición a lo largo del borde
+        y: alturaZ,
+        prof: a1 - a0,
+        dia: b1 - b0,
+        herramienta: p.capa,
+      });
+    } else {
+      ladosNoSoportados++;
+    }
+  }
+  if (polisSueltas) {
+    avisos.push(`${polisSueltas} polilínea(s) que no son contorno ni laterales no se convirtieron.`);
+  }
+  if (ladosNoSoportados) {
     avisos.push(
-      `Entidades no convertidas: ${tiposIgn.map(([t, n]) => `${t} (${n})`).join(", ")}.`,
+      `${ladosNoSoportados} taladro(s) en el borde inferior/superior no se convirtieron (lados 2 y 4 sin verificar).`,
     );
   }
 
-  const { salto, resto, posInsercion, plantilla } = modelo;
-  const lineas = resto.map((l) => {
-    if (l.startsWith("PAN=LPX|")) return l.replace(/PAN=LPX\|[^|]*/, `PAN=LPX|${formatearPanel(W)}`);
-    if (l.startsWith("PAN=LPY|")) return l.replace(/PAN=LPY\|[^|]*/, `PAN=LPY|${formatearPanel(H)}`);
-    if (espesor && l.startsWith("PAN=LPZ|")) {
-      return l.replace(/PAN=LPZ\|[^|]*/, `PAN=LPZ|${formatearPanel(espesor)}`);
-    }
-    return l;
-  });
+  // Verticales: círculos dentro del contorno.
+  const verticales = [];
+  let fuera = 0;
+  let sinHerramienta = 0;
+  for (const c of circulos) {
+    const x = c.cx - minX;
+    const y = c.cy - minY;
+    if (x < -TOL || x > W + TOL || y < -TOL || y > H + TOL) { fuera++; continue; }
+    const profCapa = codigoDeCapa(c.capa);
+    if (profCapa === null) { sinHerramienta++; continue; }
+    const prof = PROFUNDIDAD_POR_DIAMETRO[formatearNumero(c.dia)] ?? profCapa;
+    verticales.push({ cara: 0, x, y, prof, dia: c.dia, herramienta: c.capa });
+  }
+  if (fuera) avisos.push(`${fuera} círculo(s) fuera del contorno no se convirtieron.`);
+  if (sinHerramienta) {
+    avisos.push(`${sinHerramienta} círculo(s) en capas que no son de herramienta no se convirtieron.`);
+  }
 
-  const ops = dentro.map((c, i) => {
-    const campos = [...plantilla.campos];
-    campos[1] = '"2"';
-    campos[2] = formatearNumero(c.cx - minX);
-    campos[3] = formatearNumero(c.cy - minY);
-    campos[6] = formatearNumero(c.d);
-    if (campos[8] !== undefined) campos[8] = "-1";
-    if (campos[14] !== undefined) campos[14] = "1";
-    return `${cabeceraConId(plantilla.cabecera, i)} : ${campos.join(", ")}`;
-  });
+  ops.push(...verticales, ...laterales);
+  if (!ops.length) {
+    throw new Error("No hay taladros para convertir (círculos o rectángulos laterales válidos).");
+  }
 
-  lineas.splice(posInsercion, 0, ...ops);
+  const tiposIgn = Object.entries(ignorados);
+  if (tiposIgn.length) {
+    avisos.push(`Entidades no convertidas: ${tiposIgn.map(([t, n]) => `${t} (${n})`).join(", ")}.`);
+  }
+
+  const lineas = [
+    ...BPP_CABECERA,
+    `PAN=LPX|${formatearPanel(W)}||4|`,
+    `PAN=LPY|${formatearPanel(H)}||4|`,
+    `PAN=LPZ|${formatearPanel(espesor)}||4|`,
+    ...BPP_VARIABLES_RESTO,
+    ...ops.map((o, i) => lineaBG({ ...o, id: 270000000 + i * 64, n: i })),
+    ...BPP_PIE,
+  ];
 
   return {
-    contenido: lineas.join(salto),
+    contenido: lineas.join(SALTO),
     W,
     H,
-    cantidad: ops.length,
+    espesor,
+    nVerticales: verticales.length,
+    nLaterales: laterales.length,
     avisos,
   };
 }
 
 /* ---- UI ---- */
 
-function cargarModeloGuardado() {
-  try {
-    const s = localStorage.getItem(CLAVE_MODELO);
-    if (!s) return null;
-    const { nombre, texto } = JSON.parse(s);
-    return { nombre, texto, analizado: analizarModelo(texto) };
-  } catch {
-    return null;
-  }
-}
-
 const COLORES_ESTADO = { ok: "#2e7d32", error: "#c0392b", salteado: "#b8860b" };
 
 export default function DxfABpp({ onVolver }) {
-  const [modelo, setModelo] = useState(cargarModeloGuardado);
   const [carpeta, setCarpeta] = useState("");
-  const [capa, setCapa] = useState("");
   const [espesor, setEspesor] = useState("");
   const [pisar, setPisar] = useState(true);
   const [procesando, setProcesando] = useState(false);
@@ -308,28 +360,6 @@ export default function DxfABpp({ onVolver }) {
   const dirRef = useRef(null);
 
   const soportado = typeof window !== "undefined" && "showDirectoryPicker" in window;
-
-  const handleModelo = async (e) => {
-    const f = e.target.files?.[0];
-    setError("");
-    if (!f) return;
-    if (!f.name.toLowerCase().endsWith(".bpp")) {
-      setError("El modelo debe tener extensión .bpp");
-      return;
-    }
-    try {
-      const texto = decodificarLatin1(await f.arrayBuffer());
-      const analizado = analizarModelo(texto);
-      setModelo({ nombre: f.name, texto, analizado });
-      try {
-        localStorage.setItem(CLAVE_MODELO, JSON.stringify({ nombre: f.name, texto }));
-      } catch {
-        /* sin almacenamiento: queda solo para esta sesión */
-      }
-    } catch (err) {
-      setError(err.message || "No se pudo leer el modelo.");
-    }
-  };
 
   const handleElegirCarpeta = async () => {
     setError("");
@@ -347,7 +377,6 @@ export default function DxfABpp({ onVolver }) {
     setError("");
     setLog([]);
     const dir = dirRef.current;
-    if (!modelo) { setError("Elegí primero el .bpp modelo."); return; }
     if (!dir) { setError("Elegí primero la carpeta con los .dxf."); return; }
 
     setProcesando(true);
@@ -364,8 +393,7 @@ export default function DxfABpp({ onVolver }) {
       }
 
       const esp = parseFloat(String(espesor).replace(",", "."));
-      const espesorOk = Number.isFinite(esp) && esp > 0 ? esp : null;
-      const capaLimpia = capa.trim();
+      const espesorManual = Number.isFinite(esp) && esp > 0 ? esp : null;
 
       for (const [nombre, h] of dxfs) {
         const nombreBpp = nombre.replace(/\.dxf$/i, "") + ".bpp";
@@ -384,9 +412,8 @@ export default function DxfABpp({ onVolver }) {
               continue;
             }
           }
-          const texto = await (await h.getFile()).text();
-          const dxf = leerDXF(texto, capaLimpia);
-          const r = generarBPP(modelo.analizado, dxf, espesorOk, capaLimpia);
+          const texto = decodificarLatin1(await (await h.getFile()).arrayBuffer());
+          const r = convertirDXF(leerDXF(texto), espesorManual);
           const fh = await dir.getFileHandle(nombreBpp, { create: true });
           const w = await fh.createWritable();
           await w.write(codificarLatin1(r.contenido));
@@ -394,7 +421,7 @@ export default function DxfABpp({ onVolver }) {
           filas.push({
             nombre,
             estado: "ok",
-            detalle: `${nombreBpp} · panel ${formatearNumero(r.W)}×${formatearNumero(r.H)} mm · ${r.cantidad} taladro(s)`,
+            detalle: `${nombreBpp} · panel ${formatearNumero(r.W)}×${formatearNumero(r.H)}×${formatearNumero(r.espesor)} mm · ${r.nVerticales} vertical(es) · ${r.nLaterales} lateral(es)`,
             avisos: r.avisos,
           });
         } catch (err) {
@@ -416,6 +443,7 @@ export default function DxfABpp({ onVolver }) {
     border: "1.5px solid #b8d6ef",
     fontSize: "13px",
     width: "100%",
+    maxWidth: "320px",
     boxSizing: "border-box",
   };
   const botonSec = {
@@ -428,7 +456,7 @@ export default function DxfABpp({ onVolver }) {
     fontWeight: "bold",
     cursor: "pointer",
   };
-  const bloqueado = procesando || !modelo || !carpeta;
+  const bloqueado = procesando || !carpeta || !soportado;
 
   const resumen = log.length
     ? {
@@ -449,9 +477,11 @@ export default function DxfABpp({ onVolver }) {
 
       <div style={{ maxWidth: "720px", margin: "0 auto" }}>
         <h2 style={{ color: "#0a3a5c", marginBottom: "8px" }}>Convertir DXF a BPP</h2>
-        <p style={{ fontSize: "12px", color: "#666", marginTop: 0, marginBottom: "20px", maxWidth: "560px" }}>
+        <p style={{ fontSize: "12px", color: "#666", marginTop: 0, marginBottom: "20px", maxWidth: "600px" }}>
           Elegís una carpeta con archivos .dxf y los .bpp se guardan en esa misma carpeta, con el mismo
-          nombre. El panel sale del contorno del DXF y cada círculo se convierte en un taladro vertical.
+          nombre. El panel sale del contorno del DXF, los círculos pasan a taladros verticales y los
+          rectángulos pegados al borde izquierdo o derecho pasan a taladros laterales. La herramienta
+          y la profundidad se toman del nombre de la capa.
         </p>
 
         {!soportado && (
@@ -461,27 +491,7 @@ export default function DxfABpp({ onVolver }) {
         )}
 
         <div style={{ marginBottom: "16px" }}>
-          <label style={etiqueta}>1. Archivo .bpp modelo</label>
-          <input type="file" accept=".bpp" onChange={handleModelo} style={{ fontSize: "13px" }} />
-          <div style={{ fontSize: "12px", color: "#555", marginTop: "6px" }}>
-            {modelo ? (
-              <>
-                Modelo actual: <b>{modelo.nombre}</b>. Se queda guardado en este navegador.
-                {modelo.analizado.opsDescartadas > 0 && (
-                  <span style={{ color: "#b8860b" }}>
-                    {" "}
-                    Sus otras {modelo.analizado.opsDescartadas} operación(es) no se copian.
-                  </span>
-                )}
-              </>
-            ) : (
-              "Elegí un .bpp que tenga al menos un taladro vertical (@ BV): de ahí se toma la cabecera, la herramienta y la profundidad."
-            )}
-          </div>
-        </div>
-
-        <div style={{ marginBottom: "16px" }}>
-          <label style={etiqueta}>2. Carpeta con los .dxf</label>
+          <label style={etiqueta}>Carpeta con los .dxf</label>
           <button onClick={handleElegirCarpeta} disabled={!soportado || procesando} style={botonSec}>
             {carpeta ? "Cambiar carpeta" : "Elegir carpeta"}
           </button>
@@ -492,27 +502,15 @@ export default function DxfABpp({ onVolver }) {
           )}
         </div>
 
-        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }}>
-          <div style={{ flex: "1 1 220px" }}>
-            <label style={etiqueta}>Capa de los taladros (opcional)</label>
-            <input
-              type="text"
-              value={capa}
-              onChange={(e) => setCapa(e.target.value)}
-              placeholder="Vacío = todos los círculos"
-              style={campo}
-            />
-          </div>
-          <div style={{ flex: "1 1 220px" }}>
-            <label style={etiqueta}>Espesor del panel en mm (opcional)</label>
-            <input
-              type="text"
-              value={espesor}
-              onChange={(e) => setEspesor(e.target.value)}
-              placeholder="Vacío = el del modelo"
-              style={campo}
-            />
-          </div>
+        <div style={{ marginBottom: "16px" }}>
+          <label style={etiqueta}>Espesor del panel en mm (opcional)</label>
+          <input
+            type="text"
+            value={espesor}
+            onChange={(e) => setEspesor(e.target.value)}
+            placeholder="Vacío = el de la capa del contorno"
+            style={campo}
+          />
         </div>
 
         <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#333", marginBottom: "18px" }}>
@@ -524,14 +522,14 @@ export default function DxfABpp({ onVolver }) {
 
         <button
           onClick={handleConvertir}
-          disabled={bloqueado || !soportado}
+          disabled={bloqueado}
           style={{
             padding: "10px 18px",
             borderRadius: "6px",
             border: "none",
-            background: bloqueado || !soportado ? "#9db8c9" : "#0a3a5c",
+            background: bloqueado ? "#9db8c9" : "#0a3a5c",
             color: "#fff",
-            cursor: bloqueado || !soportado ? "not-allowed" : "pointer",
+            cursor: bloqueado ? "not-allowed" : "pointer",
             fontSize: "13px",
             fontWeight: "bold",
           }}
@@ -552,11 +550,7 @@ export default function DxfABpp({ onVolver }) {
             {log.map((f, i) => (
               <div
                 key={f.nombre}
-                style={{
-                  padding: "8px 12px",
-                  borderTop: i ? "1px solid #e3eef8" : "none",
-                  fontSize: "12.5px",
-                }}
+                style={{ padding: "8px 12px", borderTop: i ? "1px solid #e3eef8" : "none", fontSize: "12.5px" }}
               >
                 <div>
                   <b style={{ color: COLORES_ESTADO[f.estado] }}>
