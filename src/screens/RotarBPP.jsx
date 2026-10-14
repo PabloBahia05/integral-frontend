@@ -19,9 +19,10 @@ import VistaPrevia from "./VistaPrevia";
  *       cantidad NRP, campo 14): se abren en taladros individuales (uno por
  *       repetición, NRP = 1), porque al girar 90°/270° la repetición cambia
  *       de eje y así el resultado no depende del código de RTY para "en Y".
- *   - Taladros laterales (canto): @ BH -> cambia el LADO (campo 0) y la
- *       coordenada a lo largo del canto (campo 2). El campo 3 (altura dentro
- *       del espesor) no cambia.
+ *   - Taladros laterales (canto): @ BH, y también @ BG con cara (campo 0)
+ *       de 1 a 4 -> cambia el LADO (campo 0) y la coordenada a lo largo del
+ *       canto (campo 2). El campo 3 (altura dentro del espesor) no cambia.
+ *       Un @ BG con cara 0 es un taladro vertical, igual que @ BV.
  *   - Las mismas operaciones comentadas (líneas que empiezan con "' ") se
  *       rotan igual, para que sigan siendo válidas si se descomentan.
  *
@@ -36,8 +37,8 @@ import VistaPrevia from "./VistaPrevia";
  *   4 = superior  (Y=LPY)
  *   Coordenada a lo largo del canto = eje del panel (Y en 1/3, X en 2/4).
  *
- * Qué NO rota (se avisa en pantalla): cualquier otra operación "@ ..." y
- * repeticiones no contempladas.
+ * Qué NO rota (se avisa en pantalla): cualquier otra operación "@ ...",
+ * un @ BG con una cara que no sea de 0 a 4, y repeticiones no contempladas.
  *
  * Convención de giro: siempre horario.
  *   Con panel de ancho W (LPX) y alto H (LPY):
@@ -240,6 +241,24 @@ function leerTaladroVertical(op, panel) {
   return { puntos, avisos, crnValido, repite };
 }
 
+// Un @ BH siempre es lateral. Un @ BG es lateral cuando su cara (campo 0) es
+// 1..4 (1 = izquierda, 3 = derecha); con cara 0 es un taladro vertical.
+function esTaladroLateral(op, panel) {
+  if (op.tipo === "BH") return true;
+  if (op.tipo !== "BG") return false;
+  const cara = evaluar(op.campos[0], panel);
+  return cara >= 1 && cara <= 4;
+}
+
+// @ BG que no es ni vertical (cara 0) ni lateral (cara 1..4): no se toca.
+function esBGNoContemplado(op, panel) {
+  return (
+    op.tipo === "BG" &&
+    !esTaladroLateral(op, panel) &&
+    evaluar(op.campos[0], panel) !== 0
+  );
+}
+
 function rotarOperacion(op, ctx) {
   const { angulo, panel, transformarPunto, saltoLinea } = ctx;
   const { campos } = op;
@@ -252,38 +271,48 @@ function rotarOperacion(op, ctx) {
     avisos,
   });
 
-  if (op.tipo === "BH") {
+  if (esTaladroLateral(op, panel)) {
     const ladoNum = evaluar(campos[0], panel);
     const lado = LADOS[ladoNum];
     const s = evaluar(campos[2], panel);
     if (!lado || !Number.isFinite(s)) {
       avisos.push(
-        `@ BH con lado o posición no interpretables (lado ${campos[0]}): no se rotó.`,
+        `@ ${op.tipo} con lado o posición no interpretables (lado ${campos[0]}): no se rotó.`,
       );
       return sinCambios();
     }
     const rty = evaluar(campos[8], panel);
     if (rty !== -1 && rty !== 0) {
       avisos.push(
-        "@ BH con repetición: se rotó el primer taladro pero no la repetición.",
+        `@ ${op.tipo} con repetición: se rotó el primer taladro pero no la repetición.`,
       );
     }
     const crnBH = leerCRN(campos[1]);
     if (crnBH !== null && crnBH !== 2) {
       avisos.push(
-        `@ BH con esquina (CRN) ${crnBH}: la rotación de laterales no considera la esquina, revisá el resultado en Biesse.`,
+        `@ ${op.tipo} con esquina (CRN) ${crnBH}: la rotación de laterales no considera la esquina, revisá el resultado en Biesse.`,
       );
     }
     const [ex, ey] = puntoEnBorde(lado, s, panel.W, panel.H);
     const [nx, ny] = transformarPunto(ex, ey);
     const nuevoLado = MAPA_LADO[angulo][lado];
+    if (nuevoLado === "B" || nuevoLado === "T") {
+      avisos.push(
+        "Hay taladros laterales que pasaron al borde inferior/superior (lados 2 y 4): esa numeración es supuesta, verificala en BiesseWorks.",
+      );
+    }
     const ns = nuevoLado === "L" || nuevoLado === "R" ? ny : nx;
     nuevos[0] = String(NUM_LADO[nuevoLado]);
     nuevos[2] = formatearNumero(ns);
     return final("lateral");
   }
 
-  // BV / BG: cara superior. Se pasa a coordenadas absolutas (según CRN),
+  if (esBGNoContemplado(op, panel)) {
+    avisos.push(`@ BG con cara ${campos[0]} no contemplada: no se rotó.`);
+    return sinCambios();
+  }
+
+  // BV / BG (cara 0): cara superior. Se pasa a coordenadas absolutas (según CRN),
   // se rota, y se escribe con CRN = 2. Cada repetición sale como un
   // taladro propio (NRP = 1).
   const lect = leerTaladroVertical(op, panel);
@@ -311,7 +340,7 @@ function rotarOperacion(op, ctx) {
   };
 }
 
-function rotarBPP(contenidoOriginal, angulo) {
+export function rotarBPP(contenidoOriginal, angulo) {
   const saltoLinea = contenidoOriginal.includes("\r\n") ? "\r\n" : "\n";
   const lineas = contenidoOriginal.split(saltoLinea);
 
@@ -402,7 +431,7 @@ function extraerFormasBPP(contenido) {
     const dia = evaluar(campos[6], panel);
     const r = Number.isFinite(dia) ? Math.max(dia / 2, radioMin) : radioMin;
 
-    if (op.tipo === "BH") {
+    if (esTaladroLateral(op, panel)) {
       const lado = LADOS[evaluar(campos[0], panel)];
       const s = evaluar(campos[2], panel);
       if (!lado || !Number.isFinite(s)) continue;
@@ -428,6 +457,7 @@ function extraerFormasBPP(contenido) {
       continue;
     }
 
+    if (esBGNoContemplado(op, panel)) continue;
     const lect = leerTaladroVertical(op, panel);
     if (!lect) continue;
     for (const [px, py] of lect.puntos) {

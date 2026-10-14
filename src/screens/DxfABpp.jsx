@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { rotarBPP } from "./RotarBPP";
 
 /**
  * DxfABpp
@@ -37,6 +38,14 @@ import { useState, useRef } from "react";
  *   círculos en capas que no son de herramienta, polilíneas que no son
  *   contorno ni laterales, y cualquier otra entidad (INSERT, ARC, etc.).
  *   Los TEXT se ignoran (son solo el rótulo de la pieza).
+ *
+ * Filtro de orientación: si en algún archivo el panel sale con LPX menor
+ * que LPY (más alto que ancho), no se guarda nada todavía: se muestra la
+ * lista de esas piezas y se pide, pieza por pieza (o para todas), si se
+ * avanza así, se rota 90° u 270° (giro horario, con la misma rotación de
+ * RotarBPP.jsx, que ahora se exporta) o no se convierte. Al rotar 90°/270°
+ * los laterales de las caras 1 y 3 pasan a los lados 2 y 4, cuya
+ * numeración no está verificada: se avisa.
  *
  * La cabecera, las variables PAN=... y el pie del .bpp son los mismos de
  * los .bpp reales (idénticos en los 7 archivos de TV22), salvo LPX/LPY/LPZ.
@@ -349,6 +358,23 @@ function convertirDXF(dxf, espesorManual) {
 /* ---- UI ---- */
 
 const COLORES_ESTADO = { ok: "#2e7d32", error: "#c0392b", salteado: "#b8860b" };
+const TOL_ORIENTACION = 0.001;
+
+const OPCIONES_DECISION = [
+  { valor: "asi", texto: "Avanzar así" },
+  { valor: 90, texto: "Rotar 90°" },
+  { valor: 270, texto: "Rotar 270°" },
+  { valor: "omitir", texto: "No convertir" },
+];
+
+async function existeBpp(dir, nombre) {
+  try {
+    await dir.getFileHandle(nombre);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export default function DxfABpp({ onVolver }) {
   const [carpeta, setCarpeta] = useState("");
@@ -357,6 +383,8 @@ export default function DxfABpp({ onVolver }) {
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
   const [log, setLog] = useState([]);
+  // { items, invertidas, decisiones, filasBase } mientras se espera la respuesta
+  const [revision, setRevision] = useState(null);
   const dirRef = useRef(null);
 
   const soportado = typeof window !== "undefined" && "showDirectoryPicker" in window;
@@ -368,19 +396,82 @@ export default function DxfABpp({ onVolver }) {
       dirRef.current = h;
       setCarpeta(h.name);
       setLog([]);
+      setRevision(null);
     } catch (err) {
       if (err?.name !== "AbortError") setError("No se pudo abrir la carpeta.");
+    }
+  };
+
+  // Escribe los .bpp ya convertidos en memoria, aplicando lo que se eligió
+  // para las piezas con LPX < LPY.
+  const guardar = async (dir, items, decisiones, filasBase) => {
+    setRevision(null);
+    setProcesando(true);
+    const filas = [...filasBase];
+    setLog([...filas]);
+    try {
+      for (const it of items) {
+        const dec = decisiones[it.nombre] ?? "asi";
+        try {
+          if (dec === "omitir") {
+            filas.push({
+              nombre: it.nombre,
+              estado: "salteado",
+              detalle: `No se convirtió (LPX ${formatearNumero(it.W)} < LPY ${formatearNumero(it.H)})`,
+            });
+            setLog([...filas]);
+            continue;
+          }
+          if (!pisar && (await existeBpp(dir, it.nombreBpp))) {
+            filas.push({ nombre: it.nombre, estado: "salteado", detalle: `${it.nombreBpp} ya existe` });
+            setLog([...filas]);
+            continue;
+          }
+          let contenido = it.contenido;
+          let W = it.W;
+          let H = it.H;
+          const avisos = [...it.avisos];
+          let nota = "";
+          if (dec === 90 || dec === 270) {
+            const r = rotarBPP(contenido, dec);
+            contenido = r.contenido;
+            W = r.panelNuevo.LPX;
+            H = r.panelNuevo.LPY;
+            avisos.push(...r.avisos);
+            nota = ` · rotada ${dec}° horario`;
+          } else if (W < H - TOL_ORIENTACION) {
+            avisos.push("Se guardó con LPX menor que LPY (elegiste avanzar así).");
+          }
+          const fh = await dir.getFileHandle(it.nombreBpp, { create: true });
+          const w = await fh.createWritable();
+          await w.write(codificarLatin1(contenido));
+          await w.close();
+          filas.push({
+            nombre: it.nombre,
+            estado: "ok",
+            detalle: `${it.nombreBpp} · panel ${formatearNumero(W)}×${formatearNumero(H)}×${formatearNumero(it.espesor)} mm · ${it.nVerticales} vertical(es) · ${it.nLaterales} lateral(es)${nota}`,
+            avisos,
+          });
+        } catch (err) {
+          filas.push({ nombre: it.nombre, estado: "error", detalle: err.message || String(err) });
+        }
+        setLog([...filas]);
+      }
+    } finally {
+      setProcesando(false);
     }
   };
 
   const handleConvertir = async () => {
     setError("");
     setLog([]);
+    setRevision(null);
     const dir = dirRef.current;
     if (!dir) { setError("Elegí primero la carpeta con los .dxf."); return; }
 
     setProcesando(true);
-    const filas = [];
+    const filasError = [];
+    const items = [];
     try {
       const dxfs = [];
       for await (const [nombre, h] of dir.entries()) {
@@ -389,6 +480,7 @@ export default function DxfABpp({ onVolver }) {
       dxfs.sort((a, b) => a[0].localeCompare(b[0]));
       if (!dxfs.length) {
         setError("La carpeta no tiene archivos .dxf.");
+        setProcesando(false);
         return;
       }
 
@@ -396,45 +488,43 @@ export default function DxfABpp({ onVolver }) {
       const espesorManual = Number.isFinite(esp) && esp > 0 ? esp : null;
 
       for (const [nombre, h] of dxfs) {
-        const nombreBpp = nombre.replace(/\.dxf$/i, "") + ".bpp";
         try {
-          if (!pisar) {
-            let existe = false;
-            try {
-              await dir.getFileHandle(nombreBpp);
-              existe = true;
-            } catch {
-              existe = false;
-            }
-            if (existe) {
-              filas.push({ nombre, estado: "salteado", detalle: `${nombreBpp} ya existe` });
-              setLog([...filas]);
-              continue;
-            }
-          }
           const texto = decodificarLatin1(await (await h.getFile()).arrayBuffer());
           const r = convertirDXF(leerDXF(texto), espesorManual);
-          const fh = await dir.getFileHandle(nombreBpp, { create: true });
-          const w = await fh.createWritable();
-          await w.write(codificarLatin1(r.contenido));
-          await w.close();
-          filas.push({
-            nombre,
-            estado: "ok",
-            detalle: `${nombreBpp} · panel ${formatearNumero(r.W)}×${formatearNumero(r.H)}×${formatearNumero(r.espesor)} mm · ${r.nVerticales} vertical(es) · ${r.nLaterales} lateral(es)`,
-            avisos: r.avisos,
-          });
+          items.push({ nombre, nombreBpp: nombre.replace(/\.dxf$/i, "") + ".bpp", ...r });
         } catch (err) {
-          filas.push({ nombre, estado: "error", detalle: err.message || String(err) });
+          filasError.push({ nombre, estado: "error", detalle: err.message || String(err) });
         }
-        setLog([...filas]);
       }
     } catch (err) {
       setError(err.message || "No se pudo recorrer la carpeta.");
-    } finally {
       setProcesando(false);
+      return;
     }
+
+    const invertidas = items.filter((it) => it.W < it.H - TOL_ORIENTACION);
+    if (invertidas.length) {
+      // Todavía no se guarda nada: primero se pregunta qué hacer.
+      setLog(filasError);
+      setRevision({ items, invertidas, decisiones: {}, filasBase: filasError });
+      setProcesando(false);
+      return;
+    }
+    await guardar(dir, items, {}, filasError);
   };
+
+  const elegir = (nombre, valor) =>
+    setRevision((r) => ({ ...r, decisiones: { ...r.decisiones, [nombre]: valor } }));
+
+  const elegirTodas = (valor) =>
+    setRevision((r) => ({
+      ...r,
+      decisiones: Object.fromEntries(r.invertidas.map((it) => [it.nombre, valor])),
+    }));
+
+  const sinResponder = revision
+    ? revision.invertidas.filter((it) => revision.decisiones[it.nombre] === undefined).length
+    : 0;
 
   const etiqueta = { display: "block", fontSize: "13px", marginBottom: "6px", color: "#333" };
   const campo = {
@@ -456,7 +546,8 @@ export default function DxfABpp({ onVolver }) {
     fontWeight: "bold",
     cursor: "pointer",
   };
-  const bloqueado = procesando || !carpeta || !soportado;
+  const botonChico = { ...botonSec, padding: "5px 10px", fontSize: "12px" };
+  const bloqueado = procesando || !carpeta || !soportado || !!revision;
 
   const resumen = log.length
     ? {
@@ -481,7 +572,8 @@ export default function DxfABpp({ onVolver }) {
           Elegís una carpeta con archivos .dxf y los .bpp se guardan en esa misma carpeta, con el mismo
           nombre. El panel sale del contorno del DXF, los círculos pasan a taladros verticales y los
           rectángulos pegados al borde izquierdo o derecho pasan a taladros laterales. La herramienta
-          y la profundidad se toman del nombre de la capa.
+          y la profundidad se toman del nombre de la capa. Si alguna pieza queda con LPX menor que LPY,
+          te pregunta antes de guardar.
         </p>
 
         {!soportado && (
@@ -537,7 +629,96 @@ export default function DxfABpp({ onVolver }) {
           {procesando ? "Convirtiendo..." : "Convertir carpeta"}
         </button>
 
-        {resumen && !procesando && (
+        {revision && (
+          <div
+            style={{
+              marginTop: "20px",
+              border: "1.5px solid #e0b64a",
+              background: "#fff8e1",
+              borderRadius: "8px",
+              padding: "14px 16px",
+            }}
+          >
+            <div style={{ fontSize: "14px", fontWeight: "bold", color: "#7a5a00", marginBottom: "4px" }}>
+              {revision.invertidas.length === 1
+                ? "1 pieza quedó con LPX menor que LPY (más alta que ancha)"
+                : `${revision.invertidas.length} piezas quedaron con LPX menor que LPY (más altas que anchas)`}
+            </div>
+            <div style={{ fontSize: "12.5px", color: "#555", marginBottom: "12px" }}>
+              Todavía no se guardó ningún archivo. Elegí qué hacer con cada una. Al rotar, los laterales
+              pasan al borde inferior/superior (lados 2 y 4), cuya numeración no está verificada:
+              revisalo en BiesseWorks.
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+              <span style={{ fontSize: "12.5px", color: "#333", alignSelf: "center" }}>Todas:</span>
+              {OPCIONES_DECISION.map((o) => (
+                <button key={String(o.valor)} onClick={() => elegirTodas(o.valor)} style={botonChico}>
+                  {o.texto}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ background: "#fff", border: "1px solid #ecd9a0", borderRadius: "6px" }}>
+              {revision.invertidas.map((it, i) => (
+                <div
+                  key={it.nombre}
+                  style={{ padding: "8px 12px", borderTop: i ? "1px solid #f3e6bd" : "none", fontSize: "12.5px" }}
+                >
+                  <div style={{ marginBottom: "6px" }}>
+                    <b style={{ color: "#333" }}>{it.nombre}</b>{" "}
+                    <span style={{ color: "#555" }}>
+                      · LPX {formatearNumero(it.W)} × LPY {formatearNumero(it.H)} mm · {it.nVerticales} vertical(es) ·{" "}
+                      {it.nLaterales} lateral(es)
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
+                    {OPCIONES_DECISION.map((o) => (
+                      <label key={String(o.valor)} style={{ display: "flex", alignItems: "center", gap: "5px", color: "#333" }}>
+                        <input
+                          type="radio"
+                          name={`dec-${it.nombre}`}
+                          checked={revision.decisiones[it.nombre] === o.valor}
+                          onChange={() => elegir(it.nombre, o.valor)}
+                        />
+                        {o.texto}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", marginTop: "14px", alignItems: "center", flexWrap: "wrap" }}>
+              <button
+                onClick={() => guardar(dirRef.current, revision.items, revision.decisiones, revision.filasBase)}
+                disabled={sinResponder > 0}
+                style={{
+                  padding: "9px 16px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: sinResponder > 0 ? "#9db8c9" : "#0a3a5c",
+                  color: "#fff",
+                  cursor: sinResponder > 0 ? "not-allowed" : "pointer",
+                  fontSize: "13px",
+                  fontWeight: "bold",
+                }}
+              >
+                Guardar los .bpp
+              </button>
+              <button onClick={() => setRevision(null)} style={botonSec}>
+                Cancelar
+              </button>
+              {sinResponder > 0 && (
+                <span style={{ fontSize: "12px", color: "#7a5a00" }}>
+                  Falta elegir en {sinResponder} pieza(s).
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {resumen && !procesando && !revision && (
           <div style={{ marginTop: "18px", fontSize: "13px", color: "#0a3a5c", fontWeight: "bold" }}>
             Convertidos: {resumen.ok}
             {resumen.error > 0 && ` · Con error: ${resumen.error}`}
