@@ -1,26 +1,30 @@
 import { useState } from "react";
 import RotarBPP from "./RotarBPP";
 import RotarDXF from "./RotarDXF";
+import DxfABpp from "./DxfABpp";
 
 /**
  * Herramientas
  * ------------
- * Pantalla que se abre desde el botón del menú principal. Muestra dos
- * botones, "BPP" y "CAD", que llevan cada uno a su propia pantalla de
- * carga + rotación. Es autocontenida: no depende de react-router ni de
- * ningún otro componente de Integral fuera de RotarBPP.jsx y RotarDXF.jsx
+ * Pantalla que se abre desde el botón del menú principal. Muestra tres
+ * botones, "BPP", "CAD" y "DXF → BPP", que llevan cada uno a su propia
+ * pantalla. Es autocontenida: no depende de react-router ni de ningún otro
+ * componente de Integral fuera de RotarBPP.jsx, RotarDXF.jsx y DxfABpp.jsx
  * (que van junto a este archivo).
  *
  * Props: onBack (opcional) → vuelve al panel principal de Integral.
  */
 export default function Herramientas({ onBack }) {
-  const [pantalla, setPantalla] = useState("menu"); // "menu" | "bpp" | "cad"
+  const [pantalla, setPantalla] = useState("menu"); // "menu" | "bpp" | "cad" | "dxf2bpp"
 
   if (pantalla === "bpp") {
     return <RotarBPP onVolver={() => setPantalla("menu")} />;
   }
   if (pantalla === "cad") {
     return <RotarDXF onVolver={() => setPantalla("menu")} />;
+  }
+  if (pantalla === "dxf2bpp") {
+    return <DxfABpp onVolver={() => setPantalla("menu")} />;
   }
 
   return (
@@ -55,6 +59,11 @@ export default function Herramientas({ onBack }) {
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", justifyContent: "center" }}>
         <BotonGrande titulo="BPP" subtitulo="Rotar programas .bpp (Biesse)" onClick={() => setPantalla("bpp")} />
         <BotonGrande titulo="CAD" subtitulo="Rotar planos .dxf" onClick={() => setPantalla("cad")} />
+        <BotonGrande
+          titulo="DXF → BPP"
+          subtitulo="Convertir una carpeta de .dxf a .bpp"
+          onClick={() => setPantalla("dxf2bpp")}
+        />
       </div>
     </div>
   );
