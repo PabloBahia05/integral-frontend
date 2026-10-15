@@ -26,9 +26,11 @@ import VistaPrevia from "./VistaPrevia";
  *   - Las mismas operaciones comentadas (líneas que empiezan con "' ") se
  *       rotan igual, para que sigan siendo válidas si se descomentan.
  *
- * Expresiones: los campos pueden venir como fórmulas (LPX/2+9, LPY-40...).
- * Se evalúan con las dimensiones ORIGINALES del panel y se escriben como
- * número ya rotado.
+ * Expresiones: los campos pueden venir como fórmulas (LPX/2+9, LPY-40,
+ * distest+4.5...). Se evalúan con las dimensiones ORIGINALES del panel y las
+ * variables LOC=NOMBRE|valor| de [VARIABLES], y se escriben como número ya
+ * rotado. Una variable que no figure en el archivo (p. ej. G6) no se puede
+ * evaluar: esa operación no se rota y se avisa.
  *
  * Numeración de lados de @ BH (vista desde arriba, origen abajo-izquierda):
  *   1 = izquierda (X=0)   <- deducido de un archivo real
@@ -91,25 +93,59 @@ function leerPanel(contenido) {
   const my = contenido.match(/PAN=LPY\|([\d.]+)/);
   if (!mx || !my) return null;
   const mz = contenido.match(/PAN=LPZ\|([\d.]+)/);
-  return {
+  const panel = {
     W: parseFloat(mx[1]),
     H: parseFloat(my[1]),
     Z: mz ? parseFloat(mz[1]) : 0,
+    vars: {},
   };
+  // Variables propias del programa: LOC=NOMBRE|valor|descripción|...
+  // (en orden, así una puede usar a otra). No distingue mayúsculas.
+  for (const linea of contenido.split(/\r?\n/)) {
+    const m = linea.match(/^LOC=([A-Za-z_][A-Za-z0-9_]*)\|([^|]*)\|/);
+    if (!m) continue;
+    const v = evaluar(m[2], panel);
+    if (Number.isFinite(v)) panel.vars[m[1].toUpperCase()] = v;
+  }
+  return panel;
 }
 
-// Evalúa un campo que puede ser número o fórmula (LPX/2+9, LPY-40...).
-// Solo admite números, + - * / ( ) y las variables LPX, LPY, LPZ.
+// Valor de una variable: LPX/LPY/LPZ del panel o una LOC= del archivo.
+// undefined si no se conoce.
+function valorVariable(id, panel) {
+  if (id === "LPX") return panel.W;
+  if (id === "LPY") return panel.H;
+  if (id === "LPZ") return panel.Z;
+  return panel.vars ? panel.vars[id] : undefined;
+}
+
+// Nombres de variables de `texto` que no tienen valor en el archivo.
+function variablesSinValor(texto, panel) {
+  const out = new Set();
+  for (const m of String(texto ?? "").matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) {
+    if (valorVariable(m[0].toUpperCase(), panel) === undefined) out.add(m[0]);
+  }
+  return [...out];
+}
+
+// Evalúa un campo que puede ser número o fórmula (LPX/2+9, distest+4.5...).
+// Admite números, + - * / ( ), LPX/LPY/LPZ y las variables LOC= del archivo.
 function evaluar(texto, panel) {
   if (texto === undefined || texto === null) return NaN;
   const s = String(texto).trim();
   if (!s) return NaN;
-  if (!/^[-+*/().\dLPXYZ\s]+$/.test(s)) return NaN;
-  const reemplazado = s
-    .replace(/LPX/g, `(${panel.W})`)
-    .replace(/LPY/g, `(${panel.H})`)
-    .replace(/LPZ/g, `(${panel.Z})`);
-  if (/[A-Za-z]/.test(reemplazado)) return NaN;
+  if (!/^[-+*/().\w\s]+$/.test(s)) return NaN;
+  let desconocida = false;
+  const reemplazado = s.replace(/[A-Za-z_][A-Za-z0-9_]*/g, (id) => {
+    const v = valorVariable(id.toUpperCase(), panel);
+    if (v === undefined || !Number.isFinite(v)) {
+      desconocida = true;
+      return "0";
+    }
+    return `(${v})`;
+  });
+  if (desconocida) return NaN;
+  if (!/^[-+*/().\d\s]+$/.test(reemplazado)) return NaN;
   try {
     const v = Function(`"use strict"; return (${reemplazado});`)();
     return Number.isFinite(v) ? v : NaN;
@@ -317,8 +353,13 @@ function rotarOperacion(op, ctx) {
   // taladro propio (NRP = 1).
   const lect = leerTaladroVertical(op, panel);
   if (!lect) {
+    const faltan = [
+      ...new Set([2, 3, 9, 10].flatMap((i) => variablesSinValor(campos[i], panel))),
+    ];
     avisos.push(
-      `@ ${op.tipo} con X/Y no interpretables (${campos[2]}, ${campos[3]}): no se rotó.`,
+      faltan.length
+        ? `@ ${op.tipo} usa ${faltan.join(", ")}, sin valor en el archivo (no figura en [VARIABLES]): esos taladros no se rotaron.`
+        : `@ ${op.tipo} con X/Y no interpretables (${campos[2]}, ${campos[3]}): no se rotó.`,
     );
     return sinCambios();
   }
