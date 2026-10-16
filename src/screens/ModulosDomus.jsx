@@ -929,6 +929,21 @@ export default function ModulosDomus({ authFetch, token }) {
         }
       }
 
+      // 3b. Copiar también las descripciones de subcódigo del original.
+      try {
+        const resDesc = await authFetch(
+          `${API}/codigos-produccion/${duplicarCodigoOrigen.id}/subcodigos-descripcion`,
+        );
+        const descOriginales = resDesc.ok ? await resDesc.json().catch(() => []) : [];
+        for (const d of Array.isArray(descOriginales) ? descOriginales : []) {
+          if (d.subcodigo && d.descripcion) {
+            await putDescSubcodigo(nuevoId, d.subcodigo, d.descripcion);
+          }
+        }
+      } catch (e) {
+        console.error("No se pudieron copiar las descripciones de subcódigo:", e);
+      }
+
       // 4. Reflejar el nuevo código en la lista principal.
       const nuevo = {
         id: nuevoId,
@@ -1063,6 +1078,15 @@ export default function ModulosDomus({ authFetch, token }) {
         }
       }
 
+      // 4b. El subcódigo nuevo toma como descripción la del código de origen.
+      if (subDeOrigen.descripcion && lista.some((p) => !String(p.subcodigo ?? "").trim())) {
+        try {
+          await putDescSubcodigo(destino.id, nombre, subDeOrigen.descripcion);
+        } catch (e) {
+          console.error("No se pudo guardar la descripción del subcódigo nuevo:", e);
+        }
+      }
+
       // 5. Actualizar contadores de la grilla.
       setCodigosProduccion((prev) =>
         prev.map((c) => {
@@ -1122,6 +1146,68 @@ export default function ModulosDomus({ authFetch, token }) {
   const [aEliminar, setAEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
 
+  // ── Descripción de subcódigos (variantes) ────────────────────────────
+  // { [subcodigo]: descripcion } del código abierto en el panel.
+  const [descSubcodigos, setDescSubcodigos] = useState({});
+  const [descEdit, setDescEdit] = useState("");
+  const [guardandoDesc, setGuardandoDesc] = useState(false);
+  const [errorDesc, setErrorDesc] = useState(null);
+
+  const fetchDescSubcodigos = (codigoId) => {
+    authFetch(`${API}/codigos-produccion/${codigoId}/subcodigos-descripcion`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const mapa = {};
+        (Array.isArray(data) ? data : []).forEach((d) => {
+          if (d.subcodigo) mapa[d.subcodigo] = d.descripcion || "";
+        });
+        setDescSubcodigos(mapa);
+      })
+      .catch((e) => {
+        console.error("Error cargando descripciones de subcódigos:", e);
+        setDescSubcodigos({});
+      });
+  };
+
+  // Alta/edición de la descripción de un subcódigo (vacía = la borra).
+  const putDescSubcodigo = async (codigoId, subcodigo, descripcion) => {
+    const res = await authFetch(
+      `${API}/codigos-produccion/${codigoId}/subcodigos/${encodeURIComponent(subcodigo)}/descripcion`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ descripcion }),
+      },
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `HTTP ${res.status}`);
+    }
+  };
+
+  const handleGuardarDescripcion = async () => {
+    if (!panelCodigo || !panelSubcodigo) return;
+    const nuevo = descEdit.trim();
+    const actual = descSubcodigos[panelSubcodigo] ?? "";
+    if (nuevo === actual) return;
+    setGuardandoDesc(true);
+    setErrorDesc(null);
+    try {
+      await putDescSubcodigo(panelCodigo.id, panelSubcodigo, nuevo);
+      setDescSubcodigos((prev) => {
+        const n = { ...prev };
+        if (nuevo) n[panelSubcodigo] = nuevo;
+        else delete n[panelSubcodigo];
+        return n;
+      });
+    } catch (e) {
+      console.error("Error guardando descripción de subcódigo:", e);
+      setErrorDesc(e.message || "No se pudo guardar la descripción.");
+    } finally {
+      setGuardandoDesc(false);
+    }
+  };
+
   const fetchPiezas = (codigoId) => {
     setPiezasLoading(true);
     setPiezasError(null);
@@ -1165,8 +1251,10 @@ export default function ModulosDomus({ authFetch, token }) {
     setPanelCodigo(row);
     setPanelSubcodigo(null);
     setNuevoSubcodigoInput("");
+    setDescSubcodigos({});
     fetchPiezas(row.id);
     fetchVinculosDelCodigo(row.id);
+    fetchDescSubcodigos(row.id);
     fetchFormulas(true);
   };
 
@@ -1177,6 +1265,7 @@ export default function ModulosDomus({ authFetch, token }) {
     setNuevoSubcodigoInput("");
     setPiezas([]);
     setPiezasError(null);
+    setDescSubcodigos({});
     cerrarPieza();
   };
 
@@ -1198,6 +1287,12 @@ export default function ModulosDomus({ authFetch, token }) {
   useEffect(() => {
     setFiltroFamiliaPieza("");
   }, [panelCodigo?.id, panelSubcodigo]);
+
+  // La caja de descripción refleja la descripción guardada de la variante abierta.
+  useEffect(() => {
+    setDescEdit(descSubcodigos[panelSubcodigo] ?? "");
+    setErrorDesc(null);
+  }, [panelSubcodigo, descSubcodigos]);
 
   const handlePiezaCampoChange = (id, campo, valor) => {
     setPiezas((prev) => prev.map((p) => (p.id === id ? { ...p, [campo]: valor } : p)));
@@ -1364,6 +1459,16 @@ export default function ModulosDomus({ authFetch, token }) {
       setPiezas((prev) =>
         prev.filter((p) => String(p.subcodigo ?? "").trim() !== subcodigo),
       );
+      // La descripción del subcódigo se va con él (best-effort).
+      authFetch(
+        `${API}/codigos-produccion/${panelCodigo.id}/subcodigos/${encodeURIComponent(subcodigo)}`,
+        { method: "DELETE" },
+      ).catch((e) => console.error("Error borrando descripción de subcódigo:", e));
+      setDescSubcodigos((prev) => {
+        const n = { ...prev };
+        delete n[subcodigo];
+        return n;
+      });
       setCodigosProduccion((prev) =>
         prev.map((c) =>
           c.id === panelCodigo.id
@@ -1455,6 +1560,16 @@ export default function ModulosDomus({ authFetch, token }) {
             // el body no era JSON parseable, nos quedamos con el status
           }
           throw new Error(detalle);
+        }
+      }
+      // El subcódigo nuevo hereda la descripción del original (se puede editar después).
+      const descOrigen = descSubcodigos[subcodigoOrigen];
+      if (descOrigen) {
+        try {
+          await putDescSubcodigo(panelCodigo.id, nuevo, descOrigen);
+          setDescSubcodigos((prev) => ({ ...prev, [nuevo]: descOrigen }));
+        } catch (e) {
+          console.error("No se pudo copiar la descripción del subcódigo:", e);
         }
       }
       fetchPiezas(panelCodigo.id);
@@ -3166,6 +3281,18 @@ export default function ModulosDomus({ authFetch, token }) {
                               <span style={{ fontWeight: 400, color: "#5a86ab", marginLeft: 6 }}>
                                 ({piezasDelGrupo.length})
                               </span>
+                              {descSubcodigos[subcodigo] && (
+                                <div
+                                  style={{
+                                    fontWeight: 400,
+                                    fontSize: 11,
+                                    color: "#5a86ab",
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  {descSubcodigos[subcodigo]}
+                                </div>
+                              )}
                             </button>
                             <button
                               onClick={(e) => {
@@ -3401,6 +3528,54 @@ export default function ModulosDomus({ authFetch, token }) {
                     </>
                   )}
                 </p>
+
+                {panelSubcodigo && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      margin: "0 0 14px",
+                    }}
+                  >
+                    <label
+                      htmlFor="desc-subcodigo"
+                      style={{ fontSize: 11, color: "#5a86ab" }}
+                    >
+                      Descripción del subcódigo
+                    </label>
+                    <input
+                      id="desc-subcodigo"
+                      type="text"
+                      value={descEdit}
+                      maxLength={255}
+                      placeholder="Escribí la descripción de esta variante"
+                      onChange={(e) => setDescEdit(e.target.value)}
+                      onBlur={handleGuardarDescripcion}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.currentTarget.blur();
+                      }}
+                      style={{
+                        flex: "1 1 320px",
+                        maxWidth: 520,
+                        padding: "6px 10px",
+                        fontSize: 12,
+                        fontFamily: "'Space Mono',monospace",
+                        border: "1.5px solid #b8d6ef",
+                        borderRadius: 4,
+                        color: "#0a3a5c",
+                        background: "#fff",
+                      }}
+                    />
+                    {guardandoDesc && (
+                      <span style={{ fontSize: 11, color: "#5a86ab" }}>Guardando…</span>
+                    )}
+                    {errorDesc && (
+                      <span style={{ fontSize: 11, color: "#c0392b" }}>⚠ {errorDesc}</span>
+                    )}
+                  </div>
+                )}
 
                 {panelSubcodigo && piezasBaseSinVariante.length > 0 && (
                   <div style={{ marginBottom: 14 }}>
