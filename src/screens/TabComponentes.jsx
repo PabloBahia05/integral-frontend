@@ -2,6 +2,12 @@ import { useState, useEffect } from "react";
 
 const API = "https://integral-backend-production.up.railway.app";
 
+// Familia fija: el botón siempre aparece, aunque el catálogo no tenga artículos
+// con esa familia. Si el catálogo trae artículos de esta familia se listan; si
+// no, va directo a cantidad + precio manual.
+const FAMILIA_PUERTA_VIDRIO = "Puerta de vidrio";
+const ID_PUERTA_VIDRIO_MANUAL = "puerta-vidrio-manual";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TabComponentes
 //
@@ -86,6 +92,10 @@ export default function TabComponentes({ token, agregarAPresupuesto }) {
     return "";
   };
 
+  const familiasMostradas = familias.includes(FAMILIA_PUERTA_VIDRIO)
+    ? familias
+    : [...familias, FAMILIA_PUERTA_VIDRIO];
+
   const articulosDeLaFamilia = familiaElegida
     ? articulos.filter((a) => a.familia === familiaElegida)
     : [];
@@ -130,6 +140,19 @@ export default function TabComponentes({ token, agregarAPresupuesto }) {
   const elegirFamilia = (fam) => {
     setFamiliaElegida(fam);
     setBusqueda("");
+    if (
+      fam === FAMILIA_PUERTA_VIDRIO &&
+      !articulos.some((a) => a.familia === fam)
+    ) {
+      // Sin artículos en el catálogo: carga manual de cantidad y precio
+      elegirArticulo({
+        id: ID_PUERTA_VIDRIO_MANUAL,
+        articulo: FAMILIA_PUERTA_VIDRIO,
+        codart: null,
+        familia: fam,
+      });
+      return;
+    }
     setVista("articulos");
   };
 
@@ -149,6 +172,10 @@ export default function TabComponentes({ token, agregarAPresupuesto }) {
   };
 
   const volverAArticulos = () => {
+    if (articuloElegido?.id === ID_PUERTA_VIDRIO_MANUAL) {
+      volverAFamilias();
+      return;
+    }
     setVista("articulos");
     setArticuloElegido(null);
     setAgregado(false);
@@ -199,7 +226,7 @@ export default function TabComponentes({ token, agregarAPresupuesto }) {
         <div
           style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 22 }}
         >
-          {familias.map((fam) => {
+          {familiasMostradas.map((fam) => {
             const cantidadItems = articulos.filter(
               (a) => a.familia === fam,
             ).length;
@@ -242,7 +269,9 @@ export default function TabComponentes({ token, agregarAPresupuesto }) {
                   {fam}
                 </div>
                 <div style={{ fontSize: 11, color: "#6699bb", marginTop: 4 }}>
-                  {cantidadItems} artículo{cantidadItems !== 1 ? "s" : ""}
+                  {cantidadItems === 0
+                    ? "Carga manual"
+                    : `${cantidadItems} artículo${cantidadItems !== 1 ? "s" : ""}`}
                 </div>
               </div>
             );
