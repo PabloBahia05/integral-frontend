@@ -157,10 +157,57 @@ function fmtHoraDec(h) {
   return `${pad(Math.floor(totalMin / 60))}:${pad(totalMin % 60)}`;
 }
 
+// ─── Regla de almuerzo (operario LUCAS SANTANAFESSA) ─────────────────────────
+// Toda marca entre 12:20:00 y 13:00:00 se computa siempre a las 13:00:00.
+// Se aplica a TODAS las marcas registradas (sin fecha de corte).
+// Las marcas originales no se modifican: solo cambia el instante usado en el cálculo.
+const REGLA_ALM = {
+  apellido: "SANTANAFESSA",
+  nombre: "LUCAS",
+  desde: 12 * 3600 + 20 * 60, // 12:20:00 en segundos
+  hasta: 13 * 3600,           // 13:00:00 en segundos
+};
+
+function normalizarNombre(str) {
+  return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+}
+
+function nombreAplicaRegla(nombreCompleto) {
+  const n = normalizarNombre(nombreCompleto);
+  return n.includes(REGLA_ALM.apellido) && n.includes(REGLA_ALM.nombre);
+}
+
+// Devuelve el instante (ms) a usar en el cálculo y cuántos minutos se movió la marca.
+function marcaConRegla(ts, aplicar) {
+  const d = parseMysqlTs(ts);
+  if (!d) return { ms: null, movMin: 0 };
+  const ms = d.getTime();
+  if (!aplicar) return { ms, movMin: 0 };
+  const seg = d.getUTCHours() * 3600 + d.getUTCMinutes() * 60 + d.getUTCSeconds();
+  if (seg >= REGLA_ALM.desde && seg <= REGLA_ALM.hasta) {
+    const dif = REGLA_ALM.hasta - seg;
+    return { ms: ms + dif * 1000, movMin: dif / 60 };
+  }
+  return { ms, movMin: 0 };
+}
+
+// Hora decimal (UTC, igual que horaDecimal) aplicando la regla.
+function horaDecimalRegla(ts, aplicar) {
+  const { ms } = marcaConRegla(ts, aplicar);
+  if (ms == null) return null;
+  const d = new Date(ms);
+  return d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600;
+}
+
+function fmtMinRegla(min) {
+  const m = Math.round(min * 10) / 10;
+  return `${m >= 0 ? "+" : ""}${m} min`;
+}
+
 // Arma, por empleado → por fecha, los tramos trabajados (pares entrada→salida).
 // Cada tramo se clasifica en "mañana" o "tarde" según la hora de entrada (corte 12:30).
 // Una entrada sin salida queda como tramo "abierto".
-function armarSemana(fichadas) {
+function armarSemana(fichadas, aplicaRegla = () => false) {
   const porEmp = {};
   [...fichadas]
     .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)))
@@ -175,16 +222,26 @@ function armarSemana(fichadas) {
   return Object.values(porEmp).map((emp) => {
     const dias = {};
     let totalHoras = 0;
+    let ajusteTotal = 0;
     for (const [fecha, fichs] of Object.entries(emp.dias)) {
       const tramos = [];
+      let ajusteDia = 0; // minutos netos que la regla sumó/restó en el día
+      const aplicar = aplicaRegla(emp.user_id, emp.nombre);
       for (let i = 0; i < fichs.length; i++) {
         if (fichs[i].direccion !== "entrada") continue;
-        const ini = horaDecimal(fichs[i].timestamp);
+        const ini = horaDecimalRegla(fichs[i].timestamp, aplicar);
         const sal = fichs[i + 1]?.direccion === "salida" ? fichs[i + 1] : null;
         if (ini == null) continue;
         if (sal) {
-          const fin = horaDecimal(sal.timestamp);
-          if (fin != null && fin > ini) tramos.push({ ini, fin, abierto: false });
+          const fin = horaDecimalRegla(sal.timestamp, aplicar);
+          if (fin != null && fin > ini) {
+            tramos.push({ ini, fin, abierto: false });
+            if (aplicar) {
+              // efecto de la regla = (duración ajustada) − (duración real)
+              const dReal = (horaDecimal(sal.timestamp) - horaDecimal(fichs[i].timestamp)) * 60;
+              ajusteDia += (fin - ini) * 60 - dReal;
+            }
+          }
           i++;
         } else {
           tramos.push({ ini, fin: null, abierto: true });
@@ -194,14 +251,15 @@ function armarSemana(fichadas) {
       const tarde  = tramos.filter((t) => t.ini >= 12.5);
       const horas  = tramos.reduce((a, t) => a + (t.fin != null ? t.fin - t.ini : 0), 0);
       totalHoras += horas;
-      dias[fecha] = { manana, tarde, horas };
+      ajusteTotal += ajusteDia;
+      dias[fecha] = { manana, tarde, horas, ajusteMin: ajusteDia };
     }
-    return { user_id: emp.user_id, nombre: emp.nombre, dias, totalHoras };
+    return { user_id: emp.user_id, nombre: emp.nombre, dias, totalHoras, ajusteMin: ajusteTotal };
   });
 }
 
 // ─── Gráfico semanal de barras verticales (mañana arriba / tarde abajo) ──────
-function GraficoOperario({ nombre, dias, totalHoras, fechas, hMin, hMax, hoyIso }) {
+function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin, hMax, hoyIso }) {
   const ALTO = 340;
   const rango = hMax - hMin;
   const y = (h) => ((h - hMin) / rango) * ALTO;
@@ -253,6 +311,12 @@ function GraficoOperario({ nombre, dias, totalHoras, fechas, hMin, hMax, hoyIso 
         </div>
         <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15, color: totalHoras > 0 ? "#a5b4fc" : "#475569" }}>
           Semana: {totalHoras > 0 ? fmtDuracion(totalHoras) : "—"}
+          {Math.abs(ajusteMin) >= 0.05 && (
+            <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, color: "#fbbf24" }}
+                  title="Minutos acumulados por la regla 12:20–13:00 (marca computada a las 13:00)">
+              ({fmtMinRegla(ajusteMin)} regla 12:20–13:00)
+            </span>
+          )}
         </span>
       </div>
 
@@ -303,6 +367,12 @@ function GraficoOperario({ nombre, dias, totalHoras, fechas, hMin, hMax, hoyIso 
                 fontWeight: 700, color: dia?.horas > 0 ? "#e2e8f0" : "#475569",
               }}>
                 {dia?.horas > 0 ? fmtDuracion(dia.horas) : "—"}
+                {dia && Math.abs(dia.ajusteMin) >= 0.05 && (
+                  <div style={{ fontSize: 10, fontWeight: 500, color: "#fbbf24" }}
+                       title="Minutos acumulados por la regla 12:20–13:00">
+                    {fmtMinRegla(dia.ajusteMin)}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -569,6 +639,13 @@ export default function Anviz({ onBack }) {
     if (vista === "historial") cargarHistorial();
   }, [vista, cargarHistorial]);
 
+  // ── ¿Aplica la regla de almuerzo a este operario? (por nombre o por usuario cargado) ──
+  const aplicaReglaAlmuerzo = (userId, nombreCompleto) => {
+    if (nombreAplicaRegla(nombreCompleto)) return true;
+    const u = usuarios.find((x) => String(x.id) === String(userId));
+    return u ? nombreAplicaRegla(`${u.apellido} ${u.nombre}`) : false;
+  };
+
   // ── Calcular horas acumuladas por empleado ─────────────────────────────────
   const historialEmpleados = (() => {
     // Agrupar por empleado → por día → pares entrada/salida
@@ -588,20 +665,33 @@ export default function Anviz({ onBack }) {
 
     return Object.values(porEmp).map(emp => {
       let totalMs = 0;
+      let ajusteMs = 0; // minutos netos que sumó/restó la regla 12:20–13:00
+      let marcasAjustadas = 0;
       const fichs = emp.fichadas;
+      const aplicar = aplicaReglaAlmuerzo(emp.user_id, emp.nombre);
       // Recorrer de a pares: entrada → salida
       for (let i = 0; i < fichs.length - 1; i++) {
         if (fichs[i].direccion === "entrada" && fichs[i+1].direccion === "salida") {
-          const tin  = parseMysqlTs(fichs[i].timestamp);
-          const tout = parseMysqlTs(fichs[i+1].timestamp);
-          if (tin && tout) totalMs += tout - tin;
+          const rin  = marcaConRegla(fichs[i].timestamp, aplicar);
+          const rout = marcaConRegla(fichs[i+1].timestamp, aplicar);
+          if (rin.ms != null && rout.ms != null) {
+            const dur = Math.max(0, rout.ms - rin.ms);
+            const durReal = parseMysqlTs(fichs[i+1].timestamp) - parseMysqlTs(fichs[i].timestamp);
+            totalMs += dur;
+            if (aplicar) {
+              ajusteMs += dur - durReal;
+              if (rin.movMin !== 0) marcasAjustadas++;
+              if (rout.movMin !== 0) marcasAjustadas++;
+            }
+          }
           i++; // saltar la salida ya consumida
         }
       }
       const totalMin = Math.floor(totalMs / 60000);
       const horas    = Math.floor(totalMin / 60);
       const minutos  = totalMin % 60;
-      return { ...emp, totalMs, horas, minutos, fichadas: fichs.length };
+      return { ...emp, totalMs, horas, minutos, fichadas: fichs.length,
+               aplicaRegla: aplicar, ajusteMin: ajusteMs / 60000, marcasAjustadas };
     }).sort((a, b) => b.totalMs - a.totalMs);
   })();
 
@@ -1018,7 +1108,7 @@ export default function Anviz({ onBack }) {
   }, [vista, cargarGrafico]);
 
   const grafSemana = (() => {
-    const emps = armarSemana(grafFichadas).map((e) => {
+    const emps = armarSemana(grafFichadas, aplicaReglaAlmuerzo).map((e) => {
       if (e.nombre) return e;
       const u = usuarios.find((x) => String(x.id) === String(e.user_id));
       return { ...e, nombre: u ? `${u.apellido} ${u.nombre}`.trim() : `Usuario ${e.user_id}` };
@@ -1162,6 +1252,12 @@ export default function Anviz({ onBack }) {
                         </td>
                         <td style={{ ...s.td, color: "var(--color-text-secondary)" }}>
                           {(e.horas_calculadas ?? 0)}h
+                          {(e.min_regla_almuerzo ?? 0) !== 0 && (
+                            <div style={{ fontSize: 11, color: "#fbbf24" }}
+                                 title="Minutos acumulados por la regla 12:20–13:00 (marca computada a las 13:00)">
+                              ({fmtMinRegla(e.min_regla_almuerzo)} regla 12:20–13:00)
+                            </div>
+                          )}
                         </td>
                         <td style={s.td}>
                           <button
@@ -1986,6 +2082,13 @@ export default function Anviz({ onBack }) {
                               ? `${emp.horas}h ${pad(emp.minutos)}m`
                               : "—"}
                           </span>
+                          {emp.aplicaRegla && (
+                            <span style={{ fontSize: 12, fontWeight: 600, color: "#fbbf24" }}
+                                  title="Minutos acumulados por la regla 12:20–13:00 (marca computada a las 13:00)">
+                              {fmtMinRegla(emp.ajusteMin)} regla 12:20–13:00
+                              {emp.marcasAjustadas > 0 && ` · ${emp.marcasAjustadas} marca${emp.marcasAjustadas !== 1 ? "s" : ""}`}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td style={s.td}>
@@ -2078,6 +2181,7 @@ export default function Anviz({ onBack }) {
                 nombre={emp.nombre}
                 dias={emp.dias}
                 totalHoras={emp.totalHoras}
+                ajusteMin={emp.ajusteMin}
                 fechas={grafSemana.fechas}
                 hMin={grafSemana.hMin}
                 hMax={grafSemana.hMax}
