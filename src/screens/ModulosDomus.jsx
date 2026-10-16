@@ -1107,6 +1107,7 @@ export default function ModulosDomus({ authFetch, token }) {
   const [formulasCargadas, setFormulasCargadas] = useState(false);
   const [busquedaFormula, setBusquedaFormula] = useState("");
   const [filtroFamiliaFormula, setFiltroFamiliaFormula] = useState("");
+  const [filtroFamiliaPieza, setFiltroFamiliaPieza] = useState("");
   const [formulaFocus, setFormulaFocus] = useState(false);
   const [piezaFormula, setPiezaFormula] = useState("");
   const [piezaTitulo, setPiezaTitulo] = useState("");
@@ -1192,6 +1193,11 @@ export default function ModulosDomus({ authFetch, token }) {
     setErrorTraer(null);
     cerrarPieza();
   };
+
+  // El filtro de familia de la tabla de piezas se limpia al cambiar de código o de variante.
+  useEffect(() => {
+    setFiltroFamiliaPieza("");
+  }, [panelCodigo?.id, panelSubcodigo]);
 
   const handlePiezaCampoChange = (id, campo, valor) => {
     setPiezas((prev) => prev.map((p) => (p.id === id ? { ...p, [campo]: valor } : p)));
@@ -1555,6 +1561,27 @@ export default function ModulosDomus({ authFetch, token }) {
   );
 
   const formulasFiltradas = filtrarFormulas(busquedaFormula);
+
+  // ── Filtro por familia en la tabla de piezas ─────────────────────────
+  // La familia de una pieza es la de su fórmula (formulax, buscada en el
+  // catálogo `formulas`). "__sin_familia__" = piezas sin fórmula o con una
+  // fórmula que no tiene familia cargada.
+  const SIN_FAMILIA = "__sin_familia__";
+  const familiaDePieza = (p) => {
+    const f = formulas.find((x) => x.codform === p.formulax);
+    return f ? familiaDe(f) : "";
+  };
+  const familiasDePiezas = [
+    ...new Set(piezasDeVarianteActual.map(familiaDePieza).filter(Boolean)),
+  ].sort((a, b) => a.localeCompare(b, "es"));
+  const hayPiezasSinFamilia = piezasDeVarianteActual.some((p) => !familiaDePieza(p));
+  const piezasVisibles = !filtroFamiliaPieza
+    ? piezasDeVarianteActual
+    : piezasDeVarianteActual.filter((p) =>
+        filtroFamiliaPieza === SIN_FAMILIA
+          ? !familiaDePieza(p)
+          : familiaDePieza(p) === filtroFamiliaPieza,
+      );
 
   // Subcódigos (variantes) ya usados entre las piezas de ESTE código —
   // sugerencias para el datalist. Se calculan del lado del cliente, del
@@ -3495,9 +3522,73 @@ export default function ModulosDomus({ authFetch, token }) {
                   </p>
                 ) : (
                   <div style={{ overflowX: "auto", marginBottom: 16 }}>
+                    {(familiasDePiezas.length > 0 || filtroFamiliaPieza) && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          margin: "0 0 10px",
+                        }}
+                      >
+                        <label
+                          htmlFor="filtro-familia-pieza"
+                          style={{ fontSize: 11, color: "#5a86ab" }}
+                        >
+                          Filtrar piezas por familia
+                        </label>
+                        <select
+                          id="filtro-familia-pieza"
+                          value={filtroFamiliaPieza}
+                          onChange={(e) => setFiltroFamiliaPieza(e.target.value)}
+                          style={{
+                            padding: "4px 8px",
+                            fontSize: 12,
+                            fontFamily: "'Space Mono',monospace",
+                            border: "1.5px solid #b8d6ef",
+                            borderRadius: 4,
+                            color: "#0a3a5c",
+                            background: "#fff",
+                            maxWidth: 260,
+                          }}
+                        >
+                          <option value="">Todas ({piezasDeVarianteActual.length})</option>
+                          {familiasDePiezas.map((fam) => (
+                            <option key={fam} value={fam}>
+                              {fam} ({piezasDeVarianteActual.filter((p) => familiaDePieza(p) === fam).length})
+                            </option>
+                          ))}
+                          {hayPiezasSinFamilia && (
+                            <option value={SIN_FAMILIA}>
+                              (sin familia) ({piezasDeVarianteActual.filter((p) => !familiaDePieza(p)).length})
+                            </option>
+                          )}
+                        </select>
+                        {filtroFamiliaPieza && (
+                          <>
+                            <span style={{ fontSize: 11, color: "#5a86ab" }}>
+                              Mostrando {piezasVisibles.length} de {piezasDeVarianteActual.length}
+                            </span>
+                            <button
+                              onClick={() => setFiltroFamiliaPieza("")}
+                              style={{
+                                border: "none",
+                                background: "none",
+                                color: "#4a8ab5",
+                                cursor: "pointer",
+                                fontSize: 11,
+                                textDecoration: "underline",
+                              }}
+                            >
+                              Quitar filtro
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                     <DataTable
                       columns={columnasPieza}
-                      rows={piezasDeVarianteActual}
+                      rows={piezasVisibles}
                       selectedId={null}
                       onSelect={() => {}}
                       storageKey={`modulos-domus-piezas-${panelCodigo.id}-${panelSubcodigo || "sin-variante"}`}
