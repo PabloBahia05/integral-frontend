@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import PresupuestoPuertaVidrio from "./PresupuestoPuertaVidrio";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -140,19 +141,8 @@ export default function TabComponentes({ token, agregarAPresupuesto }) {
   const elegirFamilia = (fam) => {
     setFamiliaElegida(fam);
     setBusqueda("");
-    if (
-      fam === FAMILIA_PUERTA_VIDRIO &&
-      !articulos.some((a) => a.familia === fam)
-    ) {
-      // Sin artículos en el catálogo: carga manual de cantidad y precio
-      elegirArticulo({
-        id: ID_PUERTA_VIDRIO_MANUAL,
-        articulo: FAMILIA_PUERTA_VIDRIO,
-        codart: null,
-        familia: fam,
-      });
-      return;
-    }
+    // Puerta de vidrio tiene su propio componente (perfil + vidrio + medidas)
+    if (fam === FAMILIA_PUERTA_VIDRIO) return;
     setVista("articulos");
   };
 
@@ -180,6 +170,17 @@ export default function TabComponentes({ token, agregarAPresupuesto }) {
     setArticuloElegido(null);
     setAgregado(false);
   };
+
+  // ── VISTA: Puerta de vidrio (componente propio) ──────────
+  if (familiaElegida === FAMILIA_PUERTA_VIDRIO) {
+    return (
+      <PresupuestoPuertaVidrio
+        authFetch={authFetch}
+        agregarAPresupuesto={agregarAPresupuesto}
+        onVolver={volverAFamilias}
+      />
+    );
+  }
 
   // ── VISTA: familias ──────────────────────────────────────
   if (vista === "familias") {
