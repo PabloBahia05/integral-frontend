@@ -1132,6 +1132,9 @@ export default function ModulosDomus({ authFetch, token }) {
   const [busquedaFormula, setBusquedaFormula] = useState("");
   const [filtroFamiliaFormula, setFiltroFamiliaFormula] = useState("");
   const [filtroFamiliaPieza, setFiltroFamiliaPieza] = useState("");
+  // La columna "Buscar fórmula" de la tabla de piezas está oculta por defecto;
+  // se muestra con el botón de arriba de la tabla.
+  const [mostrarBuscarFormula, setMostrarBuscarFormula] = useState(false);
   const [formulaFocus, setFormulaFocus] = useState(false);
   const [piezaFormula, setPiezaFormula] = useState("");
   const [piezaTitulo, setPiezaTitulo] = useState("");
@@ -3697,6 +3700,25 @@ export default function ModulosDomus({ authFetch, token }) {
                   </p>
                 ) : (
                   <div style={{ overflowX: "auto", marginBottom: 16 }}>
+                    <div style={{ margin: "0 0 10px" }}>
+                      <button
+                        onClick={() => setMostrarBuscarFormula((v) => !v)}
+                        title="Muestra u oculta la columna para buscar y cambiar la fórmula de cada pieza"
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 4,
+                          border: "1.5px solid #0a3a5c",
+                          background: mostrarBuscarFormula ? "#0a3a5c" : "#fff",
+                          color: mostrarBuscarFormula ? "#fff" : "#0a3a5c",
+                          cursor: "pointer",
+                          fontFamily: "'Space Mono', monospace",
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {mostrarBuscarFormula ? "🔍 Ocultar Buscar fórmula" : "🔍 Buscar fórmula"}
+                      </button>
+                    </div>
                     {(familiasDePiezas.length > 0 || filtroFamiliaPieza) && (
                       <div
                         style={{
@@ -3762,7 +3784,9 @@ export default function ModulosDomus({ authFetch, token }) {
                       </div>
                     )}
                     <DataTable
-                      columns={columnasPieza}
+                      columns={columnasPieza.filter(
+                      (c) => c.key !== "formula_madre" || mostrarBuscarFormula,
+                    )}
                       rows={piezasVisibles}
                       selectedId={null}
                       onSelect={() => {}}
