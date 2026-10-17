@@ -643,15 +643,13 @@ export default function DxfABpp({ onVolver }) {
       return;
     }
 
+    // Nada se guarda todavía: se muestra la vista previa de todas las piezas y
+    // recién al apretar "Guardar los .bpp" se escriben los archivos.
+    setLog(filasError);
+    setProcesando(false);
+    if (!items.length) return; // solo hubo errores: quedan en el log
     const invertidas = items.filter((it) => it.W < it.H - TOL_ORIENTACION);
-    if (invertidas.length) {
-      // Todavía no se guarda nada: primero se pregunta qué hacer.
-      setLog(filasError);
-      setRevision({ items, invertidas, decisiones: {}, filasBase: filasError });
-      setProcesando(false);
-      return;
-    }
-    await guardar(dir, items, {}, filasError);
+    setRevision({ items, invertidas, decisiones: {}, filasBase: filasError });
   };
 
   const elegir = (nombre, valor) =>
@@ -770,64 +768,117 @@ export default function DxfABpp({ onVolver }) {
           {procesando ? "Convirtiendo..." : "Convertir carpeta"}
         </button>
 
-        {revision && (
+        {revision && (() => {
+          const hayInv = revision.invertidas.length > 0;
+          const cNorm = hayInv
+            ? { borde: "#e0b64a", fondo: "#fff8e1", titulo: "#7a5a00", sep: "#f3e6bd", lista: "#ecd9a0" }
+            : { borde: "#b8d6ef", fondo: "#f4f9fd", titulo: "#0a3a5c", sep: "#e3eef8", lista: "#b8d6ef" };
+          return (
           <div
             style={{
               marginTop: "20px",
-              border: "1.5px solid #e0b64a",
-              background: "#fff8e1",
+              border: `1.5px solid ${cNorm.borde}`,
+              background: cNorm.fondo,
               borderRadius: "8px",
               padding: "14px 16px",
             }}
           >
-            <div style={{ fontSize: "14px", fontWeight: "bold", color: "#7a5a00", marginBottom: "4px" }}>
-              {revision.invertidas.length === 1
-                ? "1 pieza quedó con LPX menor que LPY (más alta que ancha)"
-                : `${revision.invertidas.length} piezas quedaron con LPX menor que LPY (más altas que anchas)`}
+            <div style={{ fontSize: "14px", fontWeight: "bold", color: cNorm.titulo, marginBottom: "4px" }}>
+              Vista previa: {revision.items.length} pieza(s) lista(s) para guardar
             </div>
             <div style={{ fontSize: "12.5px", color: "#555", marginBottom: "12px" }}>
-              Todavía no se guardó ningún archivo. Elegí qué hacer con cada una. Al rotar, los laterales
-              pasan al borde inferior/superior (lados 2 y 4), cuya numeración no está verificada:
-              revisalo en BiesseWorks.
+              Todavía no se guardó ningún archivo. Revisá los planos (click para ampliar) y apretá
+              "Guardar los .bpp" cuando estén bien.
+              {hayInv && (
+                <>
+                  {" "}
+                  {revision.invertidas.length === 1
+                    ? "1 pieza quedó con LPX menor que LPY (más alta que ancha): elegí qué hacer con ella."
+                    : `${revision.invertidas.length} piezas quedaron con LPX menor que LPY (más altas que anchas): elegí qué hacer con cada una.`}{" "}
+                  Al rotar, los laterales pasan al borde inferior/superior (lados 2 y 4), cuya numeración
+                  no está verificada: revisalo en BiesseWorks.
+                </>
+              )}
             </div>
 
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
-              <span style={{ fontSize: "12.5px", color: "#333", alignSelf: "center" }}>Todas:</span>
-              {OPCIONES_DECISION.map((o) => (
-                <button key={String(o.valor)} onClick={() => elegirTodas(o.valor)} style={botonChico}>
-                  {o.texto}
-                </button>
-              ))}
-            </div>
+            {hayInv && (
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+                <span style={{ fontSize: "12.5px", color: "#333", alignSelf: "center" }}>Todas las que están invertidas:</span>
+                {OPCIONES_DECISION.map((o) => (
+                  <button key={String(o.valor)} onClick={() => elegirTodas(o.valor)} style={botonChico}>
+                    {o.texto}
+                  </button>
+                ))}
+              </div>
+            )}
 
-            <div style={{ background: "#fff", border: "1px solid #ecd9a0", borderRadius: "6px" }}>
-              {revision.invertidas.map((it, i) => (
-                <div
-                  key={it.nombre}
-                  style={{ padding: "8px 12px", borderTop: i ? "1px solid #f3e6bd" : "none", fontSize: "12.5px" }}
-                >
-                  <div style={{ marginBottom: "6px" }}>
-                    <b style={{ color: "#333" }}>{it.nombre}</b>{" "}
-                    <span style={{ color: "#555" }}>
-                      · LPX {formatearNumero(it.W)} × LPY {formatearNumero(it.H)} mm · {it.nVerticales} vertical(es) ·{" "}
-                      {it.nLaterales} lateral(es)
-                    </span>
+            <div style={{ background: "#fff", border: `1px solid ${cNorm.lista}`, borderRadius: "6px" }}>
+              {revision.items.map((it, i) => {
+                const invertida = it.W < it.H - TOL_ORIENTACION;
+                const dec = revision.decisiones[it.nombre];
+                const omitida = dec === "omitir";
+                const g = dec === 90 || dec === 270 ? rotarGeom(it.geom, dec) : it.geom;
+                const detalle = `${it.nombreBpp} · panel ${formatearNumero(g.W)}×${formatearNumero(g.H)}×${formatearNumero(it.espesor)} mm · ${it.nVerticales} vertical(es) · ${it.nLaterales} lateral(es)${dec === 90 || dec === 270 ? ` · rotada ${dec}° horario` : ""}`;
+                return (
+                  <div
+                    key={it.nombre}
+                    style={{
+                      padding: "8px 12px",
+                      borderTop: i ? `1px solid ${cNorm.sep}` : "none",
+                      fontSize: "12.5px",
+                      display: "flex",
+                      gap: "14px",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div>
+                        <b style={{ color: "#333" }}>{it.nombre}</b>
+                      </div>
+                      <div style={{ color: "#555", marginTop: "2px" }}>{detalle}</div>
+                      {it.avisos.map((a, j) => (
+                        <div key={j} style={{ color: "#b8860b", marginTop: "2px" }}>
+                          ⚠ {a}
+                        </div>
+                      ))}
+                      {invertida && (
+                        <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "8px" }}>
+                          {OPCIONES_DECISION.map((o) => (
+                            <label key={String(o.valor)} style={{ display: "flex", alignItems: "center", gap: "5px", color: "#333" }}>
+                              <input
+                                type="radio"
+                                name={`dec-${it.nombre}`}
+                                checked={dec === o.valor}
+                                onChange={() => elegir(it.nombre, o.valor)}
+                              />
+                              {o.texto}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      {omitida && (
+                        <div style={{ color: "#b8860b", marginTop: "4px", fontWeight: "bold" }}>No se va a guardar.</div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setAmpliada({ nombre: it.nombre, detalle, geom: g })}
+                      title="Click para ampliar"
+                      style={{
+                        flex: "0 0 auto",
+                        width: "170px",
+                        padding: "6px",
+                        border: "1.5px solid #b8d6ef",
+                        borderRadius: "6px",
+                        background: "#fff",
+                        cursor: "zoom-in",
+                        opacity: omitida ? 0.35 : 1,
+                      }}
+                    >
+                      <VistaPlano geom={g} />
+                    </button>
                   </div>
-                  <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-                    {OPCIONES_DECISION.map((o) => (
-                      <label key={String(o.valor)} style={{ display: "flex", alignItems: "center", gap: "5px", color: "#333" }}>
-                        <input
-                          type="radio"
-                          name={`dec-${it.nombre}`}
-                          checked={revision.decisiones[it.nombre] === o.valor}
-                          onChange={() => elegir(it.nombre, o.valor)}
-                        />
-                        {o.texto}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div style={{ display: "flex", gap: "10px", marginTop: "14px", alignItems: "center", flexWrap: "wrap" }}>
@@ -852,12 +903,13 @@ export default function DxfABpp({ onVolver }) {
               </button>
               {sinResponder > 0 && (
                 <span style={{ fontSize: "12px", color: "#7a5a00" }}>
-                  Falta elegir en {sinResponder} pieza(s).
+                  Falta elegir en {sinResponder} pieza(s) invertida(s).
                 </span>
               )}
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {resumen && !procesando && !revision && (
           <div style={{ marginTop: "18px", fontSize: "13px", color: "#0a3a5c", fontWeight: "bold" }}>
