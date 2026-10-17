@@ -42,7 +42,7 @@ import { rotarBPP } from "./RotarBPP";
  * Filtro de orientación: si en algún archivo el panel sale con LPX menor
  * que LPY (más alto que ancho), no se guarda nada todavía: se muestra la
  * lista de esas piezas y se pide, pieza por pieza (o para todas), si se
- * avanza así, se rota 90° u 270° (giro horario, con la misma rotación de
+ * avanza así, se rota 90°, 180° u 270° (giro horario, con la misma rotación de
  * RotarBPP.jsx, que ahora se exporta) o no se convierte. Al rotar 90°/270°
  * los laterales de las caras 1 y 3 pasan a los lados 2 y 4, cuya
  * numeración no está verificada: se avisa.
@@ -370,11 +370,14 @@ function convertirDXF(dxf, espesorManual) {
   };
 }
 
-// Gira la geometría en sentido horario (90° o 270°), igual que la rotación
-// del .bpp: el panel nuevo mide H × W.
+// Gira la geometría en sentido horario (90°, 180° o 270°), igual que la
+// rotación del .bpp: con 90°/270° el panel nuevo mide H × W; con 180° no cambia.
 function rotarGeom(g, grados) {
   const { W, H } = g;
-  const mover = grados === 90 ? (x, y) => [y, W - x] : (x, y) => [H - y, x];
+  const mover =
+    grados === 90 ? (x, y) => [y, W - x]
+    : grados === 180 ? (x, y) => [W - x, H - y]
+    : (x, y) => [H - y, x];
   const circulos = g.circulos.map((c) => {
     const [x, y] = mover(c.x, c.y);
     return { ...c, x, y };
@@ -390,7 +393,7 @@ function rotarGeom(g, grados) {
       y1: Math.max(ya, yb),
     };
   });
-  return { W: H, H: W, circulos, rects };
+  return grados === 180 ? { W, H, circulos, rects } : { W: H, H: W, circulos, rects };
 }
 
 // ---- Vista previa de la pieza (SVG) -----------------------------------------
@@ -489,6 +492,7 @@ const TOL_ORIENTACION = 0.001;
 const OPCIONES_DECISION = [
   { valor: "asi", texto: "Avanzar así" },
   { valor: 90, texto: "Rotar 90°" },
+  { valor: 180, texto: "Rotar 180°" },
   { valor: 270, texto: "Rotar 270°" },
   { valor: "omitir", texto: "No convertir" },
 ];
@@ -571,14 +575,21 @@ export default function DxfABpp({ onVolver }) {
           const avisos = [...it.avisos];
           let nota = "";
           let geom = it.geom;
-          if (dec === 90 || dec === 270) {
-            const r = rotarBPP(contenido, dec);
-            contenido = r.contenido;
-            W = r.panelNuevo.LPX;
-            H = r.panelNuevo.LPY;
-            avisos.push(...r.avisos);
+          if (dec === 90 || dec === 180 || dec === 270) {
+            // 180° = dos giros de 90° con la misma rotación de RotarBPP.
+            const giros = dec === 180 ? [90, 90] : [dec];
+            for (const giro of giros) {
+              const r = rotarBPP(contenido, giro);
+              contenido = r.contenido;
+              W = r.panelNuevo.LPX;
+              H = r.panelNuevo.LPY;
+              for (const a of r.avisos) if (!avisos.includes(a)) avisos.push(a);
+            }
             nota = ` · rotada ${dec}° horario`;
             geom = rotarGeom(it.geom, dec);
+            if (W < H - TOL_ORIENTACION) {
+              avisos.push("Se guardó con LPX menor que LPY (la rotación no cambió la orientación del panel).");
+            }
           } else if (W < H - TOL_ORIENTACION) {
             avisos.push("Se guardó con LPX menor que LPY (elegiste avanzar así).");
           }
@@ -817,8 +828,9 @@ export default function DxfABpp({ onVolver }) {
                 const invertida = it.W < it.H - TOL_ORIENTACION;
                 const dec = revision.decisiones[it.nombre];
                 const omitida = dec === "omitir";
-                const g = dec === 90 || dec === 270 ? rotarGeom(it.geom, dec) : it.geom;
-                const detalle = `${it.nombreBpp} · panel ${formatearNumero(g.W)}×${formatearNumero(g.H)}×${formatearNumero(it.espesor)} mm · ${it.nVerticales} vertical(es) · ${it.nLaterales} lateral(es)${dec === 90 || dec === 270 ? ` · rotada ${dec}° horario` : ""}`;
+                const rota = dec === 90 || dec === 180 || dec === 270;
+                const g = rota ? rotarGeom(it.geom, dec) : it.geom;
+                const detalle = `${it.nombreBpp} · panel ${formatearNumero(g.W)}×${formatearNumero(g.H)}×${formatearNumero(it.espesor)} mm · ${it.nVerticales} vertical(es) · ${it.nLaterales} lateral(es)${rota ? ` · rotada ${dec}° horario` : ""}`;
                 return (
                   <div
                     key={it.nombre}
