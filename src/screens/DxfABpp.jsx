@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { rotarBPP } from "./RotarBPP";
 
 /**
@@ -344,6 +344,20 @@ function convertirDXF(dxf, espesorManual) {
     ...BPP_PIE,
   ];
 
+  // Geometría para la vista previa (coordenadas del panel, origen abajo-izq.).
+  // Laterales: rectángulo desde el borde hacia adentro (profundidad) y a lo
+  // largo del borde (diámetro), centrado en la posición.
+  const geom = {
+    W,
+    H,
+    circulos: verticales.map((v) => ({ x: v.x, y: v.y, r: v.dia / 2, d: v.dia })),
+    rects: laterales.map((l) =>
+      l.cara === 1
+        ? { x0: 0, x1: l.prof, y0: l.x - l.dia / 2, y1: l.x + l.dia / 2, z: l.y }
+        : { x0: W - l.prof, x1: W, y0: l.x - l.dia / 2, y1: l.x + l.dia / 2, z: l.y },
+    ),
+  };
+
   return {
     contenido: lineas.join(SALTO),
     W,
@@ -352,7 +366,119 @@ function convertirDXF(dxf, espesorManual) {
     nVerticales: verticales.length,
     nLaterales: laterales.length,
     avisos,
+    geom,
   };
+}
+
+// Gira la geometría en sentido horario (90° o 270°), igual que la rotación
+// del .bpp: el panel nuevo mide H × W.
+function rotarGeom(g, grados) {
+  const { W, H } = g;
+  const mover = grados === 90 ? (x, y) => [y, W - x] : (x, y) => [H - y, x];
+  const circulos = g.circulos.map((c) => {
+    const [x, y] = mover(c.x, c.y);
+    return { ...c, x, y };
+  });
+  const rects = g.rects.map((r) => {
+    const [xa, ya] = mover(r.x0, r.y0);
+    const [xb, yb] = mover(r.x1, r.y1);
+    return {
+      ...r,
+      x0: Math.min(xa, xb),
+      x1: Math.max(xa, xb),
+      y0: Math.min(ya, yb),
+      y1: Math.max(ya, yb),
+    };
+  });
+  return { W: H, H: W, circulos, rects };
+}
+
+// ---- Vista previa de la pieza (SVG) -----------------------------------------
+
+function VistaPlano({ geom, grande = false }) {
+  const { W, H, circulos, rects } = geom;
+  const m = Math.max(W, H);
+  const pad = grande ? m * 0.09 : m * 0.03;
+  const fs = m * 0.026;
+  const Y = (y) => H - y; // el SVG tiene el eje Y hacia abajo
+  const trazo = { vectorEffect: "non-scaling-stroke" };
+  const f = (n) => formatearNumero(n);
+
+  return (
+    <svg
+      viewBox={`${-pad} ${-pad} ${W + 2 * pad} ${H + 2 * pad}`}
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ display: "block", width: "100%", height: "auto" }}
+    >
+      <rect x={0} y={0} width={W} height={H} fill="#fdf6e3" stroke="#0a3a5c" strokeWidth={1.5} {...trazo} />
+      {rects.map((r, i) => (
+        <rect
+          key={`r${i}`}
+          x={r.x0}
+          y={Y(r.y1)}
+          width={r.x1 - r.x0}
+          height={r.y1 - r.y0}
+          fill="#f0a35a"
+          stroke="#b45f06"
+          strokeWidth={1}
+          {...trazo}
+        />
+      ))}
+      {circulos.map((c, i) => (
+        <circle
+          key={`c${i}`}
+          cx={c.x}
+          cy={Y(c.y)}
+          r={c.r}
+          fill="#7fb6e6"
+          stroke="#0a3a5c"
+          strokeWidth={1}
+          {...trazo}
+        />
+      ))}
+      {grande && (
+        <>
+          {circulos.map((c, i) => (
+            <text
+              key={`tc${i}`}
+              x={c.x}
+              y={Y(c.y) - c.r - fs * 0.35}
+              fontSize={fs}
+              textAnchor="middle"
+              fill="#0a3a5c"
+              stroke="#fff"
+              strokeWidth={fs * 0.25}
+              paintOrder="stroke"
+              fontFamily="sans-serif"
+            >
+              Ø{f(c.d)}
+            </text>
+          ))}
+          <text
+            x={W / 2}
+            y={H + pad * 0.7}
+            fontSize={fs * 1.2}
+            textAnchor="middle"
+            fill="#333"
+            fontFamily="sans-serif"
+          >
+            {f(W)} mm
+          </text>
+          <text
+            x={-pad * 0.7}
+            y={H / 2}
+            fontSize={fs * 1.2}
+            textAnchor="middle"
+            fill="#333"
+            fontFamily="sans-serif"
+            transform={`rotate(-90 ${-pad * 0.7} ${H / 2})`}
+          >
+            {f(H)} mm
+          </text>
+        </>
+      )}
+    </svg>
+  );
 }
 
 /* ---- UI ---- */
@@ -386,6 +512,17 @@ export default function DxfABpp({ onVolver }) {
   // { items, invertidas, decisiones, filasBase } mientras se espera la respuesta
   const [revision, setRevision] = useState(null);
   const dirRef = useRef(null);
+  // Fila del log cuya vista previa está ampliada (o null)
+  const [ampliada, setAmpliada] = useState(null);
+
+  useEffect(() => {
+    if (!ampliada) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") setAmpliada(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ampliada]);
 
   const soportado = typeof window !== "undefined" && "showDirectoryPicker" in window;
 
@@ -397,6 +534,7 @@ export default function DxfABpp({ onVolver }) {
       setCarpeta(h.name);
       setLog([]);
       setRevision(null);
+      setAmpliada(null);
     } catch (err) {
       if (err?.name !== "AbortError") setError("No se pudo abrir la carpeta.");
     }
@@ -432,6 +570,7 @@ export default function DxfABpp({ onVolver }) {
           let H = it.H;
           const avisos = [...it.avisos];
           let nota = "";
+          let geom = it.geom;
           if (dec === 90 || dec === 270) {
             const r = rotarBPP(contenido, dec);
             contenido = r.contenido;
@@ -439,6 +578,7 @@ export default function DxfABpp({ onVolver }) {
             H = r.panelNuevo.LPY;
             avisos.push(...r.avisos);
             nota = ` · rotada ${dec}° horario`;
+            geom = rotarGeom(it.geom, dec);
           } else if (W < H - TOL_ORIENTACION) {
             avisos.push("Se guardó con LPX menor que LPY (elegiste avanzar así).");
           }
@@ -451,6 +591,7 @@ export default function DxfABpp({ onVolver }) {
             estado: "ok",
             detalle: `${it.nombreBpp} · panel ${formatearNumero(W)}×${formatearNumero(H)}×${formatearNumero(it.espesor)} mm · ${it.nVerticales} vertical(es) · ${it.nLaterales} lateral(es)${nota}`,
             avisos,
+            geom,
           });
         } catch (err) {
           filas.push({ nombre: it.nombre, estado: "error", detalle: err.message || String(err) });
@@ -566,7 +707,7 @@ export default function DxfABpp({ onVolver }) {
         ‹ Volver
       </button>
 
-      <div style={{ maxWidth: "720px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "900px", margin: "0 auto" }}>
         <h2 style={{ color: "#0a3a5c", marginBottom: "8px" }}>Convertir DXF a BPP</h2>
         <p style={{ fontSize: "12px", color: "#666", marginTop: 0, marginBottom: "20px", maxWidth: "600px" }}>
           Elegís una carpeta con archivos .dxf y los .bpp se guardan en esa misma carpeta, con el mismo
@@ -731,25 +872,102 @@ export default function DxfABpp({ onVolver }) {
             {log.map((f, i) => (
               <div
                 key={f.nombre}
-                style={{ padding: "8px 12px", borderTop: i ? "1px solid #e3eef8" : "none", fontSize: "12.5px" }}
+                style={{
+                  padding: "8px 12px",
+                  borderTop: i ? "1px solid #e3eef8" : "none",
+                  fontSize: "12.5px",
+                  display: "flex",
+                  gap: "14px",
+                  alignItems: "center",
+                }}
               >
-                <div>
-                  <b style={{ color: COLORES_ESTADO[f.estado] }}>
-                    {f.estado === "ok" ? "Listo" : f.estado === "error" ? "Error" : "Salteado"}
-                  </b>{" "}
-                  <span style={{ color: "#333" }}>{f.nombre}</span>
-                </div>
-                <div style={{ color: "#555", marginTop: "2px" }}>{f.detalle}</div>
-                {f.avisos?.map((a, j) => (
-                  <div key={j} style={{ color: "#b8860b", marginTop: "2px" }}>
-                    ⚠ {a}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div>
+                    <b style={{ color: COLORES_ESTADO[f.estado] }}>
+                      {f.estado === "ok" ? "Listo" : f.estado === "error" ? "Error" : "Salteado"}
+                    </b>{" "}
+                    <span style={{ color: "#333" }}>{f.nombre}</span>
                   </div>
-                ))}
+                  <div style={{ color: "#555", marginTop: "2px" }}>{f.detalle}</div>
+                  {f.avisos?.map((a, j) => (
+                    <div key={j} style={{ color: "#b8860b", marginTop: "2px" }}>
+                      ⚠ {a}
+                    </div>
+                  ))}
+                </div>
+                {f.geom && (
+                  <button
+                    onClick={() => setAmpliada(f)}
+                    title="Click para ampliar"
+                    style={{
+                      flex: "0 0 auto",
+                      width: "170px",
+                      padding: "6px",
+                      border: "1.5px solid #b8d6ef",
+                      borderRadius: "6px",
+                      background: "#fff",
+                      cursor: "zoom-in",
+                    }}
+                  >
+                    <VistaPlano geom={f.geom} />
+                  </button>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {ampliada && (
+        <div
+          onClick={() => setAmpliada(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,30,50,0.72)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "20px",
+            cursor: "zoom-out",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: "10px",
+              padding: "16px 18px",
+              width: "min(94vw, 1100px)",
+              maxHeight: "92vh",
+              overflow: "auto",
+              cursor: "default",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", marginBottom: "10px" }}>
+              <div style={{ flex: 1, fontSize: "14px", color: "#0a3a5c" }}>
+                <b>{ampliada.nombre.replace(/\.dxf$/i, "")}.bpp</b>
+                <span style={{ color: "#555", fontSize: "12.5px" }}> · {ampliada.detalle.split(" · ").slice(1).join(" · ")}</span>
+              </div>
+              <button onClick={() => setAmpliada(null)} style={botonChico}>
+                Cerrar
+              </button>
+            </div>
+            <VistaPlano geom={ampliada.geom} grande />
+            <div style={{ display: "flex", gap: "18px", marginTop: "10px", fontSize: "12px", color: "#555", flexWrap: "wrap" }}>
+              <span>
+                <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: "#7fb6e6", border: "1px solid #0a3a5c", verticalAlign: "middle", marginRight: 5 }} />
+                Taladro vertical
+              </span>
+              <span>
+                <span style={{ display: "inline-block", width: 12, height: 12, background: "#f0a35a", border: "1px solid #b45f06", verticalAlign: "middle", marginRight: 5 }} />
+                Taladro lateral (profundidad × diámetro)
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
