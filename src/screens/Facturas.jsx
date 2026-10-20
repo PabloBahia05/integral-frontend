@@ -418,6 +418,11 @@ export default function Facturas({ proveedores = [], token }) {
   const [imgFiles, setImgFiles] = useState([]); // File[] — una o varias hojas de la misma factura
   const [fileType, setFileType] = useState(null); // "image" | "pdf"
   const [filtro, setFiltro] = useState("");
+  // Buscador por término dentro de los ítems de TODAS las facturas
+  const [busqItems, setBusqItems] = useState("");
+  const [resItems, setResItems] = useState([]);
+  const [buscandoItems, setBuscandoItems] = useState(false);
+  const [errorBusqItems, setErrorBusqItems] = useState("");
   const [provId, setProvId] = useState("");
   // ── Sync articulos ─────────────────────────────────────────────────────────
   const [articulosPendientes, setArticulosPendientes] = useState([]);
@@ -466,6 +471,43 @@ export default function Facturas({ proveedores = [], token }) {
       })
       .catch(console.error);
   };
+
+  // ── Búsqueda de un término en los ítems de todas las facturas ──────────────
+  useEffect(() => {
+    const q = busqItems.trim();
+    if (q.length < 2) {
+      setResItems([]);
+      setBuscandoItems(false);
+      setErrorBusqItems("");
+      return;
+    }
+    setBuscandoItems(true);
+    const ctrl = new AbortController();
+    const t = setTimeout(() => {
+      fetch(`${API}/facturas-buscar-items?q=${encodeURIComponent(q)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: ctrl.signal,
+      })
+        .then(async (r) => {
+          const d = await r.json().catch(() => null);
+          if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`);
+          setResItems(Array.isArray(d) ? d : []);
+          setErrorBusqItems("");
+        })
+        .catch((e) => {
+          if (e.name === "AbortError") return;
+          setErrorBusqItems(e.message);
+          setResItems([]);
+        })
+        .finally(() => {
+          if (!ctrl.signal.aborted) setBuscandoItems(false);
+        });
+    }, 350);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [busqItems]);
 
   // ── Filtro ─────────────────────────────────────────────────────────────────
   const facturasFiltradas = facturas.filter((f) => {
@@ -2004,6 +2046,72 @@ export default function Facturas({ proveedores = [], token }) {
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
         />
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <input
+          style={{ ...S.input, maxWidth: 360 }}
+          placeholder="Buscar producto en todas las facturas (ej: tribal)…"
+          value={busqItems}
+          onChange={(e) => setBusqItems(e.target.value)}
+        />
+        {busqItems.trim().length >= 2 && (
+          <div style={{ marginTop: 12 }}>
+            {buscandoItems ? (
+              <p style={{ color: "#6699bb", fontSize: 13 }}>Buscando…</p>
+            ) : errorBusqItems ? (
+              <p style={{ color: "#c0392b", fontSize: 13 }}>
+                Error al buscar: {errorBusqItems}
+              </p>
+            ) : resItems.length === 0 ? (
+              <p style={{ color: "#6699bb", fontSize: 13 }}>
+                No se encontró "{busqItems.trim()}" en ninguna factura.
+              </p>
+            ) : (
+              <>
+                <p style={{ color: "#0a3a5c", fontSize: 13, fontWeight: 700 }}>
+                  {resItems.length >= 500
+                    ? "500+ coincidencias (se muestran las 500 más recientes)"
+                    : `${resItems.length} coincidencia(s) en ${new Set(resItems.map((r) => r.factura_id)).size} factura(s)`}
+                </p>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={S.table}>
+                    <thead>
+                      <tr>
+                        {["Fecha", "Proveedor", "Número", "Código", "Descripción", "Cant.", "Precio unit.", "Subtotal"].map((h) => (
+                          <th key={h} style={S.th}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resItems.map((r) => (
+                        <tr
+                          key={r.item_id}
+                          style={{ cursor: "pointer" }}
+                          title="Ver factura"
+                          onClick={() => fetchDetalle(r.factura_id)}
+                        >
+                          <td style={S.td}>{r.fecha?.slice(0, 10) ?? "—"}</td>
+                          <td style={S.td}>{r.proveedor_nombre ?? "—"}</td>
+                          <td style={S.td}>
+                            <strong>{r.numero ?? "—"}</strong>
+                          </td>
+                          <td style={S.td}>{r.codigo ?? "—"}</td>
+                          <td style={S.td}>{r.descripcion ?? "—"}</td>
+                          <td style={{ ...S.td, textAlign: "right" }}>{r.cantidad ?? "—"}</td>
+                          <td style={{ ...S.td, textAlign: "right" }}>{fmt(r.precio_unit)}</td>
+                          <td style={{ ...S.td, textAlign: "right" }}>{fmt(r.subtotalprod)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (
