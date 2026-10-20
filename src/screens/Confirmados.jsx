@@ -898,6 +898,36 @@ export default function Confirmados({ authFetch, token, onInicio }) {
       render: (v) => <span style={{ fontSize: 11, color: "#8aabcc" }}>{v}</span>,
     },
     {
+      key: "codpro",
+      label: "Cód.",
+      render: (v) => (
+        <span
+          style={{
+            display: "inline-block",
+            background: "#0a3a5c",
+            color: "#fff",
+            borderRadius: "4px",
+            padding: "1px 8px",
+            fontSize: "11px",
+            fontWeight: 700,
+            letterSpacing: "0.5px",
+            fontFamily: FUENTE,
+          }}
+        >
+          {v ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "codigo_produccion",
+      label: "Cód. Producción",
+      render: (v) => (
+        <span style={{ fontSize: 12, fontFamily: FUENTE, color: "#0a3a5c" }}>
+          {v ?? "Sin código"}
+        </span>
+      ),
+    },
+    {
       key: "nombreart",
       label: "Producto",
       render: (v, row) => inputTexto(row, "nombreart", "230px"),
