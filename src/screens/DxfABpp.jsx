@@ -396,6 +396,35 @@ function rotarGeom(g, grados) {
   return grados === 180 ? { W, H, circulos, rects } : { W: H, H: W, circulos, rects };
 }
 
+// ¿Dos geometrías tienen el mismo panel y los mismos taladros (mismo origen)?
+function mismaGeom(a, b, tol = 0.05) {
+  if (Math.abs(a.W - b.W) > tol || Math.abs(a.H - b.H) > tol) return false;
+  if (a.circulos.length !== b.circulos.length || a.rects.length !== b.rects.length) return false;
+  const cc = (g) => [...g.circulos].sort((p, q) => p.x - q.x || p.y - q.y);
+  const rr = (g) => [...g.rects].sort((p, q) => p.x0 - q.x0 || p.y0 - q.y0 || p.x1 - q.x1 || p.y1 - q.y1);
+  const ca = cc(a), cb = cc(b), ra = rr(a), rb = rr(b);
+  return (
+    ca.every((c, i) => Math.abs(c.x - cb[i].x) <= tol && Math.abs(c.y - cb[i].y) <= tol && Math.abs(c.d - cb[i].d) <= tol) &&
+    ra.every((r, i) =>
+      ["x0", "x1", "y0", "y1"].every((k) => Math.abs(r[k] - rb[i][k]) <= tol) && Math.abs(r.dia - rb[i].dia) <= tol)
+  );
+}
+
+// Pares "XXX" / "XXXX": el apoyo es siempre el borde inferior, así que la pieza X y su
+// base deben tener el mismo origen. Si la base es la X girada 180°, se sugiere rotar la
+// base 180° (la X queda como referencia). Devuelve { "ETF1.dxf": "ETF1X.dxf", ... }.
+function detectarEspejos(items) {
+  const porBase = new Map(items.map((it) => [it.nombre.replace(/\.dxf$/i, "").toUpperCase(), it]));
+  const out = {};
+  for (const it of items) {
+    const base = it.nombre.replace(/\.dxf$/i, "").toUpperCase();
+    const x = porBase.get(base + "X");
+    if (!x) continue;
+    if (!mismaGeom(it.geom, x.geom) && mismaGeom(rotarGeom(it.geom, 180), x.geom)) out[it.nombre] = x.nombre;
+  }
+  return out;
+}
+
 // ---- Vista previa de la pieza (SVG) -----------------------------------------
 
 function VistaPlano({ geom, grande = false }) {
@@ -660,7 +689,7 @@ export default function DxfABpp({ onVolver }) {
             filas.push({
               nombre: it.nombre,
               estado: "salteado",
-              detalle: `No se convirtió (LPX ${formatearNumero(it.W)} < LPY ${formatearNumero(it.H)})`,
+              detalle: "No se convirtió (elegido en la vista previa)",
             });
             setLog([...filas]);
             continue;
@@ -761,7 +790,7 @@ export default function DxfABpp({ onVolver }) {
     setProcesando(false);
     if (!items.length) return; // solo hubo errores: quedan en el log
     const invertidas = items.filter((it) => it.W < it.H - TOL_ORIENTACION);
-    setRevision({ items, invertidas, decisiones: {}, filasBase: filasError });
+    setRevision({ items, invertidas, espejos: detectarEspejos(items), decisiones: {}, filasBase: filasError });
   };
 
   const elegir = (nombre, valor) =>
@@ -770,12 +799,21 @@ export default function DxfABpp({ onVolver }) {
   const elegirTodas = (valor) =>
     setRevision((r) => ({
       ...r,
-      decisiones: Object.fromEntries(r.invertidas.map((it) => [it.nombre, valor])),
+      decisiones: Object.fromEntries(r.items.map((it) => [it.nombre, valor])),
     }));
 
   const sinResponder = revision
-    ? revision.invertidas.filter((it) => revision.decisiones[it.nombre] === undefined).length
+    ? revision.invertidas.filter((it) => revision.decisiones[it.nombre] === undefined).length +
+      Object.keys(revision.espejos || {}).filter(
+        (n) => revision.decisiones[n] === undefined && !revision.invertidas.some((it) => it.nombre === n),
+      ).length
     : 0;
+  const espejosPend = revision ? Object.keys(revision.espejos || {}) : [];
+  const elegirEspejos = (valor) =>
+    setRevision((r) => ({
+      ...r,
+      decisiones: { ...r.decisiones, ...Object.fromEntries(Object.keys(r.espejos || {}).map((n) => [n, valor])) },
+    }));
 
   const etiqueta = { display: "block", fontSize: "13px", marginBottom: "6px", color: "#333" };
   const campo = {
@@ -913,9 +951,31 @@ export default function DxfABpp({ onVolver }) {
               )}
             </div>
 
-            {hayInv && (
+            {espejosPend.length > 0 && (
+              <div
+                style={{
+                  background: "#fff8e1",
+                  border: "1.5px solid #e0b84a",
+                  borderRadius: "6px",
+                  padding: "10px 12px",
+                  marginBottom: "12px",
+                  fontSize: "12.5px",
+                  color: "#333",
+                }}
+              >
+                <b>Mismo origen:</b> {espejosPend.length === 1 ? "1 pieza es" : `${espejosPend.length} piezas son`} su par "X" girado 180° (el apoyo es siempre el
+                borde inferior): {espejosPend.map((n) => `${n.replace(/\.dxf$/i, "")} ↔ ${revision.espejos[n].replace(/\.dxf$/i, "")}`).join(", ")}.
+                ¿Rotar 180° la pieza base para que coincida con la X?
+                <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                  <button onClick={() => elegirEspejos(180)} style={botonChico}>Sí, rotar todas 180°</button>
+                  <button onClick={() => elegirEspejos("asi")} style={botonChico}>No, dejarlas así</button>
+                </div>
+              </div>
+            )}
+
+            {(
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
-                <span style={{ fontSize: "12.5px", color: "#333", alignSelf: "center" }}>Todas las que están invertidas:</span>
+                <span style={{ fontSize: "12.5px", color: "#333", alignSelf: "center" }}>Todas las piezas:</span>
                 {OPCIONES_DECISION.map((o) => (
                   <button key={String(o.valor)} onClick={() => elegirTodas(o.valor)} style={botonChico}>
                     {o.texto}
@@ -927,7 +987,8 @@ export default function DxfABpp({ onVolver }) {
             <div style={{ background: "#fff", border: `1px solid ${cNorm.lista}`, borderRadius: "6px" }}>
               {revision.items.map((it, i) => {
                 const invertida = it.W < it.H - TOL_ORIENTACION;
-                const dec = revision.decisiones[it.nombre];
+                // Las piezas bien orientadas avanzan así por defecto; las invertidas obligan a elegir.
+                const dec = revision.decisiones[it.nombre] ?? (invertida ? undefined : "asi");
                 const omitida = dec === "omitir";
                 const rota = dec === 90 || dec === 180 || dec === 270;
                 const g = rota ? rotarGeom(it.geom, dec) : it.geom;
@@ -954,7 +1015,7 @@ export default function DxfABpp({ onVolver }) {
                           ⚠ {a}
                         </div>
                       ))}
-                      {invertida && (
+                      {(
                         <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "8px" }}>
                           {OPCIONES_DECISION.map((o) => (
                             <label key={String(o.valor)} style={{ display: "flex", alignItems: "center", gap: "5px", color: "#333" }}>
@@ -967,6 +1028,11 @@ export default function DxfABpp({ onVolver }) {
                               {o.texto}
                             </label>
                           ))}
+                        </div>
+                      )}
+                      {revision.espejos?.[it.nombre] && (
+                        <div style={{ color: "#8a6d00", marginTop: "4px" }}>
+                          Es {revision.espejos[it.nombre]} girada 180°: rotarla 180° la deja con el mismo origen.
                         </div>
                       )}
                       {omitida && (
