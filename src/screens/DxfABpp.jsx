@@ -350,11 +350,11 @@ function convertirDXF(dxf, espesorManual) {
   const geom = {
     W,
     H,
-    circulos: verticales.map((v) => ({ x: v.x, y: v.y, r: v.dia / 2, d: v.dia })),
+    circulos: verticales.map((v) => ({ x: v.x, y: v.y, r: v.dia / 2, d: v.dia, p: v.prof })),
     rects: laterales.map((l) =>
       l.cara === 1
-        ? { x0: 0, x1: l.prof, y0: l.x - l.dia / 2, y1: l.x + l.dia / 2, z: l.y }
-        : { x0: W - l.prof, x1: W, y0: l.x - l.dia / 2, y1: l.x + l.dia / 2, z: l.y },
+        ? { x0: 0, x1: l.prof, y0: l.x - l.dia / 2, y1: l.x + l.dia / 2, z: l.y, prof: l.prof, dia: l.dia }
+        : { x0: W - l.prof, x1: W, y0: l.x - l.dia / 2, y1: l.x + l.dia / 2, z: l.y, prof: l.prof, dia: l.dia },
     ),
   };
 
@@ -401,15 +401,138 @@ function rotarGeom(g, grados) {
 function VistaPlano({ geom, grande = false }) {
   const { W, H, circulos, rects } = geom;
   const m = Math.max(W, H);
-  const pad = grande ? m * 0.09 : m * 0.03;
-  const fs = m * 0.026;
+  const fs = grande ? m * 0.024 : m * 0.075; // tamaño del texto de las cotas
+  const t = fs * 0.5; // medio largo de las marcas de las cotas
+  const COT = "#a33";
+  const TOLB = 0.05;
   const Y = (y) => H - y; // el SVG tiene el eje Y hacia abajo
   const trazo = { vectorEffect: "non-scaling-stroke" };
-  const f = (n) => formatearNumero(n);
+  const f = (n) => formatearNumero(Math.round(n * 100) / 100);
+
+  // Margen para las líneas de cota (abajo e izquierda). En la miniatura solo va la cota total.
+  const padL = grande ? fs * 6.4 : fs * 2.6;
+  const padB = grande ? fs * 6.4 : fs * 2.7;
+  const padR = grande ? fs * 1.6 : m * 0.02;
+  const padT = grande ? fs * 1.4 : m * 0.02;
+  const filaChain = fs * 2.4;
+  const filaTotal = grande ? fs * 5.4 : fs * 1.9;
+
+  // Lado del panel al que está pegado cada taladro lateral (ya con la rotación aplicada)
+  const lado = (r) => {
+    const ex = r.x1 - r.x0;
+    const ey = r.y1 - r.y0;
+    const horiz =
+      Math.abs(ex - r.prof) < 0.01 && Math.abs(ey - r.prof) >= 0.01 ? true
+      : Math.abs(ey - r.prof) < 0.01 && Math.abs(ex - r.prof) >= 0.01 ? false
+      : ex <= ey;
+    if (horiz) return r.x0 < TOLB ? "izq" : "der";
+    return r.y0 < TOLB ? "inf" : "sup";
+  };
+  const lados = rects.map(lado);
+
+  // Posiciones a cotar en cadena: de borde a borde pasando por cada taladro
+  const unicos = (vals, tope) => {
+    const ord = [...vals].sort((a, b) => a - b);
+    const res = [];
+    for (const v of ord) {
+      if (v < 0.01 || v > tope - 0.01) continue;
+      if (res.length && v - res[res.length - 1] < 0.01) continue;
+      res.push(v);
+    }
+    return [0, ...res, tope];
+  };
+  const px = unicos(
+    [
+      ...circulos.map((c) => c.x),
+      ...rects.filter((_, i) => lados[i] === "inf" || lados[i] === "sup").map((r) => (r.x0 + r.x1) / 2),
+    ],
+    W,
+  );
+  const py = unicos(
+    [
+      ...circulos.map((c) => c.y),
+      ...rects.filter((_, i) => lados[i] === "izq" || lados[i] === "der").map((r) => (r.y0 + r.y1) / 2),
+    ],
+    H,
+  );
+
+  const estiloTexto = {
+    fontSize: fs,
+    fill: COT,
+    fontFamily: "sans-serif",
+    stroke: "#fff",
+    strokeWidth: fs * 0.22,
+    paintOrder: "stroke",
+    textAnchor: "middle",
+  };
+
+  // Cota horizontal (abajo del panel). pts = posiciones en X, de menor a mayor.
+  const cotaH = (pts, yFila, ext, sufijo) => (
+    <g>
+      <line x1={pts[0]} x2={pts[pts.length - 1]} y1={yFila} y2={yFila} stroke={COT} strokeWidth={0.8} {...trazo} />
+      {pts.map((x, i) => (
+        <g key={`h${i}`}>
+          {ext && (
+            <line x1={x} x2={x} y1={H + fs * 0.3} y2={yFila + t} stroke={COT} strokeWidth={0.5} strokeDasharray="3 3" {...trazo} />
+          )}
+          <line x1={x} x2={x} y1={yFila - t} y2={yFila + t} stroke={COT} strokeWidth={1.2} {...trazo} />
+        </g>
+      ))}
+      {pts.slice(1).map((x, i) => {
+        const a = pts[i];
+        const apretado = x - a < fs * 4.2 && i % 2 === 1; // tramos cortos: alternan arriba/abajo
+        return (
+          <text key={`ht${i}`} x={(a + x) / 2} y={apretado ? yFila + fs * 1.25 : yFila - fs * 0.35} {...estiloTexto}>
+            {f(x - a)}
+            {sufijo}
+          </text>
+        );
+      })}
+    </g>
+  );
+
+  // Cota vertical (a la izquierda del panel). pts = posiciones en Y (coordenadas del panel).
+  const cotaV = (pts, xFila, ext, sufijo) => (
+    <g>
+      <line x1={xFila} x2={xFila} y1={Y(pts[0])} y2={Y(pts[pts.length - 1])} stroke={COT} strokeWidth={0.8} {...trazo} />
+      {pts.map((v, i) => (
+        <g key={`v${i}`}>
+          {ext && (
+            <line x1={-fs * 0.3} x2={xFila - t} y1={Y(v)} y2={Y(v)} stroke={COT} strokeWidth={0.5} strokeDasharray="3 3" {...trazo} />
+          )}
+          <line x1={xFila - t} x2={xFila + t} y1={Y(v)} y2={Y(v)} stroke={COT} strokeWidth={1.2} {...trazo} />
+        </g>
+      ))}
+      {pts.slice(1).map((v, i) => {
+        const a = pts[i];
+        const apretado = v - a < fs * 4.2 && i % 2 === 1;
+        const tx = apretado ? xFila - fs * 0.35 : xFila + fs * 0.95;
+        const ty = Y((a + v) / 2);
+        return (
+          <text key={`vt${i}`} x={tx} y={ty} transform={`rotate(-90 ${tx} ${ty})`} {...estiloTexto}>
+            {f(v - a)}
+            {sufijo}
+          </text>
+        );
+      })}
+    </g>
+  );
+
+  // Texto de un taladro lateral, pegado al rectángulo y hacia adentro del panel
+  const etiquetaLateral = (r, lad, i) => {
+    const txt = `Ø${f(r.dia)} P${f(r.prof)} A${f(r.z)}`;
+    const cx = (r.x0 + r.x1) / 2;
+    const cy = Y((r.y0 + r.y1) / 2);
+    const base = { ...estiloTexto };
+    if (lad === "izq") return <text key={`tl${i}`} {...base} x={r.x1 + fs * 0.5} y={cy + fs * 0.35} textAnchor="start">{txt}</text>;
+    if (lad === "der") return <text key={`tl${i}`} {...base} x={r.x0 - fs * 0.5} y={cy + fs * 0.35} textAnchor="end">{txt}</text>;
+    if (lad === "inf") return <text key={`tl${i}`} {...base} x={cx} y={Y(r.y1) - fs * 0.5}>{txt}</text>;
+    return <text key={`tl${i}`} {...base} x={cx} y={Y(r.y0) + fs * 1.4}>{txt}</text>;
+  };
 
   return (
     <svg
-      viewBox={`${-pad} ${-pad} ${W + 2 * pad} ${H + 2 * pad}`}
+      viewBox={`${-padL} ${-padT} ${W + padL + padR} ${H + padT + padB}`}
       xmlns="http://www.w3.org/2000/svg"
       style={{ display: "block", width: "100%", height: "auto" }}
     >
@@ -439,45 +562,23 @@ function VistaPlano({ geom, grande = false }) {
           {...trazo}
         />
       ))}
+
+      {/* Cota total (en la miniatura es la única) */}
+      {cotaH([0, W], H + filaTotal, grande, " mm")}
+      {cotaV([0, H], -filaTotal, grande, " mm")}
+
       {grande && (
         <>
+          {/* Cotas en cadena: de borde a borde pasando por cada taladro */}
+          {px.length > 2 && cotaH(px, H + filaChain, true, "")}
+          {py.length > 2 && cotaV(py, -filaChain, true, "")}
           {circulos.map((c, i) => (
-            <text
-              key={`tc${i}`}
-              x={c.x}
-              y={Y(c.y) - c.r - fs * 0.35}
-              fontSize={fs}
-              textAnchor="middle"
-              fill="#0a3a5c"
-              stroke="#fff"
-              strokeWidth={fs * 0.25}
-              paintOrder="stroke"
-              fontFamily="sans-serif"
-            >
-              Ø{f(c.d)}
+            <text key={`tc${i}`} x={c.x} y={Y(c.y) - c.r - fs * 0.35} {...estiloTexto} fill="#0a3a5c">
+              {`Ø${f(c.d)}`}
+              {c.p !== undefined ? ` P${f(c.p)}` : ""}
             </text>
           ))}
-          <text
-            x={W / 2}
-            y={H + pad * 0.7}
-            fontSize={fs * 1.2}
-            textAnchor="middle"
-            fill="#333"
-            fontFamily="sans-serif"
-          >
-            {f(W)} mm
-          </text>
-          <text
-            x={-pad * 0.7}
-            y={H / 2}
-            fontSize={fs * 1.2}
-            textAnchor="middle"
-            fill="#333"
-            fontFamily="sans-serif"
-            transform={`rotate(-90 ${-pad * 0.7} ${H / 2})`}
-          >
-            {f(H)} mm
-          </text>
+          {rects.map((r, i) => etiquetaLateral(r, lados[i], i))}
         </>
       )}
     </svg>
@@ -877,7 +978,7 @@ export default function DxfABpp({ onVolver }) {
                       title="Click para ampliar"
                       style={{
                         flex: "0 0 auto",
-                        width: "170px",
+                        width: "200px",
                         padding: "6px",
                         border: "1.5px solid #b8d6ef",
                         borderRadius: "6px",
@@ -965,7 +1066,7 @@ export default function DxfABpp({ onVolver }) {
                     title="Click para ampliar"
                     style={{
                       flex: "0 0 auto",
-                      width: "170px",
+                      width: "200px",
                       padding: "6px",
                       border: "1.5px solid #b8d6ef",
                       borderRadius: "6px",
@@ -1028,6 +1129,7 @@ export default function DxfABpp({ onVolver }) {
                 <span style={{ display: "inline-block", width: 12, height: 12, background: "#f0a35a", border: "1px solid #b45f06", verticalAlign: "middle", marginRight: 5 }} />
                 Taladro lateral (profundidad × diámetro)
               </span>
+              <span>Cotas en mm · Ø diámetro · P profundidad · A altura dentro del espesor</span>
             </div>
           </div>
         </div>
