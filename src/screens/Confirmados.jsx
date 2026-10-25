@@ -481,6 +481,7 @@ export default function Confirmados({ authFetch, token, onInicio }) {
   const [items, setItems] = useState([]);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [itemsError, setItemsError] = useState(null);
+  const [filtroItems, setFiltroItems] = useState("");
 
   // Último valor guardado por ítem: evita un PUT si al salir del input no
   // cambió nada. Map<id, fila>.
@@ -602,6 +603,7 @@ export default function Confirmados({ authFetch, token, onInicio }) {
 
   const abrirRevision = (row) => {
     setAbierta(row);
+    setFiltroItems("");
     setErrorCampo(null);
     setMostrarNuevo(false);
     setNuevo(NUEVO_VACIO);
@@ -611,6 +613,7 @@ export default function Confirmados({ authFetch, token, onInicio }) {
 
   const cerrarPanel = () => {
     setAbierta(null);
+    setFiltroItems("");
     setItems([]);
     setItemsError(null);
     setErrorCampo(null);
@@ -890,6 +893,31 @@ export default function Confirmados({ authFetch, token, onInicio }) {
       ),
     },
   ];
+
+  // Filtro del modal: cada palabra escrita debe aparecer en alguna columna
+  // visible del ítem (sin distinguir mayúsculas ni tildes).
+  const itemsFiltrados = useMemo(() => {
+    const palabras = normalizar(filtroItems).split(/\s+/).filter(Boolean);
+    if (palabras.length === 0) return items;
+    return items.filter((it) => {
+      const texto = normalizar(
+        [
+          it.id,
+          it.codpro,
+          it.codigo_produccion ?? "Sin código",
+          it.nombreart,
+          it.grupo,
+          it.codartint,
+          it.color,
+          it.ancho,
+          it.alto,
+          it.profundidad,
+          it.cantidad,
+        ].join(" "),
+      );
+      return palabras.every((w) => texto.includes(w));
+    });
+  }, [items, filtroItems]);
 
   const columnasItems = [
     {
@@ -1377,15 +1405,68 @@ export default function Confirmados({ authFetch, token, onInicio }) {
                 Esta revisión no tiene ítems en confirmados.
               </p>
             ) : (
-              <div style={{ overflowX: "auto" }}>
-                <DataTable
-                  columns={columnasItems}
-                  rows={items}
-                  selectedId={null}
-                  onSelect={() => {}}
-                  storageKey="confirmados-items"
-                />
-              </div>
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    margin: "0 0 10px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={filtroItems}
+                    onChange={(e) => setFiltroItems(e.target.value)}
+                    placeholder="🔍 Filtrar ítems (producto, grupo, color, código, medidas...)"
+                    style={{
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      fontFamily: FUENTE,
+                      border: "1.5px solid #b8d6ef",
+                      borderRadius: 4,
+                      minWidth: 320,
+                      color: "#0a3a5c",
+                    }}
+                  />
+                  {filtroItems && (
+                    <button
+                      onClick={() => setFiltroItems("")}
+                      title="Limpiar filtro"
+                      style={{
+                        border: "none",
+                        background: "none",
+                        color: "#4a8ab5",
+                        cursor: "pointer",
+                        fontSize: 14,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                  {filtroItems.trim() && (
+                    <span style={{ fontSize: 11, color: "#4a8ab5" }}>
+                      {itemsFiltrados.length} de {items.length} ítems
+                    </span>
+                  )}
+                </div>
+                {itemsFiltrados.length === 0 ? (
+                  <p style={{ color: "#8aabb8", fontSize: 12 }}>
+                    Ningún ítem coincide con “{filtroItems}”.
+                  </p>
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <DataTable
+                      columns={columnasItems}
+                      rows={itemsFiltrados}
+                      selectedId={null}
+                      onSelect={() => {}}
+                      storageKey="confirmados-items"
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
