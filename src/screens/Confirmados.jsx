@@ -514,6 +514,11 @@ export default function Confirmados({ authFetch, token, onInicio }) {
 
   const [coloresMelamina, setColoresMelamina] = useState([]);
 
+  // Color para todo el amoblamiento de la obra abierta (se aplica de una vez a los ítems visibles)
+  const [colorMasivo, setColorMasivo] = useState("");
+  const [aplicandoColor, setAplicandoColor] = useState(false);
+  const [resultadoColor, setResultadoColor] = useState(null); // { ok, texto }
+
   // Catálogo de la tabla `articulos` para elegir producto/código en "Nuevo ítem".
   // Se carga una sola vez, la primera vez que se abre el formulario.
   const [catalogo, setCatalogo] = useState([]);
@@ -608,6 +613,8 @@ export default function Confirmados({ authFetch, token, onInicio }) {
     setMostrarNuevo(false);
     setNuevo(NUEVO_VACIO);
     setResultadoNuevo(null);
+    setColorMasivo("");
+    setResultadoColor(null);
     fetchItems(row.numeropres, row.revision);
   };
 
@@ -618,6 +625,8 @@ export default function Confirmados({ authFetch, token, onInicio }) {
     setItemsError(null);
     setErrorCampo(null);
     setAEliminar(null);
+    setColorMasivo("");
+    setResultadoColor(null);
   };
 
   // ── Edición inline ─────────────────────────────────────────────────
@@ -918,6 +927,74 @@ export default function Confirmados({ authFetch, token, onInicio }) {
       return palabras.every((w) => texto.includes(w));
     });
   }, [items, filtroItems]);
+
+  // Pone el mismo color a todos los ítems que se ven en la tabla (si hay un
+  // filtro escrito, solo a los filtrados). Usa el mismo PUT /confirmados/:id
+  // que la edición de una fila, así el color también llega a Producción.
+  const aplicarColorATodos = async () => {
+    if (!colorMasivo || aplicandoColor) return;
+    const objetivo = itemsFiltrados.filter((it) => String(it.color ?? "") !== colorMasivo);
+    if (objetivo.length === 0) {
+      setResultadoColor({ ok: true, texto: "Todos los ítems ya tienen ese color." });
+      return;
+    }
+    const nombre =
+      coloresMelamina.find((c) => c.codartint === colorMasivo)?.articulo ?? colorMasivo;
+    const ok = window.confirm(
+      `¿Poner el color "${nombre}" a ${objetivo.length} ítem(s)?\n` +
+        "Reemplaza el color que tengan ahora y se actualiza también en Producción.",
+    );
+    if (!ok) return;
+
+    setAplicandoColor(true);
+    setResultadoColor(null);
+    let hechos = 0;
+    let fallidos = 0;
+    const TANDA = 5;
+    for (let i = 0; i < objetivo.length; i += TANDA) {
+      const tanda = objetivo.slice(i, i + TANDA);
+      const res = await Promise.allSettled(
+        tanda.map(async (it) => {
+          const r = await authFetch(`${API}/confirmados/${it.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ color: colorMasivo }),
+          });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return it.id;
+        }),
+      );
+      const idsOk = new Set();
+      res.forEach((x, k) => {
+        if (x.status === "fulfilled") {
+          idsOk.add(x.value);
+          guardados.current.set(x.value, {
+            ...guardados.current.get(x.value),
+            color: colorMasivo,
+          });
+        } else {
+          fallidos++;
+          console.error(`Error guardando color del ítem ${tanda[k].id}:`, x.reason);
+        }
+      });
+      hechos += idsOk.size;
+      if (idsOk.size > 0) {
+        setItems((prev) =>
+          prev.map((r) => (idsOk.has(r.id) ? { ...r, color: colorMasivo } : r)),
+        );
+      }
+    }
+    setAplicandoColor(false);
+    setResultadoColor(
+      fallidos === 0
+        ? { ok: true, texto: `✓ Color aplicado a ${hechos} ítem(s).` }
+        : {
+            ok: false,
+            texto: `Se aplicó a ${hechos} ítem(s); ${fallidos} no se pudieron guardar. Volvé a intentar.`,
+          },
+    );
+    if (fallidos === 0) setColorMasivo("");
+  };
 
   const columnasItems = [
     {
@@ -1406,6 +1483,70 @@ export default function Confirmados({ authFetch, token, onInicio }) {
               </p>
             ) : (
               <>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    margin: "0 0 10px",
+                    padding: "8px 10px",
+                    border: "1px solid #b8d6ef",
+                    borderRadius: 6,
+                    background: "#f5faff",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 700 }}>
+                    🎨 Color a todo el amoblamiento
+                  </span>
+                  <div style={{ width: 280 }}>
+                    <ColorCombo
+                      value={colorMasivo}
+                      opciones={coloresMelamina}
+                      estiloInput={{ ...estiloInput("masivo", "color", "280px"), display: "block" }}
+                      onElegir={(valor) => {
+                        setColorMasivo(valor);
+                        setResultadoColor(null);
+                      }}
+                      ariaLabel="Color para todo el amoblamiento"
+                    />
+                  </div>
+                  <button
+                    onClick={aplicarColorATodos}
+                    disabled={!colorMasivo || aplicandoColor}
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: 12,
+                      fontFamily: FUENTE,
+                      fontWeight: 700,
+                      border: "1.5px solid #0a3a5c",
+                      borderRadius: 4,
+                      background: "#0a3a5c",
+                      color: "#fff",
+                      cursor: !colorMasivo || aplicandoColor ? "default" : "pointer",
+                      opacity: !colorMasivo || aplicandoColor ? 0.5 : 1,
+                    }}
+                  >
+                    {aplicandoColor
+                      ? "Aplicando…"
+                      : `Aplicar a ${itemsFiltrados.length} ítem(s)`}
+                  </button>
+                  {filtroItems.trim() && (
+                    <span style={{ fontSize: 11, color: "#4a8ab5" }}>
+                      Solo a los ítems filtrados
+                    </span>
+                  )}
+                  {resultadoColor && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: resultadoColor.ok ? "#1b7a3a" : "#c0392b",
+                      }}
+                    >
+                      {resultadoColor.texto}
+                    </span>
+                  )}
+                </div>
                 <div
                   style={{
                     display: "flex",
