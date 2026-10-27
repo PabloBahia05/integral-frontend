@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import DataTable from "../Component/DataTable";
 import ActionBar from "../Component/ActionBar";
@@ -194,6 +194,212 @@ function SelectorFormulaMadre({ formulas, cargarFormulas, onElegir, familia = ""
 // catálogo cargado y lo muestra como "descripción — código". No es
 // editable acá — para cambiarlo hay que volver a elegir en "Buscar
 // fórmula", que recalcula los tres (Alto, Ancho y Profundidad) juntos.
+// ── Selector de material (color) con búsqueda ─────────────────────────────
+//
+// Reemplaza al <select> de la columna Color del panel de piezas: se escribe y
+// la lista se filtra por palabras (sin importar el orden, mayúsculas ni
+// tildes: "nogal lincoln" encuentra "M.E.18 H1714 ST19 Nogal Lincoln"). Enter
+// (o Tab, si ya se escribió algo) elige la opción resaltada, que al tipear es
+// siempre la primera coincidencia. Si lo escrito no coincide con nada y se
+// sale del campo, vuelve al valor anterior; para dejarlo vacío está la opción
+// "— Sin material". Lo que se guarda es el nombre del artículo, igual que antes.
+//
+// La lista se dibuja en un portal con position: fixed porque la grilla de
+// piezas tiene scroll (overflow) y recortaría una lista absoluta. Va definido
+// a nivel módulo (si no, el input perdería el foco en cada tecla).
+const MAX_OPCIONES_MATERIAL = 60;
+
+const normalizarBusqueda = (v) =>
+  String(v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+function MaterialCombo({ value, opciones, onElegir, estiloInput, ariaLabel = "Material" }) {
+  const [abierto, setAbierto] = useState(false);
+  const [borrador, setBorrador] = useState(null); // null = no se está tipeando
+  const [activo, setActivo] = useState(-1);
+  const [pos, setPos] = useState(null);
+  const inputRef = useRef(null);
+  const listaRef = useRef(null);
+
+  const t = normalizarBusqueda(borrador ?? "").trim();
+  const etiqueta = String(value ?? "");
+
+  const indice = useMemo(
+    () =>
+      opciones.map((c) => ({
+        c,
+        hay: normalizarBusqueda(`${c.articulo} ${c.codartint ?? ""}`),
+      })),
+    [opciones],
+  );
+
+  const lista = useMemo(() => {
+    if (!t)
+      return [{ vacio: true }, ...opciones.slice(0, MAX_OPCIONES_MATERIAL).map((c) => ({ c }))];
+    const palabras = t.split(/\s+/);
+    const res = [];
+    for (const x of indice) {
+      if (palabras.every((pal) => x.hay.includes(pal))) {
+        res.push({ c: x.c });
+        if (res.length >= MAX_OPCIONES_MATERIAL) break;
+      }
+    }
+    return res;
+  }, [t, opciones, indice]);
+
+  const calcularPos = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const arriba = window.innerHeight - r.bottom < 260 && r.top > 260;
+    setPos({
+      left: r.left,
+      width: r.width,
+      ...(arriba ? { bottom: window.innerHeight - r.top + 2 } : { top: r.bottom + 2 }),
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!abierto) return;
+    calcularPos();
+    window.addEventListener("scroll", calcularPos, true);
+    window.addEventListener("resize", calcularPos);
+    return () => {
+      window.removeEventListener("scroll", calcularPos, true);
+      window.removeEventListener("resize", calcularPos);
+    };
+  }, [abierto]);
+
+  useEffect(() => {
+    if (activo < 0) return;
+    listaRef.current?.children[activo]?.scrollIntoView({ block: "nearest" });
+  }, [activo]);
+
+  const elegir = (x) => {
+    onElegir(x.vacio ? "" : x.c.articulo);
+    setBorrador(null);
+    setAbierto(false);
+    setActivo(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setAbierto(true);
+      setActivo((i) => Math.min(i + 1, lista.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActivo((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      if (abierto && activo >= 0 && lista[activo]) {
+        e.preventDefault();
+        elegir(lista[activo]);
+      } else {
+        setAbierto(false);
+      }
+    } else if (e.key === "Tab") {
+      if (abierto && t && activo >= 0 && lista[activo]) elegir(lista[activo]);
+    } else if (e.key === "Escape") {
+      if (abierto) {
+        e.stopPropagation();
+        setAbierto(false);
+        setBorrador(null);
+      }
+    }
+  };
+
+  const filaBase = {
+    padding: "6px 10px",
+    fontSize: 12,
+    fontFamily: "'Space Mono', monospace",
+    cursor: "pointer",
+    color: "#0a3a5c",
+  };
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="text"
+        role="combobox"
+        aria-expanded={abierto}
+        aria-label={ariaLabel}
+        autoComplete="off"
+        placeholder="— Escribí para buscar"
+        title={borrador ?? etiqueta}
+        value={borrador ?? etiqueta}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => {
+          setBorrador(e.target.value);
+          setAbierto(true);
+          setActivo(0); // la primera coincidencia queda lista para Enter
+        }}
+        onFocus={(e) => {
+          e.target.select(); // la primera tecla reemplaza el valor actual
+          setAbierto(true);
+          setActivo(-1);
+        }}
+        onBlur={() => {
+          setAbierto(false);
+          setBorrador(null);
+        }}
+        onKeyDown={handleKeyDown}
+        style={estiloInput}
+      />
+
+      {abierto &&
+        pos &&
+        createPortal(
+          <div
+            ref={listaRef}
+            style={{
+              position: "fixed",
+              top: pos.top,
+              bottom: pos.bottom,
+              left: pos.left,
+              zIndex: 1300,
+              width: `max(${pos.width}px, 340px)`,
+              maxWidth: "min(520px, 90vw)",
+              maxHeight: 260,
+              overflowY: "auto",
+              background: "#fff",
+              border: "1.5px solid #b8d6ef",
+              borderRadius: 4,
+              boxShadow: "0 4px 14px rgba(10,58,92,0.18)",
+            }}
+          >
+            {lista.length === 0 && (
+              <div style={{ ...filaBase, cursor: "default", color: "#8aabb8" }}>
+                Ningún material coincide con «{borrador}».
+              </div>
+            )}
+            {lista.map((x, i) => (
+              <div
+                key={x.vacio ? "vacio" : `${x.c.codartint}-${i}`}
+                // onMouseDown (no onClick) para elegir antes de que el input pierda el foco
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  elegir(x);
+                }}
+                onMouseEnter={() => setActivo(i)}
+                style={{
+                  ...filaBase,
+                  background: i === activo ? "#eaf3fb" : "#fff",
+                  color: x.vacio ? "#8aabb8" : "#0a3a5c",
+                }}
+              >
+                {x.vacio ? "— Sin material" : x.c.articulo}
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
 function CodigoFormulaResuelto({ codigo, formulas }) {
   if (!codigo) {
     return (
@@ -2086,23 +2292,16 @@ export default function ModulosDomus({ authFetch, token }) {
       render: (v, row) => {
         const opciones = esPiezaDeFondo(row) ? coloresFondo : coloresMelamina;
         return (
-          <select
+          <MaterialCombo
             value={row.color ?? ""}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => {
-              const valor = e.target.value;
+            opciones={opciones}
+            onElegir={(valor) => {
               handlePiezaCampoChange(row.id, "color", valor);
               guardarPiezaCampo(row.id, "color", valor);
             }}
-            style={estiloInput(row.id, "color", "140px")}
-          >
-            <option value="">—</option>
-            {opciones.map((c) => (
-              <option key={c.codartint} value={c.articulo}>
-                {c.articulo}
-              </option>
-            ))}
-          </select>
+            estiloInput={estiloInput(row.id, "color", "140px")}
+            ariaLabel="Material de la pieza"
+          />
         );
       },
     },
