@@ -148,6 +148,12 @@ function horaDecimal(ts) {
   const d = parseMysqlTs(ts);
   return d ? d.getUTCHours() + d.getUTCMinutes() / 60 : null;
 }
+// Horas que debe cumplir cada día: 9 hs de lunes a jueves, 8 hs los viernes (sáb/dom no aplican).
+function horasObjetivo(iso) {
+  const dow = new Date(iso + "T00:00:00Z").getUTCDay(); // 0 = dom ... 6 = sáb
+  if (dow === 0 || dow === 6) return null;
+  return dow === 5 ? 8 : 9;
+}
 function fmtDuracion(horas) {
   const totalMin = Math.round(horas * 60);
   return `${Math.floor(totalMin / 60)}h ${pad(totalMin % 60)}m`;
@@ -259,7 +265,7 @@ function armarSemana(fichadas, aplicaRegla = () => false) {
 }
 
 // ─── Gráfico semanal de barras verticales (mañana arriba / tarde abajo) ──────
-function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin, hMax, hoyIso }) {
+function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin, hMax, hoyIso, tituloTotal = null, faltantes = null }) {
   const ALTO = 340;
   const rango = hMax - hMin;
   const y = (h) => ((h - hMin) / rango) * ALTO;
@@ -309,9 +315,9 @@ function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin
           }}>{nombre.charAt(0).toUpperCase()}</span>
           <span style={{ fontWeight: 600, fontSize: 15 }}>{nombre}</span>
         </div>
-        <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15, color: totalHoras > 0 ? "#a5b4fc" : "#475569" }}>
-          Semana: {totalHoras > 0 ? fmtDuracion(totalHoras) : "—"}
-          {Math.abs(ajusteMin) >= 0.05 && (
+        <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15, color: tituloTotal ? "#f87171" : (totalHoras > 0 ? "#a5b4fc" : "#475569") }}>
+          {tituloTotal ?? <>Semana: {totalHoras > 0 ? fmtDuracion(totalHoras) : "—"}</>}
+          {!tituloTotal && Math.abs(ajusteMin) >= 0.05 && (
             <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, color: "#fbbf24" }}
                   title="Minutos acumulados por la regla 12:20–13:00 (marca computada a las 13:00)">
               ({fmtMinRegla(ajusteMin)} regla 12:20–13:00)
@@ -341,7 +347,7 @@ function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin
                 height: 24, textAlign: "center", fontSize: 12, fontWeight: 600,
                 color: esHoy ? "#a5b4fc" : "#94a3b8",
               }}>
-                {DIAS_CORTO[i]} <span style={{ fontWeight: 400, color: "#475569" }}>{fecha.slice(8, 10)}/{fecha.slice(5, 7)}</span>
+                {DIAS_CORTO[(new Date(fecha + "T00:00:00Z").getUTCDay() + 6) % 7]} <span style={{ fontWeight: 400, color: "#475569" }}>{fecha.slice(8, 10)}/{fecha.slice(5, 7)}</span>
               </div>
               <div style={{
                 position: "relative", height: ALTO, background: esHoy ? "#1a2540" : "#0f172a",
@@ -367,6 +373,12 @@ function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin
                 fontWeight: 700, color: dia?.horas > 0 ? "#e2e8f0" : "#475569",
               }}>
                 {dia?.horas > 0 ? fmtDuracion(dia.horas) : "—"}
+                {faltantes?.[fecha] > 0 && (
+                  <div style={{ fontSize: 10, fontWeight: 600, color: "#f87171" }}
+                       title="Horas que faltan para completar la jornada">
+                    faltan {fmtDuracion(faltantes[fecha])}
+                  </div>
+                )}
                 {dia && Math.abs(dia.ajusteMin) >= 0.05 && (
                   <div style={{ fontSize: 10, fontWeight: 500, color: "#fbbf24" }}
                        title="Minutos acumulados por la regla 12:20–13:00">
@@ -1132,6 +1144,81 @@ export default function Anviz({ onBack }) {
     return { emps, fechas, hMin, hMax };
   })();
 
+  // ── Días incompletos (< 9 hs lun–jue, < 8 hs vie) ──────────────────────────
+  const [incDesde, setIncDesde]       = useState(() => sumarDias(hoy(), -30));
+  const [incHasta, setIncHasta]       = useState(hoy());
+  const [incUser, setIncUser]         = useState("");
+  const [incFichadas, setIncFichadas] = useState([]);
+  const [incFeriados, setIncFeriados] = useState([]);
+  const [incCargando, setIncCargando] = useState(false);
+  const [incError, setIncError]       = useState(null);
+
+  const cargarIncompletos = useCallback(async () => {
+    if (!incDesde || !incHasta) return;
+    setIncCargando(true);
+    setIncError(null);
+    try {
+      const params = new URLSearchParams({ limit: 2000, fecha_desde: incDesde, fecha_hasta: incHasta });
+      if (incUser) params.set("user_id", incUser);
+      const data = await apiFetch(`/fichadas?${params}`, token);
+      setIncFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
+      // Feriados de los años del rango: esos días no se consideran incompletos
+      try {
+        const fer = [];
+        for (const anio of new Set([incDesde.slice(0, 4), incHasta.slice(0, 4)])) {
+          const d = await apiFetch(`/feriados?anio=${anio}`, token);
+          if (Array.isArray(d)) d.forEach((f) => fer.push(String(f.fecha).slice(0, 10)));
+        }
+        setIncFeriados(fer);
+      } catch { setIncFeriados([]); }
+    } catch (e) {
+      setIncError(e.message);
+    } finally {
+      setIncCargando(false);
+    }
+  }, [incDesde, incHasta, incUser]);
+
+  useEffect(() => {
+    if (vista === "incompletos") cargarIncompletos();
+  }, [vista, cargarIncompletos]);
+
+  const incSemana = (() => {
+    const hoyIso = hoy();
+    const emps = armarSemana(incFichadas, aplicaReglaAlmuerzo).map((e) => {
+      const base = e.nombre ? e : (() => {
+        const u = usuarios.find((x) => String(x.id) === String(e.user_id));
+        return { ...e, nombre: u ? `${u.apellido} ${u.nombre}`.trim() : `Usuario ${e.user_id}` };
+      })();
+      const dias = {};
+      const faltantes = {};
+      let totalFalta = 0;
+      Object.entries(base.dias).forEach(([fecha, d]) => {
+        const obj = horasObjetivo(fecha);
+        if (obj == null) return;                                   // sábado / domingo
+        if (fecha < incDesde || fecha > incHasta) return;
+        if (incFeriados.includes(fecha)) return;                   // feriado
+        const enCurso = fecha === hoyIso && [...d.manana, ...d.tarde].some((t) => t.abierto);
+        if (enCurso) return;                                       // jornada de hoy todavía abierta
+        if (d.horas >= obj - 1e-4) return;                         // completó
+        dias[fecha] = d;
+        faltantes[fecha] = obj - d.horas;
+        totalFalta += obj - d.horas;
+      });
+      return { ...base, dias, faltantes, totalFalta, fechas: Object.keys(dias).sort() };
+    }).filter((e) => e.fechas.length > 0)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    let hMin = 7, hMax = 19;
+    emps.forEach((e) => Object.values(e.dias).forEach((d) =>
+      [...d.manana, ...d.tarde].forEach((t) => {
+        hMin = Math.min(hMin, Math.floor(t.ini));
+        if (t.fin != null) hMax = Math.max(hMax, Math.ceil(t.fin));
+      })
+    ));
+    const totalDias = emps.reduce((a, e) => a + e.fechas.length, 0);
+    return { emps, hMin, hMax, totalDias };
+  })();
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div style={s.page}>
@@ -1650,6 +1737,11 @@ export default function Anviz({ onBack }) {
               <span style={s.inicioIcon}>📈</span>
               <span style={s.inicioLabel}>Gráfico semanal</span>
               <span style={s.inicioDesc}>Horas por día, mañana y tarde</span>
+            </div>
+            <div style={{ ...s.inicioCard, order: 1 }} onClick={() => setVista("incompletos")}>
+              <span style={s.inicioIcon}>⏱️</span>
+              <span style={s.inicioLabel}>Días incompletos</span>
+              <span style={s.inicioDesc}>Jornadas &lt; 9 hs (lun–jue) o &lt; 8 hs (vie)</span>
             </div>
             <div style={{ ...s.inicioCard, order: 2 }} onClick={() => abrirVacaciones()}>
               <span style={s.inicioIcon}>🏖️</span>
@@ -2186,6 +2278,90 @@ export default function Anviz({ onBack }) {
                 hMin={grafSemana.hMin}
                 hMax={grafSemana.hMax}
                 hoyIso={grafSemana.fechas.includes(hoy()) ? hoy() : null}
+              />
+            ))
+          )}
+        </>
+      )}
+
+      {/* ── Vista Días incompletos ──────────────────────────────────────── */}
+      {vista === "incompletos" && (
+        <>
+          <div style={s.header}>
+            <div style={s.headerLeft}>
+              <button style={s.btnVolver} onClick={() => setVista("inicio")}>← Volver</button>
+              <div style={s.iconBox}><IconReloj /></div>
+              <div>
+                <h1 style={s.titulo}>Días incompletos</h1>
+                <span style={s.subtitulo}>Jornadas que no llegan a 9 hs (lun–jue) u 8 hs (vie)</span>
+              </div>
+            </div>
+            <div style={s.headerRight}>
+              <AgenteBadge agente={agente} />
+            </div>
+          </div>
+
+          <div style={s.filtrosWrap}>
+            <div style={{ ...s.filtroFila, marginBottom: 0 }}>
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Desde</label>
+                <DateInput value={incDesde} onChange={setIncDesde} style={s.input} />
+              </div>
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Hasta</label>
+                <DateInput value={incHasta} onChange={setIncHasta} style={s.input} />
+              </div>
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Empleado</label>
+                <select value={incUser} onChange={e => setIncUser(e.target.value)} style={s.input}>
+                  <option value="">Todos</option>
+                  {usuarios.map(u => (
+                    <option key={u.id} value={u.id}>{u.apellido} {u.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 18, marginTop: 14, fontSize: 12, color: "#94a3b8", flexWrap: "wrap" }}>
+              <span><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 3, background: "#fbbf24", verticalAlign: "middle", marginRight: 6 }} />Mañana</span>
+              <span><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 3, background: "#818cf8", verticalAlign: "middle", marginRight: 6 }} />Tarde</span>
+              <span style={{ color: "#475569" }}>
+                {isoADisplay(incDesde)} al {isoADisplay(incHasta)} · no cuenta sábados, domingos ni feriados
+              </span>
+              {!incCargando && incSemana.totalDias > 0 && (
+                <span style={{ color: "#f87171", fontWeight: 600 }}>
+                  {incSemana.totalDias} {incSemana.totalDias === 1 ? "día incompleto" : "días incompletos"}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {incError && <div style={{ ...s.errorBanner, borderRadius: 8, marginBottom: 16 }}>⚠️ {incError}</div>}
+
+          {incCargando ? (
+            <div style={s.estado}>
+              <div style={s.spinner} />
+              <span style={{ color: "#64748b", fontSize: 14 }}>Buscando días incompletos...</span>
+            </div>
+          ) : incSemana.emps.length === 0 ? (
+            <div style={s.estado}>
+              <span style={{ fontSize: 36 }}>✅</span>
+              <span style={{ color: "#64748b", fontSize: 14, marginTop: 8 }}>
+                No hay días incompletos en el período seleccionado
+              </span>
+            </div>
+          ) : (
+            incSemana.emps.map(emp => (
+              <GraficoOperario
+                key={emp.user_id}
+                nombre={emp.nombre}
+                dias={emp.dias}
+                totalHoras={emp.totalHoras}
+                fechas={emp.fechas}
+                hMin={incSemana.hMin}
+                hMax={incSemana.hMax}
+                hoyIso={emp.fechas.includes(hoy()) ? hoy() : null}
+                faltantes={emp.faltantes}
+                tituloTotal={`${emp.fechas.length} ${emp.fechas.length === 1 ? "día" : "días"} · faltan ${fmtDuracion(emp.totalFalta)}`}
               />
             ))
           )}
