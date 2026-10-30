@@ -268,13 +268,44 @@ function armarSemana(fichadas, aplicaRegla = () => false) {
 }
 
 // ─── Gráfico semanal de barras verticales (mañana arriba / tarde abajo) ──────
+// Las columnas se reparten el ancho disponible (sin scroll horizontal) y el
+// contenido se simplifica a medida que las columnas se angostan.
 function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin, hMax, hoyIso, tituloTotal = null, faltantes = null, ausentes = null }) {
   const ALTO = 340;
+  const AXIS_W = 38;
   const rango = hMax - hMin;
   const y = (h) => ((h - hMin) / rango) * ALTO;
   const ahora = (() => { const d = new Date(); return d.getHours() + d.getMinutes() / 60; })();
   const ticks = [];
   for (let h = hMin; h <= hMax; h++) ticks.push(h);
+
+  // Ancho disponible del área de columnas
+  const wrapRef = useRef(null);
+  const [anchoWrap, setAnchoWrap] = useState(0);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const medir = () => setAnchoWrap(el.clientWidth);
+    medir();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", medir);
+      return () => window.removeEventListener("resize", medir);
+    }
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const n = Math.max(1, fechas.length);
+  const gap = n > 24 ? 2 : n > 12 ? 4 : 8;
+  const colW = anchoWrap > 0 ? (anchoWrap - AXIS_W - gap * n) / n : 80;
+  const modo = colW >= 64 ? "ancho" : colW >= 30 ? "medio" : "mini";
+  const inset = modo === "ancho" ? 6 : modo === "medio" ? 3 : 1;
+  const HEAD_H = modo === "ancho" ? 24 : 30;
+  const fmtCorta = (horas) => {
+    const totalMin = Math.round(horas * 60);
+    return `${Math.floor(totalMin / 60)}h${pad(totalMin % 60)}`;
+  };
 
   const barra = (t, color, key, esHoy) => {
     const fin = t.abierto ? (esHoy && ahora > t.ini ? Math.min(ahora, hMax) : t.ini + 0.25) : t.fin;
@@ -287,19 +318,19 @@ function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin
           ? `Entrada ${fmtHoraDec(t.ini)} — sin salida`
           : `${fmtHoraDec(t.ini)} a ${fmtHoraDec(t.fin)} · ${fmtDuracion(durHoras)}`}
         style={{
-          position: "absolute", left: 6, right: 6, top: y(t.ini), height: alto,
+          position: "absolute", left: inset, right: inset, top: y(t.ini), height: alto,
           background: t.abierto ? "transparent" : color,
           border: t.abierto ? `2px dashed ${color}` : "none",
-          borderRadius: 6, display: "flex", flexDirection: "column",
+          borderRadius: modo === "ancho" ? 6 : 3, display: "flex", flexDirection: "column",
           alignItems: "center", justifyContent: "center", overflow: "hidden",
-          fontSize: 11, fontWeight: 700, color: "#0f172a", boxSizing: "border-box",
+          fontSize: modo === "ancho" ? 11 : 9, fontWeight: 700, color: "#0f172a", boxSizing: "border-box",
         }}
       >
         {t.abierto
-          ? <span style={{ color, fontSize: 10 }}>{esHoy ? "en curso" : "sin salida"}</span>
-          : alto >= 34 && <>
-              <span>{fmtDuracion(durHoras)}</span>
-              {alto >= 58 && <span style={{ fontWeight: 500, fontSize: 10, opacity: 0.8 }}>{fmtHoraDec(t.ini)}–{fmtHoraDec(t.fin)}</span>}
+          ? (modo === "ancho" && <span style={{ color, fontSize: 10 }}>{esHoy ? "en curso" : "sin salida"}</span>)
+          : alto >= 34 && colW >= 36 && <>
+              <span>{modo === "ancho" ? fmtDuracion(durHoras) : fmtCorta(durHoras)}</span>
+              {alto >= 58 && modo === "ancho" && <span style={{ fontWeight: 500, fontSize: 10, opacity: 0.8 }}>{fmtHoraDec(t.ini)}–{fmtHoraDec(t.fin)}</span>}
             </>}
       </div>
     );
@@ -309,29 +340,37 @@ function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin
     <div style={{
       background: "#1e293b", border: "1px solid #334155",
       borderRadius: 12, padding: "16px 20px", marginBottom: 20,
+      minWidth: 0, width: "100%", maxWidth: "100%", boxSizing: "border-box",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{
             width: 32, height: 32, borderRadius: "50%", background: "#312e81", color: "#a5b4fc",
             display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14,
           }}>{nombre.charAt(0).toUpperCase()}</span>
           <span style={{ fontWeight: 600, fontSize: 15 }}>{nombre}</span>
-        </div>
-        <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15, color: tituloTotal ? "#f87171" : (totalHoras > 0 ? "#a5b4fc" : "#475569") }}>
-          {tituloTotal ?? <>Semana: {totalHoras > 0 ? fmtDuracion(totalHoras) : "—"}</>}
-          {!tituloTotal && Math.abs(ajusteMin) >= 0.05 && (
-            <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, color: "#fbbf24" }}
-                  title="Minutos acumulados por la regla 12:20–13:00 (marca computada a las 13:00)">
-              ({fmtMinRegla(ajusteMin)} regla 12:20–13:00)
+          {tituloTotal && (
+            <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15, color: "#f87171", marginLeft: 8 }}>
+              {tituloTotal}
             </span>
           )}
-        </span>
+        </div>
+        {!tituloTotal && (
+          <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15, color: totalHoras > 0 ? "#a5b4fc" : "#475569" }}>
+            Semana: {totalHoras > 0 ? fmtDuracion(totalHoras) : "—"}
+            {Math.abs(ajusteMin) >= 0.05 && (
+              <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, color: "#fbbf24" }}
+                    title="Minutos acumulados por la regla 12:20–13:00 (marca computada a las 13:00)">
+                ({fmtMinRegla(ajusteMin)} regla 12:20–13:00)
+              </span>
+            )}
+          </span>
+        )}
       </div>
 
-      <div style={{ display: "flex", gap: 8, overflowX: "auto" }}>
+      <div ref={wrapRef} style={{ display: "flex", gap, width: "100%", minWidth: 0, overflow: "hidden" }}>
         {/* Eje de horas */}
-        <div style={{ position: "relative", width: 38, height: ALTO, marginTop: 24, flexShrink: 0 }}>
+        <div style={{ position: "relative", width: AXIS_W, height: ALTO, marginTop: HEAD_H, flexShrink: 0 }}>
           {ticks.map((h) => (
             <span key={h} style={{
               position: "absolute", right: 4, top: y(h) - 7,
@@ -341,20 +380,39 @@ function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin
         </div>
 
         {/* Columnas por día */}
-        {fechas.map((fecha, i) => {
+        {fechas.map((fecha) => {
           const dia = dias[fecha];
           const esHoy = fecha === hoyIso;
+          const esAusente = ausentes?.includes(fecha);
+          const falta = faltantes?.[fecha] > 0 ? faltantes[fecha] : 0;
+          const diaSem = DIAS_CORTO[(new Date(fecha + "T00:00:00Z").getUTCDay() + 6) % 7];
+          const dd = fecha.slice(8, 10), mm = fecha.slice(5, 7);
           return (
-            <div key={fecha} style={{ flex: 1, minWidth: 74, display: "flex", flexDirection: "column" }}>
+            <div key={fecha}
+                 title={`${diaSem} ${dd}/${mm}${dia?.horas > 0 ? ` · ${fmtDuracion(dia.horas)}` : ""}${falta ? ` · faltan ${fmtDuracion(falta)}` : ""}${esAusente ? " · Ausente" : ""}`}
+                 style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column" }}>
               <div style={{
-                height: 24, textAlign: "center", fontSize: 12, fontWeight: 600,
-                color: esHoy ? "#a5b4fc" : "#94a3b8",
+                height: HEAD_H, textAlign: "center", fontSize: modo === "ancho" ? 12 : 9, fontWeight: 600,
+                color: esHoy ? "#a5b4fc" : "#94a3b8", lineHeight: 1.15,
+                display: "flex", flexDirection: modo === "ancho" ? "row" : "column",
+                alignItems: "center", justifyContent: "center", gap: modo === "ancho" ? 4 : 0,
+                whiteSpace: "nowrap", overflow: "hidden",
               }}>
-                {DIAS_CORTO[(new Date(fecha + "T00:00:00Z").getUTCDay() + 6) % 7]} <span style={{ fontWeight: 400, color: "#475569" }}>{fecha.slice(8, 10)}/{fecha.slice(5, 7)}</span>
+                {modo === "mini" ? (
+                  <>
+                    <span>{diaSem.charAt(0)}</span>
+                    <span style={{ fontWeight: 400, color: "#475569" }}>{dd}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{diaSem}</span>
+                    <span style={{ fontWeight: 400, color: "#475569" }}>{dd}/{mm}</span>
+                  </>
+                )}
               </div>
               <div style={{
                 position: "relative", height: ALTO, background: esHoy ? "#1a2540" : "#0f172a",
-                borderRadius: 8, border: "1px solid #334155",
+                borderRadius: modo === "ancho" ? 8 : 4, border: "1px solid #334155", overflow: "hidden",
               }}>
                 {ticks.map((h) => (
                   <div key={h} style={{
@@ -366,30 +424,35 @@ function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin
                 {dia?.tarde.map((t, k) => barra(t, "#818cf8", `t${k}`, esHoy))}
                 {!dia && (
                   <span style={{
-                    position: "absolute", top: "50%", left: 0, right: 0, textAlign: "center",
-                    fontSize: 11, color: ausentes?.includes(fecha) ? "#f87171" : "#334155",
-                    fontWeight: ausentes?.includes(fecha) ? 700 : 400,
-                  }}>{ausentes?.includes(fecha) ? "Ausente" : "—"}</span>
+                    position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: modo === "ancho" ? 11 : 9,
+                    color: esAusente ? "#f87171" : "#334155",
+                    fontWeight: esAusente ? 700 : 400,
+                    writingMode: modo === "ancho" ? "horizontal-tb" : "vertical-rl",
+                  }}>{esAusente ? "Ausente" : "—"}</span>
                 )}
               </div>
-              <div style={{
-                textAlign: "center", marginTop: 6, fontSize: 12, fontFamily: "monospace",
-                fontWeight: 700, color: dia?.horas > 0 ? "#e2e8f0" : "#475569",
-              }}>
-                {dia?.horas > 0 ? fmtDuracion(dia.horas) : "—"}
-                {faltantes?.[fecha] > 0 && (
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "#f87171" }}
-                       title="Horas que faltan para completar la jornada">
-                    faltan {fmtDuracion(faltantes[fecha])}
-                  </div>
-                )}
-                {dia && Math.abs(dia.ajusteMin) >= 0.05 && (
-                  <div style={{ fontSize: 10, fontWeight: 500, color: "#fbbf24" }}
-                       title="Minutos acumulados por la regla 12:20–13:00">
-                    {fmtMinRegla(dia.ajusteMin)}
-                  </div>
-                )}
-              </div>
+              {modo !== "mini" && (
+                <div style={{
+                  textAlign: "center", marginTop: 6, fontSize: modo === "ancho" ? 12 : 9, fontFamily: "monospace",
+                  fontWeight: 700, color: dia?.horas > 0 ? "#e2e8f0" : "#475569",
+                  whiteSpace: "nowrap", overflow: "hidden",
+                }}>
+                  {dia?.horas > 0 ? (modo === "ancho" ? fmtDuracion(dia.horas) : fmtCorta(dia.horas)) : "—"}
+                  {falta > 0 && (
+                    <div style={{ fontSize: modo === "ancho" ? 10 : 9, fontWeight: 600, color: "#f87171" }}
+                         title="Horas que faltan para completar la jornada">
+                      {modo === "ancho" ? `faltan ${fmtDuracion(falta)}` : `-${fmtCorta(falta)}`}
+                    </div>
+                  )}
+                  {dia && Math.abs(dia.ajusteMin) >= 0.05 && (
+                    <div style={{ fontSize: modo === "ancho" ? 10 : 9, fontWeight: 500, color: "#fbbf24" }}
+                         title="Minutos acumulados por la regla 12:20–13:00">
+                      {fmtMinRegla(dia.ajusteMin)}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -2422,7 +2485,8 @@ export default function Anviz({ onBack }) {
               </span>
             </div>
           ) : (
-            incSemana.emps.map(emp => (
+            <div style={{ minWidth: 0, width: "100%", maxWidth: "100%" }}>
+            {incSemana.emps.map(emp => (
               <GraficoOperario
                 key={emp.user_id}
                 nombre={emp.nombre}
@@ -2436,7 +2500,8 @@ export default function Anviz({ onBack }) {
                 ausentes={emp.ausentes}
                 tituloTotal={emp.titulo}
               />
-            ))
+            ))}
+            </div>
           )}
         </>
       )}
