@@ -148,6 +148,9 @@ function horaDecimal(ts) {
   const d = parseMysqlTs(ts);
   return d ? d.getUTCHours() + d.getUTCMinutes() / 60 : null;
 }
+// Tolerancia: un día recién se marca incompleto si le faltan más de estos minutos.
+const TOLERANCIA_INCOMPLETO_MIN = 10;
+
 // Horas que debe cumplir cada día: 9 hs de lunes a jueves, 8 hs los viernes (sáb/dom no aplican).
 function horasObjetivo(iso) {
   const dow = new Date(iso + "T00:00:00Z").getUTCDay(); // 0 = dom ... 6 = sáb
@@ -265,7 +268,7 @@ function armarSemana(fichadas, aplicaRegla = () => false) {
 }
 
 // ─── Gráfico semanal de barras verticales (mañana arriba / tarde abajo) ──────
-function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin, hMax, hoyIso, tituloTotal = null, faltantes = null }) {
+function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin, hMax, hoyIso, tituloTotal = null, faltantes = null, ausentes = null }) {
   const ALTO = 340;
   const rango = hMax - hMin;
   const y = (h) => ((h - hMin) / rango) * ALTO;
@@ -364,8 +367,9 @@ function GraficoOperario({ nombre, dias, totalHoras, ajusteMin = 0, fechas, hMin
                 {!dia && (
                   <span style={{
                     position: "absolute", top: "50%", left: 0, right: 0, textAlign: "center",
-                    fontSize: 11, color: "#334155",
-                  }}>—</span>
+                    fontSize: 11, color: ausentes?.includes(fecha) ? "#f87171" : "#334155",
+                    fontWeight: ausentes?.includes(fecha) ? 700 : 400,
+                  }}>{ausentes?.includes(fecha) ? "Ausente" : "—"}</span>
                 )}
               </div>
               <div style={{
@@ -1152,6 +1156,8 @@ export default function Anviz({ onBack }) {
   const [incFeriados, setIncFeriados] = useState([]);
   const [incCargando, setIncCargando] = useState(false);
   const [incError, setIncError]       = useState(null);
+  const [incTipo, setIncTipo]         = useState("todos"); // "todos" | "parcial" (solo horas) | "completo" (día ausente)
+  const [incJustif, setIncJustif]     = useState({});      // { [empleadoId]: [{ desde, hasta }] } vacaciones + justificaciones
 
   const cargarIncompletos = useCallback(async () => {
     if (!incDesde || !incHasta) return;
@@ -1162,7 +1168,7 @@ export default function Anviz({ onBack }) {
       if (incUser) params.set("user_id", incUser);
       const data = await apiFetch(`/fichadas?${params}`, token);
       setIncFichadas(asignarDirecciones(Array.isArray(data) ? data : []));
-      // Feriados de los años del rango: esos días no se consideran incompletos
+      // Feriados de los años del rango: esos días no se consideran faltas
       try {
         const fer = [];
         for (const anio of new Set([incDesde.slice(0, 4), incHasta.slice(0, 4)])) {
@@ -1171,12 +1177,30 @@ export default function Anviz({ onBack }) {
         }
         setIncFeriados(fer);
       } catch { setIncFeriados([]); }
+      // Vacaciones tomadas y justificaciones (ART / certificado): un día ausente justificado no es falta
+      try {
+        const ids = incUser ? [String(incUser)] : usuarios.map((u) => String(u.id));
+        const pares = await Promise.all(ids.map(async (id) => {
+          const rangos = [];
+          for (const ruta of ["vacaciones-tomadas", "justificaciones"]) {
+            try {
+              const l = await apiFetch(`/${ruta}?empleado_id=${id}`, token);
+              if (Array.isArray(l)) l.forEach((r) => rangos.push({
+                desde: String(r.fecha_desde).slice(0, 10),
+                hasta: String(r.fecha_hasta).slice(0, 10),
+              }));
+            } catch {}
+          }
+          return [id, rangos];
+        }));
+        setIncJustif(Object.fromEntries(pares));
+      } catch { setIncJustif({}); }
     } catch (e) {
       setIncError(e.message);
     } finally {
       setIncCargando(false);
     }
-  }, [incDesde, incHasta, incUser]);
+  }, [incDesde, incHasta, incUser, usuarios]);
 
   useEffect(() => {
     if (vista === "incompletos") cargarIncompletos();
@@ -1184,27 +1208,65 @@ export default function Anviz({ onBack }) {
 
   const incSemana = (() => {
     const hoyIso = hoy();
-    const emps = armarSemana(incFichadas, aplicaReglaAlmuerzo).map((e) => {
-      const base = e.nombre ? e : (() => {
-        const u = usuarios.find((x) => String(x.id) === String(e.user_id));
-        return { ...e, nombre: u ? `${u.apellido} ${u.nombre}`.trim() : `Usuario ${e.user_id}` };
-      })();
+    const conParcial = incTipo !== "completo";
+    const conAusente = incTipo !== "parcial";
+
+    const base = {};
+    armarSemana(incFichadas, aplicaReglaAlmuerzo).forEach((e) => { base[String(e.user_id)] = e; });
+
+    // Empleados a evaluar: los que fichan en el rango (o el elegido en el filtro)
+    const ids = new Set(Object.keys(base));
+    if (incUser) ids.add(String(incUser));
+
+    // Días hábiles del rango (lun–vie, sin feriados)
+    const habiles = [];
+    for (let f = incDesde; f && f <= incHasta; f = sumarDias(f, 1)) {
+      if (horasObjetivo(f) != null && !incFeriados.includes(f)) habiles.push(f);
+    }
+
+    const emps = [...ids].map((id) => {
+      const u = usuarios.find((x) => String(x.id) === id);
+      const e = base[id] || { user_id: id, nombre: "", dias: {}, totalHoras: 0, ajusteMin: 0 };
+      const nombre = e.nombre || (u ? `${u.apellido} ${u.nombre}`.trim() : `Usuario ${id}`);
+      const ingreso = u?.fecha_ingreso ? String(u.fecha_ingreso).slice(0, 10) : null;
+      const justif = incJustif[id] || [];
       const dias = {};
       const faltantes = {};
+      const ausentes = [];
       let totalFalta = 0;
-      Object.entries(base.dias).forEach(([fecha, d]) => {
+      let nParcial = 0;
+
+      habiles.forEach((fecha) => {
         const obj = horasObjetivo(fecha);
-        if (obj == null) return;                                   // sábado / domingo
-        if (fecha < incDesde || fecha > incHasta) return;
-        if (incFeriados.includes(fecha)) return;                   // feriado
-        const enCurso = fecha === hoyIso && [...d.manana, ...d.tarde].some((t) => t.abierto);
-        if (enCurso) return;                                       // jornada de hoy todavía abierta
-        if (d.horas >= obj - 1e-4) return;                         // completó
-        dias[fecha] = d;
-        faltantes[fecha] = obj - d.horas;
-        totalFalta += obj - d.horas;
+        const d = e.dias[fecha];
+        if (d) {
+          // Parcial: fichó pero no llegó a las horas (con tolerancia)
+          if (!conParcial) return;
+          const enCurso = fecha === hoyIso && [...d.manana, ...d.tarde].some((t) => t.abierto);
+          if (enCurso) return;                                          // jornada de hoy todavía abierta
+          if (d.horas >= obj - TOLERANCIA_INCOMPLETO_MIN / 60) return;  // completó
+          dias[fecha] = d;
+          faltantes[fecha] = obj - d.horas;
+          totalFalta += obj - d.horas;
+          nParcial++;
+        } else {
+          // Completo: no hay ninguna fichada ese día hábil
+          if (!conAusente) return;
+          if (fecha >= hoyIso) return;                                  // hoy y futuro todavía no son falta
+          if (ingreso && fecha < ingreso) return;                       // antes de su ingreso
+          if (justif.some((r) => fecha >= r.desde && fecha <= r.hasta)) return; // vacaciones / ART / certificado
+          faltantes[fecha] = obj;
+          totalFalta += obj;
+          ausentes.push(fecha);
+        }
       });
-      return { ...base, dias, faltantes, totalFalta, fechas: Object.keys(dias).sort() };
+
+      const fechas = [...Object.keys(dias), ...ausentes].sort();
+      const partes = [];
+      if (ausentes.length) partes.push(`${ausentes.length} ${ausentes.length === 1 ? "día ausente" : "días ausentes"}`);
+      if (nParcial) partes.push(`${nParcial} ${nParcial === 1 ? "día parcial" : "días parciales"}`);
+      partes.push(`faltan ${fmtDuracion(totalFalta)}`);
+      return { ...e, nombre, dias, faltantes, ausentes, totalFalta, fechas, titulo: partes.join(" · ") };
     }).filter((e) => e.fechas.length > 0)
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
@@ -2293,7 +2355,7 @@ export default function Anviz({ onBack }) {
               <div style={s.iconBox}><IconReloj /></div>
               <div>
                 <h1 style={s.titulo}>Días incompletos</h1>
-                <span style={s.subtitulo}>Jornadas que no llegan a 9 hs (lun–jue) u 8 hs (vie)</span>
+                <span style={s.subtitulo}>Jornadas que no llegan a 9 hs (lun–jue) u 8 hs (vie) · tolerancia {TOLERANCIA_INCOMPLETO_MIN} min</span>
               </div>
             </div>
             <div style={s.headerRight}>
@@ -2320,16 +2382,24 @@ export default function Anviz({ onBack }) {
                   ))}
                 </select>
               </div>
+              <div style={s.filtroGrupo}>
+                <label style={s.label}>Tipo</label>
+                <select value={incTipo} onChange={e => setIncTipo(e.target.value)} style={s.input}>
+                  <option value="todos">Todos</option>
+                  <option value="parcial">Parcial (solo horas)</option>
+                  <option value="completo">Completo (día ausente)</option>
+                </select>
+              </div>
             </div>
             <div style={{ display: "flex", gap: 18, marginTop: 14, fontSize: 12, color: "#94a3b8", flexWrap: "wrap" }}>
               <span><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 3, background: "#fbbf24", verticalAlign: "middle", marginRight: 6 }} />Mañana</span>
               <span><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 3, background: "#818cf8", verticalAlign: "middle", marginRight: 6 }} />Tarde</span>
               <span style={{ color: "#475569" }}>
-                {isoADisplay(incDesde)} al {isoADisplay(incHasta)} · no cuenta sábados, domingos ni feriados
+                {isoADisplay(incDesde)} al {isoADisplay(incHasta)} · no cuenta sábados, domingos, feriados, vacaciones ni justificaciones
               </span>
               {!incCargando && incSemana.totalDias > 0 && (
                 <span style={{ color: "#f87171", fontWeight: 600 }}>
-                  {incSemana.totalDias} {incSemana.totalDias === 1 ? "día incompleto" : "días incompletos"}
+                  {incSemana.totalDias} {incSemana.totalDias === 1 ? "día" : "días"}
                 </span>
               )}
             </div>
@@ -2346,7 +2416,9 @@ export default function Anviz({ onBack }) {
             <div style={s.estado}>
               <span style={{ fontSize: 36 }}>✅</span>
               <span style={{ color: "#64748b", fontSize: 14, marginTop: 8 }}>
-                No hay días incompletos en el período seleccionado
+                {incTipo === "completo" ? "No hay días ausentes en el período seleccionado"
+                  : incTipo === "parcial" ? "No hay días con horas incompletas en el período seleccionado"
+                  : "No hay días incompletos en el período seleccionado"}
               </span>
             </div>
           ) : (
@@ -2361,7 +2433,8 @@ export default function Anviz({ onBack }) {
                 hMax={incSemana.hMax}
                 hoyIso={emp.fechas.includes(hoy()) ? hoy() : null}
                 faltantes={emp.faltantes}
-                tituloTotal={`${emp.fechas.length} ${emp.fechas.length === 1 ? "día" : "días"} · faltan ${fmtDuracion(emp.totalFalta)}`}
+                ausentes={emp.ausentes}
+                tituloTotal={emp.titulo}
               />
             ))
           )}
