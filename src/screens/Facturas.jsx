@@ -33,6 +33,7 @@ const EMPTY_FACTURA = {
   total: "",
   moneda: "ARS",
   pers_IIBB: "",
+  pers_IVA: "", // percepción de IVA (RG 2408) — hoy solo la trae Intervidrio
 };
 
 // ítem — campos alineados a tabla `facturas_items`
@@ -539,7 +540,7 @@ export default function Facturas({ proveedores = [], token }) {
   };
 
   // ── Validación OCR ─────────────────────────────────────────────────────────
-  const [ocrValidacion, setOcrValidacion] = useState(null); // {subtotal, iva, pers_IIBB, totalOcr, totalCalc}
+  const [ocrValidacion, setOcrValidacion] = useState(null); // {subtotal, iva, pers_IIBB, pers_IVA, totalOcr, totalCalc}
 
   // ── OCR ────────────────────────────────────────────────────────────────────
   // Acepta una o varias imágenes (las hojas de una misma factura) o un único
@@ -622,14 +623,16 @@ export default function Facturas({ proveedores = [], token }) {
         total: f.total ?? "",
         moneda: f.moneda ?? "ARS",
         pers_IIBB: f.pers_IIBB ?? "",
+        pers_IVA: f.pers_IVA ?? "",
       };
 
-      // Validar: subtotal + iva + pers_IIBB debe coincidir con total
+      // Validar: subtotal + iva + pers_IIBB + pers_IVA debe coincidir con total
       const sub = parseFloat(f.subtotal) || 0;
       const iva = parseFloat(f.iva) || 0;
       const pers = parseFloat(f.pers_IIBB) || 0;
+      const persIva = parseFloat(f.pers_IVA) || 0;
       const totalOcr = parseFloat(f.total) || 0;
-      const totalCalc = +(sub + iva + pers).toFixed(2);
+      const totalCalc = +(sub + iva + pers + persIva).toFixed(2);
       const diferencia = Math.abs(totalCalc - totalOcr);
 
       if (diferencia > 1) {
@@ -638,6 +641,7 @@ export default function Facturas({ proveedores = [], token }) {
           subtotal: sub,
           iva,
           pers_IIBB: pers,
+          pers_IVA: persIva,
           totalOcr,
           totalCalc,
         });
@@ -1727,6 +1731,8 @@ export default function Facturas({ proveedores = [], token }) {
       iva: f.iva ?? "",
       total: f.total ?? "",
       moneda: f.moneda ?? "ARS",
+      pers_IIBB: f.pers_IIBB ?? "",
+      pers_IVA: f.pers_IVA ?? "",
     });
     fetch(`${API}/facturas-items/${f.id}`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
@@ -2135,6 +2141,7 @@ export default function Facturas({ proveedores = [], token }) {
                   "IVA $",
                   "Total",
                   "Perc. IIBB",
+                  "Perc. IVA",
                   "Moneda",
                   "",
                 ].map((h) => (
@@ -2181,6 +2188,9 @@ export default function Facturas({ proveedores = [], token }) {
                   </td>
                   <td style={{ ...S.td, textAlign: "right" }}>
                     {fmt(f.pers_IIBB)}
+                  </td>
+                  <td style={{ ...S.td, textAlign: "right" }}>
+                    {fmt(f.pers_IVA)}
                   </td>
                   <td style={S.td}>
                     <span
@@ -2583,6 +2593,16 @@ export default function Facturas({ proveedores = [], token }) {
               value={form.pers_IIBB}
               placeholder="0.00"
               onChange={(e) => setFormField("pers_IIBB", e.target.value)}
+            />
+          </div>
+          <div style={S.field}>
+            <label style={S.label}>Perc. IVA $</label>
+            <input
+              type="number"
+              style={S.input}
+              value={form.pers_IVA}
+              placeholder="0.00"
+              onChange={(e) => setFormField("pers_IVA", e.target.value)}
             />
           </div>
         </div>
@@ -3002,6 +3022,16 @@ export default function Facturas({ proveedores = [], token }) {
                   </td>
                   <td style={{ padding: "4px 8px", textAlign: "right" }}>
                     {ocrValidacion.pers_IIBB.toLocaleString("es-AR", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: "4px 8px", color: "#64748b" }}>
+                    Perc. IVA
+                  </td>
+                  <td style={{ padding: "4px 8px", textAlign: "right" }}>
+                    {(ocrValidacion.pers_IVA ?? 0).toLocaleString("es-AR", {
                       minimumFractionDigits: 2,
                     })}
                   </td>
