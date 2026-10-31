@@ -31,6 +31,7 @@ import VisorDWGPage from "./screens/VisorDWGPage";
 import SketchUp from "./screens/SketchUp";
 import Anviz from "./screens/Anviz";
 import FichadasAnviz from "./screens/FichadasAnviz";
+import TareasOperarios from "./screens/TareasOperarios";
 import FlujoFondos from "./screens/FlujoFondos";
 import Herramientas from "./screens/Herramientas";
 import PlanoMamparas from "./screens/PlanoMamparas";
@@ -73,6 +74,7 @@ const SCREENS = {
   "visor-dwg": { label: "VISOR 3D MÓDULOS", icon: "📐" },
   sketchup: { label: "SKETCHUP", icon: "🧊" },
   "flujo-fondos": { label: "FLUJO DE FONDOS", icon: "💵" },
+  "tareas-operarios": { label: "TAREAS OPERARIOS", icon: "👷" },
   herramientas: { label: "HERRAMIENTAS", icon: "🛠️" },
   chat: { label: "CHAT", icon: "💬" },
 };
@@ -103,6 +105,7 @@ const PANTALLAS_MENU = [
   { id: "sketchup", label: "SKETCHUP", icon: "🧊", color: "#ff8c42", ubicacionDefault: "principal" },
   { id: "herramientas", label: "HERRAMIENTAS", icon: "🛠️", color: "#607d8b", ubicacionDefault: "principal" },
   { id: "chat", label: "CHAT", icon: "💬", color: "#25d366", ubicacionDefault: "principal" },
+  { id: "tareas-operarios", label: "TAREAS OPERARIOS", icon: "👷", color: "#f59e0b", ubicacionDefault: "principal" },
   { id: "presupuesto-mamparas", label: "PRESUPUESTO MAMPARAS", icon: "🪟", color: "#4895ef", ubicacionDefault: "lateral" },
   { id: "presupuesto-muebles", label: "PRESUPUESTO MUEBLES", icon: "🪵", color: "#a0785a", ubicacionDefault: "lateral" },
   { id: "presupuestos-tabla", label: "PRESUPUESTOS MAMPARAS", icon: "📋", color: "#4895ef", ubicacionDefault: "lateral" },
@@ -1470,6 +1473,14 @@ function App() {
             {/* ── Control de Fichadas (panel simple de presencia/fichadas) ── */}
             {screen === "fichadas" && (
               <FichadasAnviz token={token} onBack={() => setScreen(null)} />
+            )}
+
+            {/* ── Tareas de operarios (tablero en vivo; el supervisor asigna) ── */}
+            {screen === "tareas-operarios" && (
+              <TareasOperarios
+                onBack={() => setScreen(null)}
+                puedoEditar={puedo("tareas-operarios", "editar")}
+              />
             )}
 
             {/* ── Clientes Activos (ex Cuenta Corriente) ── */}
