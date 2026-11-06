@@ -6,6 +6,7 @@ import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
 import { generarRemitoWord } from "../word/wordRemito";
 import { generarPdfRemitoOficial } from "../pdf/pdfRemitoOficial";
+import { generarRemitoExcel } from "../excel/excelRemito";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -842,6 +843,7 @@ export default function Confirmados({ authFetch, token, onInicio }) {
   // cada ítem (entrega parcial) o ponerla en 0 para dejarlo afuera.
   //   - "traslado": .docx propio para acompañar la mercadería.
   //   - "oficial":  PDF para imprimir sobre el talonario pre-impreso.
+  //   - "excel":    .xlsx con cantidad, código, descripción, material y medidas.
   // OJO: no se guarda nada en /remitos (ese endpoint pide
   // tabla_presupuesto_id, que `confirmados` no trae), así que estos remitos
   // salen sin número ni control de pendientes.
@@ -866,10 +868,22 @@ export default function Confirmados({ authFetch, token, onInicio }) {
     setModalRemito(true);
   };
 
+  // Material del ítem = su color (se guarda el codartint del catálogo de
+  // melaminas; acá se muestra el nombre). Si no está en el catálogo (datos
+  // viejos) se devuelve el valor tal cual.
+  const materialDe = (it) => {
+    const v = String(it.color ?? "");
+    if (!v) return "";
+    const m =
+      coloresMelamina.find((c) => c.codartint === v) ??
+      coloresMelamina.find((c) => c.articulo === v);
+    return m ? m.articulo : v;
+  };
+
   const cantidadRemitoNum = (id) =>
     parseFloat(String(cantidadesRemito[id] ?? "").replace(",", ".")) || 0;
 
-  const generarRemito = () => {
+  const generarRemito = async () => {
     const itemsRemito = items
       .map((it) => ({ it, cantidad: cantidadRemitoNum(it.id) }))
       .filter((x) => x.cantidad > 0)
@@ -878,6 +892,7 @@ export default function Confirmados({ authFetch, token, onInicio }) {
         codigo: it.codartint || it.codpro || "",
         descripcion: it.nombreart ?? "",
         medidas: fmtMedidas(it),
+        material: materialDe(it),
         // Campos sueltos por si el generador los usa por separado
         nombreart: it.nombreart ?? "",
         tipo: it.tipo ?? "",
@@ -910,6 +925,25 @@ export default function Confirmados({ authFetch, token, onInicio }) {
         numeropres: abierta.numeropres,
         items: itemsRemito,
       });
+    } else if (tipoRemito === "excel") {
+      try {
+        await generarRemitoExcel({
+          numeroRemito: null,
+          numeropres: abierta.numeropres,
+          revision: abierta.revision,
+          fecha: fechaRemito,
+          cliente: abierta.nombre,
+          domicilio: abierta.direccion,
+          telefono1: abierta.telefono1,
+          telefono2: abierta.telefono2,
+          observaciones: observacionesRemito,
+          items: itemsRemito,
+        });
+      } catch (err) {
+        console.error("Error generando el remito en Excel:", err);
+        setErrorRemito("No se pudo generar el Excel: " + (err?.message || "error desconocido"));
+        return;
+      }
     } else {
       generarRemitoWord({
         numeroRemito: null,
@@ -1791,6 +1825,7 @@ export default function Confirmados({ authFetch, token, onInicio }) {
               {[
                 ["traslado", "🚚 Remito de traslado (.docx)"],
                 ["oficial", "📋 Remito oficial (talonario, PDF)"],
+                ["excel", "📊 Remito en Excel (.xlsx)"],
               ].map(([valor, label]) => (
                 <button
                   key={valor}
@@ -1860,6 +1895,7 @@ export default function Confirmados({ authFetch, token, onInicio }) {
                     <th style={{ padding: "6px 8px", width: 90 }}>Cant.</th>
                     <th style={{ padding: "6px 8px" }}>Código</th>
                     <th style={{ padding: "6px 8px" }}>Descripción</th>
+                    <th style={{ padding: "6px 8px" }}>Material</th>
                     <th style={{ padding: "6px 8px" }}>Medidas</th>
                   </tr>
                 </thead>
@@ -1880,8 +1916,8 @@ export default function Confirmados({ authFetch, token, onInicio }) {
                       <td style={{ padding: "4px 8px" }}>{it.codartint || it.codpro || "—"}</td>
                       <td style={{ padding: "4px 8px" }}>
                         {it.nombreart || "—"}
-                        {it.color ? <span style={{ color: "#8aabcc" }}> · {it.color}</span> : null}
                       </td>
+                      <td style={{ padding: "4px 8px" }}>{materialDe(it) || "—"}</td>
                       <td style={{ padding: "4px 8px", whiteSpace: "nowrap" }}>{fmtMedidas(it) || "—"}</td>
                     </tr>
                   ))}
@@ -1889,7 +1925,7 @@ export default function Confirmados({ authFetch, token, onInicio }) {
               </table>
             </div>
 
-            {tipoRemito === "traslado" && (
+            {(tipoRemito === "traslado" || tipoRemito === "excel") && (
               <label style={{ display: "block", fontSize: 11, color: "#5a86ab", marginBottom: 12 }}>
                 Observaciones (opcional)
                 <textarea
@@ -1945,7 +1981,11 @@ export default function Confirmados({ authFetch, token, onInicio }) {
                   cursor: "pointer",
                 }}
               >
-                {tipoRemito === "oficial" ? "Generar PDF" : "Generar y descargar Word"}
+                {tipoRemito === "oficial"
+                  ? "Generar PDF"
+                  : tipoRemito === "excel"
+                    ? "Generar y descargar Excel"
+                    : "Generar y descargar Word"}
               </button>
             </div>
           </div>
