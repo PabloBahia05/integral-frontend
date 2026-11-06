@@ -4,6 +4,8 @@ import DataTable from "../Component/DataTable";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
+import { generarRemitoWord } from "../word/wordRemito";
+import { generarPdfRemitoOficial } from "../pdf/pdfRemitoOficial";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -63,6 +65,22 @@ const fmtMonto = (v) =>
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
+
+// Fecha de hoy en formato YYYY-MM-DD (lo que espera un <input type="date">).
+const hoyISO = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+// Medidas de un ítem para el remito: "60 × 80 × 45 cm" (solo las que tengan
+// valor). Los DECIMAL de MySQL llegan como "60.00": Number() los deja en 60.
+const fmtMedidas = (it) => {
+  const partes = [it.ancho, it.alto, it.profundidad]
+    .filter((v) => v != null && String(v).trim() !== "" && Number(v) > 0)
+    .map((v) => String(Number(v)));
+  return partes.length ? `${partes.join(" × ")} cm` : "";
+};
 
 // ── Selector de artículos (catálogo `articulos`) ──────────────────────────
 //
@@ -818,6 +836,97 @@ export default function Confirmados({ authFetch, token, onInicio }) {
     }
   };
 
+  // ── Remito ─────────────────────────────────────────────────────────
+  // Se arma con los ítems de `confirmados` de la revisión abierta (los que
+  // ya están cargados en `items`). El usuario puede bajar la cantidad de
+  // cada ítem (entrega parcial) o ponerla en 0 para dejarlo afuera.
+  //   - "traslado": .docx propio para acompañar la mercadería.
+  //   - "oficial":  PDF para imprimir sobre el talonario pre-impreso.
+  // OJO: no se guarda nada en /remitos (ese endpoint pide
+  // tabla_presupuesto_id, que `confirmados` no trae), así que estos remitos
+  // salen sin número ni control de pendientes.
+  const [modalRemito, setModalRemito] = useState(false);
+  const [tipoRemito, setTipoRemito] = useState("traslado");
+  const [cantidadesRemito, setCantidadesRemito] = useState({});
+  const [fechaRemito, setFechaRemito] = useState(hoyISO());
+  const [observacionesRemito, setObservacionesRemito] = useState("");
+  const [errorRemito, setErrorRemito] = useState("");
+
+  const abrirRemito = () => {
+    const c = {};
+    items.forEach((it) => {
+      const n = Number(it.cantidad);
+      c[it.id] = Number.isFinite(n) && n > 0 ? String(n) : "1";
+    });
+    setCantidadesRemito(c);
+    setFechaRemito(hoyISO());
+    setObservacionesRemito("");
+    setErrorRemito("");
+    setTipoRemito("traslado");
+    setModalRemito(true);
+  };
+
+  const cantidadRemitoNum = (id) =>
+    parseFloat(String(cantidadesRemito[id] ?? "").replace(",", ".")) || 0;
+
+  const generarRemito = () => {
+    const itemsRemito = items
+      .map((it) => ({ it, cantidad: cantidadRemitoNum(it.id) }))
+      .filter((x) => x.cantidad > 0)
+      .map(({ it, cantidad }) => ({
+        cantidad,
+        codigo: it.codartint || it.codpro || "",
+        descripcion: it.nombreart ?? "",
+        medidas: fmtMedidas(it),
+        // Campos sueltos por si el generador los usa por separado
+        nombreart: it.nombreart ?? "",
+        tipo: it.tipo ?? "",
+        grupo: it.grupo ?? "",
+        color: it.color ?? "",
+        ancho: it.ancho,
+        alto: it.alto,
+        profundidad: it.profundidad,
+      }));
+
+    if (!itemsRemito.length) {
+      setErrorRemito("Ingresá una cantidad mayor a cero en al menos un ítem.");
+      return;
+    }
+    if (!fechaRemito) {
+      setErrorRemito("Elegí una fecha para el remito.");
+      return;
+    }
+
+    if (tipoRemito === "oficial") {
+      generarPdfRemitoOficial({
+        fecha: fechaRemito,
+        numeroRemito: null, // TODO: falta definir numeración del talonario oficial
+        cliente: abierta.nombre,
+        domrem: abierta.domrem,
+        domicilio_fiscal: abierta.domicilio_fiscal ?? abierta["domicilio fiscal"],
+        domicilio: abierta.direccion,
+        localidad: abierta.localidad,
+        telefono: abierta.telefono1 || abierta.telefono2 || "",
+        numeropres: abierta.numeropres,
+        items: itemsRemito,
+      });
+    } else {
+      generarRemitoWord({
+        numeroRemito: null,
+        numeropres: abierta.numeropres,
+        revision: abierta.revision,
+        fecha: fechaRemito,
+        cliente: abierta.nombre,
+        domicilio: abierta.direccion,
+        telefono1: abierta.telefono1,
+        telefono2: abierta.telefono2,
+        observaciones: observacionesRemito,
+        items: itemsRemito,
+      });
+    }
+    setModalRemito(false);
+  };
+
   // ── Filtro de la lista ─────────────────────────────────────────────
 
   const q = search.trim().toLowerCase();
@@ -1351,6 +1460,26 @@ export default function Confirmados({ authFetch, token, onInicio }) {
               >
                 {reenviando ? "Enviando…" : "↻ Reenviar a Producción"}
               </button>
+              <button
+                onClick={abrirRemito}
+                disabled={itemsLoading || items.length === 0}
+                title="Genera un remito con los ítems confirmados de esta obra"
+                style={{
+                  marginLeft: 8,
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontFamily: FUENTE,
+                  fontWeight: 700,
+                  border: "1.5px solid #0a3a5c",
+                  borderRadius: 4,
+                  background: "#fff",
+                  color: "#0a3a5c",
+                  cursor: itemsLoading || items.length === 0 ? "default" : "pointer",
+                  opacity: itemsLoading || items.length === 0 ? 0.5 : 1,
+                }}
+              >
+                📦 Remito
+              </button>
 
               {mostrarNuevo && (
                 <div
@@ -1609,6 +1738,216 @@ export default function Confirmados({ authFetch, token, onInicio }) {
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {modalRemito && abierta && (
+        <div
+          onClick={() => setModalRemito(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1250,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 820,
+              maxHeight: "85vh",
+              overflowY: "auto",
+              background: "#fff",
+              borderRadius: 10,
+              padding: "20px 22px",
+              fontFamily: FUENTE,
+              color: "#0a3a5c",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16 }}>
+                  Remito — Presupuesto N° {fmtNumPres(abierta.numeropres)} · Rev. {abierta.revision}
+                </h3>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: "#8aabcc" }}>
+                  {[abierta.nombre, abierta.direccion].filter(Boolean).join(" · ") || "—"}
+                </p>
+              </div>
+              <button
+                onClick={() => setModalRemito(false)}
+                style={{ border: "none", background: "none", color: "#4a8ab5", cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, margin: "14px 0", flexWrap: "wrap" }}>
+              {[
+                ["traslado", "🚚 Remito de traslado (.docx)"],
+                ["oficial", "📋 Remito oficial (talonario, PDF)"],
+              ].map(([valor, label]) => (
+                <button
+                  key={valor}
+                  onClick={() => setTipoRemito(valor)}
+                  style={{
+                    padding: "7px 12px",
+                    fontSize: 12,
+                    fontFamily: FUENTE,
+                    fontWeight: 700,
+                    border: "1.5px solid #0a3a5c",
+                    borderRadius: 4,
+                    background: tipoRemito === valor ? "#0a3a5c" : "#fff",
+                    color: tipoRemito === valor ? "#fff" : "#0a3a5c",
+                    cursor: "pointer",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+              <label style={{ fontSize: 11, color: "#5a86ab", marginLeft: "auto" }}>
+                Fecha{" "}
+                <input
+                  type="date"
+                  value={fechaRemito}
+                  onChange={(e) => setFechaRemito(e.target.value)}
+                  style={{ ...estiloInput("remito", "fecha", "150px"), marginLeft: 4 }}
+                />
+              </label>
+            </div>
+
+            {errorRemito && (
+              <p style={{ color: "#c0392b", fontSize: 12, margin: "0 0 10px" }}>⚠ {errorRemito}</p>
+            )}
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "#4a8ab5" }}>
+                Cantidad a entregar de cada ítem (0 lo deja fuera del remito).
+              </span>
+              <button
+                onClick={() => {
+                  const c = {};
+                  items.forEach((it) => {
+                    const n = Number(it.cantidad);
+                    c[it.id] = Number.isFinite(n) && n > 0 ? String(n) : "1";
+                  });
+                  setCantidadesRemito(c);
+                }}
+                style={{
+                  padding: "4px 10px",
+                  fontSize: 11,
+                  fontFamily: FUENTE,
+                  border: "1.5px solid #b8d6ef",
+                  borderRadius: 4,
+                  background: "#fff",
+                  color: "#0a3a5c",
+                  cursor: "pointer",
+                }}
+              >
+                Todo
+              </button>
+            </div>
+
+            <div style={{ overflowX: "auto", marginBottom: 12 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "#4a8ab5", borderBottom: "1.5px solid #b8d6ef" }}>
+                    <th style={{ padding: "6px 8px", width: 90 }}>Cant.</th>
+                    <th style={{ padding: "6px 8px" }}>Código</th>
+                    <th style={{ padding: "6px 8px" }}>Descripción</th>
+                    <th style={{ padding: "6px 8px" }}>Medidas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((it) => (
+                    <tr key={it.id} style={{ borderBottom: "1px solid #e3eef8" }}>
+                      <td style={{ padding: "4px 8px" }}>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={cantidadesRemito[it.id] ?? ""}
+                          onChange={(e) =>
+                            setCantidadesRemito((prev) => ({ ...prev, [it.id]: e.target.value }))
+                          }
+                          style={{ ...estiloInput("remito", `cant-${it.id}`, "70px"), textAlign: "right" }}
+                        />
+                      </td>
+                      <td style={{ padding: "4px 8px" }}>{it.codartint || it.codpro || "—"}</td>
+                      <td style={{ padding: "4px 8px" }}>
+                        {it.nombreart || "—"}
+                        {it.color ? <span style={{ color: "#8aabcc" }}> · {it.color}</span> : null}
+                      </td>
+                      <td style={{ padding: "4px 8px", whiteSpace: "nowrap" }}>{fmtMedidas(it) || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {tipoRemito === "traslado" && (
+              <label style={{ display: "block", fontSize: 11, color: "#5a86ab", marginBottom: 12 }}>
+                Observaciones (opcional)
+                <textarea
+                  value={observacionesRemito}
+                  onChange={(e) => setObservacionesRemito(e.target.value)}
+                  rows={2}
+                  placeholder="Notas sobre esta entrega..."
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    marginTop: 2,
+                    padding: "6px 8px",
+                    fontSize: 12,
+                    fontFamily: FUENTE,
+                    border: "1.5px solid #b8d6ef",
+                    borderRadius: 4,
+                    color: "#0a3a5c",
+                    resize: "vertical",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </label>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                onClick={() => setModalRemito(false)}
+                style={{
+                  padding: "7px 14px",
+                  fontSize: 12,
+                  fontFamily: FUENTE,
+                  fontWeight: 700,
+                  border: "1.5px solid #b8d6ef",
+                  borderRadius: 4,
+                  background: "#fff",
+                  color: "#0a3a5c",
+                  cursor: "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={generarRemito}
+                style={{
+                  padding: "7px 14px",
+                  fontSize: 12,
+                  fontFamily: FUENTE,
+                  fontWeight: 700,
+                  border: "none",
+                  borderRadius: 4,
+                  background: "#0a3a5c",
+                  color: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                {tipoRemito === "oficial" ? "Generar PDF" : "Generar y descargar Word"}
+              </button>
+            </div>
           </div>
         </div>
       )}
