@@ -819,6 +819,39 @@ export default function Produccion({ authFetch, token, onInicio }) {
   // El visor guarda/lee el modelo por codpro contra la tabla modelos_3d
   // (independiente de produccion, ver modelos3d.routes.js).
   const [modelo3D, setModelo3D] = useState(null);
+  // Planos del módulo (imagen con cotas + vista explotada) que sube DOMUS2 al
+  // exportar el DXF, relacionados por código de producción (columna "Planos").
+  // { row, cargando, items: [{ tipo, src }], error } o null si el modal está cerrado.
+  const [planos, setPlanos] = useState(null);
+
+  const abrirPlanos = async (row) => {
+    setPlanos({ row, cargando: true, items: [], error: "" });
+    try {
+      const res = await authFetch(`${API}/produccion/${row.id}/planos`);
+      if (!res.ok) throw new Error("No se pudieron leer los planos.");
+      const lista = await res.json();
+      const items = [];
+      for (const p of lista) {
+        const r = await authFetch(`${API}${p.url}`);
+        if (!r.ok) continue;
+        items.push({ tipo: p.tipo, src: URL.createObjectURL(await r.blob()) });
+      }
+      setPlanos({
+        row,
+        cargando: false,
+        items,
+        error: items.length ? "" : "Este código de producción no tiene planos cargados.",
+      });
+    } catch (e) {
+      setPlanos({ row, cargando: false, items: [], error: e.message });
+    }
+  };
+
+  const cerrarPlanos = () => {
+    (planos?.items || []).forEach((i) => URL.revokeObjectURL(i.src));
+    setPlanos(null);
+  };
+
 
   // Fila para la que se está generando/descargando el CSV de resultados de
   // fórmulas (columna "CSV"). Pide GET /produccion/:id/formulas-csv — el
@@ -1902,6 +1935,42 @@ export default function Produccion({ authFetch, token, onInicio }) {
       ),
     },
     {
+      key: "cant_planos",
+      label: "Planos",
+      render: (v, row) => {
+        const hay = Number(row.cant_planos) > 0;
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (hay) abrirPlanos(row);
+            }}
+            disabled={!hay}
+            title={
+              hay
+                ? "Ver planos del módulo (cotas y explotado)"
+                : row.codigo_produccion_id
+                  ? "Este código de producción todavía no tiene planos (se suben al Exportar DXF desde DOMUS2)"
+                  : "Elegí primero el código de producción"
+            }
+            style={{
+              background: hay ? "#eaf3fb" : "#f1f1f1",
+              color: hay ? "#0a3a5c" : "#9aa5ae",
+              border: `1px solid ${hay ? "#b8d6ef" : "#ddd"}`,
+              borderRadius: "4px",
+              padding: "3px 10px",
+              fontSize: "12px",
+              fontWeight: 700,
+              cursor: hay ? "pointer" : "not-allowed",
+              fontFamily: "'Space Mono', monospace",
+            }}
+          >
+            📐 {hay ? "Ver" : "—"}
+          </button>
+        );
+      },
+    },
+    {
       key: "csv",
       label: "CSV",
       render: (v, row) => {
@@ -2367,6 +2436,77 @@ export default function Produccion({ authFetch, token, onInicio }) {
               apiUrl={`${API}/api/dwg`}
               token={token}
             />
+          </div>
+        </div>
+      )}
+      {planos && (
+        <div
+          onClick={cerrarPlanos}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,58,92,0.55)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "96%",
+              maxWidth: 1000,
+              maxHeight: "90vh",
+              overflow: "auto",
+              background: "#fff",
+              borderRadius: 10,
+              padding: "16px 18px",
+              fontFamily: "'Space Mono', monospace",
+              color: "#0a3a5c",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 15 }}>
+                Planos — {planos.row.modulo || planos.row.producto || planos.row.codpro}
+              </h3>
+              <button
+                onClick={cerrarPlanos}
+                style={{
+                  background: "#eaf3fb",
+                  color: "#0a3a5c",
+                  border: "1px solid #b8d6ef",
+                  borderRadius: 6,
+                  padding: "4px 10px",
+                  cursor: "pointer",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            {planos.cargando && <div style={{ fontSize: 13 }}>Cargando planos…</div>}
+            {planos.error && <div style={{ fontSize: 13, color: "#b3261e" }}>{planos.error}</div>}
+            {planos.items.map((p) => (
+              <div key={p.tipo} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, margin: "0 0 6px" }}>
+                  {p.tipo === "cotas" ? "Imagen con cotas" : "Vista explotada"}
+                </div>
+                <a href={p.src} target="_blank" rel="noreferrer" title="Abrir en otra pestaña">
+                  <img
+                    src={p.src}
+                    alt={p.tipo}
+                    style={{ width: "100%", height: "auto", border: "1px solid #b8d6ef", borderRadius: 6 }}
+                  />
+                </a>
+              </div>
+            ))}
           </div>
         </div>
       )}
