@@ -9,6 +9,8 @@ import EscanerBarcode from "../Component/EscanerBarcode";
 import VisorDWG from "./VisorDWG";
 
 const API = "https://integral-backend-production.up.railway.app";
+// Nombres para mostrar de los planos (cualquier otro tipo que suba DOMUS2 se muestra con su propio nombre).
+const ETIQUETAS_PLANO = { cotas: "Imagen con cotas", explotado: "Vista explotada" };
 
 // Tabla modulos-domus (una fila por pieza): se usa para saber si el CÓDIGO
 // DE PRODUCCIÓN elegido en una fila (`row.codigo_produccion_id`) tiene
@@ -2496,7 +2498,7 @@ export default function Produccion({ authFetch, token, onInicio }) {
             {planos.items.map((p) => (
               <div key={p.tipo} style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, margin: "0 0 6px" }}>
-                  {p.tipo === "cotas" ? "Imagen con cotas" : "Vista explotada"}
+                  {ETIQUETAS_PLANO[p.tipo] || p.tipo.replace(/_/g, " ")}
                 </div>
                 <a href={p.src} target="_blank" rel="noreferrer" title="Abrir en otra pestaña">
                   <img
