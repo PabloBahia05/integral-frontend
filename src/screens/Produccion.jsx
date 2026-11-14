@@ -1588,11 +1588,23 @@ export default function Produccion({ authFetch, token, onInicio }) {
   };
 
   const q = search.toLowerCase();
+  // Texto del código de producción elegido en cada fila (código + descripción),
+  // tomado de la tabla de códigos por `codigo_produccion_id`: así el buscador
+  // lo encuentra aunque `row.modulo` (texto guardado en la fila) esté
+  // desactualizado o vacío.
+  const textoCodigoPorId = new Map(
+    todosLosCodigosProduccion.map((o) => [
+      String(o.id),
+      `${o.codigo ?? ""} ${o.descripcion ?? ""}`.toLowerCase(),
+    ]),
+  );
   const filtered = rows.filter(
     (r) =>
       cumpleEtapa(r) &&
       cumpleGrupo(r) &&
       ((r.codpro ?? "").toLowerCase().includes(q) ||
+        (r.codartint ?? "").toLowerCase().includes(q) ||
+        (textoCodigoPorId.get(String(r.codigo_produccion_id)) ?? "").includes(q) ||
         (r.cliente_nombre ?? "").toLowerCase().includes(q) ||
         String(r.numeropres ?? "").includes(q) ||
         (r.grupo ?? "").toLowerCase().includes(q) ||
