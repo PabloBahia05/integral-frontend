@@ -5,6 +5,7 @@ import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
 import Modal from "../Component/Modal";
+import FotosPresupuestoModal from "../Component/FotosPresupuestoModal";
 import {
   API,
   COLS_ENCABEZADO,
@@ -59,7 +60,14 @@ const BTN_ACCION_ARCHIVO_STYLE_CON_ARCHIVOS = {
 // Botón desplegable (▶/▼) para el resumen rápido de artículos — independiente
 // de la selección de fila (que sigue disparando ItemsPanel al pie). onToggle
 // recibe la fila entera porque el fetch de items necesita numeropres/revision.
-const buildColsObras = (onImagenes, onPlanos, expandedId, onToggleExpand, conteos) => [
+const buildColsObras = (
+  onImagenes,
+  onPlanos,
+  expandedId,
+  onToggleExpand,
+  conteos,
+  onFotosPresupuesto,
+) => [
   {
     key: "__expand__",
     label: "",
@@ -86,6 +94,25 @@ const buildColsObras = (onImagenes, onPlanos, expandedId, onToggleExpand, conteo
     ),
   },
   ...COLS_OBRAS_BASE,
+  {
+    // Fotos que se cargaron en el editor del presupuesto (presupuesto_imagenes)
+    // de la revisión CONFIRMADA — solo lectura. No confundir con "Imágenes"
+    // (galería propia de la obra, tabla obra_archivos).
+    key: "__fotos_presupuesto__",
+    label: "Fotos presup.",
+    render: (_, row) => (
+      <button
+        title="Ver las fotos del presupuesto confirmado"
+        onClick={(e) => {
+          e.stopPropagation();
+          onFotosPresupuesto(row);
+        }}
+        style={BTN_ACCION_ARCHIVO_STYLE}
+      >
+        📸 Fotos
+      </button>
+    ),
+  },
   {
     key: "__imagenes__",
     label: "Imágenes",
@@ -233,6 +260,28 @@ export default function Obras({
     setArchivosModal({ numeropres: row.numeropres, tipo: "imagen", nombre: row.nombre });
   const abrirPlanos = (row) =>
     setArchivosModal({ numeropres: row.numeropres, tipo: "plano", nombre: row.nombre });
+
+  // { numeropres, revision, nombre } | null — fotos del presupuesto confirmado
+  const [fotosPresModal, setFotosPresModal] = useState(null);
+  // La lista de Obras colapsa a 1 fila por numeropres (la revisión más nueva,
+  // que puede ser una posterior sin confirmar). Las fotos están ligadas a
+  // numeropres + revisión, así que acá se busca la última revisión CONFIRMADA
+  // de esa obra; si por algún motivo no hubiera ninguna marcada, se usa la
+  // de la fila.
+  const abrirFotosPresupuesto = (row) => {
+    const confirmadas = encabezados
+      .filter((e) => e.numeropres === row.numeropres && !!e.confirmado)
+      .map((e) => Number(e.revision))
+      .filter((n) => Number.isFinite(n));
+    const revision = confirmadas.length
+      ? Math.max(...confirmadas)
+      : (row.revision ?? 0);
+    setFotosPresModal({
+      numeropres: row.numeropres,
+      revision,
+      nombre: row.nombre,
+    });
+  };
 
   // { [numeropres]: { imagen: n, plano: n } } — para mostrar la cantidad de
   // archivos cargados en los botones de la lista principal, sin traer los
@@ -686,7 +735,14 @@ export default function Obras({
         </p>
       ) : (
         <DataTable
-          columns={buildColsObras(abrirImagenes, abrirPlanos, expandedId, toggleExpand, conteosArchivos)}
+          columns={buildColsObras(
+            abrirImagenes,
+            abrirPlanos,
+            expandedId,
+            toggleExpand,
+            conteosArchivos,
+            abrirFotosPresupuesto,
+          )}
           rows={filtered}
           selectedId={selected?.id}
           onSelect={handleSelect}
@@ -732,6 +788,17 @@ export default function Obras({
           onClose={() =>
             !eliminandoPresupuesto && setPresupuestoAEliminar(null)
           }
+        />
+      )}
+
+      {fotosPresModal && (
+        <FotosPresupuestoModal
+          numeropres={fotosPresModal.numeropres}
+          revision={fotosPresModal.revision}
+          nombre={fotosPresModal.nombre}
+          authFetch={authFetch}
+          api={API}
+          onClose={() => setFotosPresModal(null)}
         />
       )}
 

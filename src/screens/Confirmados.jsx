@@ -4,6 +4,7 @@ import DataTable from "../Component/DataTable";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
+import FotosPresupuestoModal from "../Component/FotosPresupuestoModal";
 import { generarRemitoWord } from "../word/wordRemito";
 import { generarPdfRemitoOficial } from "../pdf/pdfRemitoOficial";
 import { generarRemitoExcel } from "../excel/excelRemito";
@@ -497,6 +498,8 @@ export default function Confirmados({ authFetch, token, onInicio }) {
 
   // ── Panel con los ítems de una revisión ────────────────────────────
   const [abierta, setAbierta] = useState(null); // fila de `revisiones`
+  // Fotos del presupuesto (presupuesto_imagenes) de la revisión de esa fila
+  const [fotosPres, setFotosPres] = useState(null); // fila de `revisiones`
   const [items, setItems] = useState([]);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [itemsError, setItemsError] = useState(null);
@@ -1020,6 +1023,32 @@ export default function Confirmados({ authFetch, token, onInicio }) {
     { key: "fecha", label: "Fecha", render: (v) => fmtFecha(v) },
     { key: "total1", label: "Total", render: (v) => fmtMonto(v) },
     {
+      key: "fotos",
+      label: "Fotos",
+      render: (v, row) => (
+        <button
+          // stopPropagation: si no, el clic también abriría el panel de la fila
+          onClick={(e) => {
+            e.stopPropagation();
+            setFotosPres(row);
+          }}
+          title="Ver las fotos del presupuesto"
+          style={{
+            border: "1px solid #b8cfe0",
+            background: "none",
+            color: "#3a7abf",
+            borderRadius: 4,
+            padding: "3px 8px",
+            cursor: "pointer",
+            fontSize: 12,
+            whiteSpace: "nowrap",
+          }}
+        >
+          📸 Fotos
+        </button>
+      ),
+    },
+    {
       key: "eliminar",
       label: "",
       render: (v, row) => (
@@ -1383,6 +1412,17 @@ export default function Confirmados({ authFetch, token, onInicio }) {
           selectedId={abierta?.id ?? null}
           onSelect={(row) => row && abrirRevision(row)}
           storageKey="confirmados-revisiones"
+        />
+      )}
+
+      {fotosPres && (
+        <FotosPresupuestoModal
+          numeropres={fotosPres.numeropres}
+          revision={fotosPres.revision}
+          nombre={fotosPres.nombre}
+          authFetch={authFetch}
+          api={API}
+          onClose={() => setFotosPres(null)}
         />
       )}
 
