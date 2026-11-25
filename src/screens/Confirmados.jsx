@@ -4,7 +4,7 @@ import DataTable from "../Component/DataTable";
 import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
-import FotosPresupuestoModal from "../Component/FotosPresupuestoModal";
+import FotosPresupuestoModal from "./FotosPresupuestoModal"; // está en screens/, no en Component/
 import { generarRemitoWord } from "../word/wordRemito";
 import { generarPdfRemitoOficial } from "../pdf/pdfRemitoOficial";
 import { generarRemitoExcel } from "../excel/excelRemito";

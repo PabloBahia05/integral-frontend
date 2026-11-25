@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ImportarSketchUp from "./ImportarSketchUp.jsx";
 
 const API = "https://integral-backend-production.up.railway.app";
 
@@ -28,11 +29,16 @@ const tipoAccesorioParaItem = (fila, proveedor) => {
   const esEsquineroBajo =
     nombreart.startsWith("ESQUINERO BAJO") ||
     articulo.startsWith("ESQUINERO BAJO");
-  if (
-    esEsquineroBajo &&
-    String(proveedor ?? "").trim().toUpperCase() === "DANIEL ROQUE SRL"
-  ) {
-    return "ESQ";
+  if (esEsquineroBajo) {
+    // Nunca cae al fallback CAJ/PTA de abajo: el nombre de estos muebles
+    // suele terminar en "... 2 Pta" (cantidad de puertas del mueble, no
+    // el tipo de accesorio), lo que hacía matchear el substring "PTA" por
+    // error y mostraba accesorios de puerta/cajón en vez de ESQ. Si el
+    // proveedor no matchea (comprado, no fabricado en casa), se devuelve
+    // null en vez de arriesgar una clasificación falsa.
+    return String(proveedor ?? "").trim().toUpperCase() === "DANIEL ROQUE SRL"
+      ? "ESQ"
+      : null;
   }
   const nombre = `${nombreart} ${articulo}`;
   if (nombre.includes("CAJ")) return "CAJ";
@@ -56,6 +62,15 @@ const FILA_VACIA = {
   area: null,
   accesorios: [],
   grupo: "",
+  // Medidas + código de fórmula interno del artículo elegido — mismo
+  // patrón que placardFila en PlacardSection.jsx. Antes no existían acá,
+  // así que ítems de Cocina (Bajomesada/Alacena) se guardaban siempre sin
+  // ancho/alto/codartint (se veían vacíos en la pestaña Presupuesto y
+  // faltaban para el CSV de fórmulas de producción).
+  ancho: null,
+  alto: null,
+  profundidad: null,
+  codartint: null,
 };
 
 export default function TabCocina({
@@ -65,6 +80,9 @@ export default function TabCocina({
   // familia activa (elevada al padre para que el sync con presupuesto funcione)
   cocinaFamilia,
   setCocinaFamilia,
+  // pedido de edición de un ítem puntual desde la pestaña Presupuesto
+  cocinaItemAEditar,
+  setCocinaItemAEditar,
   // líneas activas y precio (del encabezado)
   lineasActivas,
   listaPorcentaje,
@@ -97,8 +115,14 @@ export default function TabCocina({
   const [cocinaSearch, setCocinaSearch] = useState("");
   const [cocinaSearchFocus, setCocinaSearchFocus] = useState(false);
   const [articulosFamilia, setArticulosFamilia] = useState([]);
+  // Modal "Importar proyecto de SketchUp" (ver ImportarSketchUp.jsx)
+  const [mostrarImportarSketchUp, setMostrarImportarSketchUp] = useState(false);
 
   // ── Fetch artículos cuando cambia la familia activa ───────
+  // GENERAL: los artículos sin familia puntual ya vienen incluidos por el
+  // backend en la MISMA respuesta de /articulos/por-familia (con su
+  // precio ya completado para cada línea de esta familia, vía el
+  // backfill de precioGenerico) — no hace falta pedirlos aparte acá.
   useEffect(() => {
     if (!cocinaFamilia) {
       setArticulosFamilia([]);
@@ -126,12 +150,15 @@ export default function TabCocina({
       .replace(/[\u0300-\u036f]/g, "");
 
   const productosFiltrados = articulosFamilia
-    .filter(
-      (a) =>
-        !cocinaSearch.trim() ||
-        normalizar(a.articulo).includes(normalizar(cocinaSearch)),
-    )
-    .slice(0, 10);
+    .filter((a) => {
+      if (!cocinaSearch.trim()) return true;
+      const q = normalizar(cocinaSearch);
+      return (
+        normalizar(a.articulo).includes(q) ||
+        normalizar(a.codartint ?? a.CODARTINT ?? "").includes(q)
+      );
+    })
+    .slice(0, 30);
 
   // Para ítems ya guardados sin `area` (guardados antes de que se
   // empezara a persistir esa columna): busca el área del artículo por
@@ -140,14 +167,26 @@ export default function TabCocina({
   // guardado/recarga previo.
   const resolverAreaItem = (fila) => {
     if (fila.area != null) return fila.area;
+    // Prioridad 1: codartint. Es estable aunque el nombre del artículo se
+    // haya editado en el catálogo después de guardado el presupuesto (ej.
+    // "...2 Pta" -> "...2 Ptas"), a diferencia del match por nombre exacto
+    // de abajo, que rompe con cualquier diferencia de un carácter.
     // fila.nombreart es el nombre REAL del catálogo (columna "Articulo" en
     // la tabla); fila.articulo es el nombre que quedó guardado como
     // display y puede diferir (ej. otra medida del mismo modelo). Por eso
-    // se prioriza nombreart en el match — comparar solo por fila.articulo
-    // hacía fallar el matching en varios ítems ya guardados.
-    const match = articulosFamilia.find(
-      (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
-    );
+    // se prioriza nombreart en el match por nombre — comparar solo por
+    // fila.articulo hacía fallar el matching en varios ítems ya guardados.
+    const matchPorCodigo = fila.codartint
+      ? articulosFamilia.find(
+          (a) =>
+            String(a.codartint ?? a.CODARTINT ?? "") === String(fila.codartint),
+        )
+      : null;
+    const match =
+      matchPorCodigo ??
+      articulosFamilia.find(
+        (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
+      );
     return match ? (match.area ?? match.AREA ?? null) : null;
   };
 
@@ -156,9 +195,23 @@ export default function TabCocina({
   // en el catálogo). Se usa para clasificar el ítem como "ESQ" en
   // tipoAccesorioParaItem (ver arriba del archivo).
   const resolverProveedorItem = (fila) => {
-    const match = articulosFamilia.find(
-      (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
-    );
+    // Mismo criterio que resolverAreaItem: codartint primero (estable),
+    // nombre exacto como fallback. Antes matcheaba solo por nombre, así
+    // que un artículo renombrado en el catálogo (ej. "...2 Pta" ->
+    // "...2 Ptas") dejaba esto en null, y como tipoAccesorioParaItem exige
+    // proveedor === "DANIEL ROQUE SRL" para clasificar un Esquinero Bajo
+    // como "ESQ", el popover de accesorios quedaba sin filtrar.
+    const matchPorCodigo = fila.codartint
+      ? articulosFamilia.find(
+          (a) =>
+            String(a.codartint ?? a.CODARTINT ?? "") === String(fila.codartint),
+        )
+      : null;
+    const match =
+      matchPorCodigo ??
+      articulosFamilia.find(
+        (a) => a.articulo === fila.nombreart || a.articulo === fila.articulo,
+      );
     return match ? (match.proveedor ?? match.PROVEEDOR ?? null) : null;
   };
 
@@ -210,6 +263,23 @@ export default function TabCocina({
     setCocinaEditIdx(idx);
   };
 
+  // Pedido de edición llegado desde la pestaña Presupuesto (ver
+  // editarItemCocinaDesdePresupuesto en PresupuestoNuevo.jsx). El padre ya
+  // hizo setCocinaFamilia(familia) en el mismo click, así que para cuando
+  // este efecto corre cocinaFamilia ya está actualizada.
+  useEffect(() => {
+    if (!cocinaItemAEditar) return;
+    const { familia, idx } = cocinaItemAEditar;
+    if (familia !== cocinaFamilia) return;
+    const fila = cocinaItems[familia]?.[idx];
+    if (fila) {
+      setCocinaFila({ ...fila });
+      setCocinaSearch(fila.articulo);
+      setCocinaEditIdx(idx);
+    }
+    setCocinaItemAEditar(null);
+  }, [cocinaItemAEditar, cocinaFamilia, cocinaItems]);
+
   const cocina_total = (familia) =>
     cocinaItems[familia]?.reduce(
       (s, r) => s + (parseFloat(r.precio) || 0) * (parseFloat(r.cantidad) || 0),
@@ -230,19 +300,35 @@ export default function TabCocina({
   if (!cocinaFamilia) {
     return (
       <div>
-        {hayItemsCocina && (
-          <div
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 20,
+            padding: "12px 16px",
+            background: "#f5f9fc",
+            border: "1px solid #c8dae8",
+            borderRadius: 3,
+          }}
+        >
+          <button
+            onClick={() => setMostrarImportarSketchUp(true)}
+            title="Carga el .json exportado desde SketchUp (Extensiones → Integral → Exportar proyecto a JSON) y agrega los muebles a Bajomesada / Alacena."
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 20,
-              padding: "12px 16px",
-              background: "#f5f9fc",
-              border: "1px solid #c8dae8",
-              borderRadius: 3,
+              padding: "7px 18px",
+              background: "#0a5c3a",
+              color: "#fff",
+              border: "none",
+              borderRadius: 2,
+              fontFamily: "'Space Mono',monospace",
+              fontSize: 12,
+              cursor: "pointer",
             }}
           >
+            📥 Importar de SketchUp
+          </button>
+          {hayItemsCocina && (
             <button
               onClick={() => aplicarFrenoATodosCocina?.()}
               title="Le pega el accesorio de freno que corresponda (puerta o cajonera) a cada ítem de Bajomesada y Alacena, según su nombre. No afecta a Placard."
@@ -259,7 +345,17 @@ export default function TabCocina({
             >
               🛑 Aplicar freno a toda la Cocina
             </button>
-          </div>
+          )}
+        </div>
+        {mostrarImportarSketchUp && (
+          <ImportarSketchUp
+            authFetch={authFetch}
+            lineasActivas={lineasActivas}
+            aplicarPorcentaje={aplicarPorcentaje}
+            recalcFila={recalcFila}
+            setCocinaItems={setCocinaItems}
+            onClose={() => setMostrarImportarSketchUp(false)}
+          />
         )}
         <div
           style={{
@@ -498,6 +594,39 @@ export default function TabCocina({
                   textAlign: "center",
                   border: "1px solid #c8dae8",
                   fontWeight: 700,
+                  width: 70,
+                }}
+              >
+                Ancho
+              </th>
+              <th
+                style={{
+                  padding: "8px 12px",
+                  textAlign: "center",
+                  border: "1px solid #c8dae8",
+                  fontWeight: 700,
+                  width: 70,
+                }}
+              >
+                Alto
+              </th>
+              <th
+                style={{
+                  padding: "8px 12px",
+                  textAlign: "center",
+                  border: "1px solid #c8dae8",
+                  fontWeight: 700,
+                  width: 70,
+                }}
+              >
+                Prof.
+              </th>
+              <th
+                style={{
+                  padding: "8px 12px",
+                  textAlign: "center",
+                  border: "1px solid #c8dae8",
+                  fontWeight: 700,
                   width: 90,
                 }}
               >
@@ -652,6 +781,48 @@ export default function TabCocina({
                                   // guardar y para calcular el cargo por
                                   // accesorios en recalcFila.
                                   const area = p.area ?? p.AREA ?? null;
+                                  // Medidas + código de fórmula interno del
+                                  // catálogo, mismo patrón que
+                                  // PlacardSection.jsx — punto de partida;
+                                  // no hay input para editarlos a mano en
+                                  // Cocina (a diferencia de Placard), así
+                                  // que quedan tal cual vienen del artículo.
+                                  const codartint =
+                                    p.codartint ?? p.CODARTINT ?? null;
+                                  const anchoCatalogo =
+                                    p.ancho ?? p.ANCHO ?? null;
+                                  const altoCatalogo =
+                                    p.alto ?? p.ALTO ?? null;
+                                  // Profundidad: mismo patrón que ancho/alto
+                                  // — viene del catálogo, en caso de tener
+                                  // valor cargado (si no, queda null y el
+                                  // backend usa su propio respaldo).
+                                  const profundidadCatalogo =
+                                    p.profundidad ?? p.PROFUNDIDAD ?? null;
+                                  // codartint/ancho/alto reales por línea
+                                  // (backend agrupa varias líneas —Nº 0..22—
+                                  // bajo un mismo artículo; cada una tiene su
+                                  // propio codartint/ancho/alto). Igual que el
+                                  // precio ya se resuelve con lineasActivas[0]
+                                  // (precioUsar arriba), acá se resuelve el
+                                  // código/medidas contra esa MISMA línea —
+                                  // antes quedaba fijo al valor "pisado" que
+                                  // manda el backend (la última fila que
+                                  // procesa su forEach, sin relación con la
+                                  // línea realmente activa en el presupuesto).
+                                  const lineaActiva = lineasActivas[0]?.linea;
+                                  const codartintResuelto =
+                                    p.codartintPorLinea?.[String(lineaActiva)] ??
+                                    codartint;
+                                  const anchoResuelto =
+                                    p.anchoPorLinea?.[String(lineaActiva)] ??
+                                    anchoCatalogo;
+                                  const altoResuelto =
+                                    p.altoPorLinea?.[String(lineaActiva)] ??
+                                    altoCatalogo;
+                                  const profundidadResuelta =
+                                    p.profundidadPorLinea?.[String(lineaActiva)] ??
+                                    profundidadCatalogo;
                                   setCocinaFila((f) => ({
                                     ...f,
                                     articulo: base,
@@ -661,6 +832,10 @@ export default function TabCocina({
                                     precios,
                                     preciosBase,
                                     area,
+                                    codartint: codartintResuelto,
+                                    ancho: anchoResuelto,
+                                    alto: altoResuelto,
+                                    profundidad: profundidadResuelta,
                                   }));
                                   setCocinaSearch(base);
                                 }}
@@ -699,6 +874,78 @@ export default function TabCocina({
                         setCocinaFila((f) => ({
                           ...f,
                           cantidad: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "100%",
+                        textAlign: "center",
+                        fontFamily: "'Space Mono',monospace",
+                        fontSize: 12,
+                        border: "1px solid #7aaac8",
+                        padding: "4px 4px",
+                        borderRadius: 2,
+                      }}
+                    />
+                  </td>
+                  <td
+                    style={{ padding: "6px 8px", border: "1px solid #c8dae8" }}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      value={cocinaFila.ancho ?? ""}
+                      onChange={(e) =>
+                        setCocinaFila((f) => ({
+                          ...f,
+                          ancho: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "100%",
+                        textAlign: "center",
+                        fontFamily: "'Space Mono',monospace",
+                        fontSize: 12,
+                        border: "1px solid #7aaac8",
+                        padding: "4px 4px",
+                        borderRadius: 2,
+                      }}
+                    />
+                  </td>
+                  <td
+                    style={{ padding: "6px 8px", border: "1px solid #c8dae8" }}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      value={cocinaFila.alto ?? ""}
+                      onChange={(e) =>
+                        setCocinaFila((f) => ({
+                          ...f,
+                          alto: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "100%",
+                        textAlign: "center",
+                        fontFamily: "'Space Mono',monospace",
+                        fontSize: 12,
+                        border: "1px solid #7aaac8",
+                        padding: "4px 4px",
+                        borderRadius: 2,
+                      }}
+                    />
+                  </td>
+                  <td
+                    style={{ padding: "6px 8px", border: "1px solid #c8dae8" }}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      value={cocinaFila.profundidad ?? ""}
+                      onChange={(e) =>
+                        setCocinaFila((f) => ({
+                          ...f,
+                          profundidad: e.target.value,
                         }))
                       }
                       style={{
@@ -771,21 +1018,33 @@ export default function TabCocina({
                           tipoAccesorioParaItem(fila, resolverProveedorItem(fila)),
                         )
                       }
-                      title="Agregar/quitar accesorios (autofreno, led, etc)"
+                      title={
+                        fila._accesoriosSinResolver
+                          ? "⚠️ Este ítem tiene un accesorio guardado en la base que no se pudo encontrar en el catálogo (código huérfano o catálogo sin cargar todavía). El precio y/o la lista mostrada pueden estar incompletos — revisar antes de confiar en este total."
+                          : "Agregar/quitar accesorios (autofreno, led, etc)"
+                      }
                       style={{
                         padding: "4px 8px",
-                        background: fila.accesorios?.length
-                          ? "#0a5c3a"
-                          : "#fff",
-                        color: fila.accesorios?.length ? "#fff" : "#0a3a5c",
-                        border: "1px solid #7aaac8",
+                        background: fila._accesoriosSinResolver
+                          ? "#b03a2e"
+                          : fila.accesorios?.length
+                            ? "#0a5c3a"
+                            : "#fff",
+                        color:
+                          fila._accesoriosSinResolver || fila.accesorios?.length
+                            ? "#fff"
+                            : "#0a3a5c",
+                        border: fila._accesoriosSinResolver
+                          ? "1px solid #7a2015"
+                          : "1px solid #7aaac8",
                         borderRadius: 2,
                         fontFamily: "'Space Mono',monospace",
                         fontSize: 11,
                         cursor: "pointer",
                       }}
                     >
-                      🔧 {fila.accesorios?.length ?? 0}
+                      {fila._accesoriosSinResolver ? "⚠️ " : "🔧 "}
+                      {fila.accesorios?.length ?? 0}
                     </button>
                   </td>
                   {lineasActivas.length > 0 ? (
@@ -1033,6 +1292,36 @@ export default function TabCocina({
                   </td>
                   <td
                     style={{
+                      padding: "8px 12px",
+                      border: "1px solid #c8dae8",
+                      textAlign: "center",
+                      color: "#334155",
+                    }}
+                  >
+                    {fila.ancho || "—"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "8px 12px",
+                      border: "1px solid #c8dae8",
+                      textAlign: "center",
+                      color: "#334155",
+                    }}
+                  >
+                    {fila.alto || "—"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "8px 12px",
+                      border: "1px solid #c8dae8",
+                      textAlign: "center",
+                      color: "#334155",
+                    }}
+                  >
+                    {fila.profundidad || "—"}
+                  </td>
+                  <td
+                    style={{
                       padding: "6px 8px",
                       border: "1px solid #c8dae8",
                       textAlign: "center",
@@ -1062,21 +1351,33 @@ export default function TabCocina({
                           tipoAccesorioParaItem(fila, resolverProveedorItem(fila)),
                         )
                       }
-                      title="Agregar/quitar accesorios (autofreno, led, etc)"
+                      title={
+                        fila._accesoriosSinResolver
+                          ? "⚠️ Este ítem tiene un accesorio guardado en la base que no se pudo encontrar en el catálogo (código huérfano o catálogo sin cargar todavía). El precio y/o la lista mostrada pueden estar incompletos — revisar antes de confiar en este total."
+                          : "Agregar/quitar accesorios (autofreno, led, etc)"
+                      }
                       style={{
                         padding: "4px 8px",
-                        background: fila.accesorios?.length
-                          ? "#0a5c3a"
-                          : "#fff",
-                        color: fila.accesorios?.length ? "#fff" : "#0a3a5c",
-                        border: "1px solid #c8dae8",
+                        background: fila._accesoriosSinResolver
+                          ? "#b03a2e"
+                          : fila.accesorios?.length
+                            ? "#0a5c3a"
+                            : "#fff",
+                        color:
+                          fila._accesoriosSinResolver || fila.accesorios?.length
+                            ? "#fff"
+                            : "#0a3a5c",
+                        border: fila._accesoriosSinResolver
+                          ? "1px solid #7a2015"
+                          : "1px solid #c8dae8",
                         borderRadius: 2,
                         fontFamily: "'Space Mono',monospace",
                         fontSize: 11,
                         cursor: "pointer",
                       }}
                     >
-                      🔧 {fila.accesorios?.length ?? 0}
+                      {fila._accesoriosSinResolver ? "⚠️ " : "🔧 "}
+                      {fila.accesorios?.length ?? 0}
                     </button>
                   </td>
                   {lineasActivas.length > 0 ? (
@@ -1292,7 +1593,7 @@ export default function TabCocina({
             {/* Fila de total */}
             <tr style={{ background: "#e8f4ee" }}>
               <td
-                colSpan={4}
+                colSpan={7}
                 style={{
                   padding: "8px 12px",
                   border: "1px solid #c8dae8",
@@ -1509,6 +1810,28 @@ export default function TabCocina({
                           // articulos): se usa como cantidad (cantacc) del
                           // accesorio de freno al guardar.
                           const area = p.area ?? p.AREA ?? null;
+                          const codartint =
+                            p.codartint ?? p.CODARTINT ?? null;
+                          const anchoCatalogo = p.ancho ?? p.ANCHO ?? null;
+                          const altoCatalogo = p.alto ?? p.ALTO ?? null;
+                          const profundidadCatalogo =
+                            p.profundidad ?? p.PROFUNDIDAD ?? null;
+                          // codartint/ancho/alto por línea real: ver
+                          // comentario en el otro buscador de artículo de
+                          // Cocina (más arriba en este archivo).
+                          const lineaActiva = lineasActivas[0]?.linea;
+                          const codartintResuelto =
+                            p.codartintPorLinea?.[String(lineaActiva)] ??
+                            codartint;
+                          const anchoResuelto =
+                            p.anchoPorLinea?.[String(lineaActiva)] ??
+                            anchoCatalogo;
+                          const altoResuelto =
+                            p.altoPorLinea?.[String(lineaActiva)] ??
+                            altoCatalogo;
+                          const profundidadResuelta =
+                            p.profundidadPorLinea?.[String(lineaActiva)] ??
+                            profundidadCatalogo;
                           setCocinaFila((f) => ({
                             ...f,
                             articulo: base,
@@ -1518,6 +1841,10 @@ export default function TabCocina({
                             precios,
                             preciosBase,
                             area,
+                            codartint: codartintResuelto,
+                            ancho: anchoResuelto,
+                            alto: altoResuelto,
+                            profundidad: profundidadResuelta,
                           }));
                           setCocinaSearch(base);
                         }}
@@ -1592,6 +1919,105 @@ export default function TabCocina({
                 onChange={(e) =>
                   setCocinaFila((f) => ({ ...f, cantidad: e.target.value }))
                 }
+                style={{
+                  width: "100%",
+                  textAlign: "center",
+                  fontFamily: "'Space Mono',monospace",
+                  fontSize: 12,
+                  border: "1px solid #b8cfe0",
+                  padding: "6px 6px",
+                  borderRadius: 2,
+                }}
+              />
+            </div>
+
+            {/* Ancho */}
+            <div style={{ flex: "0 0 80px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "#6699bb",
+                  marginBottom: 4,
+                }}
+              >
+                Ancho
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={cocinaFila.ancho ?? ""}
+                onChange={(e) =>
+                  setCocinaFila((f) => ({ ...f, ancho: e.target.value }))
+                }
+                placeholder="—"
+                style={{
+                  width: "100%",
+                  textAlign: "center",
+                  fontFamily: "'Space Mono',monospace",
+                  fontSize: 12,
+                  border: "1px solid #b8cfe0",
+                  padding: "6px 6px",
+                  borderRadius: 2,
+                }}
+              />
+            </div>
+
+            {/* Alto */}
+            <div style={{ flex: "0 0 80px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "#6699bb",
+                  marginBottom: 4,
+                }}
+              >
+                Alto
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={cocinaFila.alto ?? ""}
+                onChange={(e) =>
+                  setCocinaFila((f) => ({ ...f, alto: e.target.value }))
+                }
+                placeholder="—"
+                style={{
+                  width: "100%",
+                  textAlign: "center",
+                  fontFamily: "'Space Mono',monospace",
+                  fontSize: 12,
+                  border: "1px solid #b8cfe0",
+                  padding: "6px 6px",
+                  borderRadius: 2,
+                }}
+              />
+            </div>
+
+            {/* Prof. */}
+            <div style={{ flex: "0 0 80px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "#6699bb",
+                  marginBottom: 4,
+                }}
+              >
+                Prof.
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={cocinaFila.profundidad ?? ""}
+                onChange={(e) =>
+                  setCocinaFila((f) => ({
+                    ...f,
+                    profundidad: e.target.value,
+                  }))
+                }
+                placeholder="—"
                 style={{
                   width: "100%",
                   textAlign: "center",
