@@ -35,6 +35,7 @@ import TareasOperarios from "./screens/TareasOperarios";
 import FlujoFondos from "./screens/FlujoFondos";
 import Herramientas from "./screens/Herramientas";
 import PlanoMamparas from "./screens/PlanoMamparas";
+import SimulacionPlacard from "./screens/SimulacionPlacard";
 import ActionButton from "./Component/ActionButton";
 import Login from "./screens/Login";
 import { useEffect, useState, useRef } from "react";
@@ -76,6 +77,7 @@ const SCREENS = {
   "flujo-fondos": { label: "FLUJO DE FONDOS", icon: "💵" },
   "tareas-operarios": { label: "TAREAS OPERARIOS", icon: "👷" },
   herramientas: { label: "HERRAMIENTAS", icon: "🛠️" },
+  "simulacion-placard": { label: "SIMULACIÓN PLACARD", icon: "🚪" },
   chat: { label: "CHAT", icon: "💬" },
 };
 
@@ -104,6 +106,7 @@ const PANTALLAS_MENU = [
   { id: "visor-dwg", label: "VISOR 3D MÓDULOS", icon: "📐", color: "#00838f", ubicacionDefault: "lateral" },
   { id: "sketchup", label: "SKETCHUP", icon: "🧊", color: "#ff8c42", ubicacionDefault: "principal" },
   { id: "herramientas", label: "HERRAMIENTAS", icon: "🛠️", color: "#607d8b", ubicacionDefault: "principal" },
+  { id: "simulacion-placard", label: "SIMULACIÓN PLACARD", icon: "🚪", color: "#963c28", ubicacionDefault: "principal" },
   { id: "chat", label: "CHAT", icon: "💬", color: "#25d366", ubicacionDefault: "principal" },
   { id: "tareas-operarios", label: "TAREAS OPERARIOS", icon: "👷", color: "#f59e0b", ubicacionDefault: "principal" },
   { id: "presupuesto-mamparas", label: "PRESUPUESTO MAMPARAS", icon: "🪟", color: "#4895ef", ubicacionDefault: "lateral" },
@@ -1508,6 +1511,9 @@ function App() {
             {screen === "flujo-fondos" && (
               <FlujoFondos token={token} authFetch={authFetch} onBack={() => setScreen(null)} />
             )}
+
+            {/* ── Simulación de placard (puertas corredizas en planta, chequeo y PDF) ── */}
+            {screen === "simulacion-placard" && <SimulacionPlacard />}
 
             {/* ── Herramientas (Rotar BPP / DXF) ── */}
             {screen === "herramientas" && <Herramientas onBack={() => setScreen(null)} />}
