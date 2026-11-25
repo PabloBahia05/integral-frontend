@@ -5,7 +5,7 @@ import ScreenHeader from "../Component/ScreenHeader";
 import StatCards from "../Component/StatCards";
 import ConfirmDelete from "../Component/ConfirmDelete";
 import Modal from "../Component/Modal";
-import FotosPresupuestoModal from "./FotosPresupuestoModal"; // está en screens/, no en Component/
+import FotosPresupuestoModal from "../Component/FotosPresupuestoModal"; // está en screens/, no en Component/
 import {
   API,
   COLS_ENCABEZADO,
