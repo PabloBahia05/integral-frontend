@@ -15,10 +15,14 @@ const fmt = (n) => (Number.isInteger(n) ? String(n) : Number(n).toFixed(1));
 // Si en tu tabla están cargados para la izquierda, cambiá esta constante a "IZQUIERDA".
 const LADO_BASE_MANIJON = "DERECHA";
 
+// La mano de la puerta aplica a todo salvo a la corrediza sin paño fijo (IM6001: un vidrio solo).
+// La corrediza con paño fijo (IM6002-A) sí la usa: define de qué lado va la puerta y su tirador.
+const usaMano = (config, fijos) => config !== "CORREDIZA" || Number(fijos) > 0;
+
 // El "Agujero tirador" del vidrio 8mm viene del plano con la manija a la derecha (x = W - 50).
 // Con puerta a la izquierda se espeja: la distancia al lateral izq. pasa a ser la del der. y viceversa.
 function aplicarLado(data, lado) {
-  const l = lado === "IZQUIERDA" && data.plano?.config !== "CORREDIZA" ? "IZQUIERDA" : "DERECHA";
+  const l = lado === "IZQUIERDA" && usaMano(data.plano?.config, data.plano?.fijos) ? "IZQUIERDA" : "DERECHA";
   if (l === "DERECHA") return orientarBisagras({ ...data, lado: l });
   return orientarBisagras({
     ...data,
@@ -184,7 +188,7 @@ function dibujarPlano(d) {
   doc.setFont("helvetica", "normal");
   doc.text(
     `Modelo: ${m.modelo ?? "-"}${
-      d.lado && plano.config !== "CORREDIZA" ? `   |   Puerta y manija: ${d.lado}` : ""
+      d.lado && usaMano(plano.config, plano.fijos) ? `   |   Puerta y manija: ${d.lado}` : ""
     }   |   Manijon: ${
       d.manija ? `${d.manija.codartprov ? `${d.manija.codartprov} - ` : ""}${d.manija.articulo}` : "sin manijon"
     }`,
@@ -594,7 +598,8 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
   const [repAncho, setRepAncho] = useState("");
   const [repMsg, setRepMsg] = useState("");
   const esEsmerilado = /esmerilado/i.test(String(sel?.modelo ?? ""));
-  const [planoConfig, setPlanoConfig] = useState(null); // RECTA | ESQUINA | CORREDIZA (la corrediza no usa mano)
+  const [planoConfig, setPlanoConfig] = useState(null); // RECTA | ESQUINA | CORREDIZA
+  const [planoFijos, setPlanoFijos] = useState(null); // corrediza con paño fijo (IM6002-A) usa mano; sin fijo (IM6001) no
 
   const cargarModelos = async () => {
     try {
@@ -763,6 +768,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     setSobrealtoDef(null);
     setSobrealto("");
     setPlanoConfig(null);
+    setPlanoFijos(null);
     setFranjasMsg("");
     setRepartoInfo(null);
     setRepPieza("PUERTA");
@@ -774,7 +780,10 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
     authFetch(`${API}/mamparas-plano/${sel.id}/config?tipo=${sel.tipo ?? "mampara"}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((c) => {
-        if (c) setPlanoConfig(c.config ?? null);
+        if (c) {
+          setPlanoConfig(c.config ?? null);
+          setPlanoFijos(c.fijos ?? null);
+        }
         if (c?.reparto) setRepartoInfo(c.reparto);
         if (c && c.sobrealto_def != null) {
           setSobrealtoDef(c.sobrealto_def);
@@ -938,7 +947,7 @@ export default function PlanoMamparas({ authFetch, API, onBack }) {
             <p style={{ margin: "0 0 10px", fontSize: 13, color: "#555" }}>
               Plano de <b>{sel?.modelo}</b>. Elegí el manijón que va en esta mampara.
             </p>
-            {planoConfig !== "CORREDIZA" && (
+            {usaMano(planoConfig, planoFijos) && (
               <label style={{ fontSize: 13, display: "block", marginBottom: 8 }}>
                 <b>Mano de la puerta</b>{" "}
                 <select value={lado} onChange={(e) => cambiarLado(e.target.value)}>
