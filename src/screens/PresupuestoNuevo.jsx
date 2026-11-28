@@ -12,7 +12,11 @@ import PresupuestoDespensero from "./PresupuestoDespensero";
 import TabMampara from "./TabMampara";
 import TabPuertas from "./TabPuertas";
 import TabEspeciales from "./TabEspeciales";
-import PanelImportados, { codigoDeArticulo, SEP_CODIGO } from "./ImportarModulos";
+import PanelImportados, {
+  codigoDeFila,
+  precioBaseProducto,
+  SEP_CODIGO,
+} from "./ImportarModulos";
 import TabCocina from "./TabCocina";
 import TablaArticulos from "./TablaArticulos";
 import PlacardSection from "./PlacardSection";
@@ -1588,14 +1592,53 @@ export default function PresupuestoNuevo({
       ...(cocinaItems?.alacenas ?? []),
       ...(placardItems?.placard ?? []),
     ]
-      .map((f) => codigoDeArticulo(f.articulo))
+      .map((f) => codigoDeFila(f))
       .filter(Boolean),
   );
 
   // Convierte un módulo revisado en una fila de Cocina / Placard (mismo formato
-  // que arma cargarPresupuesto al leer un presupuesto guardado). Precio 0: se
-  // cotiza después con el popover de precio como cualquier ítem.
+  // que arma cargarPresupuesto al leer un presupuesto guardado).
+  //  - Sin producto del catálogo: articulo = "C2 · Nombre", precio 0.
+  //  - Con producto: igual que elegirlo en el buscador de la solapa
+  //    (TabCocina / PlacardSection): articulo = nombre del catálogo (así
+  //    "Actualizar" y el cambio de líneas lo siguen encontrando), precios por
+  //    línea activa con % de lista, área y codartint del catálogo, y después
+  //    recalcFila. Las medidas son las del módulo, no las del catálogo.
   const filaDesdeImportado = (m) => {
+    const fila = filaImportadaSinProducto(m);
+    const prod = m.producto;
+    if (!prod) return fila;
+    const esPlacard = m.destino === "placard";
+    const preciosBase = lineasActivas.map((l) => ({
+      linea: l.linea,
+      precioBase: precioBaseProducto(prod, m.destino, l.linea),
+    }));
+    const precios = preciosBase.map((pb) => ({
+      linea: pb.linea,
+      precioBase: pb.precioBase,
+      precio: aplicarPorcentaje(pb.precioBase),
+    }));
+    const lineaActiva = lineasActivas[0]?.linea;
+    let precioBaseUsar = preciosBase[0]?.precioBase ?? "";
+    if (esPlacard && (precioBaseUsar === "" || precioBaseUsar == null))
+      precioBaseUsar = precioBaseProducto(prod, "placard", "15");
+    const nombreModulo = `${m.codigo}${SEP_CODIGO}${m.nombre}`;
+    return recalcFila({
+      ...fila,
+      articulo: prod.articulo,
+      nombreart: m.detalle ? `${nombreModulo} | ${m.detalle}` : nombreModulo,
+      precio: String(precios[0]?.precio ?? ""),
+      precioBase: String(precioBaseUsar ?? ""),
+      precios,
+      preciosBase,
+      ...(esPlacard ? { precioPlacard: String(prod.precio_un ?? "") } : {}),
+      area: prod.area ?? null,
+      codartint:
+        prod.codartintPorLinea?.[String(lineaActiva)] ?? prod.codartint ?? null,
+    });
+  };
+
+  const filaImportadaSinProducto = (m) => {
     const cantidad = Number(m.cantidad) || 1;
     const precios = lineasActivas.map((l) => ({
       linea: l.linea,
@@ -1641,8 +1684,8 @@ export default function PresupuestoNuevo({
   const mezclarPorCodigo = (actuales = [], nuevas) => {
     const res = [...actuales];
     nuevas.forEach((fila) => {
-      const cod = codigoDeArticulo(fila.articulo);
-      const i = res.findIndex((x) => codigoDeArticulo(x.articulo) === cod);
+      const cod = codigoDeFila(fila);
+      const i = res.findIndex((x) => codigoDeFila(x) === cod);
       if (i >= 0) res[i] = fila;
       else res.push(fila);
     });
@@ -4576,6 +4619,10 @@ export default function PresupuestoNuevo({
               setPendientes={setImportPend}
               yaPasados={codigosEnSolapas}
               onPasar={pasarImportados}
+              authFetch={authFetch}
+              api={API}
+              lineasActivas={lineasActivas}
+              aplicarPorcentaje={aplicarPorcentaje}
             />
           )}
 

@@ -3,6 +3,9 @@
 // Cocina (Bajomesada / Alacena) y Placard. NO pasan directo a presupuesto:
 //   1. Se importan como "pendientes" y se ven en la solapa que les toca.
 //   2. Ahí se editan y corrigen (nombre, detalle, cantidad, medidas, altura desde el piso, destino).
+//      En "Producto del catálogo" se elige el artículo con un filtro (varias palabras, por
+//      nombre o código). Con producto elegido el ítem toma el precio de la lista como si se
+//      cargara a mano en la solapa; sin producto pasa con precio 0.
 //   3. "Guardar y pasar a presupuesto" los agrega a la familia de la solapa
 //      (cocinaItems / placardItems). Desde ahí se sincronizan con la tabla del presupuesto
 //      como cualquier otro ítem de Cocina o Placard.
@@ -11,7 +14,7 @@
 //   - Si el nombre o el ambiente dice "placard" o "vestidor"        -> Placard / Vestidor
 //   - Si arranca en el piso o a menos de 15 cm del piso (desde_piso) -> Cocina · Bajomesada
 //   - El resto                                                       -> Cocina · Alacena
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export const LIMITE_BAJOMESADA_CM = 15;
 
@@ -30,11 +33,50 @@ const numOrNull = (v) => {
 // El código del módulo va al principio del artículo ("C2 · Bajo mesada 3 cuerpos").
 // Con eso se reconoce si un módulo ya se pasó a la solapa.
 export const SEP_CODIGO = " · ";
-export const codigoDeArticulo = (articulo) => {
-  const s = String(articulo ?? "");
-  const i = s.indexOf(SEP_CODIGO);
-  return i > 0 ? s.slice(0, i) : null;
+// Sin producto: articulo = "C2 · Bajo mesada 3 cuerpos".
+// Con producto: articulo = nombre del catálogo (para que "Actualizar" lo encuentre)
+// y el código va al principio de nombreart ("C2 · Bajo mesada 3 cuerpos | ...").
+const RE_CODIGO = /^(\S{1,10}) · /;
+export const codigoDeFila = (fila) =>
+  RE_CODIGO.exec(String(fila?.nombreart ?? ""))?.[1] ??
+  RE_CODIGO.exec(String(fila?.articulo ?? ""))?.[1] ??
+  null;
+
+// Familias del catálogo que se consultan (mismo nombre en BD que usan TabCocina y useCocinaPlacard)
+export const FAMILIA_BD = { bajomesadas: "Bajomesada", alacenas: "Alacena", placard: "PLACARD" };
+const LINEA_FIJA_PLACARD = "15";
+
+const normalizar = (s) =>
+  String(s ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+// Lo que se guarda del artículo elegido (va al navegador junto con el pendiente)
+const resumenProducto = (a, familia) => ({
+  articulo: a.articulo,
+  nombreart: a.nombreart ?? a.NOMBREART ?? null,
+  precios: a.precios ?? {},
+  precio_un: a.precio_un ?? a.PRECIO_UN ?? null,
+  area: a.area ?? a.AREA ?? null,
+  codartint: a.codartint ?? a.CODARTINT ?? null,
+  codartintPorLinea: a.codartintPorLinea ?? null,
+  familia,
+});
+
+// Precio base de una línea, con el mismo respaldo que usa cada solapa
+// (Placard cae a la línea 15 si la línea activa no tiene precio).
+export const precioBaseProducto = (prod, destino, linea) => {
+  if (!prod) return "";
+  let b = prod.precios?.[String(linea)] ?? "";
+  if ((b === "" || b == null) && destino === "placard") b = prod.precios?.[LINEA_FIJA_PLACARD] ?? "";
+  return b ?? "";
 };
+
+const pesos = (v) =>
+  `$${(parseFloat(v) || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function destinoDe(m) {
   const txt = `${m.nombre ?? ""} ${m.ambiente ?? ""}`.toLowerCase();
@@ -75,6 +117,7 @@ const aPendiente = (m, obra) => ({
   destino: destinoDe(m),
   destinoManual: false,
   nota: m.fuente_medida ?? "",
+  producto: null,
 });
 
 // ───────────────────────── estilos ─────────────────────────
@@ -214,8 +257,108 @@ function ModalImportar({ onCerrar, onCargar, pendientes, yaPasados }) {
   );
 }
 
+// ───────────────────────── buscador de producto (por fila) ─────────────────────────
+function BuscadorProducto({ fila, listas, cargando, precioDe, onElegir, onQuitar, onCopiar, haySeleccion }) {
+  const [q, setQ] = useState("");
+  const [abierto, setAbierto] = useState(false);
+
+  if (fila.producto) {
+    const pr = precioDe(fila.producto, fila.destino);
+    return (
+      <div style={{ fontSize: 12 }}>
+        <div style={{ fontWeight: 600, color: "#0a3a5c" }}>{fila.producto.articulo}</div>
+        <div style={{ color: pr.sinPrecio ? "#b71c1c" : "#2e7d32" }}>
+          {pr.sinPrecio ? `Sin precio en línea ${pr.linea ?? "(no hay líneas activas)"}` : `${pesos(pr.precio)} c/u`}
+        </div>
+        <button onClick={onQuitar} style={{ fontSize: 11, marginRight: 4 }} title="Quitar el producto (pasa con precio 0)">
+          ✕ Cambiar
+        </button>
+        {haySeleccion && (
+          <button onClick={onCopiar} style={{ fontSize: 11 }} title="Pone este mismo producto en las filas tildadas de esta solapa">
+            ⇣ A los tildados
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const palabras = normalizar(q).split(" ").filter(Boolean);
+  const coincide = (a) => {
+    const t = normalizar(`${a.articulo} ${a.codartint ?? a.CODARTINT ?? ""}`);
+    return palabras.every((w) => t.includes(w));
+  };
+  // Primero la familia del destino; si no hay nada ahí, las otras (ej. zócalos, cajoneras)
+  let fam = fila.destino;
+  let res = (listas[fila.destino] ?? []).filter(coincide);
+  if (!res.length && palabras.length) {
+    for (const [k, lista] of Object.entries(listas)) {
+      if (k === fila.destino) continue;
+      const r = (lista ?? []).filter(coincide);
+      if (r.length) {
+        res = r;
+        fam = k;
+        break;
+      }
+    }
+  }
+  const total = res.length;
+  res = res.slice(0, 40);
+
+  return (
+    <div style={{ fontSize: 12 }}>
+      <input
+        style={inp}
+        value={q}
+        placeholder={cargando ? "Cargando catálogo…" : "Filtrar productos…"}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setAbierto(true);
+        }}
+        onFocus={() => setAbierto(true)}
+        onBlur={() => setTimeout(() => setAbierto(false), 150)}
+      />
+      {!abierto && <div style={{ color: "#999", fontSize: 11 }}>Sin producto: pasa con precio 0</div>}
+      {abierto && (
+        <div style={{ border: "1px solid #b8cfe0", maxHeight: 180, overflowY: "auto", background: "#fff" }}>
+          {fam !== fila.destino && (
+            <div style={{ padding: "3px 8px", color: "#e65100", fontSize: 11 }}>
+              No hay en {DESTINOS[fila.destino].label}; resultados de {DESTINOS[fam].label}
+            </div>
+          )}
+          {res.length === 0 && <div style={{ padding: "4px 8px", color: "#999" }}>{cargando ? "Cargando…" : "Sin resultados"}</div>}
+          {res.map((a, i) => {
+            const pr = precioDe(a, fila.destino);
+            return (
+              <div
+                key={`${a.articulo}-${i}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onElegir(resumenProducto(a, fam));
+                  setQ("");
+                  setAbierto(false);
+                }}
+                style={{ padding: "4px 8px", cursor: "pointer", borderBottom: "1px solid #eef2f6", display: "flex", justifyContent: "space-between", gap: 8 }}
+                onMouseOver={(e) => (e.currentTarget.style.background = "#ddeefa")}
+                onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+              >
+                <span style={{ color: "#0a3a5c", fontWeight: 600 }}>{a.articulo}</span>
+                <span style={{ color: pr.sinPrecio ? "#b71c1c" : "#555", whiteSpace: "nowrap" }}>{pr.sinPrecio ? "s/precio" : pesos(pr.precio)}</span>
+              </div>
+            );
+          })}
+          {total > res.length && (
+            <div style={{ padding: "3px 8px", color: "#999", fontSize: 11 }}>
+              {total - res.length} más: escribí otra palabra para achicar la lista
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ───────────────────────── tabla de pendientes de una familia ─────────────────────────
-function TablaPendientes({ titulo, filas, seleccion, setSeleccion, cambiar, yaPasados }) {
+function TablaPendientes({ titulo, filas, seleccion, setSeleccion, cambiar, yaPasados, listas, cargando, precioDe, copiarProducto }) {
   if (!filas.length) return null;
   const todas = filas.every((f) => seleccion[f.uid]);
   return (
@@ -234,7 +377,7 @@ function TablaPendientes({ titulo, filas, seleccion, setSeleccion, cambiar, yaPa
                   onChange={(e) => setSeleccion((s) => ({ ...s, ...Object.fromEntries(filas.map((f) => [f.uid, e.target.checked])) }))}
                 />
               </th>
-              {["Ambiente", "Cód.", "Mueble", "Detalle (puertas, cajones, frente…)", "Cant.", "Ancho", "Alto", "Prof.", "Desde piso", "Va a"].map((h) => (
+              {["Ambiente", "Cód.", "Mueble", "Producto del catálogo", "Detalle (puertas, cajones, frente…)", "Cant.", "Ancho", "Alto", "Prof.", "Desde piso", "Va a"].map((h) => (
                 <th key={h} style={th}>{h}</th>
               ))}
             </tr>
@@ -256,7 +399,19 @@ function TablaPendientes({ titulo, filas, seleccion, setSeleccion, cambiar, yaPa
                   {yaPasados.has(f.codigo) && <div style={{ color: "#e65100", fontSize: 11 }}>Ya está en la solapa: al pasarlo se reemplaza</div>}
                   {f.nota && <div style={{ color: "#888", fontSize: 11 }} title={f.nota}>{f.nota}</div>}
                 </td>
-                <td style={{ ...td, minWidth: 260 }}>
+                <td style={{ ...td, minWidth: 230, maxWidth: 300 }}>
+                  <BuscadorProducto
+                    fila={f}
+                    listas={listas}
+                    cargando={cargando}
+                    precioDe={precioDe}
+                    onElegir={(producto) => cambiar(f.uid, { producto })}
+                    onQuitar={() => cambiar(f.uid, { producto: null })}
+                    onCopiar={() => copiarProducto(f.producto, f.uid)}
+                    haySeleccion={filas.some((x) => seleccion[x.uid] && x.uid !== f.uid)}
+                  />
+                </td>
+                <td style={{ ...td, minWidth: 200 }}>
                   <textarea style={{ ...inp, minHeight: 44, resize: "vertical" }} value={f.detalle} onChange={(e) => cambiar(f.uid, { detalle: e.target.value })} />
                 </td>
                 {["cantidad", "ancho", "alto", "profundidad", "desde_piso"].map((campo) => (
@@ -299,16 +454,55 @@ function TablaPendientes({ titulo, filas, seleccion, setSeleccion, cambiar, yaPa
 //   setPendientes  setter
 //   yaPasados      Set con los códigos que ya están en cocinaItems / placardItems
 //   onPasar(filas) agrega las filas a su familia (lo resuelve PresupuestoNuevo)
-export default function PanelImportados({ tab, pendientes, setPendientes, yaPasados, onPasar }) {
+//   authFetch, api  para traer el catálogo (/articulos/por-familia)
+//   lineasActivas   líneas del encabezado (el precio que se muestra es el de la primera)
+//   aplicarPorcentaje  % de la lista de precios activa
+export default function PanelImportados({ tab, pendientes, setPendientes, yaPasados, onPasar, authFetch, api, lineasActivas = [], aplicarPorcentaje }) {
   const [modal, setModal] = useState(false);
   const [seleccion, setSeleccion] = useState({});
   const [aviso, setAviso] = useState("");
+  // Catálogo de las tres familias: { bajomesadas: [...], alacenas: [...], placard: [...] }
+  const [listas, setListas] = useState({});
+  const [errorCatalogo, setErrorCatalogo] = useState("");
+  const hayPendientes = pendientes.length > 0;
+  useEffect(() => {
+    if (!hayPendientes || !authFetch) return;
+    Object.entries(FAMILIA_BD).forEach(([k, familia]) => {
+      if (listas[k]) return;
+      authFetch(`${api}/articulos/por-familia?familia=${encodeURIComponent(familia)}`)
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+        .then((d) => setListas((prev) => ({ ...prev, [k]: Array.isArray(d) ? d : [] })))
+        .catch((e) => {
+          setListas((prev) => ({ ...prev, [k]: [] }));
+          setErrorCatalogo(`No se pudo traer el catálogo de ${familia} (${e.message}).`);
+        });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hayPendientes]);
+  const cargandoCatalogo = Object.keys(FAMILIA_BD).some((k) => !listas[k]);
+
+  const lineaPrincipal = lineasActivas[0]?.linea ?? null;
+  const precioDe = (prod, destino) => {
+    const base = lineaPrincipal != null ? precioBaseProducto(prod, destino, lineaPrincipal) : "";
+    const sinPrecio = !(parseFloat(base) > 0);
+    return { linea: lineaPrincipal, sinPrecio, precio: sinPrecio ? 0 : aplicarPorcentaje ? aplicarPorcentaje(base) : base };
+  };
 
   const deEstaSolapa = pendientes.filter((f) => DESTINOS[f.destino]?.tab === tab);
   const otraSolapa = pendientes.length - deEstaSolapa.length;
   const elegidas = deEstaSolapa.filter((f) => seleccion[f.uid]);
 
   const cambiar = (uid, cambio) => setPendientes((prev) => prev.map((f) => (f.uid === uid ? { ...f, ...cambio } : f)));
+
+  // "⇣ A los tildados": mismo producto para todas las filas tildadas de esta solapa
+  const copiarProducto = (producto, desdeUid) => {
+    const destinoUids = new Set(deEstaSolapa.filter((f) => seleccion[f.uid] && f.uid !== desdeUid).map((f) => f.uid));
+    setPendientes((prev) => prev.map((f) => (destinoUids.has(f.uid) ? { ...f, producto } : f)));
+    setAviso(`Producto "${producto.articulo}" puesto en ${destinoUids.size} fila(s).`);
+  };
 
   const cargar = (nuevas) => {
     setPendientes((prev) => {
@@ -353,7 +547,14 @@ export default function PanelImportados({ tab, pendientes, setPendientes, yaPasa
     const uids = new Set(limpias.map((f) => f.uid));
     setPendientes((prev) => prev.filter((p) => !uids.has(p.uid)));
     setSeleccion({});
-    setAviso(`${limpias.length} módulo(s) guardados en la solapa y pasados a presupuesto, con precio 0. Ponéles precio desde la lista de abajo o desde Presupuesto.`);
+    const sinProducto = limpias.filter((f) => !f.producto).length;
+    const sinPrecio = limpias.filter((f) => f.producto && precioDe(f.producto, f.destino).sinPrecio).length;
+    setAviso(
+      `${limpias.length} módulo(s) guardados en la solapa y pasados a presupuesto.` +
+        (sinProducto ? ` ${sinProducto} sin producto quedaron en $0.` : "") +
+        (sinPrecio ? ` ${sinPrecio} con producto sin precio en la línea activa.` : "") +
+        (sinProducto || sinPrecio ? " Revisalos en la lista de abajo o en Presupuesto." : ""),
+    );
   };
 
   const quitar = (filas) => {
@@ -398,6 +599,11 @@ export default function PanelImportados({ tab, pendientes, setPendientes, yaPasa
         </p>
       )}
 
+      {deEstaSolapa.length > 0 && errorCatalogo && <p style={{ fontSize: 12, color: "#b71c1c", margin: "6px 0 0" }}>{errorCatalogo}</p>}
+      {deEstaSolapa.length > 0 && lineaPrincipal == null && (
+        <p style={{ fontSize: 12, color: "#b71c1c", margin: "6px 0 0" }}>No hay líneas activas en el Encabezado: los productos van a pasar sin precio.</p>
+      )}
+
       {familias.map((fam) => (
         <TablaPendientes
           key={fam}
@@ -407,6 +613,10 @@ export default function PanelImportados({ tab, pendientes, setPendientes, yaPasa
           setSeleccion={setSeleccion}
           cambiar={cambiar}
           yaPasados={yaPasados}
+          listas={listas}
+          cargando={cargandoCatalogo}
+          precioDe={precioDe}
+          copiarProducto={copiarProducto}
         />
       ))}
 
