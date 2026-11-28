@@ -12,6 +12,7 @@ import PresupuestoDespensero from "./PresupuestoDespensero";
 import TabMampara from "./TabMampara";
 import TabPuertas from "./TabPuertas";
 import TabEspeciales from "./TabEspeciales";
+import ImportarModulos from "./ImportarModulos";
 import TabCocina from "./TabCocina";
 import TablaArticulos from "./TablaArticulos";
 import PlacardSection from "./PlacardSection";
@@ -4557,6 +4558,13 @@ export default function PresupuestoNuevo({
               tiposDespenseroRUD={tiposDespenseroRUD}
               onVerTabla={onVerTabla}
               agregarAPresupuesto={agregarAPresupuesto}
+            />
+          )}
+
+          {tab === "presupuesto" && (
+            <ImportarModulos
+              existentes={presupuestoItems}
+              onImportar={(items) => items.forEach(agregarAPresupuesto)}
             />
           )}
 
