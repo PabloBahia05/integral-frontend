@@ -15,6 +15,122 @@ const precioDeArticulo = (a) => {
   return a.precio ?? "";
 };
 
+// ── Filtro de artículos ──────────────────────────────────────────────────────
+// Busca por nombre, código y proveedor, sin importar mayúsculas ni acentos, y
+// con varias palabras en cualquier orden: "vidrio esm 6" encuentra
+// "VIDRIO TEMPLADO ESMERILADO 6MM".
+const normalizar = (s) =>
+  (s ?? "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const coincideArticulo = (a, consulta) => {
+  const palabras = normalizar(consulta).split(/\s+/).filter(Boolean);
+  if (palabras.length === 0) return true;
+  const texto = normalizar(
+    `${a.articulo ?? ""} ${a.codartint ?? ""} ${a.codart ?? ""} ${a.proveedor ?? ""}`,
+  );
+  return palabras.every((p) => texto.includes(p));
+};
+
+const MAX_RESULTADOS = 200;
+
+// Campo con buscador y lista desplegable. Se usa para el artículo padre y
+// para cada slot. `lista` ya viene filtrada por rubro.
+function BuscadorArticulo({ lista, valor, onElegir, onLimpiar, compacto }) {
+  const [busqueda, setBusqueda] = useState("");
+  const [abierto, setAbierto] = useState(false);
+
+  const filtrados = useMemo(
+    () => lista.filter((a) => coincideArticulo(a, busqueda)),
+    [lista, busqueda],
+  );
+  const visibles = filtrados.slice(0, MAX_RESULTADOS);
+
+  const elegir = (a) => {
+    onElegir(a);
+    setBusqueda("");
+    setAbierto(false);
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        className={compacto ? "sc-sel" : "ep-sel"}
+        style={{ paddingRight: valor ? 22 : 8 }}
+        placeholder={valor ? `${valor}  (escribí para cambiar)` : "Buscar por nombre o código..."}
+        value={busqueda}
+        onChange={(e) => {
+          setBusqueda(e.target.value);
+          setAbierto(true);
+        }}
+        onFocus={() => setAbierto(true)}
+        onBlur={() => setTimeout(() => setAbierto(false), 180)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && visibles.length > 0) {
+            e.preventDefault();
+            elegir(visibles[0]);
+          } else if (e.key === "Escape") {
+            setBusqueda("");
+            setAbierto(false);
+          }
+        }}
+      />
+      {valor && (
+        <span
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onLimpiar();
+            setBusqueda("");
+          }}
+          style={{
+            position: "absolute",
+            right: 6,
+            top: "50%",
+            transform: "translateY(-50%)",
+            cursor: "pointer",
+            color: "#94a3b8",
+            fontSize: 11,
+            lineHeight: 1,
+          }}
+          title="Limpiar"
+        >
+          ✕
+        </span>
+      )}
+      {abierto && (
+        <div className="bus-lista">
+          <div className="bus-info">
+            {filtrados.length === 0
+              ? "Sin resultados"
+              : filtrados.length > MAX_RESULTADOS
+                ? `${filtrados.length} resultados (se muestran ${MAX_RESULTADOS}, seguí escribiendo)`
+                : `${filtrados.length} resultado${filtrados.length === 1 ? "" : "s"}`}
+          </div>
+          {visibles.map((a) => (
+            <div
+              key={a.id ?? `${a.codartint ?? a.codart}-${a.articulo}`}
+              className={`bus-item ${valor === a.articulo ? "bus-item-sel" : ""}`}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                elegir(a);
+              }}
+            >
+              <div style={{ fontWeight: 500 }}>{a.articulo}</div>
+              <div className="bus-sub">
+                {a.codartint ?? a.codart ?? ""}
+                {a.proveedor ? ` · ${a.proveedor}` : ""}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // El precio de cada artículo asociado NO se carga ni se guarda acá: se
 // busca después, en Mampara/Presupuesto, en la tabla `articulos` usando el
 // código guardado en art${n}. Acá solo se define QUÉ artículo, cantidad,
@@ -175,6 +291,14 @@ const CSS = `
 
   .sv-auto { color:#94a3b8; font-size:10.5px; font-style:italic; }
 
+  /* buscador de artículos (padre y slots) */
+  .bus-lista { position:absolute; z-index:999; top:100%; left:0; min-width:100%; width:max-content; max-width:420px; background:#fff; border:1.5px solid #bfdbfe; border-radius:8px; box-shadow:0 8px 24px rgba(15,31,53,.13); max-height:280px; overflow-y:auto; margin-top:2px; }
+  .bus-info { position:sticky; top:0; background:#f7f9fc; padding:5px 10px; font-size:10px; color:#7a92b0; border-bottom:1px solid #e8edf5; }
+  .bus-item { padding:6px 10px; cursor:pointer; font-size:11px; border-bottom:1px solid #f0f4f8; color:#1a2332; white-space:normal; }
+  .bus-item:hover { background:#f0f6ff; }
+  .bus-item-sel { background:#eff4ff; }
+  .bus-sub { font-size:10px; color:#94a3b8; font-family:monospace; }
+
   .ep-acts { display:flex; gap:8px; justify-content:flex-end; padding-top:12px; border-top:1px solid #e0eaf5; }
   .ep-save   { padding:8px 20px; background:linear-gradient(135deg,#2563eb,#1d4ed8); border:none; border-radius:8px; font-family:'Syne',sans-serif; font-size:13px; font-weight:700; color:#fff; cursor:pointer; }
   .ep-save:hover { transform:translateY(-1px); }
@@ -205,8 +329,6 @@ function SlotEdit({
   formulasList,
   formulasSlot,
 }) {
-  const [busqueda, setBusqueda] = useState("");
-  const [abierto, setAbierto] = useState(false);
   // Estado de UI puro: qué botón está activo. El dato que realmente se
   // guarda sigue siendo solo form${n}: si está vacío, el slot funciona en
   // modo "precio" (Mampara lo resuelve solo contra la tabla `articulos`);
@@ -219,20 +341,12 @@ function SlotEdit({
   const artActual = form[`art${n}`] ?? "";
   const formulasFiltradas = formulasSlot?.[n] ?? formulasList;
 
-  const filtrados = busqueda.trim()
-    ? lista.filter((a) =>
-        a.articulo.toLowerCase().includes(busqueda.toLowerCase()),
-      )
-    : lista;
-
   const seleccionar = (a) => {
     setForm((f) => ({
       ...f,
       [`art${n}`]: a.articulo,
       [`cod${n}`]: a.codartint ?? a.codart ?? "",
     }));
-    setBusqueda("");
-    setAbierto(false);
   };
 
   const limpiar = () => {
@@ -241,8 +355,6 @@ function SlotEdit({
       [`art${n}`]: "",
       [`cod${n}`]: "",
     }));
-    setBusqueda("");
-    setAbierto(false);
   };
 
   const elegirModo = (nuevo) => {
@@ -263,7 +375,6 @@ function SlotEdit({
         onChange={(e) => {
           setRubroSlots((p) => ({ ...p, [n]: e.target.value }));
           setForm((f) => ({ ...f, [`art${n}`]: "", [`cod${n}`]: "" }));
-          setBusqueda("");
         }}
       >
         <option value="">— Rubro —</option>
@@ -274,91 +385,14 @@ function SlotEdit({
         ))}
       </select>
 
-      {/* Buscador filtrable de material */}
-      <div style={{ position: "relative" }}>
-        <input
-          className="sc-sel"
-          style={{ paddingRight: artActual ? 22 : 8 }}
-          placeholder={artActual || "Buscar material..."}
-          value={busqueda}
-          onChange={(e) => {
-            setBusqueda(e.target.value);
-            setAbierto(true);
-          }}
-          onFocus={() => setAbierto(true)}
-          onBlur={() => setTimeout(() => setAbierto(false), 180)}
-        />
-        {artActual && (
-          <span
-            onClick={limpiar}
-            style={{
-              position: "absolute",
-              right: 5,
-              top: "50%",
-              transform: "translateY(-50%)",
-              cursor: "pointer",
-              color: "#94a3b8",
-              fontSize: 11,
-              lineHeight: 1,
-            }}
-            title="Limpiar"
-          >
-            ✕
-          </span>
-        )}
-        {abierto && filtrados.length > 0 && (
-          <div
-            style={{
-              position: "absolute",
-              zIndex: 999,
-              top: "100%",
-              left: 0,
-              right: 0,
-              background: "#fff",
-              border: "1.5px solid #bfdbfe",
-              borderRadius: 8,
-              boxShadow: "0 8px 24px rgba(15,31,53,.13)",
-              maxHeight: 200,
-              overflowY: "auto",
-            }}
-          >
-            {filtrados.map((a) => (
-              <div
-                key={a.id}
-                onMouseDown={() => seleccionar(a)}
-                style={{
-                  padding: "6px 10px",
-                  cursor: "pointer",
-                  fontSize: 11,
-                  borderBottom: "1px solid #f0f4f8",
-                  color: "#1a2332",
-                  background: artActual === a.articulo ? "#eff4ff" : undefined,
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#f0f6ff")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background =
-                    artActual === a.articulo ? "#eff4ff" : "#fff")
-                }
-              >
-                <div style={{ fontWeight: 500 }}>{a.articulo}</div>
-                {(a.codartint || a.codart) && (
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "#94a3b8",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {a.codartint ?? a.codart}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Buscador filtrable de material (nombre, código o proveedor) */}
+      <BuscadorArticulo
+        lista={lista}
+        valor={artActual}
+        onElegir={seleccionar}
+        onLimpiar={limpiar}
+        compacto
+      />
 
       <input
         className="sc-inp ro"
@@ -729,10 +763,16 @@ export default function Asociaciones({
   };
 
   const filtered = asociaciones.filter((a) => {
-    const matchTexto =
-      !search ||
-      (a.articulo ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (a.codartint ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchTexto = coincideArticulo(
+      {
+        articulo: [
+          a.articulo,
+          ...SLOTS.map((n) => `${a[`art${n}`] ?? ""} ${a[`cod${n}`] ?? ""}`),
+        ].join(" "),
+        codartint: codigoDeArticulo(a),
+      },
+      search,
+    );
     const matchRubro = !rubroFiltro || rubroDeArticulo(a) === rubroFiltro;
     return matchTexto && matchRubro;
   });
@@ -766,7 +806,7 @@ export default function Asociaciones({
             <span className="ar-si">🔍</span>
             <input
               className="ar-s"
-              placeholder="Buscar por artículo o código…"
+              placeholder="Buscar por artículo, código o asociado…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -971,27 +1011,24 @@ export default function Asociaciones({
                                 </div>
                                 <div>
                                   <div className="ep-lbl">Artículo</div>
-                                  <select
-                                    className="ep-sel"
-                                    value={editForm.articulo}
-                                    onChange={(e) => {
-                                      const found = listaPadreEdit.find(
-                                        (a) => a.articulo === e.target.value,
-                                      );
+                                  <BuscadorArticulo
+                                    lista={listaPadreEdit}
+                                    valor={editForm.articulo}
+                                    onElegir={(a) =>
                                       setEditForm((f) => ({
                                         ...f,
-                                        articulo: e.target.value,
-                                        codartint: found?.codartint ?? "",
-                                      }));
-                                    }}
-                                  >
-                                    <option value="">— Elegir —</option>
-                                    {listaPadreEdit.map((a) => (
-                                      <option key={a.id} value={a.articulo}>
-                                        {a.articulo}
-                                      </option>
-                                    ))}
-                                  </select>
+                                        articulo: a.articulo,
+                                        codartint: a.codartint ?? a.codart ?? "",
+                                      }))
+                                    }
+                                    onLimpiar={() =>
+                                      setEditForm((f) => ({
+                                        ...f,
+                                        articulo: "",
+                                        codartint: "",
+                                      }))
+                                    }
+                                  />
                                 </div>
                                 <div>
                                   <div className="ep-lbl">Código</div>
@@ -1132,27 +1169,20 @@ export default function Asociaciones({
                 </div>
                 <div>
                   <div className="ep-lbl">Artículo</div>
-                  <select
-                    className="ep-sel"
-                    value={newForm.articulo}
-                    onChange={(e) => {
-                      const found = listaPadreNew.find(
-                        (a) => a.articulo === e.target.value,
-                      );
+                  <BuscadorArticulo
+                    lista={listaPadreNew}
+                    valor={newForm.articulo}
+                    onElegir={(a) =>
                       setNewForm((f) => ({
                         ...f,
-                        articulo: e.target.value,
-                        codartint: found?.codartint ?? "",
-                      }));
-                    }}
-                  >
-                    <option value="">— Elegir —</option>
-                    {listaPadreNew.map((a) => (
-                      <option key={a.id} value={a.articulo}>
-                        {a.articulo}
-                      </option>
-                    ))}
-                  </select>
+                        articulo: a.articulo,
+                        codartint: a.codartint ?? a.codart ?? "",
+                      }))
+                    }
+                    onLimpiar={() =>
+                      setNewForm((f) => ({ ...f, articulo: "", codartint: "" }))
+                    }
+                  />
                 </div>
                 <div>
                   <div className="ep-lbl">Código</div>
