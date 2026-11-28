@@ -12,7 +12,7 @@ import PresupuestoDespensero from "./PresupuestoDespensero";
 import TabMampara from "./TabMampara";
 import TabPuertas from "./TabPuertas";
 import TabEspeciales from "./TabEspeciales";
-import ImportarModulos from "./ImportarModulos";
+import PanelImportados, { codigoDeArticulo, SEP_CODIGO } from "./ImportarModulos";
 import TabCocina from "./TabCocina";
 import TablaArticulos from "./TablaArticulos";
 import PlacardSection from "./PlacardSection";
@@ -1542,6 +1542,128 @@ export default function PresupuestoNuevo({
     cargandoPresupuestoRef,
     setPresupuestoItems,
   });
+
+  // ── Módulos importados de obra (ImportarModulos.jsx) ──
+  // Quedan "pendientes" arriba de Cocina / Placard hasta que se tocan con
+  // "Guardar y pasar a presupuesto". Se guardan en el navegador por
+  // presupuesto, para no perder lo corregido si se recarga la página.
+  const [importPend, setImportPend] = useState([]);
+  const claveImport =
+    numeroPres != null
+      ? `integral-import-pend-${numeroPres}`
+      : presupuestoInicial
+        ? null // presupuesto existente que todavía no cargó su número
+        : "integral-import-pend-nuevo";
+  const [claveImportLeida, setClaveImportLeida] = useState(null);
+  useEffect(() => {
+    if (!claveImport) return;
+    let guardadas = null;
+    try {
+      guardadas = JSON.parse(localStorage.getItem(claveImport) || "null");
+    } catch {
+      guardadas = null;
+    }
+    // Si para esta clave no hay nada guardado se conserva lo que haya en pantalla
+    // (ej. presupuesto nuevo que recibe su número al primer guardado).
+    if (Array.isArray(guardadas)) setImportPend(guardadas);
+    setClaveImportLeida(claveImport);
+  }, [claveImport]);
+  useEffect(() => {
+    if (!claveImport || claveImportLeida !== claveImport) return;
+    try {
+      if (importPend.length)
+        localStorage.setItem(claveImport, JSON.stringify(importPend));
+      else localStorage.removeItem(claveImport);
+      if (numeroPres != null)
+        localStorage.removeItem("integral-import-pend-nuevo");
+    } catch {
+      /* sin almacenamiento del navegador: los pendientes viven solo en memoria */
+    }
+  }, [importPend, claveImport, claveImportLeida, numeroPres]);
+
+  // Códigos de módulo que ya están en las familias de Cocina / Placard
+  const codigosEnSolapas = new Set(
+    [
+      ...(cocinaItems?.bajomesadas ?? []),
+      ...(cocinaItems?.alacenas ?? []),
+      ...(placardItems?.placard ?? []),
+    ]
+      .map((f) => codigoDeArticulo(f.articulo))
+      .filter(Boolean),
+  );
+
+  // Convierte un módulo revisado en una fila de Cocina / Placard (mismo formato
+  // que arma cargarPresupuesto al leer un presupuesto guardado). Precio 0: se
+  // cotiza después con el popover de precio como cualquier ítem.
+  const filaDesdeImportado = (m) => {
+    const cantidad = Number(m.cantidad) || 1;
+    const precios = lineasActivas.map((l) => ({
+      linea: l.linea,
+      precioBase: "0",
+      precio: "0",
+    }));
+    return {
+      articulo: `${m.codigo}${SEP_CODIGO}${m.nombre}`,
+      nombreart: m.detalle ?? "",
+      cantidad,
+      precio: "0",
+      precioBase: "0",
+      precios,
+      preciosBase: precios.map((p) => ({ linea: p.linea, precioBase: p.precioBase })),
+      margen: null,
+      valor1: null,
+      porcentaje1: null,
+      valor2: null,
+      porcentaje2: null,
+      valor3: null,
+      porcentaje3: null,
+      area: null,
+      _accesorioCods: [],
+      accesorios: [],
+      _cantaccGuardadas: [],
+      cantAccManual: manualDesdeGuardado(
+        { area: null, cantidad, _cantaccGuardadas: [] },
+        accesoriosDisponibles,
+      ),
+      _accesoriosSinResolver: false,
+      grupo: m.ambiente ?? "",
+      color: null,
+      manija: null,
+      ancho: m.ancho,
+      alto: m.alto,
+      profundidad: m.profundidad,
+      codartint: null,
+    };
+  };
+
+  // Agrega (o reemplaza, si el código ya estaba) en la familia que corresponde.
+  // Reemplazar en el mismo lugar mantiene el id "cocina-{familia}-{idx}".
+  const mezclarPorCodigo = (actuales = [], nuevas) => {
+    const res = [...actuales];
+    nuevas.forEach((fila) => {
+      const cod = codigoDeArticulo(fila.articulo);
+      const i = res.findIndex((x) => codigoDeArticulo(x.articulo) === cod);
+      if (i >= 0) res[i] = fila;
+      else res.push(fila);
+    });
+    return res;
+  };
+
+  const pasarImportados = (modulos) => {
+    const por = { bajomesadas: [], alacenas: [], placard: [] };
+    modulos.forEach((m) => por[m.destino]?.push(filaDesdeImportado(m)));
+    if (por.bajomesadas.length || por.alacenas.length)
+      setCocinaItems((prev) => ({
+        ...prev,
+        bajomesadas: mezclarPorCodigo(prev?.bajomesadas, por.bajomesadas),
+        alacenas: mezclarPorCodigo(prev?.alacenas, por.alacenas),
+      }));
+    if (por.placard.length)
+      setPlacardItems((prev) => ({
+        ...prev,
+        placard: mezclarPorCodigo(prev?.placard, por.placard),
+      }));
+  };
 
   // Resuelve si el ítem (id + fila) cae dentro del scope elegido para el
   // ajuste. Para ids "cocina-"/"placard-" la fila interna (cocinaItems/
@@ -4447,6 +4569,16 @@ export default function PresupuestoNuevo({
             </>
           )}
 
+          {(tab === "cocina" || tab === "placard") && (
+            <PanelImportados
+              tab={tab}
+              pendientes={importPend}
+              setPendientes={setImportPend}
+              yaPasados={codigosEnSolapas}
+              onPasar={pasarImportados}
+            />
+          )}
+
           {tab === "cocina" && (
             <TabCocina
               cocinaItems={cocinaItems}
@@ -4558,13 +4690,6 @@ export default function PresupuestoNuevo({
               tiposDespenseroRUD={tiposDespenseroRUD}
               onVerTabla={onVerTabla}
               agregarAPresupuesto={agregarAPresupuesto}
-            />
-          )}
-
-          {tab === "presupuesto" && (
-            <ImportarModulos
-              existentes={presupuestoItems}
-              onImportar={(items) => items.forEach(agregarAPresupuesto)}
             />
           )}
 
